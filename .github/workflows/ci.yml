@@ -36,9 +36,11 @@ jobs:
 
       - name: Install Pester and PSScriptAnalyzer
         run: |
-          Set-PSResourceRepository -Name PSGallery -Trusted
-          Install-PSResource -Name Pester -Version '[5.7.1,6.0)' -Scope CurrentUser -Quiet
-          Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -Quiet
+          # -TrustRepository rather than Set-PSResourceRepository: on a fresh
+          # runner the repository store doesn't exist yet, and
+          # Set-PSResourceRepository fails before anything creates it.
+          Install-PSResource -Name Pester -Version '[5.7.1,6.0)' -Scope CurrentUser -TrustRepository -Quiet
+          Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -TrustRepository -Quiet
           "PowerShell $($PSVersionTable.PSVersion) on $($PSVersionTable.OS)"
           Get-Module Pester, PSScriptAnalyzer -ListAvailable | Format-Table Name, Version
 
@@ -62,9 +64,11 @@ jobs:
 
       - name: Install Pester and PSScriptAnalyzer
         run: |
-          Set-PSResourceRepository -Name PSGallery -Trusted
-          Install-PSResource -Name Pester -Version '[5.7.1,6.0)' -Scope CurrentUser -Quiet
-          Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -Quiet
+          # -TrustRepository rather than Set-PSResourceRepository: on a fresh
+          # runner the repository store doesn't exist yet, and
+          # Set-PSResourceRepository fails before anything creates it.
+          Install-PSResource -Name Pester -Version '[5.7.1,6.0)' -Scope CurrentUser -TrustRepository -Quiet
+          Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -TrustRepository -Quiet
 
       # docs\ is generated from the comment-based help; a change to the help
       # without ./build.ps1 -Task Docs fails here.
