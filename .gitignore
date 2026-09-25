@@ -1,0 +1,5 @@
+# build.ps1 output
+out/
+TestResults/
+release-notes.md
+*.zip

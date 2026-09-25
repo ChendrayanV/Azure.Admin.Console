@@ -1,0 +1,241 @@
+# about_Azure.Admin.Console
+
+[Azure.Admin.Console](Azure.Admin.Console.md)
+
+```text
+TOPIC
+    about_Azure.Admin.Console
+
+SHORT DESCRIPTION
+    Azure admin reports and checks from PowerShell, over plain REST, with no
+    Az or Microsoft.Graph modules.
+
+LONG DESCRIPTION
+    Azure.Admin.Console signs you in to Azure with your browser, then reads
+    your estate through Azure Resource Graph and the Azure Resource Manager
+    REST API. It turns what it reads into:
+
+      - flat PowerShell objects you can filter, group and sort,
+      - CSV files written with Export-Csv (one row per item, the same
+        columns on every row, ready for Excel or Power BI),
+      - PDF reports laid out for people who don't use PowerShell,
+      - Pester test runs with a readable console report.
+
+    Nothing in Azure is ever changed. Reader access to the subscriptions is
+    enough for every command.
+
+COMMANDS
+    Connect-AAC
+        Signs in with an interactive browser flow (OAuth 2.0 authorization
+        code with PKCE and a localhost redirect). No app registration is
+        needed: it uses the Azure CLI's public client ID, pre-consented in
+        every Entra ID tenant, unless you pass -ClientId.
+
+    Disconnect-AAC
+        Forgets the sign-in.
+
+    Get-AACAdvisorRecommendation
+        A consolidated, flattened view of every Azure Advisor
+        recommendation (Cost, Security, Reliability, Operational excellence,
+        Performance), with estimated savings, retirement dates and
+        postponed/dismissed status. A colour-coded console view at the
+        prompt, objects down a pipeline, and CSV and/or PDF exports.
+
+    Export-AACFirewallRule
+        Every Azure Firewall Policy rule (DNAT, network, application) with
+        IP Groups resolved, base policy and attached firewalls. Objects, CSV
+        and/or PDF.
+
+    Invoke-AACPester
+        Runs any Pester v5 tests with a live progress display, a
+        Spectre.Console report (table, tree with failures called out,
+        chart, banner) and an optional PDF. With no -Path it runs the
+        bundled Azure estate check.
+
+    Export-AACPesterReport
+        Writes an Invoke-AACPester or Invoke-Pester result as a PDF.
+
+    Get-Help <command> -Full shows every parameter and example.
+
+GETTING STARTED
+        Import-Module Azure.Admin.Console
+        Connect-AAC
+
+        # Advisor: the console view
+        Get-AACAdvisorRecommendation
+
+        # Advisor: everything, to CSV and PDF
+        Get-AACAdvisorRecommendation -CsvPath .\Adv.csv -PdfPath .\Adv.pdf
+
+        # Advisor: high-impact cost items, as objects
+        Get-AACAdvisorRecommendation -Category Cost -Impact High |
+            Sort-Object MonthlySavings -Descending |
+            Format-Table ResourceName, Problem, MonthlySavings, SavingsCurrency
+
+        # Firewall rules, to CSV
+        Export-AACFirewallRule -CsvPath .\FirewallRules.csv
+
+        # The estate check, only failures, saved as a PDF
+        Invoke-AACPester -FailedOnly -PdfPath .\Estate.pdf
+
+OUTPUT: CONSOLE VIEW, OBJECTS, CSV AND PDF
+    Get-AACAdvisorRecommendation decides by where it runs:
+
+        at the prompt   a Spectre.Console view: scope, tiles for
+                        recommendations, impact, resources and savings,
+                        then a colour-coded table per category, shown a
+                        screen at a time (any key: next page, A: the
+                        rest; -NoPaging to turn paging off)
+        piped onward    the objects, no view (| Where-Object, ...)
+        -PassThru       the view and the objects
+        -NoDisplay      the objects only (scripts, scheduled tasks)
+
+    PowerShell can't tell "$r = Get-AACAdvisorRecommendation" from a plain
+    call, so add -PassThru or -NoDisplay to keep the objects in a variable.
+
+    Export-AACFirewallRule returns objects when you give no path. With
+    -CsvPath and/or -PdfPath it writes the files instead; add -PassThru to
+    get the objects as well.
+
+    Paths are relative to the current location, missing folders are
+    created and existing files are overwritten.
+
+    The CSV is written with PowerShell's own Export-Csv (UTF-8, comma
+    separated, no type header). For other options, such as a semicolon
+    delimiter, pipe the objects to Export-Csv yourself:
+
+        Get-AACAdvisorRecommendation |
+            Export-Csv .\Advisor.csv -NoTypeInformation -Delimiter ';'
+
+    At the console only a few key columns are shown. Use
+    Select-Object * or Format-List * to see every column.
+
+THE AZURE ESTATE CHECK
+    Checks\AzureEstate.Tests.ps1 in the module folder is a live, read-only
+    Pester check of every resource you can see: 85 checks, 75 of them
+    following PSRule for Azure (each failure names its PSRule rule).
+    Invoke-AACPester runs it when you give no -Path.
+
+        Invoke-AACPester                                   # everything
+        Invoke-AACPester -Tag Security -FailedOnly         # one area
+        Invoke-AACPester -Data @{ ResourceType = 'microsoft.keyvault/vaults' }
+
+    Every check is in one area, a tag you can pick with -Tag:
+
+        Governance   approved regions, required tags, resource naming
+        Security     encryption, network exposure, authentication,
+                     WAF, Defender
+        Networking   RDP/SSH from the Internet, public IPs attached,
+                     custom DNS on VNets
+        Operations   backup, logs, replication, zones, soft delete,
+                     versions
+
+    What it covers:
+
+        Every resource         region, tags
+        Storage accounts       15 Azure.Storage.* rules
+        Key Vault              10 Azure.KeyVault.* rules
+        API Management         20 Azure.APIM.* rules
+        Application Gateway    13 Azure.AppGw.* rules
+        WAF policies            4 Azure.AppGwWAF.* rules
+        Service Bus             6 Azure.ServiceBus.* rules
+        Application Insights    4 Azure.AppInsights.* rules
+        Managed Grafana         2 Azure.Grafana.* rules
+        Logic Apps              1 Azure.LogicApp.* rule
+        SQL, App Service,      public access, HTTPS only, customer-managed
+        disks, NSGs, public    keys, RDP/SSH, attached IPs, custom DNS,
+        IPs, VNets, VMs        Azure Backup, diagnostic logs
+
+SETTINGS
+    Change the check with -Data. Each key sets one of its parameters:
+
+        SubscriptionId             only these subscriptions (default: all)
+        ResourceType               only these types, wildcards work
+        AllowedLocation            approved regions
+                                   (default: uksouth, ukwest, global)
+        RequiredTag                tags every resource must have
+                                   (default: Owner, CostCenter, Environment)
+        DnsServer                  the DNS servers every VNet must use
+        LogAnalyticsWorkspaceId    the workspace diagnostic logs must reach
+        BackupExemptEnvironment    Environment tags that need no VM backup
+                                   (default: dev)
+        DiagnosticResourceType     types that must send diagnostic logs
+        AppInsightsNameFormat      regular expression for Application
+                                   Insights names (default: off)
+        StorageAccountNameFormat   regular expression for storage account
+                                   names (default: off)
+        StorageDefenderPerAccount  $true to require Defender for Storage on
+                                   each account (default: $false)
+
+        Invoke-AACPester -Tag Governance -Data @{
+            AllowedLocation = 'uksouth', 'ukwest', 'global'
+            RequiredTag     = 'Owner', 'CostCenter'
+        }
+
+PROGRESS
+    While the tests run, Invoke-AACPester shows a live progress display: a
+    line for the Pester run, and the estate check's own lines for reading
+    the estate and evaluating its rules (naming each rule as it goes), each
+    with a bar, percentage and elapsed time. Without an interactive
+    terminal (CI, redirected output) each finished step is one plain line.
+    -NoSpinner turns the display off.
+
+    Some settings aren't in Resource Graph and are read over REST, once
+    per resource however many checks use them: diagnostic settings,
+    storage blob services, containers and Defender settings, Key Vault key
+    and secret metadata (never their values), API Management APIs,
+    products, backends, named values and policies, Service Bus queues and
+    topics, and each resource provider's availability zones.
+
+YOUR OWN TESTS
+    Invoke-AACPester runs any Pester v5 tests the same way:
+
+        Invoke-AACPester -Path .\MyTests -Tag Smoke -CI
+
+    -Tag, -ExcludeTag and -TestName filter the tests, -Data passes values
+    to their param() blocks, -FailedOnly lists only failures, -CI writes
+    JUnit XML and -PdfPath saves a PDF report.
+
+REQUIREMENTS
+    - PowerShell 7.2 or later. PDF export needs PowerShell 7.4 or later on
+      Windows. Objects and CSV work on Windows, Linux and macOS.
+    - Pester 5.7.1 or later. It is installed with the module.
+    - A browser for Connect-AAC, and Reader access to the subscriptions.
+
+SECURITY
+    - The sign-in is kept only in memory for the PowerShell session. It is
+      never written to disk. Disconnect-AAC forgets it.
+    - No client secret is used. PKCE protects the sign-in code, and the
+      redirect goes only to localhost.
+    - The bundled Spectre.Console and PDFsharp/MigraDoc assemblies in lib\
+      are checked against pinned SHA-256 hashes before they load. A changed
+      file is refused.
+
+TROUBLESHOOTING
+    "Not signed in" or a skipped estate check
+        Run Connect-AAC in the same PowerShell session first.
+
+    Sign-in times out
+        Finish signing in within 180 seconds, or pass -TimeoutSeconds.
+        Some tenants block the Azure CLI client ID. If yours does, pass your
+        own App Registration's -ClientId (platform "Mobile and desktop
+        applications", redirect URI http://localhost).
+
+    Nothing is returned
+        The account may not have Reader access on the subscriptions, or the
+        filters matched nothing. Try again without -SubscriptionId,
+        -Category or -Impact.
+
+    PDF export fails on Linux, macOS or PowerShell 7.2 or 7.3
+        PDF export needs Windows and PowerShell 7.4 or later. Use -CsvPath
+        instead.
+
+SEE ALSO
+    Get-Help Connect-AAC -Full
+    Get-Help Get-AACAdvisorRecommendation -Full
+    Get-Help Export-AACFirewallRule -Full
+    Get-Help Invoke-AACPester -Full
+    Get-Help Export-AACPesterReport -Full
+    https://learn.microsoft.com/azure/advisor/
+    https://learn.microsoft.com/azure/governance/resource-graph/
+```

@@ -1,0 +1,89 @@
+# Every push to main and every pull request: unit tests on Windows, Linux
+# and macOS, then a docs drift check and a validated package on Windows.
+# Everything runs through build.ps1, so CI does exactly what a local
+# ./build.ps1 does.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Objects and CSV are supported everywhere; the PDF test skips
+        # itself off Windows.
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Pester and PSScriptAnalyzer
+        run: |
+          Set-PSResourceRepository -Name PSGallery -Trusted
+          Install-PSResource -Name Pester -Version '[5.7.1,6.0)' -Scope CurrentUser -Quiet
+          Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -Quiet
+          "PowerShell $($PSVersionTable.PSVersion) on $($PSVersionTable.OS)"
+          Get-Module Pester, PSScriptAnalyzer -ListAvailable | Format-Table Name, Version
+
+      - name: Unit tests
+        run: ./build.ps1 -Task Test -TestResultPath ./TestResults/junit-${{ matrix.os }}.xml
+
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}
+          path: TestResults/
+          if-no-files-found: ignore
+
+  package:
+    name: Docs and package
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Pester and PSScriptAnalyzer
+        run: |
+          Set-PSResourceRepository -Name PSGallery -Trusted
+          Install-PSResource -Name Pester -Version '[5.7.1,6.0)' -Scope CurrentUser -Quiet
+          Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -Quiet
+
+      # docs\ is generated from the comment-based help; a change to the help
+      # without ./build.ps1 -Task Docs fails here.
+      - name: Check docs are up to date
+        run: |
+          ./build.ps1 -Task Docs
+          git add --intent-to-add -- docs
+          git diff --ignore-cr-at-eol --exit-code -- docs
+          if ($LASTEXITCODE -ne 0) {
+              Write-Output '::error::docs/ is out of date. Run ./build.ps1 -Task Docs and commit the result.'
+              exit 1
+          }
+
+      - name: Build and validate the package
+        run: ./build.ps1 -Task Build
+
+      - name: Upload the package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Azure.Admin.Console
+          path: out/Azure.Admin.Console/
+          if-no-files-found: error

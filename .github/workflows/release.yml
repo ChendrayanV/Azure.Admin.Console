@@ -1,0 +1,80 @@
+# Pushing a tag like v0.10.0 releases that version:
+#   1. checks the tag matches ModuleVersion in Azure.Admin.Console.psd1
+#   2. runs the unit tests and builds the package
+#   3. publishes it to the PowerShell Gallery
+#   4. creates a GitHub release with the CHANGELOG entry and the package zip
+#
+# Setup, once (repository Settings):
+#   - Environments > New environment "psgallery". Add yourself as a required
+#     reviewer so every publish waits for your approval, and restrict it to
+#     tags matching v*.
+#   - Add the secret PSGALLERY_API_KEY to that environment (an API key from
+#     powershellgallery.com scoped to push Azure.Admin.Console).
+#
+# To release:
+#   git tag v0.10.0
+#   git push origin v0.10.0
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write   # to create the GitHub release
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  release:
+    name: Publish ${{ github.ref_name }}
+    runs-on: windows-latest
+    environment:
+      name: psgallery
+      url: https://www.powershellgallery.com/packages/Azure.Admin.Console
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches ModuleVersion
+        run: |
+          $version = (Import-PowerShellDataFile ./Azure.Admin.Console.psd1).ModuleVersion
+          if ("v$version" -ne $env:GITHUB_REF_NAME) {
+              Write-Output "::error::Tag $env:GITHUB_REF_NAME does not match ModuleVersion $version in Azure.Admin.Console.psd1."
+              exit 1
+          }
+          "VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Install Pester and PSScriptAnalyzer
+        run: |
+          Set-PSResourceRepository -Name PSGallery -Trusted
+          Install-PSResource -Name Pester -Version '[5.7.1,6.0)' -Scope CurrentUser -Quiet
+          Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -Quiet
+
+      - name: Test and build
+        run: ./build.ps1 -Task Test, Build
+
+      - name: Publish to the PowerShell Gallery
+        env:
+          PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+        run: ./build.ps1 -Task Publish
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # This version's CHANGELOG section, up to the next "## " heading.
+          $changelog = Get-Content ./CHANGELOG.md -Raw
+          $match = [regex]::Match($changelog, "(?ms)^## v$([regex]::Escape($env:VERSION))\s*$\s*(.*?)(?=^## |\z)")
+          $notes = if ($match.Success) { $match.Groups[1].Value.Trim() } else { "Azure.Admin.Console $env:VERSION" }
+          $notes += "`n`nInstall: ``Install-PSResource -Name Azure.Admin.Console -Version $env:VERSION``"
+          Set-Content -Path ./release-notes.md -Value $notes -Encoding utf8NoBOM
+
+          $zip = "Azure.Admin.Console-$env:VERSION.zip"
+          Compress-Archive -Path ./out/Azure.Admin.Console -DestinationPath $zip
+          gh release create $env:GITHUB_REF_NAME $zip --title "Azure.Admin.Console $env:VERSION" --notes-file ./release-notes.md
