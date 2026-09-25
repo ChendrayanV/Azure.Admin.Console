@@ -332,16 +332,24 @@ It then checks the staged copy: the manifest is valid, the exports match
    git push origin v0.10.0
    ```
 
-[`.github/workflows/release.yml`](.github/workflows/release.yml) then:
-1. checks the tag matches `ModuleVersion`,
+Only a version tag publishes. Pushes and pull requests run CI only.
+[`.github/workflows/release.yml`](.github/workflows/release.yml) first runs a
+gate with no secrets and no approval. It stops the release unless all of
+these hold:
+- the tag matches `ModuleVersion`;
+- the tagged commit is on `main`;
+- `CHANGELOG.md` has a `## v<version>` entry;
+- the version is higher than the one on the PowerShell Gallery.
+
+The run summary shows each check. Only after the gate passes, the workflow:
+1. waits for approval in the `psgallery` environment,
 2. runs the tests and builds the package,
-3. waits for approval in the `psgallery` environment,
-4. publishes to the PowerShell Gallery,
-5. creates a GitHub release with the changelog entry and the package zip.
+3. publishes to the PowerShell Gallery,
+4. creates a GitHub release with the changelog entry and the package zip.
 
 Setup, once:
-- Create a `psgallery` environment in the repository settings, with yourself as a required reviewer.
-- Add a `PSGALLERY_API_KEY` secret to it.
+- Create a `psgallery` environment in the repository settings. Add yourself as a required reviewer, and limit its deployment tags to `v*`.
+- Add a `PSGALLERY_API_KEY` secret to that environment.
 
 To publish by hand instead:
 

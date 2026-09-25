@@ -1,19 +1,30 @@
-# Pushing a tag like v0.10.0 releases that version:
-#   1. checks the tag matches ModuleVersion in Azure.Admin.Console.psd1
-#   2. runs the unit tests and builds the package
-#   3. publishes it to the PowerShell Gallery
-#   4. creates a GitHub release with the CHANGELOG entry and the package zip
+# Publishes a new version to the PowerShell Gallery - only when a version tag
+# is pushed, and only when that version is genuinely new. Ordinary pushes and
+# pull requests never publish (they run ci.yml only).
+#
+#   1. gate     checks, with no secrets and no approval needed:
+#                 - the tag (v1.2.3) matches ModuleVersion in the manifest
+#                 - the tagged commit is on main
+#                 - CHANGELOG.md has a "## v1.2.3" entry
+#                 - the version is higher than the one on the PowerShell
+#                   Gallery (a published version can never be replaced)
+#               Any failed check stops the run before anything else happens,
+#               and the run summary shows which.
+#   2. release  waits for approval in the "psgallery" environment, then runs
+#               the tests, builds and publishes the package, and creates a
+#               GitHub release with the CHANGELOG entry and the package zip.
 #
 # Setup, once (repository Settings):
-#   - Environments > New environment "psgallery". Add yourself as a required
-#     reviewer so every publish waits for your approval, and restrict it to
-#     tags matching v*.
+#   - Environments > New environment "psgallery":
+#       Required reviewers: yourself, so every publish waits for approval.
+#       Deployment branches and tags: "Selected", add the tag rule "v*".
 #   - Add the secret PSGALLERY_API_KEY to that environment (an API key from
-#     powershellgallery.com scoped to push Azure.Admin.Console).
+#     powershellgallery.com with Push permission, scoped to Azure.Admin.Console).
 #
 # To release:
-#   git tag v0.10.0
-#   git push origin v0.10.0
+#   1. Bump ModuleVersion in Azure.Admin.Console.psd1 and add "## v1.2.3" to
+#      CHANGELOG.md, then merge to main.
+#   2. git tag v1.2.3 && git push origin v1.2.3
 name: Release
 
 on:
@@ -21,7 +32,7 @@ on:
     tags: ['v*.*.*']
 
 permissions:
-  contents: write   # to create the GitHub release
+  contents: read
 
 concurrency:
   group: release
@@ -32,23 +43,63 @@ defaults:
     shell: pwsh
 
 jobs:
-  release:
-    name: Publish ${{ github.ref_name }}
-    runs-on: windows-latest
-    environment:
-      name: psgallery
-      url: https://www.powershellgallery.com/packages/Azure.Admin.Console
+  gate:
+    name: Is ${{ github.ref_name }} a new version?
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the full history, to check the tag is on main
 
-      - name: Check the tag matches ModuleVersion
+      - name: Check the version
+        id: check
         run: |
-          $version = (Import-PowerShellDataFile ./Azure.Admin.Console.psd1).ModuleVersion
-          if ("v$version" -ne $env:GITHUB_REF_NAME) {
-              Write-Output "::error::Tag $env:GITHUB_REF_NAME does not match ModuleVersion $version in Azure.Admin.Console.psd1."
+          $name = 'Azure.Admin.Console'
+          $version = [version](Import-PowerShellDataFile "./$name.psd1").ModuleVersion
+          $checks = [System.Collections.Generic.List[object]]::new()
+          $add = { param($Check, [bool] $Ok, $Detail) $checks.Add([pscustomobject]@{ Check = $Check; Ok = $Ok; Detail = $Detail }) }
+
+          & $add 'Tag matches ModuleVersion' ($env:GITHUB_REF_NAME -eq "v$version") "tag $env:GITHUB_REF_NAME, ModuleVersion $version"
+
+          git merge-base --is-ancestor $env:GITHUB_SHA origin/main
+          & $add 'Tagged commit is on main' ($LASTEXITCODE -eq 0) "commit $($env:GITHUB_SHA.Substring(0, 7))"
+
+          $hasEntry = [bool](Select-String -Path ./CHANGELOG.md -Pattern "^## v$([regex]::Escape("$version"))\s*$" -Quiet)
+          & $add 'CHANGELOG.md has an entry' $hasEntry "## v$version"
+
+          # Nothing found means this is the first release.
+          $published = Find-PSResource -Name $name -Repository PSGallery -ErrorAction SilentlyContinue | Sort-Object Version -Descending | Select-Object -First 1
+          $newer = -not $published -or $version -gt [version]"$($published.Version)"
+          & $add 'Newer than the PowerShell Gallery' $newer $(if ($published) { "Gallery has $($published.Version)" } else { 'not on the Gallery yet' })
+
+          $summary = @('| Check | | Detail |', '|---|---|---|')
+          foreach ($c in $checks) {
+              $summary += "| $($c.Check) | $(if ($c.Ok) { '✅' } else { '❌' }) | $($c.Detail) |"
+              if (-not $c.Ok) { Write-Output "::error::$($c.Check): $($c.Detail)" }
+          }
+          $summary -join "`n" >> $env:GITHUB_STEP_SUMMARY
+
+          if (@($checks | Where-Object { -not $_.Ok }).Count -gt 0) {
+              Write-Output "::error::$name $version will not be published - see the checks above."
               exit 1
           }
-          "VERSION=$version" >> $env:GITHUB_ENV
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+  release:
+    name: Publish ${{ github.ref_name }}
+    needs: gate
+    runs-on: windows-latest
+    permissions:
+      contents: write   # to create the GitHub release
+    environment:
+      name: psgallery
+      url: https://www.powershellgallery.com/packages/Azure.Admin.Console/${{ needs.gate.outputs.version }}
+    env:
+      VERSION: ${{ needs.gate.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Install Pester and PSScriptAnalyzer
         run: |
