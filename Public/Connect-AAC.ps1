@@ -113,34 +113,39 @@ function Connect-AAC {
             Write-AACMarkup "[gold1]Could not open a browser automatically: $($_.Exception.Message)[/]"
         }
 
-        $authorizationResult = Invoke-AACStatus -Title 'Waiting for you to finish signing in...' -Spinner 'Dots' -ScriptBlock {
-            $contextTask = $httpListener.GetContextAsync()
-            $timeoutTask = [System.Threading.Tasks.Task]::Delay([TimeSpan]::FromSeconds($TimeoutSeconds))
-            $completedIndex = [System.Threading.Tasks.Task]::WaitAny(@($contextTask, $timeoutTask))
+        $authorizationResult = Invoke-AACProgress -ScriptBlock {
+            Update-AACProgress -Id 'signin' -Indeterminate -Description "Waiting for you to sign in in your browser (up to $TimeoutSeconds s)"
+            $result = & {
+                $contextTask = $httpListener.GetContextAsync()
+                $timeoutTask = [System.Threading.Tasks.Task]::Delay([TimeSpan]::FromSeconds($TimeoutSeconds))
+                $completedIndex = [System.Threading.Tasks.Task]::WaitAny(@($contextTask, $timeoutTask))
 
-            if ($completedIndex -eq 1) {
-                return [pscustomobject]@{ TimedOut = $true }
-            }
+                if ($completedIndex -eq 1) {
+                    return [pscustomobject]@{ TimedOut = $true }
+                }
 
-            $context = $contextTask.GetAwaiter().GetResult()
-            $queryParameters = ConvertFrom-AACQueryString -Query $context.Request.Url.Query
+                $context = $contextTask.GetAwaiter().GetResult()
+                $queryParameters = ConvertFrom-AACQueryString -Query $context.Request.Url.Query
 
-            $responseHtml = if ($queryParameters.ContainsKey('code')) {
-                '<html><body style="font-family:sans-serif"><h2>Signed in</h2><p>You can close this window and return to the console.</p></body></html>'
-            }
-            else {
-                '<html><body style="font-family:sans-serif"><h2>Sign-in was not completed</h2><p>You can close this window and return to the console.</p></body></html>'
-            }
-            $buffer = [System.Text.Encoding]::UTF8.GetBytes($responseHtml)
-            $context.Response.ContentType = 'text/html'
-            $context.Response.ContentLength64 = $buffer.Length
-            $context.Response.OutputStream.Write($buffer, 0, $buffer.Length)
-            $context.Response.OutputStream.Close()
+                $responseHtml = if ($queryParameters.ContainsKey('code')) {
+                    '<html><body style="font-family:sans-serif"><h2>Signed in</h2><p>You can close this window and return to the console.</p></body></html>'
+                }
+                else {
+                    '<html><body style="font-family:sans-serif"><h2>Sign-in was not completed</h2><p>You can close this window and return to the console.</p></body></html>'
+                }
+                $buffer = [System.Text.Encoding]::UTF8.GetBytes($responseHtml)
+                $context.Response.ContentType = 'text/html'
+                $context.Response.ContentLength64 = $buffer.Length
+                $context.Response.OutputStream.Write($buffer, 0, $buffer.Length)
+                $context.Response.OutputStream.Close()
 
-            return [pscustomobject]@{
-                TimedOut = $false
-                Query    = $queryParameters
+                return [pscustomobject]@{
+                    TimedOut = $false
+                    Query    = $queryParameters
+                }
             }
+            Update-AACProgress -Id 'signin' -Complete -Description $(if ($result.TimedOut) { 'Sign-in timed out' } else { 'Signed in in the browser' })
+            $result
         }
     }
     finally {
@@ -174,14 +179,17 @@ function Connect-AAC {
         scope         = ($Scope -join ' ')
     }
 
-    $tokenResponse = Invoke-AACStatus -Title 'Exchanging the authorization code for a token...' -Spinner 'Dots' -ScriptBlock {
+    $tokenResponse = Invoke-AACProgress -ScriptBlock {
+        Update-AACProgress -Id 'token' -Indeterminate -Description 'Exchanging the sign-in code for a token'
         try {
-            Invoke-RestMethod -Uri $tokenEndpoint -Method Post -Body $tokenBody -ContentType 'application/x-www-form-urlencoded' -ErrorAction Stop
+            $response = Invoke-RestMethod -Uri $tokenEndpoint -Method Post -Body $tokenBody -ContentType 'application/x-www-form-urlencoded' -ErrorAction Stop -Verbose:$false
         }
         catch {
             $details = $_.ErrorDetails.Message
             throw "Token exchange failed: $(if ($details) { $details } else { $_.Exception.Message })"
         }
+        Update-AACProgress -Id 'token' -Complete -Description 'Token received'
+        $response
     }
 
     $idToken = Get-AACPropertyValue -InputObject $tokenResponse -Name 'id_token'

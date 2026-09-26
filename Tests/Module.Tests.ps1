@@ -36,10 +36,11 @@ Describe 'Azure Admin Console - Module scaffold' {
         $expectedFunctions = @(
             'Connect-AAC'
             'Disconnect-AAC'
-            'Export-AACFirewallRule'
-            'Export-AACPesterReport'
             'Get-AACAdvisorRecommendation'
+            'Get-AACFirewallRule'
             'Invoke-AACPester'
+            'Show-AACCost'
+            'Show-AACResource'
         )
         $exportedFunctions = (Get-Command -Module 'Azure.Admin.Console').Name
 

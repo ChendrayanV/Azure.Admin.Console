@@ -43,8 +43,9 @@ press any key for the next page, or A to show the rest. Paging is
 skipped automatically when output is redirected or with -CI, and can
 be turned off with -NoPaging.
 
--PdfPath also saves the results as a PDF report (see
-Export-AACPesterReport), honouring -FailedOnly.
+-PdfPath also saves the results as an A4 PDF report - a summary
+with the verdict, pass/fail counts per check, and every test with
+its failure message - honouring -FailedOnly.
 
 ## Examples
 

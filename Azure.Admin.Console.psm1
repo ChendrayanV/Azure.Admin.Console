@@ -27,6 +27,8 @@ $script:AACProgressTasks = @{}
 # True while Invoke-AACProgress runs without a live display (output is not
 # an interactive terminal): finished tasks are then written as plain lines.
 $script:AACProgressPlain = $false
+# Set once Invoke-AACProgress has told the user how to get the Unicode display.
+$script:AACUnicodeHintShown = $false
 
 # This module renders its UI with Spectre.Console (https://spectreconsole.net)
 # loaded directly from the vendored DLL in .\lib - no PowerShell wrapper module
@@ -69,12 +71,14 @@ foreach ($folder in 'Private', 'Public') {
     }
 }
 
-# Export-AACFirewallRule's objects carry ~35 properties (all of them go to
+# Get-AACFirewallRule's objects carry ~35 properties (all of them go to
 # CSV); at the console show a readable table by default. Select-Object * or
 # Format-List * shows everything.
 Update-TypeData -TypeName 'AAC.FirewallRule' -DefaultDisplayPropertySet 'FirewallPolicy', 'RuleCollection', 'RuleName', 'Action' -Force
 # Same for Get-AACAdvisorRecommendation's ~25 (or more, with Ext_ columns).
 Update-TypeData -TypeName 'AAC.AdvisorRecommendation' -DefaultDisplayPropertySet 'Category', 'Impact', 'ResourceName', 'Problem' -Force
+# Show-AACCost -PassThru: one property per month on top of these.
+Update-TypeData -TypeName 'AAC.SubscriptionCost' -DefaultDisplayPropertySet 'SubscriptionName', 'Currency', 'MonthToDate', 'Total', 'TopServices', 'Status' -Force
 
 $publicFunctionNames = Get-ChildItem -LiteralPath (Join-Path -Path $moduleRoot -ChildPath 'Public') -Filter '*.ps1' -File -ErrorAction SilentlyContinue |
     Select-Object -ExpandProperty BaseName

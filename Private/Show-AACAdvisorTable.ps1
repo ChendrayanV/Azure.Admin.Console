@@ -34,6 +34,8 @@ function Show-AACAdvisorTable {
     )
 
     $escape = { param($Text) [Spectre.Console.Markup]::Escape([string]$Text) }
+    # Unicode symbols, or ASCII in a console that isn't UTF-8.
+    $glyph = Get-AACGlyph
     $categories = [ordered]@{
         Cost                  = @{ Label = 'Cost'; Color = 'green3' }
         Security              = @{ Label = 'Security'; Color = 'indianred1' }
@@ -70,7 +72,7 @@ function Show-AACAdvisorTable {
         $items = @($group.Group)
 
         $title = [System.Collections.Generic.List[string]]::new()
-        $title.Add("[bold $color]● $(& $escape $style.Label)[/]")
+        $title.Add("[bold $color]$($glyph.Bullet) $(& $escape $style.Label)[/]")
         $title.Add("$($items.Count) recommendation$(if ($items.Count -ne 1) { 's' })")
         $resourceCount = @($items | ForEach-Object $resourceKey | Select-Object -Unique).Count
         $title.Add("$resourceCount resource$(if ($resourceCount -ne 1) { 's' })")
@@ -81,7 +83,7 @@ function Show-AACAdvisorTable {
         $table.Border = [Spectre.Console.TableBorder]::Rounded
         $table.BorderStyle = [Spectre.Console.Style]::Parse($color)
         $table.Expand = $true
-        $table.Title = [Spectre.Console.TableTitle]::new(($title -join ' [grey58]·[/] '))
+        $table.Title = [Spectre.Console.TableTitle]::new(($title -join " [grey58]$($glyph.Dot)[/] "))
 
         $addColumn = {
             param([string] $Header, [switch] $NoWrap, [int] $Width = 0)
@@ -93,7 +95,7 @@ function Show-AACAdvisorTable {
         & $addColumn 'Impact' -NoWrap -Width 8
         & $addColumn 'Recommendation'
         & $addColumn 'Resource'
-        & $addColumn 'Subscription · resource group'
+        & $addColumn 'Subscription / resource group'
         & $addColumn 'Savings / retirement' -Width 24
 
         $previousKey = $null
@@ -117,7 +119,7 @@ function Show-AACAdvisorTable {
             }
 
             $where = if ($item.SubscriptionName) { $item.SubscriptionName } else { $item.SubscriptionId }
-            if ($item.ResourceGroup) { $where = "$where · $($item.ResourceGroup)" }
+            if ($item.ResourceGroup) { $where = "$where $($glyph.Dot) $($item.ResourceGroup)" }
 
             $notes = [System.Collections.Generic.List[string]]::new()
             if ($null -ne $item.MonthlySavings) {

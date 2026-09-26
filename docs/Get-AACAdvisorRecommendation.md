@@ -82,8 +82,8 @@ Savings are Advisor's own estimates. Two recommendations can overlap
 (e.g. a reservation and a right-size for the same VM), so a total is
 an upper bound; totals are kept per currency, never converted.
 
-PDF export needs Windows and PowerShell 7.4 or later (see
-Export-AACPesterReport); objects and CSV work everywhere.
+PDF export needs Windows and PowerShell 7.4 or later; objects and
+CSV work everywhere.
 
 ## Examples
 

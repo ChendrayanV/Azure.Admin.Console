@@ -1,12 +1,11 @@
-function Export-AACPesterReport {
+function Write-AACPesterReportPdf {
     <#
     .SYNOPSIS
         Writes a Pester v5 result as a PDF report: a summary page, pass/fail
         counts per check, and every test result with the reason for each
-        failure.
+        failure. Used by Invoke-AACPester -PdfPath.
     .DESCRIPTION
-        Takes the result object that Invoke-AACPester -PassThru (or
-        Invoke-Pester -PassThru) returns and renders an A4 PDF:
+        Renders an A4 PDF from the object Invoke-Pester -PassThru returns:
 
           1. Summary: title, when and where it ran (with the Azure account
              and tenant when Connect-AAC is signed in), a PASSED/FAILED
@@ -26,28 +25,6 @@ function Export-AACPesterReport {
         lib\pdf and loaded only when a report is exported, after every DLL
         has been checked against a pinned SHA-256 hash. Needs Windows (for
         its fonts) and PowerShell 7.4 or later.
-    .PARAMETER PesterResult
-        The Pester.Run object from Invoke-AACPester -PassThru or
-        Invoke-Pester -PassThru.
-    .PARAMETER Path
-        Where to write the PDF. An existing file is overwritten; missing
-        folders are created.
-    .PARAMETER Title
-        The report's title. Defaults to 'Azure Admin Console test report'.
-    .PARAMETER Detail
-        Extra name/value lines for the summary page, such as the test path
-        and filters used. Invoke-AACPester -PdfPath fills this in.
-    .PARAMETER FailedOnly
-        List only failed tests in the results tables.
-    .EXAMPLE
-        $result = Invoke-AACPester -PassThru
-        Export-AACPesterReport -PesterResult $result -Path .\out\TestReport.pdf
-        Runs the bundled Azure estate check, then writes the full report as a PDF.
-    .EXAMPLE
-        $result | Export-AACPesterReport -Path .\EstateFailures.pdf -FailedOnly -Title 'Azure estate - failures'
-        A shorter PDF listing only what failed.
-    .OUTPUTS
-        System.IO.FileInfo - the PDF written.
     #>
     [CmdletBinding()]
     [OutputType([System.IO.FileInfo])]

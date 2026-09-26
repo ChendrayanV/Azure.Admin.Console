@@ -19,13 +19,20 @@ function Invoke-AACProgress {
         the display always ends complete; it stays on screen above whatever
         is written next.
 
-        Spectre.Console allows one live display at a time, so the script block
-        must not start a spinner, status or another progress display of its
-        own. PowerShell's own progress bars (Write-Progress, web requests) are
+        Spectre.Console allows one live display at a time. A call made while
+        a display is running (a command calling another, an export step)
+        simply adds its lines to that display. PowerShell's own progress bars (Write-Progress, web requests) are
         switched off while it runs, as they would draw over this one.
 
         An error thrown by the script block is re-thrown as-is once the
         display has closed, not wrapped in a .NET "Exception calling Start".
+
+        Spectre.Console draws the spinner, tick and bars with Unicode only
+        when the console's output encoding is UTF-8; otherwise it falls back
+        to '+' and '-'. The first time that happens in a session, a grey tip
+        says how to switch the console to UTF-8. The module doesn't switch it
+        itself: the encoding also decides how every other program's output
+        is read.
 
         When output is not an interactive terminal (CI logs, redirected
         output), there is no live display: each task is written as one plain
@@ -39,6 +46,12 @@ function Invoke-AACProgress {
 
     $ProgressPreference = 'SilentlyContinue'
 
+    # Already inside a display (one command calling another, or an export
+    # step): join it - Spectre.Console allows only one live display.
+    if ($script:AACProgressContext -or $script:AACProgressPlain) {
+        return & $ScriptBlock
+    }
+
     if (-not [Spectre.Console.AnsiConsole]::Profile.Capabilities.Interactive) {
         $script:AACProgressPlain = $true
         try {
@@ -47,6 +60,11 @@ function Invoke-AACProgress {
         finally {
             $script:AACProgressPlain = $false
         }
+    }
+
+    if (-not [Spectre.Console.AnsiConsole]::Profile.Capabilities.Unicode -and -not $script:AACUnicodeHintShown) {
+        $script:AACUnicodeHintShown = $true
+        Write-AACMarkup '[grey42]Tip: this console is not UTF-8, so symbols are drawn in plain ASCII. For the full display, run [/][grey62][[Console]]::OutputEncoding = [[Text.Encoding]]::UTF8[/][grey42] (or add it to your $PROFILE) and import the module again.[/]'
     }
 
     $resultHolder = [ref]$null
@@ -77,7 +95,7 @@ function Invoke-AACProgress {
 
     $spinner = [Spectre.Console.SpinnerColumn]::new([Spectre.Console.Spinner+Known]::Dots)
     $spinner.Style = [Spectre.Console.Style]::Parse('deepskyblue3_1')
-    $spinner.CompletedText = if ([Spectre.Console.AnsiConsole]::Profile.Capabilities.Unicode) { '✓' } else { '+' }
+    $spinner.CompletedText = (Get-AACGlyph).Tick
     $spinner.CompletedStyle = [Spectre.Console.Style]::Parse('green3')
 
     $description = [Spectre.Console.TaskDescriptionColumn]::new()

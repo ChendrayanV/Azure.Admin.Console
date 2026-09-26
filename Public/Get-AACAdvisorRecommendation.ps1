@@ -70,8 +70,8 @@ function Get-AACAdvisorRecommendation {
         (e.g. a reservation and a right-size for the same VM), so a total is
         an upper bound; totals are kept per currency, never converted.
 
-        PDF export needs Windows and PowerShell 7.4 or later (see
-        Export-AACPesterReport); objects and CSV work everywhere.
+        PDF export needs Windows and PowerShell 7.4 or later; objects and
+        CSV work everywhere.
     .PARAMETER SubscriptionId
         Only get recommendations in these subscriptions. Defaults to every
         subscription the signed-in account can see.
@@ -206,12 +206,20 @@ advisorresources
 '@
     $subscriptionQuery = "resourcecontainers | where type =~ 'microsoft.resources/subscriptions' | project subscriptionId, name"
 
-    $data = Invoke-AACStatus -Title 'Reading Advisor recommendations from Azure Resource Graph' -Spinner 'Dots' -ScriptBlock {
-        @{
-            Recommendations = @(Invoke-AACResourceGraphQuery -SubscriptionId $SubscriptionId -Headers $headers -Query $recommendationQuery)
-            Suppressions    = @(Invoke-AACResourceGraphQuery -SubscriptionId $SubscriptionId -Headers $headers -Query $suppressionQuery)
-            Subscriptions   = @(Invoke-AACResourceGraphQuery -Headers $headers -Query $subscriptionQuery)
-        }
+    # The title first, then a line per step - as every command shows them.
+    if ($showSummary) {
+        Write-AACRule -Title 'Azure Admin Console :: Azure Advisor' -Color 'deepskyblue3_1'
+    }
+    $data = Invoke-AACProgress -ScriptBlock {
+        Update-AACProgress -Id 'read' -Total 3 -Description 'Reading Advisor recommendations from Azure Resource Graph'
+        $recommendationRows = @(Invoke-AACResourceGraphQuery -SubscriptionId $SubscriptionId -Headers $headers -Query $recommendationQuery)
+        Update-AACProgress -Id 'read' -Increment 1 -Description 'Reading postponed and dismissed recommendations'
+        $suppressionRows = @(Invoke-AACResourceGraphQuery -SubscriptionId $SubscriptionId -Headers $headers -Query $suppressionQuery)
+        Update-AACProgress -Id 'read' -Increment 1 -Description 'Reading subscription names'
+        $subscriptionRows = @(Invoke-AACResourceGraphQuery -Headers $headers -Query $subscriptionQuery)
+        $subscriptionCount = @($recommendationRows | ForEach-Object { $_.subscriptionId } | Select-Object -Unique).Count
+        Update-AACProgress -Id 'read' -Complete -Description ('Read {0:N0} Advisor recommendation(s) in {1:N0} subscription(s)' -f $recommendationRows.Count, $subscriptionCount)
+        @{ Recommendations = $recommendationRows; Suppressions = $suppressionRows; Subscriptions = $subscriptionRows }
     }
 
     $lastSegment = { param([string] $Id) if ($Id) { $Id.TrimEnd('/').Split('/')[-1] } }
@@ -332,34 +340,14 @@ advisorresources
         Write-Warning 'No Azure Advisor recommendations were found for the signed-in account and the given filters.'
     }
 
-    if ($csvFullPath) {
-        $folder = Split-Path -Path $csvFullPath -Parent
-        if ($folder -and -not (Test-Path -LiteralPath $folder)) {
-            New-Item -ItemType Directory -Path $folder -Force | Out-Null
-        }
-        $recommendations | Export-Csv -LiteralPath $csvFullPath -NoTypeInformation -Encoding utf8 -Force
-        if (-not $showSummary) {
-            Write-AACMarkup "[grey58]$($recommendations.Count) recommendation(s) written to $([Spectre.Console.Markup]::Escape($csvFullPath))[/]"
-        }
-    }
-
-    $pdf = $null
-    if ($pdfFullPath) {
-        # Copied first: inside Invoke-AACStatus's script block, $Title would
-        # be Invoke-AACStatus's own -Title (the spinner text).
-        $reportTitle = $Title
-        $pdf = Invoke-AACStatus -Title 'Writing the PDF report' -Spinner 'Dots' -ScriptBlock {
-            Write-AACAdvisorRecommendationPdf -Recommendation $recommendations -Path $pdfFullPath -Title $reportTitle -Detail $scope
-        }
-        if (-not $showSummary) {
-            Write-AACMarkup "[grey58]PDF report written to $([Spectre.Console.Markup]::Escape($pdf.FullName))[/]"
-        }
+    $pdf = Invoke-AACExport -CsvPath $csvFullPath -CsvObject $recommendations -Noun 'recommendation' -PdfPath $pdfFullPath -WritePdf {
+        Write-AACAdvisorRecommendationPdf -Recommendation $recommendations -Path $pdfFullPath -Title $Title -Detail $scope
     }
 
     if ($showSummary) {
         $pdfWritten = if ($pdf) { $pdf.FullName }
         Invoke-AACPagedOutput -NoPaging:$NoPaging -ScriptBlock {
-            Show-AACAdvisorSummary -Recommendation $recommendations -Scope $scope
+            Show-AACAdvisorSummary -Recommendation $recommendations -Scope $scope -NoTitle
             Show-AACAdvisorTable -Recommendation $recommendations
             [Spectre.Console.AnsiConsole]::WriteLine()
             if ($csvFullPath) { Write-AACMarkup "[grey58]CSV written to[/] [link]$([Spectre.Console.Markup]::Escape($csvFullPath))[/]" }

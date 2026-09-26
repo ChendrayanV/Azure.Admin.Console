@@ -39,6 +39,9 @@ function Write-AACPesterReport {
         [switch] $FailedOnly
     )
 
+    # Unicode symbols, or ASCII in a console that isn't UTF-8.
+    $glyph = Get-AACGlyph
+
     $containers = @(Get-AACPropertyValue -InputObject $PesterResult -Name 'Containers')
     $brokenContainers = @($containers | Where-Object { [string]$_.Result -eq 'Failed' -and @($_.Blocks).Count -eq 0 })
 
@@ -92,7 +95,7 @@ function Write-AACPesterReport {
         $ruleColor = if ($count.Failed -gt 0 -or $isBroken) { 'red3' } elseif ($count.Passed -gt 0) { 'green3' } else { 'grey62' }
 
         Write-AACMarkup ''
-        $rule = [Spectre.Console.Rule]::new("[bold]$(& $escape $fileName)[/]  [grey62]$($count.Passed) passed · $($count.Failed) failed · $($count.Skipped) skipped[/]")
+        $rule = [Spectre.Console.Rule]::new("[bold]$(& $escape $fileName)[/]  [grey62]$($count.Passed) passed $($glyph.Dot) $($count.Failed) failed $($glyph.Dot) $($count.Skipped) skipped[/]")
         $rule.Justification = [Spectre.Console.Justify]::Left
         $rule.Style = [Spectre.Console.Style]::Parse($ruleColor)
         [Spectre.Console.AnsiConsole]::Write($rule)

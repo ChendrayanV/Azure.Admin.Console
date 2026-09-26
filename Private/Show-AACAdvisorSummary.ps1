@@ -23,13 +23,20 @@ function Show-AACAdvisorSummary {
         [AllowEmptyCollection()]
         [object[]] $Recommendation,
 
-        [System.Collections.IDictionary] $Scope
+        [System.Collections.IDictionary] $Scope,
+
+        # The command has already written the title, above its progress display.
+        [switch] $NoTitle
     )
 
     $escape = { param($Text) [Spectre.Console.Markup]::Escape([string]$Text) }
+    # Unicode symbols, or ASCII in a console that isn't UTF-8.
+    $glyph = Get-AACGlyph
     $count = $Recommendation.Count
 
-    Write-AACRule -Title 'Azure Admin Console :: Azure Advisor' -Color 'deepskyblue3_1'
+    if (-not $NoTitle) {
+        Write-AACRule -Title 'Azure Admin Console :: Azure Advisor' -Color 'deepskyblue3_1'
+    }
 
     # The scope line: who, where, which filters, when.
     $facts = [System.Collections.Generic.List[string]]::new()
@@ -56,7 +63,7 @@ function Show-AACAdvisorSummary {
         }
     }
     $facts.Add((Get-Date).ToString('d MMM yyyy HH:mm'))
-    Write-AACMarkup "[grey58]$($facts -join ' · ')[/]"
+    Write-AACMarkup "[grey58]$($facts -join " $($glyph.Dot) ")[/]"
     [Spectre.Console.AnsiConsole]::WriteLine()
 
     if ($count -eq 0) {
@@ -88,21 +95,7 @@ function Show-AACAdvisorSummary {
             @{ Value = $savingsValue; Caption = $savingsCaption; Color = 'green3' }
         )
 
-        $panels = foreach ($tile in $tiles) {
-            $muted = $tile.Value -in '0', '-'
-            $color = if ($muted) { 'grey42' } else { $tile.Color }
-            $text = [Spectre.Console.Markup]::new("[bold $color]$(& $escape $tile.Value)[/]`n[grey58]$(& $escape $tile.Caption)[/]")
-            $text.Justification = [Spectre.Console.Justify]::Center
-            $panel = [Spectre.Console.Panel]::new($text)
-            $panel.Border = [Spectre.Console.BoxBorder]::Rounded
-            $panel.BorderStyle = [Spectre.Console.Style]::Parse($color)
-            $panel.Padding = [Spectre.Console.Padding]::new(2, 0, 2, 0)
-            $panel.Expand = $true
-            $panel
-        }
-        $columns = [Spectre.Console.Columns]::new([Spectre.Console.Rendering.IRenderable[]]@($panels))
-        $columns.Expand = $true
-        [Spectre.Console.AnsiConsole]::Write($columns)
+        Show-AACTileRow -Tile $tiles
     }
 
 }

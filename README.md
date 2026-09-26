@@ -12,14 +12,19 @@ Microsoft.Graph modules, and no app registration.
   resource, with estimated savings, retirement dates and postponed/dismissed
   status, shown as a colour-coded console view.
 - **Azure Firewall rules.** Every Firewall Policy rule (DNAT, network,
-  application) with IP Groups resolved to names and addresses.
+  application) with IP Groups resolved to names and addresses, shown one
+  colour-coded table per rule collection.
 - **Azure estate check.** 85 live, read-only checks across every subscription
   you can see. 75 of them follow [PSRule for Azure](https://azure.github.io/PSRule.Rules.Azure/).
   They run as Pester tests, with a live progress display and a report.
+- **Resource and cost charts.** Colourful console charts of what you run (by
+  type, region, resource group or subscription) and what it costs (month to
+  date by subscription and service, and the monthly trend).
 - **Output your way.** PowerShell objects, CSV (`Export-Csv`) or a PDF report,
   from the same command.
 
-Everything is read-only. Reader access on the subscriptions is enough.
+Everything is read-only. Reader access on the subscriptions is enough (costs
+need Cost Management Reader or Reader).
 
 ## Install
 
@@ -45,8 +50,15 @@ Connect-AAC                                  # opens your browser to sign in
 # Azure Advisor: the console view, plus CSV and PDF reports
 Get-AACAdvisorRecommendation -CsvPath .\Advisor.csv -PdfPath .\Advisor.pdf
 
-# Azure Firewall Policy rules, to CSV
-Export-AACFirewallRule -CsvPath .\FirewallRules.csv
+# Azure Firewall Policy rules: the console view, plus a CSV file
+Get-AACFirewallRule -CsvPath .\FirewallRules.csv
+
+# Which firewall rules let 10.1.2.3 reach 10.0.0.4 on UDP 53?
+Get-AACFirewallRule -SourceAddress 10.1.2.3 -DestinationAddress 10.0.0.4 -Port 53 -Protocol UDP
+
+# What you run, and what it costs
+Show-AACResource
+Show-AACCost
 
 # The estate check: failures only, with a PDF copy
 Invoke-AACPester -FailedOnly -PdfPath .\Estate.pdf
@@ -59,9 +71,10 @@ Invoke-AACPester -FailedOnly -PdfPath .\Estate.pdf
 | [`Connect-AAC`](docs/Connect-AAC.md) | Signs in with a browser (OAuth 2.0 + PKCE, localhost redirect). Uses the Azure CLI's pre-consented public client ID unless you pass `-ClientId`. |
 | [`Disconnect-AAC`](docs/Disconnect-AAC.md) | Forgets the sign-in. It was only ever in memory. |
 | [`Get-AACAdvisorRecommendation`](docs/Get-AACAdvisorRecommendation.md) | A consolidated, flattened view of Azure Advisor: a console view at the prompt, objects down a pipeline, CSV and/or PDF exports. |
-| [`Export-AACFirewallRule`](docs/Export-AACFirewallRule.md) | Every Azure Firewall Policy rule as objects, CSV and/or PDF. |
+| [`Get-AACFirewallRule`](docs/Get-AACFirewallRule.md) | Every Azure Firewall Policy rule: a console view at the prompt (Allow in green, Deny in red), objects down a pipeline, CSV and/or PDF exports. |
+| [`Show-AACResource`](docs/Show-AACResource.md) | A colourful bar chart of your resources by type, location, resource group or subscription. |
+| [`Show-AACCost`](docs/Show-AACCost.md) | Subscription costs: month to date by subscription and by service, and a monthly trend, as charts and a table. |
 | [`Invoke-AACPester`](docs/Invoke-AACPester.md) | Runs any Pester v5 tests with a progress display, a console report and an optional PDF. With no `-Path` it runs the bundled estate check. |
-| [`Export-AACPesterReport`](docs/Export-AACPesterReport.md) | Writes a Pester result as a PDF. |
 
 Full help:
 - **In PowerShell:** run `Get-Help <command> -Full`, or `Get-Help about_Azure.Admin.Console` for the module overview.
@@ -154,15 +167,124 @@ total is an upper bound.
 
 ## Azure Firewall rules
 
+`Get-AACFirewallRule` reads every Firewall Policy rule from Azure Resource
+Graph. It returns output the same way as `Get-AACAdvisorRecommendation`:
+- **At the prompt:** a console view.
+- **Piped onward:** the objects, with no view.
+- **`-PassThru`:** both. **`-NoDisplay`:** the objects only.
+- **`-CsvPath` and `-PdfPath`:** export in any of these modes.
+
 ```powershell
-Export-AACFirewallRule -CsvPath .\rules.csv -PdfPath .\rules.pdf
-Export-AACFirewallRule -FirewallPolicyName 'fwpol-hub-*' |
+Get-AACFirewallRule                                          # the console view
+Get-AACFirewallRule -CsvPath .\rules.csv -PdfPath .\rules.pdf # the view, plus CSV and PDF
+Get-AACFirewallRule -FirewallPolicyName 'fwpol-hub-*' |
     Where-Object { $_.Action -eq 'Allow' -and $_.SourceAddresses -match '(^|, )\*($|,)' }
 ```
 
-There is one row per rule, in the order the portal lists them. Source and
-destination IP Groups are resolved to names and addresses, and each row also
-shows the base policy and the firewalls the policy is attached to.
+The view follows the policy hierarchy:
+1. **Tiles** for the rules, allow, deny and DNAT counts, policies and rule collections.
+2. **A policies table** with each policy's base policy, attached firewalls and rule counts.
+3. **One section per policy**, with one table per rule collection in priority order:
+
+```text
+╭──── rcg-platform · 100 › Allow-Web · 200 · Filter · 2 rules   ALLOW ────╮   (green border)
+│ Rule          │ Source             │ Destination        │ Protocols · ports │ Translation · TLS  │
+│ web-out       │ 10.0.0.0/16        │ fqdn *.contoso.com │ Https:443         │ TLS inspection off │
+│ application   │ ipg-spokes (IP     │                    │                   │                    │
+│ rule          │ group)             │                    │                   │                    │
+│               │ 10.1.0.0/16, …     │                    │                   │                    │
+╰───────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──── rcg-platform · 100 › Block-Legacy · 300 · Filter · 1 rule   DENY ────╮   (red border)
+```
+
+In each table:
+- The border and badge carry the collection's action: **Allow** in green, **Deny** in red, **DNAT** in orange.
+- IP Groups show their addresses underneath.
+- A `*` source or destination on an Allow rule is highlighted in yellow as `* (any)`.
+- The last column shows the DNAT translation, or whether TLS inspection is on for application rules.
+- Long output is paged; `-NoPaging` turns paging off.
+
+### Searching rules
+
+Search parameters narrow the rules. You can combine them, and each takes several values:
+- **All given filters must match.** A rule appears only if it satisfies every search parameter you pass.
+- **Any value of one filter will do.** `-Port 22, 3389` matches a rule for either port.
+
+Addresses and ports match by containment, so a search answers "which rules
+let this source reach that destination?":
+
+| Parameter | Matches |
+|---|---|
+| `-SourceAddress`, `-DestinationAddress` | An IP, CIDR or `a-b` range (IPv4 or IPv6). It matches rules that cover or overlap it, including through IP Groups, and a `*` rule matches any address. |
+| `-Port` | A port or range (`443`, `8000-8080`), overlapping the rule's ports. For application rules, each protocol's port counts. |
+| `-Protocol` | `TCP`, `UDP` or `ICMP`, where a rule for `Any` matches all; or `Http`, `Https` or `Mssql` for application rules. |
+| `-Fqdn` | A host name covered by the rule's FQDNs (`*.contoso.com` covers `www.contoso.com`), or a wildcard pattern. |
+| `-Action`, `-RuleName` | `Allow`, `Deny` or `DNAT`; a rule-name wildcard. |
+
+```powershell
+Get-AACFirewallRule -SourceAddress 10.1.2.3 -DestinationAddress 10.0.0.4 -Port 53 -Protocol UDP
+Get-AACFirewallRule -Action Allow -SourceAddress 0.0.0.0/0 -Port 3389, 22     # RDP/SSH open to any source
+Get-AACFirewallRule -Fqdn www.contoso.com -Protocol Https -CsvPath .\contoso.csv
+```
+
+The results come back in priority order, allow and deny alike, so the first
+match is the one Azure Firewall applies. Service tags (such as `AzureCloud`)
+aren't expanded, so an address search doesn't match them.
+
+The rules are listed in the order the Azure portal shows them. The CSV has one
+row per rule, with the base policy and attached firewalls on every row. The
+PDF groups rules by policy, rule collection group and collection, with the
+same colours.
+
+## Resources and costs
+
+`Show-AACResource` counts every resource you can see with two Resource Graph
+queries, and draws one bar per type, each in its own colour:
+
+```text
+Resources by type (top 20 of 57)
+  compute/virtualmachines  ███████████████████████████████████████████ 412
+network/networkinterfaces  █████████████████████████████████████████ 398
+  storage/storageaccounts  █████████████████ 164
+           37 other types  ██████ 61
+```
+
+```powershell
+Show-AACResource                                  # by type, top 20
+Show-AACResource -By Location                     # or ResourceGroup, Subscription
+Show-AACResource -ResourceType 'microsoft.network/*' -Top 10
+Show-AACResource -By Subscription -PassThru | Export-Csv .\PerSubscription.csv
+```
+
+`Show-AACCost` reads each subscription's actual cost from the Cost Management
+Query API, broken down by month, service and resource group, with one query
+per subscription. It shows:
+- tiles for month to date, last month, the period total and the top service;
+- month to date by subscription (with several subscriptions), by service and by resource group;
+- a bar chart of the last months, with this month marked "to date";
+- a subscription-by-month table with a total column and a total row, and each subscription's highest month in gold.
+
+When Cost Management reports no cost for the whole period, the view says so
+instead of drawing empty charts.
+
+```powershell
+Show-AACCost                                      # month to date + last 6 months
+Show-AACCost -Months 12 -SubscriptionId '00000000-0000-0000-0000-000000000000'
+Show-AACCost -Months 12 -CsvPath .\Cost.csv -PdfPath .\Cost.pdf   # the detail and a report
+Show-AACCost -PassThru | Export-Csv .\CostSummary.csv                  # one row per subscription
+```
+
+| Export | Contents |
+|---|---|
+| `-CsvPath` | The detail: one row per subscription, month, resource group and service (`SubscriptionName`, `SubscriptionId`, `Month`, `ResourceGroup`, `Service`, `Cost`, `Currency`), ready for an Excel pivot table |
+| `-PdfPath` | Landscape A4. A summary with totals, the subscription-by-month table, and this month's top services and resource groups; then a page per subscription with its services and resource groups month by month |
+| `-PassThru` | One object per subscription, with `MonthToDate`, one property per month (`2026-07`, ...), `Total`, `TopServices` and `Status` |
+
+Costs stay in each subscription's billing currency, and each currency gets its
+own charts. Cost Management allows only a few queries a minute, so a progress
+display shows each subscription as it is read, and throttled calls are
+retried. A subscription that Cost Management can't report on, such as some
+offer types or one you lack permission for, is listed with the reason.
 
 ## Azure estate check
 
@@ -268,6 +390,28 @@ Other options:
 
 Test files can add their own progress lines. See the help in `Private\Update-AACProgress.ps1`.
 
+## Troubleshooting
+
+**`?` instead of symbols, or `+` and `-` in the progress.** Windows consoles
+often default to a legacy code page (437 or 850), which has no `●`, `→` or
+`✓`. The module detects this: in such a console it draws its symbols in plain
+ASCII (`*`, `->`, `+`, `-`), so nothing is printed as `?`. The tests check
+every view against code pages 437 and 850. For the full Unicode display,
+switch the session to UTF-8 and import the module again:
+
+```powershell
+[Console]::OutputEncoding = [Text.Encoding]::UTF8   # add to your $PROFILE to keep it
+Import-Module Azure.Admin.Console -Force
+```
+
+Windows Terminal and the VS Code terminal display the full Unicode output once
+the encoding is UTF-8.
+
+**"requires a minimum Windows PowerShell version of '7.2'".** The module runs
+on PowerShell 7.2 or later (7.4+ for PDF export), on Windows, Linux and macOS,
+not on Windows PowerShell 5.1. Install PowerShell 7 (`winget install
+Microsoft.PowerShell`) and run it as `pwsh`.
+
 ## Design and security
 
 - **No Az / Microsoft.Graph modules.** Every Azure call is a plain REST call
@@ -300,6 +444,23 @@ Azure.Admin.Console/
   build.ps1                  Docs, tests, packaging and publishing
   CHANGELOG.md, LICENSE
 ```
+
+### Testing
+
+The unit tests in `Tests\` cover every command, with no Azure account needed.
+Each one mocks the point where the module leaves the machine and runs
+everything on this side for real:
+
+| Command | Mocked | Tested for real |
+|---|---|---|
+| `Connect-AAC` | The browser (`Start-Process`) and the token endpoint (`Invoke-RestMethod`) | The PKCE code, the localhost listener receiving the redirect, state (CSRF) validation, the token exchange and the stored session |
+| `Get-AACAdvisorRecommendation`, `Get-AACFirewallRule`, `Show-AACResource` | Resource Graph (`Invoke-AACResourceGraphQuery`) with hand-built rows | Flattening, filters and search, output modes, CSV and PDF, and the console view |
+| `Show-AACCost` | The Cost Management query (`Invoke-AACCostQuery`) | Month and service totals, failed subscriptions, the charts; also the query's paging |
+| `Invoke-AACPester` | Nothing | It runs in a child `pwsh` process against a sample test file, because Pester can't run inside Pester |
+
+The console views are checked by swapping the Spectre console for one that
+writes to a text buffer, then looking for what should be drawn. For a new
+command, copy the nearest test file and change its mocks.
 
 The comment-based help in each `Public\*.ps1` file is the single source of
 command help. `Get-Help` reads it directly, and `docs\` is generated from it.

@@ -18,7 +18,7 @@ Describe 'Azure Admin Console - Get-AACAdvisorRecommendation' {
         # Runs a script block with the Spectre console swapped for one that
         # writes plain text into a buffer, and returns that text.
         $script:renderToText = {
-            param([scriptblock] $Render)
+            param([scriptblock] $Render, [switch] $Ascii)
             $real = [Spectre.Console.AnsiConsole]::Console
             $buffer = [System.IO.StringWriter]::new()
             $settings = [Spectre.Console.AnsiConsoleSettings]::new()
@@ -26,7 +26,8 @@ Describe 'Azure Admin Console - Get-AACAdvisorRecommendation' {
             $settings.Ansi = [Spectre.Console.AnsiSupport]::No
             $capture = [Spectre.Console.AnsiConsole]::Create($settings)
             $capture.Profile.Width = 160
-            $capture.Profile.Capabilities.Unicode = $true
+            # -Ascii: a console that isn't UTF-8 (code page 437, 850...).
+            $capture.Profile.Capabilities.Unicode = -not $Ascii
             try {
                 [Spectre.Console.AnsiConsole]::Console = $capture
                 & $Render
@@ -68,7 +69,6 @@ Describe 'Azure Admin Console - Get-AACAdvisorRecommendation' {
         $subscriptions = "[{`"subscriptionId`":`"$sub`",`"name`":`"sub-prod`"}]" | ConvertFrom-Json
 
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Get-AACAccessToken -MockWith { 'fake-token' }
-        Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACStatus -MockWith { & $ScriptBlock }
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Write-AACMarkup -MockWith { }
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACResourceGraphQuery -ParameterFilter { $Query -match "microsoft.advisor/recommendations'" } -MockWith { $recommendations }.GetNewClosure()
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACResourceGraphQuery -ParameterFilter { $Query -match 'microsoft.advisor/suppressions' } -MockWith { $suppressions }.GetNewClosure()
@@ -173,6 +173,22 @@ Describe 'Azure Admin Console - Get-AACAdvisorRecommendation' {
 
         foreach ($expected in 'Azure Advisor', 'recommendations', 'high impact', 'medium impact', 'resources affected', 'USD 123') {
             $text | Should -BeLike "*$expected*"
+        }
+    }
+
+    It 'draws only characters a legacy console (code page 437/850) can show' {
+        $text = InModuleScope 'Azure.Admin.Console' {
+            $rows = @(Get-AACAdvisorRecommendation -NoDisplay -IncludeSuppressed)
+            & $args[0] { Show-AACAdvisorSummary -Recommendation $rows -Scope ([ordered]@{ Subscriptions = 'all' }); Show-AACAdvisorTable -Recommendation $rows } -Ascii
+        } -ArgumentList $script:renderToText
+
+        $text | Should -BeLike '** Cost*' -Because 'the category bullet becomes *'
+        # Every character must exist in the legacy code pages Windows consoles
+        # use (437, 850) - anything else would be printed as '?'.
+        foreach ($codePage in 437, 850) {
+            $encoding = [System.Text.Encoding]::GetEncoding($codePage)
+            $lost = @($text.ToCharArray() | Select-Object -Unique | Where-Object { $encoding.GetString($encoding.GetBytes([string]$_)) -ne [string]$_ } | ForEach-Object { 'U+{0:X4}' -f [int]$_ })
+            $lost | Should -BeNullOrEmpty -Because "code page $codePage would print these as ?"
         }
     }
 

@@ -34,8 +34,9 @@ function Invoke-AACPester {
         skipped automatically when output is redirected or with -CI, and can
         be turned off with -NoPaging.
 
-        -PdfPath also saves the results as a PDF report (see
-        Export-AACPesterReport), honouring -FailedOnly.
+        -PdfPath also saves the results as an A4 PDF report - a summary
+        with the verdict, pass/fail counts per check, and every test with
+        its failure message - honouring -FailedOnly.
     .PARAMETER Path
         One or more test files or folders. Folders are searched recursively
         for *.Tests.ps1 files. Defaults to this module's bundled Checks
@@ -241,10 +242,10 @@ function Invoke-AACPester {
         # A failed export is reported but doesn't lose the run: the console
         # report is already shown and -PassThru still returns the result.
         try {
-            $pdf = Invoke-AACStatus -Title 'Writing the PDF report' -Spinner 'Dots' -ScriptBlock {
-                Export-AACPesterReport -PesterResult $pesterResult -Path $PdfPath -Detail $detail -FailedOnly:$FailedOnly
+            $pdfFullPath = $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($PdfPath)
+            $null = Invoke-AACExport -PdfPath $pdfFullPath -WritePdf {
+                Write-AACPesterReportPdf -PesterResult $pesterResult -Path $pdfFullPath -Detail $detail -FailedOnly:$FailedOnly
             }
-            Write-AACMarkup "[grey58]PDF report written to $([Spectre.Console.Markup]::Escape($pdf.FullName))[/]"
         }
         catch {
             Write-Error -Message "Could not write the PDF report: $($_.Exception.Message)" -ErrorAction Continue

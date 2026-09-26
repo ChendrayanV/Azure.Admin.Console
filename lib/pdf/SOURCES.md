@@ -1,6 +1,6 @@
 # PDF export libraries - where they came from
 
-`Export-AACPesterReport` (and `Invoke-AACPester -PdfPath`) render PDFs with
+The PDF reports (`Invoke-AACPester -PdfPath`, `Get-AACAdvisorRecommendation -PdfPath`, `Get-AACFirewallRule -PdfPath`) are rendered with
 PDFsharp + MigraDoc. The assemblies here are copied unmodified from the
 official nuget.org packages below (the `lib/net8.0` build of each), and are
 loaded only when a PDF is exported - never at module import.

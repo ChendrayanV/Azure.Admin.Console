@@ -36,19 +36,28 @@ COMMANDS
         postponed/dismissed status. A colour-coded console view at the
         prompt, objects down a pipeline, and CSV and/or PDF exports.
 
-    Export-AACFirewallRule
+    Get-AACFirewallRule
         Every Azure Firewall Policy rule (DNAT, network, application) with
-        IP Groups resolved, base policy and attached firewalls. Objects, CSV
-        and/or PDF.
+        IP Groups resolved, base policy and attached firewalls. A console
+        view at the prompt (one table per rule collection: Allow in green,
+        Deny in red, DNAT in orange), objects down a pipeline, and CSV
+        and/or PDF exports.
+
+    Show-AACResource
+        A colourful bar chart of your resources by type, location,
+        resource group or subscription.
+
+    Show-AACCost
+        Subscription costs from Cost Management: month to date by
+        subscription, service and resource group, and the monthly trend, as
+        charts and a table. -CsvPath writes the detail (per month, resource
+        group and service), -PdfPath a report.
 
     Invoke-AACPester
         Runs any Pester v5 tests with a live progress display, a
         Spectre.Console report (table, tree with failures called out,
         chart, banner) and an optional PDF. With no -Path it runs the
         bundled Azure estate check.
-
-    Export-AACPesterReport
-        Writes an Invoke-AACPester or Invoke-Pester result as a PDF.
 
     Get-Help <command> -Full shows every parameter and example.
 
@@ -68,13 +77,22 @@ GETTING STARTED
             Format-Table ResourceName, Problem, MonthlySavings, SavingsCurrency
 
         # Firewall rules, to CSV
-        Export-AACFirewallRule -CsvPath .\FirewallRules.csv
+        Get-AACFirewallRule -CsvPath .\FirewallRules.csv
+
+        # Firewall rules that let 10.1.2.3 reach 10.0.0.4 on UDP 53
+        Get-AACFirewallRule -SourceAddress 10.1.2.3 `
+            -DestinationAddress 10.0.0.4 -Port 53 -Protocol UDP
+
+        # What you run, and what it costs
+        Show-AACResource
+        Show-AACCost
 
         # The estate check, only failures, saved as a PDF
         Invoke-AACPester -FailedOnly -PdfPath .\Estate.pdf
 
 OUTPUT: CONSOLE VIEW, OBJECTS, CSV AND PDF
-    Get-AACAdvisorRecommendation decides by where it runs:
+    Get-AACAdvisorRecommendation and Get-AACFirewallRule decide by where
+    they run:
 
         at the prompt   a Spectre.Console view: scope, tiles for
                         recommendations, impact, resources and savings,
@@ -85,12 +103,9 @@ OUTPUT: CONSOLE VIEW, OBJECTS, CSV AND PDF
         -PassThru       the view and the objects
         -NoDisplay      the objects only (scripts, scheduled tasks)
 
-    PowerShell can't tell "$r = Get-AACAdvisorRecommendation" from a plain
-    call, so add -PassThru or -NoDisplay to keep the objects in a variable.
-
-    Export-AACFirewallRule returns objects when you give no path. With
-    -CsvPath and/or -PdfPath it writes the files instead; add -PassThru to
-    get the objects as well.
+    PowerShell can't tell "$r = Get-AACFirewallRule" from a plain call,
+    so add -PassThru or -NoDisplay to keep the objects in a variable.
+    -CsvPath and -PdfPath write their files in any of these modes.
 
     Paths are relative to the current location, missing folders are
     created and existing files are overwritten.
@@ -207,6 +222,17 @@ SECURITY
       file is refused.
 
 TROUBLESHOOTING
+    Symbols show as plain ASCII (*, ->, +, -)
+        The console isn't UTF-8 (often code page 437 or 850), so the module
+        draws its symbols in ASCII rather than letting them print as ?.
+        For the full display, run
+        [Console]::OutputEncoding = [Text.Encoding]::UTF8 (add it to your
+        $PROFILE to keep it) and import the module again.
+
+    "requires a minimum Windows PowerShell version of '7.2'"
+        The module runs on PowerShell 7.2 or later (pwsh), not Windows
+        PowerShell 5.1. Install it with: winget install Microsoft.PowerShell
+
     "Not signed in" or a skipped estate check
         Run Connect-AAC in the same PowerShell session first.
 
@@ -228,8 +254,7 @@ TROUBLESHOOTING
 SEE ALSO
     Get-Help Connect-AAC -Full
     Get-Help Get-AACAdvisorRecommendation -Full
-    Get-Help Export-AACFirewallRule -Full
+    Get-Help Get-AACFirewallRule -Full
     Get-Help Invoke-AACPester -Full
-    Get-Help Export-AACPesterReport -Full
     https://learn.microsoft.com/azure/advisor/
     https://learn.microsoft.com/azure/governance/resource-graph/

@@ -1,7 +1,7 @@
 function Write-AACFirewallRulePdf {
     <#
     .SYNOPSIS
-        Writes AAC.FirewallRule objects (from Export-AACFirewallRule) as a
+        Writes AAC.FirewallRule objects (from Get-AACFirewallRule) as a
         landscape A4 PDF report.
     .DESCRIPTION
         Layout:
@@ -60,7 +60,7 @@ function Write-AACFirewallRulePdf {
         $paragraph.AddText($Values) | Out-Null
     }
     # IP Groups as "name" in semibold with the addresses in small grey under
-    # it, from Export-AACFirewallRule's "name: a, b | name2: c" format.
+    # it, from Get-AACFirewallRule's "name: a, b | name2: c" format.
     $addIpGroups = {
         param($Cell, [string] $Described)
         if (-not $Described) {

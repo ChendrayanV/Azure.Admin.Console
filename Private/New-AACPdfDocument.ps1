@@ -4,7 +4,7 @@ function New-AACPdfDocument {
         Starts an A4 PDF document in the module's report style, and returns
         it with the helpers the report commands build their pages with.
     .DESCRIPTION
-        Shared by Export-AACPesterReport and Export-AACFirewallRule so every
+        Shared by every PDF report (Pester, firewall, Advisor) so every
         PDF the module writes looks the same: Segoe UI, a blue accent,
         headings, a header line with the title and date, and a footer with
         "Page X of Y".
