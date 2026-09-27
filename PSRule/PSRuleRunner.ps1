@@ -56,6 +56,18 @@ try {
         'Binding.TargetType'          = @('resourceType', 'type')
         'Binding.TargetName'          = @('ResourceName', 'name')
     }
+    # The cultures PSRule reads rule help (synopsis, recommendation, link) in:
+    # this session's, then en-US - each with its parents (en-US, then en), as
+    # PSRule looks only in the folders named. Linux often runs with the
+    # invariant culture (LANG=C.UTF-8), which on its own matches no help
+    # folder at all.
+    $cultures = [System.Collections.Generic.List[string]]::new()
+    foreach ($culture in [System.Globalization.CultureInfo]::CurrentUICulture, [System.Globalization.CultureInfo]::GetCultureInfo('en-US')) {
+        for ($c = $culture; $c.Name; $c = $c.Parent) {
+            if (-not $cultures.Contains($c.Name)) { $cultures.Add($c.Name) }
+        }
+    }
+    $options['Output.Culture'] = $cultures.ToArray()
     $all = @(Get-PSRule @source -Option (New-PSRuleOption -Option $options -Configuration $configuration) -ErrorAction Stop |
             ForEach-Object { [string]$_.Name } | Select-Object -Unique)
     $names = @($all | Where-Object {

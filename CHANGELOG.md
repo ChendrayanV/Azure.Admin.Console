@@ -5,6 +5,7 @@ All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never pu
 ## v0.11.0
 
 - **Fixed:** the console-view unit tests no longer depend on the CI system they run on. Spectre.Console's default enrichers detect GitHub Actions, Azure Pipelines and others and switch on ANSI colour and Unicode for every new console, overriding the plain-text console the tests render to - which broke the v0.10.0 release run. The tests' consoles now turn that detection off. No change to the module's commands.
+- **Fixed:** `Invoke-AACPSRule` lost the help of the module's own `AAC.*` rules - severity, recommendation and documentation link - under the invariant culture that Linux shells often run with (`LANG=C.UTF-8`). PSRule now reads rule help in the session's culture, then en-US, each with its parent cultures.
 - **Released:** the first PowerShell Gallery release, with everything listed under v0.10.0 (which was tagged but never published).
 
 ## v0.10.0

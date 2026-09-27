@@ -166,7 +166,7 @@ Describe 'Azure Admin Console - PSRule runner: custom rules and exclusions' {
         $script:bundled = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '../PSRule/Rules')).Path
         $script:psrule = Get-Module -Name 'PSRule.Rules.Azure' -ListAvailable | Sort-Object -Property Version -Descending | Select-Object -First 1
         $script:runWith = {
-            param([hashtable] $Settings)
+            param([hashtable] $Settings, [string] $Culture)
             $sub = '11111111-1111-1111-1111-111111111111'
             $objects = @(
                 @{ id = "/subscriptions/$sub/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/st1"; name = 'st1'; type = 'microsoft.storage/storageaccounts'; kind = 'StorageV2'; location = 'uksouth'; resourceGroupName = 'rg'; subscriptionId = $sub; sku = @{ name = 'Standard_LRS' }; tags = @{ Owner = 'ops'; Environment = 'staging' }; properties = @{ minimumTlsVersion = 'TLS1_0' } }
@@ -177,7 +177,15 @@ Describe 'Azure Admin Console - PSRule runner: custom rules and exclusions' {
             $out = Join-Path -Path $TestDrive -ChildPath 'out.json'
             ConvertTo-Json -InputObject $objects -Depth 20 | Set-Content -LiteralPath $in -Encoding utf8
             $Settings | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $settingFile -Encoding utf8
-            $output = @(& pwsh -NoProfile -NonInteractive -File $script:runner -ModulePath $script:psrule.Path -InputPath $in -SettingPath $settingFile -OutputPath $out 2>&1 | ForEach-Object { "$_" })
+            $output = if ($PSBoundParameters.ContainsKey('Culture')) {
+                # The runner under another culture, e.g. the invariant culture
+                # Linux shells often use (LANG=C.UTF-8).
+                $command = "[System.Globalization.CultureInfo]::CurrentUICulture = [System.Globalization.CultureInfo]::GetCultureInfo('$Culture'); & '$($script:runner)' -ModulePath '$($script:psrule.Path)' -InputPath '$in' -SettingPath '$settingFile' -OutputPath '$out'; exit `$LASTEXITCODE"
+                @(& pwsh -NoProfile -NonInteractive -Command $command 2>&1 | ForEach-Object { "$_" })
+            }
+            else {
+                @(& pwsh -NoProfile -NonInteractive -File $script:runner -ModulePath $script:psrule.Path -InputPath $in -SettingPath $settingFile -OutputPath $out 2>&1 | ForEach-Object { "$_" })
+            }
             [pscustomobject]@{ Exit = $LASTEXITCODE; Output = $output; Results = @(Get-Content -LiteralPath $out -Raw | ConvertFrom-Json) }
         }
     }
@@ -195,6 +203,19 @@ Describe 'Azure Admin Console - PSRule runner: custom rules and exclusions' {
         $required.Link | Should -BeLike '*AAC.Resource.RequiredTags.md'
         ($run.Results | Where-Object { $_.RuleName -eq 'AAC.ResourceGroup.RequiredTags' }).Outcome | Should -Be 'Fail' -Because 'custom rules can use -Type with PSRule for Azure''s binding'
         ($run.Results | Where-Object { $_.RuleName -eq 'AAC.Resource.AllowedTagValues' -and $_.Name -eq 'st1' }).Reason | Should -BeLike "*'staging'*"
+    }
+
+    It 'finds the rules'' help under the invariant culture too (Linux with LANG=C.UTF-8)' -Skip:(-not (Get-Module -Name 'PSRule.Rules.Azure' -ListAvailable)) {
+        $run = & $script:runWith -Culture '' -Settings @{
+            Rule = @('AAC.Resource.RequiredTags', 'Azure.Storage.MinTLS'); ExcludeRule = @(); Baseline = ''; RulePath = @($script:bundled)
+            Configuration = @{ AAC_REQUIRED_TAGS = @('CostCenter') }
+        }
+        $run.Exit | Should -Be 0 -Because ($run.Output -join ' ')
+        $own = $run.Results | Where-Object { $_.RuleName -eq 'AAC.Resource.RequiredTags' }
+        $own.Link | Should -BeLike '*AAC.Resource.RequiredTags.md'
+        $own.Severity | Should -Be 'Important'
+        $own.Recommendation | Should -Not -BeNullOrEmpty
+        ($run.Results | Where-Object { $_.RuleName -eq 'Azure.Storage.MinTLS' }).Recommendation | Should -Not -BeNullOrEmpty -Because 'PSRule for Azure''s own help must still be found'
     }
 
     It 'leaves out rules by wildcard' -Skip:(-not (Get-Module -Name 'PSRule.Rules.Azure' -ListAvailable)) {
