@@ -1,6 +1,6 @@
 @{
     RootModule           = 'Azure.Admin.Console.psm1'
-    ModuleVersion        = '0.10.0'
+    ModuleVersion        = '0.11.0'
     GUID                 = '9923da59-cf92-4a4a-b855-f59a088a3f09'
     Author               = 'Chendrayan Venkatesan'
     CompanyName          = 'Golden Five Consulting'
@@ -46,7 +46,7 @@
             Tags         = @('Azure', 'AzureAdvisor', 'AzureFirewall', 'CostManagement', 'Inventory', 'FirewallPolicy', 'ResourceGraph', 'Governance', 'Report', 'PDF', 'CSV', 'ApplicationInsights', 'LogAnalytics', 'KQL', 'PSRule', 'WellArchitected', 'HTML', 'Compliance', 'SpectreConsole', 'REST', 'PKCE', 'PSEdition_Core', 'Windows', 'Linux', 'MacOS')
             ProjectUri   = 'https://github.com/ChendrayanV/Azure.Admin.Console'
             LicenseUri   = 'https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/LICENSE'
-            ReleaseNotes = 'v0.10.0: First PowerShell Gallery release. Get-AACAdvisorRecommendation (a consolidated, flattened Azure Advisor view), Get-AACFirewallRule (every Firewall Policy rule, searchable by address, port and protocol), Show-AACResource (resources and a full inventory) and Show-AACCost (costs by subscription, service and month), and Invoke-AACPSRule: PSRule for Azure, the module''s own AAC.* rules and your custom rules (-RulePath) on the live estate, without the Az modules, with -Rule/-ExcludeRule by name or wildcard. Every command has a console view, objects, and CSV, PDF and interactive HTML reports; with an export path the console shows only the progress. Help built with PlatyPS (MAML for Get-Help). Full history: CHANGELOG.md.'
+            ReleaseNotes = 'v0.11.0: First PowerShell Gallery release (v0.10.0 was never published). Get-AACAdvisorRecommendation (a consolidated, flattened Azure Advisor view), Get-AACFirewallRule (every Firewall Policy rule, searchable by address, port and protocol), Show-AACResource (resources and a full inventory) and Show-AACCost (costs by subscription, service and month), and Invoke-AACPSRule: PSRule for Azure, the module''s own AAC.* rules and your custom rules (-RulePath) on the live estate, without the Az modules, with -Rule/-ExcludeRule by name or wildcard. Every command has a console view, objects, and CSV, PDF and interactive HTML reports; with an export path the console shows only the progress. Help built with PlatyPS (MAML for Get-Help). Full history: CHANGELOG.md.'
         }
     }
 }

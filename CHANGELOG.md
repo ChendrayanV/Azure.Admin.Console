@@ -2,6 +2,11 @@
 
 All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never published to the PowerShell Gallery.
 
+## v0.11.0
+
+- **Fixed:** the console-view unit tests no longer depend on the CI system they run on. Spectre.Console's default enrichers detect GitHub Actions, Azure Pipelines and others and switch on ANSI colour and Unicode for every new console, overriding the plain-text console the tests render to - which broke the v0.10.0 release run. The tests' consoles now turn that detection off. No change to the module's commands.
+- **Released:** the first PowerShell Gallery release, with everything listed under v0.10.0 (which was tagged but never published).
+
 ## v0.10.0
 
 - **New:** `Invoke-AACPSRule` - PSRule for Azure (every rule of the installed PSRule.Rules.Azure, 500+ in v1.47) on the live estate, without the Az modules: the data `Export-AzRuleData` would export is read with the `Connect-AAC` sign-in (Resource Graph, then the same child settings and API versions as its resource expansion) and PSRule runs in a `pwsh` process of its own, so its `YamlDotNet.dll` never clashes with another version in the session. A console view (tiles, failures by Well-Architected pillar, a table per pillar of failing rules - most severe first - with resources and reasons), `AAC.PSRuleResult` objects, and CSV, PDF and interactive HTML reports; `-FailedOnly`. `-Rule` and `-ExcludeRule` take names or wildcards; `-Baseline`; `-Configuration` for PSRule for Azure's options and custom rules' settings. A rule that can't evaluate a resource is reported for that resource instead of stopping the run.

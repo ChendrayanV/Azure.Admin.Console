@@ -23,6 +23,10 @@ Describe 'Azure Admin Console - Get-AACFirewallRule' {
             $settings = [Spectre.Console.AnsiConsoleSettings]::new()
             $settings.Out = [Spectre.Console.AnsiConsoleOutput]::new($buffer)
             $settings.Ansi = [Spectre.Console.AnsiSupport]::No
+            # No CI detection: on GitHub Actions (or Azure Pipelines...) Spectre's
+            # default enrichers would switch on ANSI colour and Unicode, overriding
+            # what this console is set to - and the text checks would fail.
+            $settings.Enrichment.UseDefaultEnrichers = $false
             $capture = [Spectre.Console.AnsiConsole]::Create($settings)
             $capture.Profile.Width = 180
             # -Ascii: a console that isn't UTF-8 (code page 437, 850...).
