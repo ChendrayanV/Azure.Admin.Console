@@ -9,12 +9,12 @@ $moduleRoot = $PSScriptRoot
 $script:AACModuleRoot = $moduleRoot
 
 # The active sign-in, set by Connect-AAC and read/refreshed by Get-AACAccessToken.
-# It is $global: rather than $script: because Pester runs each test file in its
-# own dynamic module, which can't reliably see this module's $script: scope, and
-# the bundled Azure tests need the session. Declared here rather than
-# left implicitly $null because Set-StrictMode -Version Latest treats reading a
-# variable that was never assigned as an error.
-$global:AACSession = $null
+# Module-scoped, so its access and refresh tokens can't be read (or
+# replaced) by other code in the session - only the module's own functions
+# see it. Declared here rather than left implicitly $null because
+# Set-StrictMode -Version Latest treats reading a variable that was never
+# assigned as an error.
+$script:AACSession = $null
 
 # Set by Import-AACPdfLibrary once the PDF assemblies in .\lib\pdf are loaded
 # (only when a PDF report is first exported).
@@ -77,6 +77,10 @@ foreach ($folder in 'Private', 'Public') {
 Update-TypeData -TypeName 'AAC.FirewallRule' -DefaultDisplayPropertySet 'FirewallPolicy', 'RuleCollection', 'RuleName', 'Action' -Force
 # Same for Get-AACAdvisorRecommendation's ~25 (or more, with Ext_ columns).
 Update-TypeData -TypeName 'AAC.AdvisorRecommendation' -DefaultDisplayPropertySet 'Category', 'Impact', 'ResourceName', 'Problem' -Force
+# Invoke-AACApplicationInsightQuery's ~30 properties per exception.
+Update-TypeData -TypeName 'AAC.ApplicationInsightsException' -DefaultDisplayPropertySet 'TimeGenerated', 'Severity', 'ExceptionType', 'Message', 'AppRoleName' -Force
+# Invoke-AACPSRule's ~18 properties.
+Update-TypeData -TypeName 'AAC.PSRuleResult' -DefaultDisplayPropertySet 'Outcome', 'RuleName', 'ResourceName', 'Reason' -Force
 # Show-AACCost -PassThru: one property per month on top of these.
 Update-TypeData -TypeName 'AAC.SubscriptionCost' -DefaultDisplayPropertySet 'SubscriptionName', 'Currency', 'MonthToDate', 'Total', 'TopServices', 'Status' -Force
 

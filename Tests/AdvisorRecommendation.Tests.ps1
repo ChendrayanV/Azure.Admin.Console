@@ -139,6 +139,18 @@ Describe 'Azure Admin Console - Get-AACAdvisorRecommendation' {
             Mock -ModuleName 'Azure.Admin.Console' -CommandName Show-AACAdvisorTable -MockWith { }
         }
 
+        It 'writes an interactive HTML report instead of showing the summary' {
+            $html = Join-Path -Path $TestDrive -ChildPath 'advisor.html'
+            @(Get-AACAdvisorRecommendation -HtmlPath $html).Count | Should -Be 0
+            Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Show-AACAdvisorSummary -Times 0 -Exactly
+            $model = [regex]::Match((Get-Content -LiteralPath $html -Raw), '<script id="aac-data" type="application/json">(.*?)</script>', 'Singleline').Groups[1].Value | ConvertFrom-Json
+            $expected = @(Get-AACAdvisorRecommendation -NoDisplay).Count
+            $model.tables[0].rows.Count | Should -Be $expected
+            $model.tables[0].group | Should -Be 'Problem' -Because 'the report is consolidated by recommendation'
+            @($model.tiles.label) | Should -Contain 'high impact'
+            (Get-Content -LiteralPath $html -Raw) | Should -Not -Match '<script[^>]+src=' -Because 'the page works offline'
+        }
+
         It 'shows the summary and returns nothing when run on its own' {
             $out = @(Get-AACAdvisorRecommendation)
             $out.Count | Should -Be 0

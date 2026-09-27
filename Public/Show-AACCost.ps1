@@ -1,9 +1,10 @@
 function Show-AACCost {
     <#
+    .EXTERNALHELP Azure.Admin.Console-help.xml
     .SYNOPSIS
         Shows what your Azure subscriptions cost - month to date and the
         last few months - as colourful Spectre.Console charts, with optional
-        CSV and PDF exports of the detail.
+        CSV, PDF and interactive HTML exports of the detail.
     .DESCRIPTION
         Asks the Azure Cost Management Query API, over REST with the
         Connect-AAC sign-in (no Az modules), for each subscription's actual
@@ -43,9 +44,20 @@ function Show-AACCost {
                       resource groups this month), then a page per
                       subscription with its services and resource groups
                       month by month
+          -HtmlPath   a self-contained, interactive HTML report: tiles and
+                      charts (by month, subscription, service, resource
+                      group) that filter the detail, a subscription-by-month
+                      table and every detail row, with search, filters,
+                      grouping, totals of what is shown and a CSV download
           -PassThru   one AAC.SubscriptionCost object per subscription:
                       MonthToDate, one property per month ('2026-07', ...),
                       Total, TopServices and Status
+
+        When any of -CsvPath, -PdfPath or -HtmlPath is given, the console
+        shows only the progress and the files written - the report is in
+        the files. Otherwise the view is paged when it is longer than the
+        terminal: press any key for the next page, or A for the rest
+        (-NoPaging turns that off).
 
         Reading costs needs Cost Management Reader (or Reader) on the
         subscriptions. Costs are "actual cost" as Cost Management reports
@@ -66,8 +78,13 @@ function Show-AACCost {
     .PARAMETER PdfPath
         Also write a PDF report to this file. An existing file is
         overwritten; missing folders are created.
+    .PARAMETER HtmlPath
+        Also write an interactive HTML report to this file. An existing file
+        is overwritten; missing folders are created.
     .PARAMETER Title
-        The PDF's title. Defaults to 'Azure cost'.
+        The PDF and HTML report's title. Defaults to 'Azure cost'.
+    .PARAMETER NoPaging
+        Show the whole view at once instead of a screen at a time.
     .PARAMETER PassThru
         Also return the costs as AAC.SubscriptionCost objects.
     .EXAMPLE
@@ -76,7 +93,10 @@ function Show-AACCost {
         Month to date and the last 6 months for every subscription you can see.
     .EXAMPLE
         Show-AACCost -Months 12 -CsvPath .\out\Cost.csv -PdfPath .\out\Cost.pdf
-        The last year, on screen, as a detail CSV file and as a PDF report.
+        The last year as a detail CSV file and a PDF report.
+    .EXAMPLE
+        Show-AACCost -Months 12 -HtmlPath .\out\Cost.html
+        The last year in an interactive HTML report.
     .EXAMPLE
         Show-AACCost -SubscriptionId '00000000-0000-0000-0000-000000000000' -Months 3
         One subscription over the last three months.
@@ -102,7 +122,11 @@ function Show-AACCost {
 
         [string] $PdfPath,
 
+        [string] $HtmlPath,
+
         [string] $Title = 'Azure cost',
+
+        [switch] $NoPaging,
 
         [switch] $PassThru
     )
@@ -111,6 +135,7 @@ function Show-AACCost {
     # fails before any Azure call.
     $csvFullPath = if ($CsvPath) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($CsvPath) }
     $pdfFullPath = if ($PdfPath) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($PdfPath) }
+    $htmlFullPath = if ($HtmlPath) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($HtmlPath) }
 
     # --- The period and helpers ------------------------------------------------------------------
     $invariant = [cultureinfo]::InvariantCulture
@@ -164,7 +189,7 @@ function Show-AACCost {
         }
     }
 
-    # --- Read and export behind one progress display, as Invoke-AACPester does ----------------
+    # --- Read and export behind one progress display, as every command does -------------------
     # The title first; then a line per step - subscriptions, costs (naming
     # each subscription as it is read), CSV and PDF - each finishing with
     # what it found; then the report.
@@ -256,132 +281,143 @@ function Show-AACCost {
             })
 
         $period = "$($monthStarts[0].ToString('MMM yyyy')) - $($today.ToString('d MMM yyyy'))"
-        $pdf = Invoke-AACExport -CsvPath $csvFullPath -CsvObject @($detail | Sort-Object SubscriptionName, Month, ResourceGroup, Service) -Noun 'detail row' -PdfPath $pdfFullPath -WritePdf {
+        $null = Invoke-AACExport -CsvPath $csvFullPath -CsvObject @($detail | Sort-Object SubscriptionName, Month, ResourceGroup, Service) -Noun 'detail row' -PdfPath $pdfFullPath -WritePdf {
             Write-AACCostPdf -Cost $costs -Detail $detail.ToArray() -MonthStart $monthStarts -Path $pdfFullPath -Title $Title -Period $period
+        } -HtmlPath $htmlFullPath -WriteHtml {
+            $scope = [ordered]@{ Subscriptions = if ($SubscriptionId) { $SubscriptionId -join ', ' } else { 'every enabled subscription the account can see' }; Period = $period }
+            Write-AACCostHtml -Cost $costs -CostDetail $detail.ToArray() -MonthStart $monthStarts -Path $htmlFullPath -Title $Title -Period $period -Detail $scope
         }
 
-        @{ Subscriptions = $subscriptions; Costs = $costs; Detail = $detail; Pdf = $pdf }
+        @{ Subscriptions = $subscriptions; Costs = $costs; Detail = $detail }
     }
     $subscriptions = @($state.Subscriptions)
     $costs = @($state.Costs)
     $detail = $state.Detail
-    $pdf = $state.Pdf
 
-    # --- The view --------------------------------------------------------------------------------
-    $escape = { param($Text) [Spectre.Console.Markup]::Escape([string]$Text) }
-    # Unicode symbols, or ASCII in a console that isn't UTF-8.
-    $glyph = Get-AACGlyph
-    $money = { param([double] $Value, [string] $Currency) ('{0:N2} {1}' -f $Value, $Currency).Trim() }
-    $monthLabel = { param([datetime] $Start) "$($Start.ToString('MMM yyyy'))$(if ($Start -eq $thisMonth) { ' (to date)' })" }
-    $facts = [System.Collections.Generic.List[string]]::new()
-    if ($global:AACSession) {
-        $facts.Add("[white]$(& $escape $global:AACSession.Account)[/]")
-        $facts.Add("tenant $(& $escape $global:AACSession.TenantId)")
-    }
-    $facts.Add("$($subscriptions.Count) subscription(s)")
-    $facts.Add("actual cost $($monthStarts[0].ToString('MMM yyyy')) - $($today.ToString('d MMM yyyy'))")
-    Write-AACMarkup "[grey58]$($facts -join " $($glyph.Dot) ")[/]"
-    [Spectre.Console.AnsiConsole]::WriteLine()
-
-    $read = @($costs | Where-Object Status -eq 'OK')
-    if ($read.Count -eq 0) {
-        Show-AACPanel -Content '[bold]No costs could be read[/] [grey58]for these subscriptions - see the reasons below.[/]' -BorderColor 'grey50' -AllowMarkup
-    }
-    $currencyGroups = @($read | Group-Object -Property Currency | Sort-Object -Property Count -Descending)
-    foreach ($currencyGroup in $currencyGroups) {
-        $currency = $currencyGroup.Name
-        $group = @($currencyGroup.Group)
-        $ids = @($group | ForEach-Object { $_.SubscriptionId })
-        $rows = @($detail | Where-Object { $_.SubscriptionId -in $ids })
-        if ($currencyGroups.Count -gt 1) {
-            Write-AACRule -Title "[bold]$(& $escape $(if ($currency) { $currency } else { 'no currency' }))[/]" -Color 'grey50'
+    # An export means the report is in the files: no view.
+    if ($CsvPath -or $PdfPath -or $HtmlPath) {
+        foreach ($failed in @($costs | Where-Object Status -ne 'OK')) {
+            Write-AACMarkup "[orange1]![/] [grey58]$([Spectre.Console.Markup]::Escape($failed.SubscriptionName)): $([Spectre.Console.Markup]::Escape($failed.Status))[/]"
         }
+        if ($PassThru) { $costs }
+        return
+    }
 
-        $monthToDate = & $sum $group 'MonthToDate'
-        $periodTotal = & $sum $group 'Total'
-        $thisMonthRows = @($rows | Where-Object Month -eq $thisMonthKey)
-        $byService = @($thisMonthRows | Group-Object Service | ForEach-Object { [pscustomobject]@{ Name = $(if ($_.Name) { $_.Name } else { '(no service)' }); Cost = (& $sum $_.Group 'Cost') } } | Where-Object Cost -gt 0 | Sort-Object Cost -Descending)
-        $byGroup = @($thisMonthRows | Group-Object ResourceGroup | ForEach-Object { [pscustomobject]@{ Name = $(if ($_.Name) { $_.Name } else { '(no resource group)' }); Cost = (& $sum $_.Group 'Cost') } } | Where-Object Cost -gt 0 | Sort-Object Cost -Descending)
-
-        Show-AACTileRow -Tile @(
-            @{ Value = (& $money $monthToDate $currency); Caption = 'month to date'; Color = 'springgreen2' }
-            @{ Value = $(if ($Months -gt 1) { & $money (& $sum $group $lastMonthKey) $currency } else { '-' }); Caption = 'last month'; Color = 'deepskyblue1' }
-            @{ Value = (& $money $periodTotal $currency); Caption = "last $Months month$(if ($Months -ne 1) { 's' })"; Color = 'mediumpurple2' }
-            @{ Value = '{0:N0}' -f $group.Count; Caption = 'subscriptions'; Color = 'gold1' }
-            @{ Value = $(if ($byService) { $byService[0].Name } else { '-' }); Caption = 'top service this month'; Color = 'hotpink' }
-        )
+    # --- The view, a page at a time ----------------------------------------------------------------
+    Invoke-AACPagedOutput -NoPaging:$NoPaging -ScriptBlock {
+        $escape = { param($Text) [Spectre.Console.Markup]::Escape([string]$Text) }
+        # Unicode symbols, or ASCII in a console that isn't UTF-8.
+        $glyph = Get-AACGlyph
+        $money = { param([double] $Value, [string] $Currency) ('{0:N2} {1}' -f $Value, $Currency).Trim() }
+        $monthLabel = { param([datetime] $Start) "$($Start.ToString('MMM yyyy'))$(if ($Start -eq $thisMonth) { ' (to date)' })" }
+        $facts = [System.Collections.Generic.List[string]]::new()
+        if ($script:AACSession) {
+            $facts.Add("[white]$(& $escape $script:AACSession.Account)[/]")
+            $facts.Add("tenant $(& $escape $script:AACSession.TenantId)")
+        }
+        $facts.Add("$($subscriptions.Count) subscription(s)")
+        $facts.Add("actual cost $($monthStarts[0].ToString('MMM yyyy')) - $($today.ToString('d MMM yyyy'))")
+        Write-AACMarkup "[grey58]$($facts -join " $($glyph.Dot) ")[/]"
         [Spectre.Console.AnsiConsole]::WriteLine()
 
-        if ($periodTotal -eq 0) {
-            Show-AACPanel -Content "[bold]Cost Management reports no cost[/] [grey58]for $(if ($group.Count -eq 1) { 'this subscription' } else { 'these subscriptions' }) from $($monthStarts[0].ToString('MMM yyyy')) to today. Its usage may be billed to another subscription, be covered by credits, or not be processed yet.[/]" -BorderColor 'grey50' -AllowMarkup
+        $read = @($costs | Where-Object Status -eq 'OK')
+        if ($read.Count -eq 0) {
+            Show-AACPanel -Content '[bold]No costs could be read[/] [grey58]for these subscriptions - see the reasons below.[/]' -BorderColor 'grey50' -AllowMarkup
+        }
+        $currencyGroups = @($read | Group-Object -Property Currency | Sort-Object -Property Count -Descending)
+        foreach ($currencyGroup in $currencyGroups) {
+            $currency = $currencyGroup.Name
+            $group = @($currencyGroup.Group)
+            $ids = @($group | ForEach-Object { $_.SubscriptionId })
+            $rows = @($detail | Where-Object { $_.SubscriptionId -in $ids })
+            if ($currencyGroups.Count -gt 1) {
+                Write-AACRule -Title "[bold]$(& $escape $(if ($currency) { $currency } else { 'no currency' }))[/]" -Color 'grey50'
+            }
+
+            $monthToDate = & $sum $group 'MonthToDate'
+            $periodTotal = & $sum $group 'Total'
+            $thisMonthRows = @($rows | Where-Object Month -eq $thisMonthKey)
+            $byService = @($thisMonthRows | Group-Object Service | ForEach-Object { [pscustomobject]@{ Name = $(if ($_.Name) { $_.Name } else { '(no service)' }); Cost = (& $sum $_.Group 'Cost') } } | Where-Object Cost -gt 0 | Sort-Object Cost -Descending)
+            $byGroup = @($thisMonthRows | Group-Object ResourceGroup | ForEach-Object { [pscustomobject]@{ Name = $(if ($_.Name) { $_.Name } else { '(no resource group)' }); Cost = (& $sum $_.Group 'Cost') } } | Where-Object Cost -gt 0 | Sort-Object Cost -Descending)
+
+            Show-AACTileRow -Tile @(
+                @{ Value = (& $money $monthToDate $currency); Caption = 'month to date'; Color = 'springgreen2' }
+                @{ Value = $(if ($Months -gt 1) { & $money (& $sum $group $lastMonthKey) $currency } else { '-' }); Caption = 'last month'; Color = 'deepskyblue1' }
+                @{ Value = (& $money $periodTotal $currency); Caption = "last $Months month$(if ($Months -ne 1) { 's' })"; Color = 'mediumpurple2' }
+                @{ Value = '{0:N0}' -f $group.Count; Caption = 'subscriptions'; Color = 'gold1' }
+                @{ Value = $(if ($byService) { $byService[0].Name } else { '-' }); Caption = 'top service this month'; Color = 'hotpink' }
+            )
             [Spectre.Console.AnsiConsole]::WriteLine()
-            continue
+
+            if ($periodTotal -eq 0) {
+                Show-AACPanel -Content "[bold]Cost Management reports no cost[/] [grey58]for $(if ($group.Count -eq 1) { 'this subscription' } else { 'these subscriptions' }) from $($monthStarts[0].ToString('MMM yyyy')) to today. Its usage may be billed to another subscription, be covered by credits, or not be processed yet.[/]" -BorderColor 'grey50' -AllowMarkup
+                [Spectre.Console.AnsiConsole]::WriteLine()
+                continue
+            }
+
+            if ($group.Count -gt 1) {
+                $bars = @($group | Sort-Object -Property MonthToDate -Descending | ForEach-Object { @{ Label = $_.SubscriptionName; Value = $_.MonthToDate } })
+                Show-AACBarChart -Item $bars -Title "Month to date by subscription ($currency)" -Format 'N2'
+                [Spectre.Console.AnsiConsole]::WriteLine()
+            }
+            if ($byService) {
+                $slices = [ordered]@{}
+                foreach ($service in @($byService | Select-Object -First $Top)) { $slices[[string]$service.Name] = [Math]::Round($service.Cost, 2) }
+                $other = @($byService | Select-Object -Skip $Top)
+                if ($other) { $slices['other services'] = [Math]::Round((& $sum $other 'Cost'), 2) }
+                Show-AACBreakdownChart -Data $slices -Title "Month to date by service ($currency)" -Width 120
+                [Spectre.Console.AnsiConsole]::WriteLine()
+            }
+            if ($byGroup) {
+                $bars = @($byGroup | Select-Object -First 10 | ForEach-Object { @{ Label = $_.Name; Value = [Math]::Round($_.Cost, 2) } })
+                Show-AACBarChart -Item $bars -Title "Month to date by resource group ($currency, top $([Math]::Min(10, $byGroup.Count)) of $($byGroup.Count))" -Format 'N2'
+                [Spectre.Console.AnsiConsole]::WriteLine()
+            }
+            if ($Months -gt 1) {
+                $monthBars = @(foreach ($start in $monthStarts) {
+                        @{ Label = (& $monthLabel $start); Value = (& $sum $group (& $monthKey $start)); Color = $(if ($start -eq $thisMonth) { 'springgreen2' } else { 'deepskyblue1' }) }
+                    })
+                Show-AACBarChart -Item $monthBars -Title "Last $Months months ($currency)" -Format 'N2'
+                [Spectre.Console.AnsiConsole]::WriteLine()
+            }
+
+            # Every subscription month by month, with a total column (and row).
+            $table = [Spectre.Console.Table]::new()
+            $table.Border = [Spectre.Console.TableBorder]::Rounded
+            $table.BorderStyle = [Spectre.Console.Style]::Parse('grey35')
+            $table.Title = [Spectre.Console.TableTitle]::new("[bold]Actual cost by subscription and month ($(& $escape $currency))[/]")
+            $table.AddColumn([Spectre.Console.TableColumn]::new('[grey62]Subscription[/]')) | Out-Null
+            foreach ($header in @($monthStarts | ForEach-Object { "$($_.ToString('MMM yy'))$(if ($_ -eq $thisMonth) { '*' })" }) + 'Total') {
+                $column = [Spectre.Console.TableColumn]::new("[grey62]$header[/]")
+                $column.Alignment = [Spectre.Console.Justify]::Right
+                $table.AddColumn($column) | Out-Null
+            }
+            $cell = { param([double] $Value, [string] $Style) $text = '{0:N2}' -f $Value; [Spectre.Console.Markup]::new($(if ($Value -eq 0) { "[grey42]$text[/]" } elseif ($Style) { "[$Style]$text[/]" } else { $text })) }
+            foreach ($item in @($group | Sort-Object -Property Total -Descending)) {
+                $values = @($monthStarts | ForEach-Object { [double]$item.(& $monthKey $_) })
+                $peak = ($values | Measure-Object -Maximum).Maximum
+                $cells = @([Spectre.Console.Markup]::new("[bold]$(& $escape $item.SubscriptionName)[/]"))
+                foreach ($value in $values) { $cells += & $cell $value $(if ($value -eq $peak -and $value -gt 0) { 'bold gold1' }) }
+                $cells += & $cell $item.Total 'bold'
+                [Spectre.Console.TableExtensions]::AddRow($table, [Spectre.Console.Rendering.IRenderable[]]$cells) | Out-Null
+            }
+            if ($group.Count -gt 1) {
+                $cells = @([Spectre.Console.Markup]::new('[bold]Total[/]'))
+                foreach ($start in $monthStarts) { $cells += & $cell (& $sum $group (& $monthKey $start)) 'bold' }
+                $cells += & $cell $periodTotal 'bold'
+                $table.ShowFooters = $false
+                [Spectre.Console.TableExtensions]::AddEmptyRow($table) | Out-Null
+                [Spectre.Console.TableExtensions]::AddRow($table, [Spectre.Console.Rendering.IRenderable[]]$cells) | Out-Null
+            }
+            [Spectre.Console.AnsiConsole]::Write($table)
+            Write-AACMarkup "[grey42]* month to date. Each subscription's highest month is in gold.[/]"
+            [Spectre.Console.AnsiConsole]::WriteLine()
         }
 
-        if ($group.Count -gt 1) {
-            $bars = @($group | Sort-Object -Property MonthToDate -Descending | ForEach-Object { @{ Label = $_.SubscriptionName; Value = $_.MonthToDate } })
-            Show-AACBarChart -Item $bars -Title "Month to date by subscription ($currency)" -Format 'N2'
-            [Spectre.Console.AnsiConsole]::WriteLine()
+        foreach ($failed in @($costs | Where-Object Status -ne 'OK')) {
+            Write-AACMarkup "[orange1]![/] [grey58]$(& $escape $failed.SubscriptionName): $(& $escape $failed.Status)[/]"
         }
-        if ($byService) {
-            $slices = [ordered]@{}
-            foreach ($service in @($byService | Select-Object -First $Top)) { $slices[[string]$service.Name] = [Math]::Round($service.Cost, 2) }
-            $other = @($byService | Select-Object -Skip $Top)
-            if ($other) { $slices['other services'] = [Math]::Round((& $sum $other 'Cost'), 2) }
-            Show-AACBreakdownChart -Data $slices -Title "Month to date by service ($currency)" -Width 120
-            [Spectre.Console.AnsiConsole]::WriteLine()
-        }
-        if ($byGroup) {
-            $bars = @($byGroup | Select-Object -First 10 | ForEach-Object { @{ Label = $_.Name; Value = [Math]::Round($_.Cost, 2) } })
-            Show-AACBarChart -Item $bars -Title "Month to date by resource group ($currency, top $([Math]::Min(10, $byGroup.Count)) of $($byGroup.Count))" -Format 'N2'
-            [Spectre.Console.AnsiConsole]::WriteLine()
-        }
-        if ($Months -gt 1) {
-            $monthBars = @(foreach ($start in $monthStarts) {
-                    @{ Label = (& $monthLabel $start); Value = (& $sum $group (& $monthKey $start)); Color = $(if ($start -eq $thisMonth) { 'springgreen2' } else { 'deepskyblue1' }) }
-                })
-            Show-AACBarChart -Item $monthBars -Title "Last $Months months ($currency)" -Format 'N2'
-            [Spectre.Console.AnsiConsole]::WriteLine()
-        }
-
-        # Every subscription month by month, with a total column (and row).
-        $table = [Spectre.Console.Table]::new()
-        $table.Border = [Spectre.Console.TableBorder]::Rounded
-        $table.BorderStyle = [Spectre.Console.Style]::Parse('grey35')
-        $table.Title = [Spectre.Console.TableTitle]::new("[bold]Actual cost by subscription and month ($(& $escape $currency))[/]")
-        $table.AddColumn([Spectre.Console.TableColumn]::new('[grey62]Subscription[/]')) | Out-Null
-        foreach ($header in @($monthStarts | ForEach-Object { "$($_.ToString('MMM yy'))$(if ($_ -eq $thisMonth) { '*' })" }) + 'Total') {
-            $column = [Spectre.Console.TableColumn]::new("[grey62]$header[/]")
-            $column.Alignment = [Spectre.Console.Justify]::Right
-            $table.AddColumn($column) | Out-Null
-        }
-        $cell = { param([double] $Value, [string] $Style) $text = '{0:N2}' -f $Value; [Spectre.Console.Markup]::new($(if ($Value -eq 0) { "[grey42]$text[/]" } elseif ($Style) { "[$Style]$text[/]" } else { $text })) }
-        foreach ($item in @($group | Sort-Object -Property Total -Descending)) {
-            $values = @($monthStarts | ForEach-Object { [double]$item.(& $monthKey $_) })
-            $peak = ($values | Measure-Object -Maximum).Maximum
-            $cells = @([Spectre.Console.Markup]::new("[bold]$(& $escape $item.SubscriptionName)[/]"))
-            foreach ($value in $values) { $cells += & $cell $value $(if ($value -eq $peak -and $value -gt 0) { 'bold gold1' }) }
-            $cells += & $cell $item.Total 'bold'
-            [Spectre.Console.TableExtensions]::AddRow($table, [Spectre.Console.Rendering.IRenderable[]]$cells) | Out-Null
-        }
-        if ($group.Count -gt 1) {
-            $cells = @([Spectre.Console.Markup]::new('[bold]Total[/]'))
-            foreach ($start in $monthStarts) { $cells += & $cell (& $sum $group (& $monthKey $start)) 'bold' }
-            $cells += & $cell $periodTotal 'bold'
-            $table.ShowFooters = $false
-            [Spectre.Console.TableExtensions]::AddEmptyRow($table) | Out-Null
-            [Spectre.Console.TableExtensions]::AddRow($table, [Spectre.Console.Rendering.IRenderable[]]$cells) | Out-Null
-        }
-        [Spectre.Console.AnsiConsole]::Write($table)
-        Write-AACMarkup "[grey42]* month to date. Each subscription's highest month is in gold.[/]"
-        [Spectre.Console.AnsiConsole]::WriteLine()
     }
-
-    foreach ($failed in @($costs | Where-Object Status -ne 'OK')) {
-        Write-AACMarkup "[orange1]![/] [grey58]$(& $escape $failed.SubscriptionName): $(& $escape $failed.Status)[/]"
-    }
-    if ($csvFullPath) { Write-AACMarkup "[grey58]CSV written to[/] [link]$(& $escape $csvFullPath)[/] [grey42]($($detail.Count) detail rows)[/]" }
-    if ($pdf) { Write-AACMarkup "[grey58]PDF written to[/] [link]$(& $escape $pdf.FullName)[/]" }
 
     if ($PassThru) {
         $costs

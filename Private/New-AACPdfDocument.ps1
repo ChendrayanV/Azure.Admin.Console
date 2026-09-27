@@ -28,6 +28,7 @@ function New-AACPdfDocument {
         Write it with Save-AACPdfDocument.
     #>
     [CmdletBinding()]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Builds a document in memory; nothing outside the process changes.')]
     param(
         [Parameter(Mandatory)]
         [string] $Title,

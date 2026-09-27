@@ -13,10 +13,20 @@ BeforeDiscovery {
     }
 }
 
+BeforeAll {
+    # The session lives in the module's script scope; these reach it.
+    function global:Get-AACTestSession { & (Get-Module -Name 'Azure.Admin.Console') { $script:AACSession } }
+    function global:Set-AACTestSession { param($Value) & (Get-Module -Name 'Azure.Admin.Console') { param($v) $script:AACSession = $v } $Value }
+}
+
+AfterAll {
+    Remove-Item -Path Function:\Get-AACTestSession, Function:\Set-AACTestSession -ErrorAction Ignore
+}
+
 Describe 'Azure Admin Console - sign-in' {
     BeforeAll {
         # Keep the real Connect-AAC sign-in (if any); the tests replace it.
-        $script:savedSession = $global:AACSession
+        $script:savedSession = (Get-AACTestSession)
 
         $script:base64Url = { param([string] $Text) [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Text)).TrimEnd('=').Replace('+', '-').Replace('/', '_') }
         $script:idToken = "$(& $script:base64Url '{"alg":"none"}').$(& $script:base64Url '{"preferred_username":"tester@contoso.com","tid":"72f988bf-0000-0000-0000-000000000000"}').sig"
@@ -27,12 +37,12 @@ Describe 'Azure Admin Console - sign-in' {
     }
 
     AfterAll {
-        $global:AACSession = $script:savedSession
+        Set-AACTestSession ($script:savedSession)
         Remove-Variable -Name AACTestBrowserReply, AACTestAuthorizeUrl, AACTestTokenBody, AACTestBrowser, AACTestIdToken -Scope Global -ErrorAction Ignore
     }
 
     BeforeEach {
-        $global:AACSession = $null
+        Set-AACTestSession ($null)
         $global:AACTestIdToken = $script:idToken
 
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Write-AACRule -MockWith { }
@@ -60,7 +70,8 @@ Describe 'Azure Admin Console - sign-in' {
         $session.AccessToken | Should -BeExactly 'access-123'
         $session.RefreshToken | Should -BeExactly 'refresh-456'
         $session.ExpiresOn | Should -BeGreaterThan (Get-Date).AddMinutes(55)
-        $global:AACSession.AccessToken | Should -BeExactly 'access-123'
+        (Get-AACTestSession).AccessToken | Should -BeExactly 'access-123'
+        Get-Variable -Name 'AACSession' -Scope Global -ErrorAction Ignore | Should -BeNullOrEmpty -Because 'the tokens stay inside the module'
 
         $global:AACTestAuthorizeUrl | Should -BeLike 'https://login.microsoftonline.com/contoso.onmicrosoft.com/oauth2/v2.0/authorize?*code_challenge_method=S256*'
         $global:AACTestTokenBody.grant_type | Should -BeExactly 'authorization_code'
@@ -75,7 +86,7 @@ Describe 'Azure Admin Console - sign-in' {
         $global:AACTestBrowserReply = { param($State) "error=access_denied&error_description=User%20cancelled&state=$([uri]::EscapeDataString($State))" }
         try {
             { Connect-AAC -TimeoutSeconds 30 } | Should -Throw '*Sign-in failed: User cancelled*'
-            $global:AACSession | Should -BeNullOrEmpty
+            (Get-AACTestSession) | Should -BeNullOrEmpty
         }
         finally {
             $global:AACTestBrowserReply = { param($State) "code=test-code&state=$([uri]::EscapeDataString($State))" }
@@ -94,34 +105,34 @@ Describe 'Azure Admin Console - sign-in' {
     }
 
     It 'Disconnect-AAC forgets the sign-in, and is harmless when signed out' {
-        $global:AACSession = [pscustomobject]@{ Account = 'tester@contoso.com'; AccessToken = 'x' }
+        Set-AACTestSession ([pscustomobject]@{ Account = 'tester@contoso.com'; AccessToken = 'x' })
         Disconnect-AAC
-        $global:AACSession | Should -BeNullOrEmpty
+        (Get-AACTestSession) | Should -BeNullOrEmpty
         { Disconnect-AAC } | Should -Not -Throw
     }
 }
 
 Describe 'Azure Admin Console - access token' {
-    BeforeAll { $script:savedSession = $global:AACSession }
-    AfterAll { $global:AACSession = $script:savedSession }
+    BeforeAll { $script:savedSession = (Get-AACTestSession) }
+    AfterAll { Set-AACTestSession $script:savedSession }
 
     It 'needs a sign-in' {
-        $global:AACSession = $null
+        Set-AACTestSession ($null)
         { InModuleScope 'Azure.Admin.Console' { Get-AACAccessToken } } | Should -Throw '*Connect-AAC*'
     }
 
     It 'returns the current token while it is valid' {
-        $global:AACSession = [pscustomobject]@{ AccessToken = 'current'; RefreshToken = 'r'; ExpiresOn = (Get-Date).AddHours(1); TenantId = 't'; ClientId = 'c'; Scope = @('s') }
+        Set-AACTestSession ([pscustomobject]@{ AccessToken = 'current'; RefreshToken = 'r'; ExpiresOn = (Get-Date).AddHours(1); TenantId = 't'; ClientId = 'c'; Scope = @('s') })
         InModuleScope 'Azure.Admin.Console' { Get-AACAccessToken } | Should -BeExactly 'current'
     }
 
     It 'refreshes an expiring token with the refresh token' {
-        $global:AACSession = [pscustomobject]@{ AccessToken = 'old'; RefreshToken = 'r1'; ExpiresOn = (Get-Date).AddSeconds(30); TenantId = 't'; ClientId = 'c'; Scope = @('s') }
+        Set-AACTestSession ([pscustomobject]@{ AccessToken = 'old'; RefreshToken = 'r1'; ExpiresOn = (Get-Date).AddSeconds(30); TenantId = 't'; ClientId = 'c'; Scope = @('s') })
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-RestMethod -MockWith {
             [pscustomobject]@{ access_token = 'new'; refresh_token = 'r2'; expires_in = 3600 }
         }
         InModuleScope 'Azure.Admin.Console' { Get-AACAccessToken } | Should -BeExactly 'new'
-        $global:AACSession.RefreshToken | Should -BeExactly 'r2'
+        (Get-AACTestSession).RefreshToken | Should -BeExactly 'r2'
         Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Invoke-RestMethod -ParameterFilter { $Body.grant_type -eq 'refresh_token' -and $Body.refresh_token -eq 'r1' } -Times 1 -Exactly
     }
 }

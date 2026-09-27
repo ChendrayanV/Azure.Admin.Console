@@ -26,6 +26,7 @@ function Update-AACProgress {
         description as a plain line instead.
     #>
     [CmdletBinding()]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Moves a line of the progress display; nothing outside the console changes.')]
     param(
         [Parameter(Mandatory)]
         [string] $Id,

@@ -1,18 +1,33 @@
+---
+document type: cmdlet
+external help file: Azure.Admin.Console-help.xml
+HelpUri: https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Show-AACCost.md
+Locale: en-US
+Module Name: Azure.Admin.Console
+PlatyPS schema version: 2024-05-01
+title: Show-AACCost
+---
+
 # Show-AACCost
 
-[Azure.Admin.Console](Azure.Admin.Console.md) · [about_Azure.Admin.Console](about_Azure.Admin.Console.md)
+## SYNOPSIS
 
-## Synopsis
+Shows what your Azure subscriptions cost - month to date and the last few months - as colourful Spectre.Console charts, with optional CSV, PDF and interactive HTML exports of the detail.
 
-Shows what your Azure subscriptions cost - month to date and the last few months - as colourful Spectre.Console charts, with optional CSV and PDF exports of the detail.
+## SYNTAX
 
-## Syntax
+### __AllParameterSets
 
-```powershell
-Show-AACCost [[-SubscriptionId] <string[]>] [[-Months] <int>] [[-Top] <int>] [[-CsvPath] <string>] [[-PdfPath] <string>] [[-Title] <string>] [-PassThru] [<CommonParameters>]
+```
+Show-AACCost [[-SubscriptionId] <string[]>] [[-Months] <int>] [[-Top] <int>] [[-CsvPath] <string>]
+ [[-PdfPath] <string>] [[-HtmlPath] <string>] [[-Title] <string>] [-NoPaging] [-PassThru]
 ```
 
-## Description
+## ALIASES
+
+This command has no aliases.
+
+## DESCRIPTION
 
 Asks the Azure Cost Management Query API, over REST with the
 Connect-AAC sign-in (no Az modules), for each subscription's actual
@@ -45,6 +60,7 @@ allows only a few queries a minute, so a progress display shows each
 subscription as it is read, and throttled requests are retried.
 
 Exports:
+
 ```text
   -CsvPath    the detail: one row per subscription, month, resource
               group and service - SubscriptionName, SubscriptionId,
@@ -55,17 +71,28 @@ Exports:
               resource groups this month), then a page per
               subscription with its services and resource groups
               month by month
+  -HtmlPath   a self-contained, interactive HTML report: tiles and
+              charts (by month, subscription, service, resource
+              group) that filter the detail, a subscription-by-month
+              table and every detail row, with search, filters,
+              grouping, totals of what is shown and a CSV download
   -PassThru   one AAC.SubscriptionCost object per subscription:
               MonthToDate, one property per month ('2026-07', ...),
               Total, TopServices and Status
 ```
+
+When any of -CsvPath, -PdfPath or -HtmlPath is given, the console
+shows only the progress and the files written - the report is in
+the files. Otherwise the view is paged when it is longer than the
+terminal: press any key for the next page, or A for the rest
+(-NoPaging turns that off).
 
 Reading costs needs Cost Management Reader (or Reader) on the
 subscriptions. Costs are "actual cost" as Cost Management reports
 it, which can lag usage by a day or so. PDF export needs Windows and
 PowerShell 7.4 or later.
 
-## Examples
+## EXAMPLES
 
 ### Example 1
 
@@ -82,9 +109,17 @@ Month to date and the last 6 months for every subscription you can see.
 Show-AACCost -Months 12 -CsvPath .\out\Cost.csv -PdfPath .\out\Cost.pdf
 ```
 
-The last year, on screen, as a detail CSV file and as a PDF report.
+The last year as a detail CSV file and a PDF report.
 
 ### Example 3
+
+```powershell
+Show-AACCost -Months 12 -HtmlPath .\out\Cost.html
+```
+
+The last year in an interactive HTML report.
+
+### Example 4
 
 ```powershell
 Show-AACCost -SubscriptionId '00000000-0000-0000-0000-000000000000' -Months 3
@@ -92,7 +127,7 @@ Show-AACCost -SubscriptionId '00000000-0000-0000-0000-000000000000' -Months 3
 
 One subscription over the last three months.
 
-### Example 4
+### Example 5
 
 ```powershell
 Show-AACCost -PassThru | Export-Csv .\CostSummary.csv -NoTypeInformation
@@ -100,48 +135,7 @@ Show-AACCost -PassThru | Export-Csv .\CostSummary.csv -NoTypeInformation
 
 One row per subscription, with a column per month.
 
-## Parameters
-
-### -SubscriptionId
-
-Only these subscriptions. Defaults to every enabled subscription the
-signed-in account can see.
-
-| | |
-|---|---|
-| Type | `String[]` |
-| Required | No |
-| Position | 0 |
-| Default value | `None` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
-
-### -Months
-
-How many months to cover, this month included (default 6, up to 12).
-
-| | |
-|---|---|
-| Type | `Int32` |
-| Required | No |
-| Position | 1 |
-| Default value | `6` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
-
-### -Top
-
-How many services the month-to-date breakdown shows (default 8); the
-rest are summed as "other services".
-
-| | |
-|---|---|
-| Type | `Int32` |
-| Required | No |
-| Position | 2 |
-| Default value | `8` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
+## PARAMETERS
 
 ### -CsvPath
 
@@ -149,59 +143,211 @@ Also write the detail - one row per subscription, month, resource
 group and service - to this CSV file. An existing file is
 overwritten; missing folders are created.
 
-| | |
-|---|---|
-| Type | `String` |
-| Required | No |
-| Position | 3 |
-| Default value | `None` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 3
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -HtmlPath
+
+Also write an interactive HTML report to this file. An existing file
+is overwritten; missing folders are created.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 5
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Months
+
+How many months to cover, this month included (default 6, up to 12).
+
+```yaml
+Type: System.Int32
+DefaultValue: 6
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 1
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoPaging
+
+Show the whole view at once instead of a screen at a time.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PassThru
+
+Also return the costs as AAC.SubscriptionCost objects.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
 ### -PdfPath
 
 Also write a PDF report to this file. An existing file is
 overwritten; missing folders are created.
 
-| | |
-|---|---|
-| Type | `String` |
-| Required | No |
-| Position | 4 |
-| Default value | `None` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 4
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -SubscriptionId
+
+Only these subscriptions. Defaults to every enabled subscription the
+signed-in account can see.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 0
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
 ### -Title
 
-The PDF's title. Defaults to 'Azure cost'.
+The PDF and HTML report's title. Defaults to 'Azure cost'.
 
-| | |
-|---|---|
-| Type | `String` |
-| Required | No |
-| Position | 5 |
-| Default value | `'Azure cost'` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
+```yaml
+Type: System.String
+DefaultValue: "'Azure cost'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 6
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
-### -PassThru
+### -Top
 
-Also return the costs as AAC.SubscriptionCost objects.
+How many services the month-to-date breakdown shows (default 8); the
+rest are summed as "other services".
 
-| | |
-|---|---|
-| Type | `SwitchParameter` |
-| Required | No |
-| Position | Named |
-| Default value | `False` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
+```yaml
+Type: System.Int32
+DefaultValue: 8
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 2
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
 ### CommonParameters
 
-This command supports the common parameters (`-Verbose`, `-ErrorAction`, `-WarningAction` and so on). See [about_CommonParameters](https://learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_commonparameters).
+This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable,
+-InformationAction, -InformationVariable, -OutBuffer, -OutVariable, -PipelineVariable,
+-ProgressAction, -Verbose, -WarningAction, and -WarningVariable. For more information, see
+[about_CommonParameters](https://go.microsoft.com/fwlink/?LinkID=113216).
 
-## Outputs
+## INPUTS
 
-AAC.SubscriptionCost (with -PassThru)
+## OUTPUTS
+
+### AAC.SubscriptionCost (with -PassThru)
+
+## NOTES
+
+## RELATED LINKS
+
+- [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Show-AACCost.md)
+- [about_Azure.Admin.Console](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md)

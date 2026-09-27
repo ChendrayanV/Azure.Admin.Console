@@ -1557,6 +1557,7 @@ RecoveryServicesResources
                                         $subscription = $subscriptionNames[$resource.subscriptionId]
                                         @{
                                             Name         = $resource.name
+                                            ResourceId   = $resource.id
                                             Type         = $resource.type
                                             RG           = $resource.resourceGroup
                                             Subscription = if ($subscription) { $subscription } else { $resource.subscriptionId }

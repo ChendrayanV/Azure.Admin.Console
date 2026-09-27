@@ -8,7 +8,7 @@ BeforeDiscovery {
     $script:aacModulePath = Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')
     $script:aacManifestPath = Join-Path -Path $script:aacModulePath -ChildPath 'Azure.Admin.Console.psd1'
     # Import only if not already loaded - a -Force reimport here would
-    # replace the module Invoke-AACPester is running from, mid-run.
+    # replace the module other test files are mocking into, mid-run.
     if (-not (Get-Module -Name 'Azure.Admin.Console')) {
         Import-Module -Name $script:aacManifestPath -ErrorAction Stop
     }
@@ -20,8 +20,8 @@ BeforeDiscovery {
 
 Describe 'Azure Admin Console - Module scaffold' {
     BeforeAll {
-        # Re-establish this here, not just in BeforeDiscovery: when Invoke-AACPester
-        # runs every *.Tests.ps1 file together in one Invoke-Pester call, a script-scoped
+        # Re-establish this here, not just in BeforeDiscovery: when every
+        # *.Tests.ps1 file runs together in one Invoke-Pester call, a script-scoped
         # variable set only during Discovery is not reliably readable from inside an
         # It block's body during the later Run phase.
         $script:aacModulePath = Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')
@@ -32,20 +32,32 @@ Describe 'Azure Admin Console - Module scaffold' {
         { Test-ModuleManifest -Path $script:aacManifestPath -ErrorAction Stop } | Should -Not -Throw
     }
 
-    It 'exports the expected public functions' {
+    It 'exports exactly the public functions, and nothing parked or private' {
         $expectedFunctions = @(
             'Connect-AAC'
             'Disconnect-AAC'
             'Get-AACAdvisorRecommendation'
             'Get-AACFirewallRule'
-            'Invoke-AACPester'
+            'Invoke-AACApplicationInsightQuery'
+            'Invoke-AACPSRule'
             'Show-AACCost'
             'Show-AACResource'
         )
-        $exportedFunctions = (Get-Command -Module 'Azure.Admin.Console').Name
+        @((Get-Command -Module 'Azure.Admin.Console').Name | Sort-Object) | Should -Be @($expectedFunctions | Sort-Object)
+        Get-Command -Name 'Invoke-AACPester' -ErrorAction Ignore | Should -BeNullOrEmpty -Because 'Invoke-AACPester is parked (Parked\README.md)'
+    }
 
-        foreach ($functionName in $expectedFunctions) {
-            $exportedFunctions | Should -Contain $functionName
+    It 'has a Public\<name>.ps1 file for every exported function, and exports every one' {
+        $files = @(Get-ChildItem -Path (Join-Path $script:aacModulePath 'Public') -Filter '*.ps1' | ForEach-Object BaseName | Sort-Object)
+        $files | Should -Be @((Import-PowerShellDataFile $script:aacManifestPath).FunctionsToExport | Sort-Object)
+    }
+
+    It 'ships MAML help for every exported function' {
+        $maml = Join-Path $script:aacModulePath 'en-US/Azure.Admin.Console-help.xml'
+        $maml | Should -Exist
+        $names = @(([xml](Get-Content -LiteralPath $maml -Raw)).helpItems.command.details.name)
+        foreach ($name in (Import-PowerShellDataFile $script:aacManifestPath).FunctionsToExport) {
+            $names | Should -Contain $name -Because 'run ./build.ps1 -Task Docs after adding a command'
         }
     }
 
@@ -65,8 +77,8 @@ Describe 'Azure Admin Console - Module scaffold' {
         $loaded | Should -Not -BeNullOrEmpty
     }
 
-    It 'depends only on Pester (no PwshSpectreConsole, Az.* or Microsoft.Graph.* modules)' {
+    It 'depends only on PSRule for Azure (no Pester, PwshSpectreConsole, Az.* or Microsoft.Graph.* modules)' {
         $requiredModuleNames = (Get-Module -Name 'Azure.Admin.Console').RequiredModules.Name
-        $requiredModuleNames | Should -Be @('Pester')
+        $requiredModuleNames | Should -Be @('PSRule.Rules.Azure')
     }
 }

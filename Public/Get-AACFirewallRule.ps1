@@ -1,9 +1,10 @@
 function Get-AACFirewallRule {
     <#
+    .EXTERNALHELP Azure.Admin.Console-help.xml
     .SYNOPSIS
         Gets every Azure Firewall Policy rule - DNAT, network and application:
         a colour-coded Spectre.Console view at the prompt, PowerShell objects
-        down a pipeline, and optional CSV and PDF exports.
+        down a pipeline, and optional CSV, PDF and interactive HTML exports.
     .DESCRIPTION
         Reads the rules of every Azure Firewall Policy the signed-in account
         can see (or only those in -SubscriptionId / -FirewallPolicyName) from
@@ -40,13 +41,23 @@ function Get-AACFirewallRule {
         '*' called out in yellow. When the view is longer than the terminal
         it is paged: press any key for the next page, or A for the rest.
 
-        Exports, in any of those modes:
+        Exports:
           -CsvPath    a CSV file written with Export-Csv (UTF-8, one row per
                       rule, list values joined with ", ")
           -PdfPath    a landscape A4 PDF: a summary of each policy, then every
                       rule grouped by policy, rule collection group and rule
                       collection, with Allow in green, Deny in red and DNAT
                       in amber
+          -HtmlPath   a self-contained, interactive HTML report: clickable
+                      tiles and charts (by action, policy, rule collection,
+                      rule type) that filter a table of every rule, grouped
+                      by rule collection, with search, filters, sorting,
+                      Allow rules open to any address flagged, Azure portal
+                      links and a CSV download of what is shown
+
+        When any of -CsvPath, -PdfPath or -HtmlPath is given, the console
+        shows only the progress and the files written - the report is in
+        the files. Add -PassThru to get the objects as well.
 
         Search: -SourceAddress, -DestinationAddress, -Port, -Protocol,
         -Fqdn, -Action and -RuleName narrow the rules to those that match -
@@ -101,8 +112,11 @@ function Get-AACFirewallRule {
     .PARAMETER PdfPath
         Also write the rules to this PDF file. An existing file is
         overwritten; missing folders are created.
+    .PARAMETER HtmlPath
+        Also write an interactive HTML report to this file. An existing file
+        is overwritten; missing folders are created.
     .PARAMETER Title
-        The PDF's title. Defaults to 'Azure Firewall rules'.
+        The PDF and HTML report's title. Defaults to 'Azure Firewall rules'.
     .PARAMETER PassThru
         Show the view and also return the rule objects.
     .PARAMETER NoDisplay
@@ -115,7 +129,7 @@ function Get-AACFirewallRule {
         Shows every Firewall Policy rule you can see, policy by policy.
     .EXAMPLE
         Get-AACFirewallRule -CsvPath .\out\FirewallRules.csv -PdfPath .\out\FirewallRules.pdf
-        Shows the view and writes every rule to a CSV file and a PDF report.
+        Writes every rule to a CSV file and a PDF report; the console shows the progress and the files.
     .EXAMPLE
         Get-AACFirewallRule -SubscriptionId '00000000-0000-0000-0000-000000000000' |
             Where-Object { $_.Action -eq 'Allow' -and $_.SourceAddresses -match '(^|, )\*($|,)' } |
@@ -123,7 +137,10 @@ function Get-AACFirewallRule {
         Lists allow rules open to any source in one subscription.
     .EXAMPLE
         Get-AACFirewallRule -FirewallPolicyName 'fwpol-hub-*' -PdfPath .\HubFirewall.pdf -Title 'Hub firewall rules'
-        The hub firewall policies only, on screen and as a PDF.
+        The hub firewall policies only, as a PDF.
+    .EXAMPLE
+        Get-AACFirewallRule -HtmlPath .\out\FirewallRules.html
+        Every rule in an interactive HTML report to search, filter and share.
     .EXAMPLE
         Get-AACFirewallRule -SourceAddress 10.1.2.3 -DestinationAddress 10.0.0.4 -Port 53 -Protocol UDP
         Which rules let 10.1.2.3 reach 10.0.0.4 on UDP 53 - allow and deny - in priority order.
@@ -172,6 +189,8 @@ function Get-AACFirewallRule {
 
         [string] $PdfPath,
 
+        [string] $HtmlPath,
+
         [string] $Title = 'Azure Firewall rules',
 
         [switch] $PassThru,
@@ -183,14 +202,19 @@ function Get-AACFirewallRule {
 
     # Piped onward (| Where-Object, | Export-Csv ...) the objects are the
     # point, so no view is drawn over them.
+    # An export means the report is in the files: the console shows only
+    # the title, the progress and the files written.
     $pipedOnward = $MyInvocation.PipelinePosition -lt $MyInvocation.PipelineLength
-    $showView = -not $NoDisplay -and -not $pipedOnward
+    $interactive = -not $NoDisplay -and -not $pipedOnward
+    $exporting = [bool]($CsvPath -or $PdfPath -or $HtmlPath)
+    $showView = $interactive -and -not $exporting
     $returnObjects = $PassThru -or $NoDisplay -or $pipedOnward
 
     # Resolve paths now, relative to the caller's location, so a bad path
     # fails before any Azure call.
     $csvFullPath = if ($CsvPath) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($CsvPath) }
     $pdfFullPath = if ($PdfPath) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($PdfPath) }
+    $htmlFullPath = if ($HtmlPath) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($HtmlPath) }
 
     $headers = @{ Authorization = "Bearer $(Get-AACAccessToken)" }
 
@@ -223,7 +247,7 @@ resources
     $subscriptionQuery = "resourcecontainers | where type =~ 'microsoft.resources/subscriptions' | project subscriptionId, name"
 
     # The title first, then a line per step - as every command shows them.
-    if ($showView) {
+    if ($interactive) {
         Write-AACRule -Title 'Azure Admin Console :: Azure Firewall' -Color 'deepskyblue3_1'
     }
     $data = Invoke-AACProgress -ScriptBlock {
@@ -379,19 +403,18 @@ resources
         Write-Warning 'No Firewall Policy rules were found for the signed-in account and the given filters.'
     }
 
-    $pdf = Invoke-AACExport -CsvPath $csvFullPath -CsvObject $rules -Noun 'rule' -PdfPath $pdfFullPath -WritePdf {
+    $null = Invoke-AACExport -CsvPath $csvFullPath -CsvObject $rules -Noun 'rule' -PdfPath $pdfFullPath -WritePdf {
         Write-AACFirewallRulePdf -Rule $rules -Path $pdfFullPath -Title $Title -Detail $scope
+    } -HtmlPath $htmlFullPath -WriteHtml {
+        Write-AACFirewallRuleHtml -Rule $rules -Path $htmlFullPath -Title $Title -Detail $scope
     }
 
     if ($showView) {
-        $pdfWritten = if ($pdf) { $pdf.FullName }
         Invoke-AACPagedOutput -NoPaging:$NoPaging -ScriptBlock {
             Show-AACFirewallRuleView -Rule $rules -Scope $scope -NoTitle
             [Spectre.Console.AnsiConsole]::WriteLine()
-            if ($csvFullPath) { Write-AACMarkup "[grey58]CSV written to[/] [link]$([Spectre.Console.Markup]::Escape($csvFullPath))[/]" }
-            if ($pdfWritten) { Write-AACMarkup "[grey58]PDF written to[/] [link]$([Spectre.Console.Markup]::Escape($pdfWritten))[/]" }
             if ($rules.Count -gt 0) {
-                Write-AACMarkup '[grey42]Add -PassThru (or pipe the command) for the objects, -CsvPath / -PdfPath for a report.[/]'
+                Write-AACMarkup '[grey42]Add -PassThru (or pipe the command) for the objects; -CsvPath, -PdfPath or -HtmlPath for a report.[/]'
             }
         }
     }

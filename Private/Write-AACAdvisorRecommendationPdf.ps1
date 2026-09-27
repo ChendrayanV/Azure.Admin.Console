@@ -86,7 +86,7 @@ function Write-AACAdvisorRecommendationPdf {
     & $pdf.AddTitle "$('{0:N0}' -f $Recommendation.Count) recommendations for $('{0:N0}' -f $resourceCount) resources in $subscriptionCount subscription$(if ($subscriptionCount -ne 1) { 's' }) · generated $($pdf.Generated.ToString('dddd d MMMM yyyy, HH:mm'))"
 
     $facts = [ordered]@{}
-    $session = Get-Variable -Name 'AACSession' -Scope Global -ValueOnly -ErrorAction Ignore
+    $session = $script:AACSession
     if ($session) {
         $facts['Azure account'] = [string]$session.Account
         $facts['Tenant'] = [string]$session.TenantId

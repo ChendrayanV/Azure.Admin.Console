@@ -1,10 +1,11 @@
 function Get-AACAdvisorRecommendation {
     <#
+    .EXTERNALHELP Azure.Admin.Console-help.xml
     .SYNOPSIS
         Gets a consolidated, flattened view of Azure Advisor recommendations
         (Resource Graph's advisorresources table): a Spectre.Console summary
         at the prompt, PowerShell objects down a pipeline, and optional CSV
-        and PDF exports.
+        PDF and interactive HTML exports.
     .DESCRIPTION
         Reads every Azure Advisor recommendation the signed-in account can
         see (or only those in -SubscriptionId) from the advisorresources table
@@ -57,7 +58,7 @@ function Get-AACAdvisorRecommendation {
         turns that off; paging is also skipped automatically when output is
         redirected.
 
-        Exports, in any of those modes:
+        Exports:
           -CsvPath    a CSV file written with Export-Csv (UTF-8, one row per
                       recommendation per resource)
           -PdfPath    a landscape A4 PDF: a summary (totals, category by
@@ -65,6 +66,16 @@ function Get-AACAdvisorRecommendation {
                       recommendation type consolidated with its affected
                       resource count, then one section per category listing
                       the affected resources under each recommendation
+          -HtmlPath   a self-contained, interactive HTML report: clickable
+                      tiles and charts (by category, impact, subscription,
+                      recommendation) that filter a table of every
+                      recommendation, grouped by recommendation, with
+                      search, filters, sorting, subtotals of savings, Azure
+                      portal links and a CSV download of what is shown
+
+        When any of -CsvPath, -PdfPath or -HtmlPath is given, the console
+        shows only the progress and the files written - the report is in
+        the files. Add -PassThru to get the objects as well.
 
         Savings are Advisor's own estimates. Two recommendations can overlap
         (e.g. a reservation and a right-size for the same VM), so a total is
@@ -93,8 +104,12 @@ function Get-AACAdvisorRecommendation {
     .PARAMETER PdfPath
         Also write the report to this PDF file. An existing file is
         overwritten; missing folders are created.
+    .PARAMETER HtmlPath
+        Also write an interactive HTML report to this file. An existing file
+        is overwritten; missing folders are created.
     .PARAMETER Title
-        The PDF's title. Defaults to 'Azure Advisor recommendations'.
+        The PDF and HTML report's title. Defaults to 'Azure Advisor
+        recommendations'.
     .PARAMETER PassThru
         Show the summary and also return the recommendation objects.
     .PARAMETER NoDisplay
@@ -106,8 +121,8 @@ function Get-AACAdvisorRecommendation {
         Get-AACAdvisorRecommendation
         Shows the summary of every Advisor recommendation you can see.
     .EXAMPLE
-        Get-AACAdvisorRecommendation -CsvPath .\out\Advisor.csv -PdfPath .\out\Advisor.pdf
-        Shows the summary and writes every recommendation to a CSV file and a PDF report.
+        Get-AACAdvisorRecommendation -CsvPath .\out\Advisor.csv -PdfPath .\out\Advisor.pdf -HtmlPath .\out\Advisor.html
+        Writes every recommendation to a CSV file, a PDF report and an interactive HTML report.
     .EXAMPLE
         Get-AACAdvisorRecommendation -Category Cost |
             Group-Object SavingsCurrency |
@@ -151,6 +166,8 @@ function Get-AACAdvisorRecommendation {
 
         [string] $PdfPath,
 
+        [string] $HtmlPath,
+
         [string] $Title = 'Azure Advisor recommendations',
 
         [switch] $PassThru,
@@ -162,14 +179,19 @@ function Get-AACAdvisorRecommendation {
 
     # Piped onward (| Where-Object, | Export-Csv ...) the objects are the
     # point, so no summary is drawn over them.
+    # An export means the report is in the files: the console shows only
+    # the title, the progress and the files written.
     $pipedOnward = $MyInvocation.PipelinePosition -lt $MyInvocation.PipelineLength
-    $showSummary = -not $NoDisplay -and -not $pipedOnward
+    $interactive = -not $NoDisplay -and -not $pipedOnward
+    $exporting = [bool]($CsvPath -or $PdfPath -or $HtmlPath)
+    $showSummary = $interactive -and -not $exporting
     $returnObjects = $PassThru -or $NoDisplay -or $pipedOnward
 
     # Resolve paths now, relative to the caller's location, so a bad path
     # fails before any Azure call.
     $csvFullPath = if ($CsvPath) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($CsvPath) }
     $pdfFullPath = if ($PdfPath) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($PdfPath) }
+    $htmlFullPath = if ($HtmlPath) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($HtmlPath) }
 
     $headers = @{ Authorization = "Bearer $(Get-AACAccessToken)" }
 
@@ -207,7 +229,7 @@ advisorresources
     $subscriptionQuery = "resourcecontainers | where type =~ 'microsoft.resources/subscriptions' | project subscriptionId, name"
 
     # The title first, then a line per step - as every command shows them.
-    if ($showSummary) {
+    if ($interactive) {
         Write-AACRule -Title 'Azure Admin Console :: Azure Advisor' -Color 'deepskyblue3_1'
     }
     $data = Invoke-AACProgress -ScriptBlock {
@@ -340,20 +362,19 @@ advisorresources
         Write-Warning 'No Azure Advisor recommendations were found for the signed-in account and the given filters.'
     }
 
-    $pdf = Invoke-AACExport -CsvPath $csvFullPath -CsvObject $recommendations -Noun 'recommendation' -PdfPath $pdfFullPath -WritePdf {
+    $null = Invoke-AACExport -CsvPath $csvFullPath -CsvObject $recommendations -Noun 'recommendation' -PdfPath $pdfFullPath -WritePdf {
         Write-AACAdvisorRecommendationPdf -Recommendation $recommendations -Path $pdfFullPath -Title $Title -Detail $scope
+    } -HtmlPath $htmlFullPath -WriteHtml {
+        Write-AACAdvisorRecommendationHtml -Recommendation $recommendations -Path $htmlFullPath -Title $Title -Detail $scope
     }
 
     if ($showSummary) {
-        $pdfWritten = if ($pdf) { $pdf.FullName }
         Invoke-AACPagedOutput -NoPaging:$NoPaging -ScriptBlock {
             Show-AACAdvisorSummary -Recommendation $recommendations -Scope $scope -NoTitle
             Show-AACAdvisorTable -Recommendation $recommendations
             [Spectre.Console.AnsiConsole]::WriteLine()
-            if ($csvFullPath) { Write-AACMarkup "[grey58]CSV written to[/] [link]$([Spectre.Console.Markup]::Escape($csvFullPath))[/]" }
-            if ($pdfWritten) { Write-AACMarkup "[grey58]PDF written to[/] [link]$([Spectre.Console.Markup]::Escape($pdfWritten))[/]" }
             if ($recommendations.Count -gt 0) {
-                Write-AACMarkup '[grey42]Add -PassThru (or pipe the command) for the objects, -CsvPath / -PdfPath for a report.[/]'
+                Write-AACMarkup '[grey42]Add -PassThru (or pipe the command) for the objects; -CsvPath, -PdfPath or -HtmlPath for a report.[/]'
             }
         }
     }

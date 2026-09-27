@@ -1,18 +1,35 @@
+---
+document type: cmdlet
+external help file: Azure.Admin.Console-help.xml
+HelpUri: https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACAdvisorRecommendation.md
+Locale: en-US
+Module Name: Azure.Admin.Console
+PlatyPS schema version: 2024-05-01
+title: Get-AACAdvisorRecommendation
+---
+
 # Get-AACAdvisorRecommendation
 
-[Azure.Admin.Console](Azure.Admin.Console.md) · [about_Azure.Admin.Console](about_Azure.Admin.Console.md)
+## SYNOPSIS
 
-## Synopsis
+Gets a consolidated, flattened view of Azure Advisor recommendations (Resource Graph's advisorresources table): a Spectre.Console summary at the prompt, PowerShell objects down a pipeline, and optional CSV PDF and interactive HTML exports.
 
-Gets a consolidated, flattened view of Azure Advisor recommendations (Resource Graph's advisorresources table): a Spectre.Console summary at the prompt, PowerShell objects down a pipeline, and optional CSV and PDF exports.
+## SYNTAX
 
-## Syntax
+### __AllParameterSets
 
-```powershell
-Get-AACAdvisorRecommendation [[-SubscriptionId] <string[]>] [[-Category] <string[]>] [[-Impact] <string[]>] [[-CsvPath] <string>] [[-PdfPath] <string>] [[-Title] <string>] [-IncludeSuppressed] [-ExpandExtendedProperty] [-PassThru] [-NoDisplay] [-NoPaging] [<CommonParameters>]
+```
+Get-AACAdvisorRecommendation [[-SubscriptionId] <string[]>] [[-Category] <string[]>]
+ [[-Impact] <string[]>] [[-CsvPath] <string>] [[-PdfPath] <string>] [[-HtmlPath] <string>]
+ [[-Title] <string>] [-IncludeSuppressed] [-ExpandExtendedProperty] [-PassThru] [-NoDisplay]
+ [-NoPaging]
 ```
 
-## Description
+## ALIASES
+
+This command has no aliases.
+
+## DESCRIPTION
 
 Reads every Azure Advisor recommendation the signed-in account can
 see (or only those in -SubscriptionId) from the advisorresources table
@@ -40,6 +57,7 @@ left out, as in the Azure portal; -IncludeSuppressed brings them back
 with Status 'Postponed' or 'Dismissed'.
 
 What you get depends on where the command runs:
+
 ```text
   at the prompt    a Spectre.Console view: the account and scope,
                    tiles with the number of recommendations, high /
@@ -67,7 +85,8 @@ press any key for the next page, or A to show the rest. -NoPaging
 turns that off; paging is also skipped automatically when output is
 redirected.
 
-Exports, in any of those modes:
+Exports:
+
 ```text
   -CsvPath    a CSV file written with Export-Csv (UTF-8, one row per
               recommendation per resource)
@@ -76,7 +95,17 @@ Exports, in any of those modes:
               recommendation type consolidated with its affected
               resource count, then one section per category listing
               the affected resources under each recommendation
+  -HtmlPath   a self-contained, interactive HTML report: clickable
+              tiles and charts (by category, impact, subscription,
+              recommendation) that filter a table of every
+              recommendation, grouped by recommendation, with
+              search, filters, sorting, subtotals of savings, Azure
+              portal links and a CSV download of what is shown
 ```
+
+When any of -CsvPath, -PdfPath or -HtmlPath is given, the console
+shows only the progress and the files written - the report is in
+the files. Add -PassThru to get the objects as well.
 
 Savings are Advisor's own estimates. Two recommendations can overlap
 (e.g. a reservation and a right-size for the same VM), so a total is
@@ -85,7 +114,7 @@ an upper bound; totals are kept per currency, never converted.
 PDF export needs Windows and PowerShell 7.4 or later; objects and
 CSV work everywhere.
 
-## Examples
+## EXAMPLES
 
 ### Example 1
 
@@ -99,10 +128,10 @@ Shows the summary of every Advisor recommendation you can see.
 ### Example 2
 
 ```powershell
-Get-AACAdvisorRecommendation -CsvPath .\out\Advisor.csv -PdfPath .\out\Advisor.pdf
+Get-AACAdvisorRecommendation -CsvPath .\out\Advisor.csv -PdfPath .\out\Advisor.pdf -HtmlPath .\out\Advisor.html
 ```
 
-Shows the summary and writes every recommendation to a CSV file and a PDF report.
+Writes every recommendation to a CSV file, a PDF report and an interactive HTML report.
 
 ### Example 3
 
@@ -149,64 +178,51 @@ Get-AACAdvisorRecommendation | Export-Csv -Path .\advisor.csv -NoTypeInformation
 
 Uses Export-Csv directly, for control over its options.
 
-## Parameters
-
-### -SubscriptionId
-
-Only get recommendations in these subscriptions. Defaults to every
-subscription the signed-in account can see.
-
-| | |
-|---|---|
-| Type | `String[]` |
-| Required | No |
-| Position | 0 |
-| Default value | `None` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
+## PARAMETERS
 
 ### -Category
 
 Only get these categories: Cost, Security, Reliability,
 OperationalExcellence, Performance.
 
-| | |
-|---|---|
-| Type | `String[]` |
-| Accepted values | `Cost`, `Security`, `Reliability`, `OperationalExcellence`, `Performance` |
-| Required | No |
-| Position | 1 |
-| Default value | `None` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 1
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
-### -Impact
+### -CsvPath
 
-Only get recommendations with these impacts: High, Medium, Low.
+Also write the recommendations to this CSV file. An existing file is
+overwritten; missing folders are created.
 
-| | |
-|---|---|
-| Type | `String[]` |
-| Accepted values | `High`, `Medium`, `Low` |
-| Required | No |
-| Position | 2 |
-| Default value | `None` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
-
-### -IncludeSuppressed
-
-Also get recommendations that were postponed or dismissed in
-Advisor, with Status set to 'Postponed' or 'Dismissed'.
-
-| | |
-|---|---|
-| Type | `SwitchParameter` |
-| Required | No |
-| Position | Named |
-| Default value | `False` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 3
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
 ### -ExpandExtendedProperty
 
@@ -214,99 +230,233 @@ Add one Ext_\<key\> column per key of Advisor's extendedProperties bag
 (the union of keys over every recommendation returned), next to the
 combined ExtendedProperties column.
 
-| | |
-|---|---|
-| Type | `SwitchParameter` |
-| Required | No |
-| Position | Named |
-| Default value | `False` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
-### -CsvPath
+### -HtmlPath
 
-Also write the recommendations to this CSV file. An existing file is
-overwritten; missing folders are created.
+Also write an interactive HTML report to this file. An existing file
+is overwritten; missing folders are created.
 
-| | |
-|---|---|
-| Type | `String` |
-| Required | No |
-| Position | 3 |
-| Default value | `None` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 5
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Impact
+
+Only get recommendations with these impacts: High, Medium, Low.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 2
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -IncludeSuppressed
+
+Also get recommendations that were postponed or dismissed in
+Advisor, with Status set to 'Postponed' or 'Dismissed'.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoDisplay
+
+Return the recommendation objects without showing the summary.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoPaging
+
+Show the whole view at once instead of a screen at a time.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PassThru
+
+Show the summary and also return the recommendation objects.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
 ### -PdfPath
 
 Also write the report to this PDF file. An existing file is
 overwritten; missing folders are created.
 
-| | |
-|---|---|
-| Type | `String` |
-| Required | No |
-| Position | 4 |
-| Default value | `None` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 4
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -SubscriptionId
+
+Only get recommendations in these subscriptions. Defaults to every
+subscription the signed-in account can see.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 0
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
 ### -Title
 
-The PDF's title. Defaults to 'Azure Advisor recommendations'.
+The PDF and HTML report's title. Defaults to 'Azure Advisor
+recommendations'.
 
-| | |
-|---|---|
-| Type | `String` |
-| Required | No |
-| Position | 5 |
-| Default value | `'Azure Advisor recommendations'` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
-
-### -PassThru
-
-Show the summary and also return the recommendation objects.
-
-| | |
-|---|---|
-| Type | `SwitchParameter` |
-| Required | No |
-| Position | Named |
-| Default value | `False` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
-
-### -NoDisplay
-
-Return the recommendation objects without showing the summary.
-
-| | |
-|---|---|
-| Type | `SwitchParameter` |
-| Required | No |
-| Position | Named |
-| Default value | `False` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
-
-### -NoPaging
-
-Show the whole view at once instead of a screen at a time.
-
-| | |
-|---|---|
-| Type | `SwitchParameter` |
-| Required | No |
-| Position | Named |
-| Default value | `False` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
+```yaml
+Type: System.String
+DefaultValue: "'Azure Advisor recommendations'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 6
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
 ### CommonParameters
 
-This command supports the common parameters (`-Verbose`, `-ErrorAction`, `-WarningAction` and so on). See [about_CommonParameters](https://learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_commonparameters).
+This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable,
+-InformationAction, -InformationVariable, -OutBuffer, -OutVariable, -PipelineVariable,
+-ProgressAction, -Verbose, -WarningAction, and -WarningVariable. For more information, see
+[about_CommonParameters](https://go.microsoft.com/fwlink/?LinkID=113216).
 
-## Outputs
+## INPUTS
 
-AAC.AdvisorRecommendation (piped onward, or with -PassThru or -NoDisplay)
+## OUTPUTS
+
+### AAC.AdvisorRecommendation (piped onward, or with -PassThru or -NoDisplay)
+
+## NOTES
+
+## RELATED LINKS
+
+- [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACAdvisorRecommendation.md)
+- [about_Azure.Admin.Console](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md)

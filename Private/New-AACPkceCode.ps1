@@ -9,6 +9,7 @@ function New-AACPkceCode {
         exactly as the spec defines the "S256" transform.
     #>
     [CmdletBinding()]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Returns a random verifier and its challenge; nothing changes.')]
     [OutputType([pscustomobject])]
     param()
 

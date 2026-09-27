@@ -165,11 +165,24 @@ Describe 'Azure Admin Console - Show-AACCost' {
         [double]$keyVault.Cost | Should -Be 2.25
     }
 
-    It 'writes a PDF report' -Skip:(-not $script:canWritePdf) {
+    It 'writes a PDF report, and only the progress and the file on the console' -Skip:(-not $script:canWritePdf) {
         $pdf = Join-Path -Path $TestDrive -ChildPath 'cost.pdf'
         $text = (& $script:capture { Show-AACCost -PdfPath $pdf -Months 3 }).Text
         (Get-Item -LiteralPath $pdf).Length | Should -BeGreaterThan 1000
-        $text | Should -BeLike '*PDF written to*'
+        $text | Should -BeLike "*PDF: $pdf*"
+        $text | Should -Not -BeLike '*Month to date by*' -Because 'an export shows no view'
+    }
+
+    It 'writes an interactive HTML report of the detail' {
+        $html = Join-Path -Path $TestDrive -ChildPath 'cost.html'
+        $text = (& $script:capture { Show-AACCost -HtmlPath $html -Months 3 }).Text
+        $text | Should -BeLike "*HTML: $html*"
+        $text | Should -Not -BeLike '*Month to date by*'
+        $page = Get-Content -LiteralPath $html -Raw
+        $model = [regex]::Match($page, '<script id="aac-data" type="application/json">(.*?)</script>', 'Singleline').Groups[1].Value | ConvertFrom-Json
+        @($model.tables.id) | Should -Be @('subscriptions', 'detail')
+        ($model.tables | Where-Object id -EQ 'detail').rows.Count | Should -BeGreaterThan 0
+        $model.notices.text | Should -BeLike '*sub-dev*'
     }
 
     It 'asks Cost Management once per subscription, for the -Months period, by service and resource group' {

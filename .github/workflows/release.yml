@@ -101,13 +101,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Pester and PSScriptAnalyzer
+      - name: Install the build and test modules
         run: |
           # -TrustRepository rather than Set-PSResourceRepository: on a fresh
           # runner the repository store doesn't exist yet, and
           # Set-PSResourceRepository fails before anything creates it.
           Install-PSResource -Name Pester -Version '[5.7.1,6.0)' -Scope CurrentUser -TrustRepository -Quiet
           Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -TrustRepository -Quiet
+          # A required module: the package's clean-import check needs it.
+          Install-PSResource -Name PSRule.Rules.Azure -Version '[1.47.0,2.0)' -Scope CurrentUser -TrustRepository -Quiet
 
       - name: Test and build
         run: ./build.ps1 -Task Test, Build

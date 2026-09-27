@@ -1,18 +1,36 @@
+---
+document type: cmdlet
+external help file: Azure.Admin.Console-help.xml
+HelpUri: https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACFirewallRule.md
+Locale: en-US
+Module Name: Azure.Admin.Console
+PlatyPS schema version: 2024-05-01
+title: Get-AACFirewallRule
+---
+
 # Get-AACFirewallRule
 
-[Azure.Admin.Console](Azure.Admin.Console.md) · [about_Azure.Admin.Console](about_Azure.Admin.Console.md)
+## SYNOPSIS
 
-## Synopsis
+Gets every Azure Firewall Policy rule - DNAT, network and application: a colour-coded Spectre.Console view at the prompt, PowerShell objects down a pipeline, and optional CSV, PDF and interactive HTML exports.
 
-Gets every Azure Firewall Policy rule - DNAT, network and application: a colour-coded Spectre.Console view at the prompt, PowerShell objects down a pipeline, and optional CSV and PDF exports.
+## SYNTAX
 
-## Syntax
+### __AllParameterSets
 
-```powershell
-Get-AACFirewallRule [[-SubscriptionId] <string[]>] [[-FirewallPolicyName] <string[]>] [[-SourceAddress] <string[]>] [[-DestinationAddress] <string[]>] [[-Port] <string[]>] [[-Protocol] <string[]>] [[-Fqdn] <string[]>] [[-Action] <string[]>] [[-RuleName] <string[]>] [[-CsvPath] <string>] [[-PdfPath] <string>] [[-Title] <string>] [-PassThru] [-NoDisplay] [-NoPaging] [<CommonParameters>]
+```
+Get-AACFirewallRule [[-SubscriptionId] <string[]>] [[-FirewallPolicyName] <string[]>]
+ [[-SourceAddress] <string[]>] [[-DestinationAddress] <string[]>] [[-Port] <string[]>]
+ [[-Protocol] <string[]>] [[-Fqdn] <string[]>] [[-Action] <string[]>] [[-RuleName] <string[]>]
+ [[-CsvPath] <string>] [[-PdfPath] <string>] [[-HtmlPath] <string>] [[-Title] <string>] [-PassThru]
+ [-NoDisplay] [-NoPaging]
 ```
 
-## Description
+## ALIASES
+
+This command has no aliases.
+
+## DESCRIPTION
 
 Reads the rules of every Azure Firewall Policy the signed-in account
 can see (or only those in -SubscriptionId / -FirewallPolicyName) from
@@ -30,6 +48,7 @@ query, no per-group calls). Each rule also carries its policy's base
 (parent) policy and the firewalls the policy is attached to.
 
 What you get depends on where the command runs:
+
 ```text
   at the prompt    a Spectre.Console view: the account and scope,
                    tiles with the number of rules, allow, deny and
@@ -51,7 +70,8 @@ them, and an Allow rule open to any source or destination has its
 '\*' called out in yellow. When the view is longer than the terminal
 it is paged: press any key for the next page, or A for the rest.
 
-Exports, in any of those modes:
+Exports:
+
 ```text
   -CsvPath    a CSV file written with Export-Csv (UTF-8, one row per
               rule, list values joined with ", ")
@@ -59,7 +79,17 @@ Exports, in any of those modes:
               rule grouped by policy, rule collection group and rule
               collection, with Allow in green, Deny in red and DNAT
               in amber
+  -HtmlPath   a self-contained, interactive HTML report: clickable
+              tiles and charts (by action, policy, rule collection,
+              rule type) that filter a table of every rule, grouped
+              by rule collection, with search, filters, sorting,
+              Allow rules open to any address flagged, Azure portal
+              links and a CSV download of what is shown
 ```
+
+When any of -CsvPath, -PdfPath or -HtmlPath is given, the console
+shows only the progress and the files written - the report is in
+the files. Add -PassThru to get the objects as well.
 
 Search: -SourceAddress, -DestinationAddress, -Port, -Protocol,
 -Fqdn, -Action and -RuleName narrow the rules to those that match -
@@ -78,7 +108,7 @@ policy inherits from its base policy appear under the base policy.
 PDF export needs Windows and PowerShell 7.4 or later; objects and
 CSV work everywhere.
 
-## Examples
+## EXAMPLES
 
 ### Example 1
 
@@ -95,7 +125,7 @@ Shows every Firewall Policy rule you can see, policy by policy.
 Get-AACFirewallRule -CsvPath .\out\FirewallRules.csv -PdfPath .\out\FirewallRules.pdf
 ```
 
-Shows the view and writes every rule to a CSV file and a PDF report.
+Writes every rule to a CSV file and a PDF report; the console shows the progress and the files.
 
 ### Example 3
 
@@ -113,9 +143,17 @@ Lists allow rules open to any source in one subscription.
 Get-AACFirewallRule -FirewallPolicyName 'fwpol-hub-*' -PdfPath .\HubFirewall.pdf -Title 'Hub firewall rules'
 ```
 
-The hub firewall policies only, on screen and as a PDF.
+The hub firewall policies only, as a PDF.
 
 ### Example 5
+
+```powershell
+Get-AACFirewallRule -HtmlPath .\out\FirewallRules.html
+```
+
+Every rule in an interactive HTML report to search, filter and share.
+
+### Example 6
 
 ```powershell
 Get-AACFirewallRule -SourceAddress 10.1.2.3 -DestinationAddress 10.0.0.4 -Port 53 -Protocol UDP
@@ -123,7 +161,7 @@ Get-AACFirewallRule -SourceAddress 10.1.2.3 -DestinationAddress 10.0.0.4 -Port 5
 
 Which rules let 10.1.2.3 reach 10.0.0.4 on UDP 53 - allow and deny - in priority order.
 
-### Example 6
+### Example 7
 
 ```powershell
 Get-AACFirewallRule -Action Allow -SourceAddress 0.0.0.0/0 -Port 3389, 22
@@ -131,7 +169,7 @@ Get-AACFirewallRule -Action Allow -SourceAddress 0.0.0.0/0 -Port 3389, 22
 
 Allow rules for RDP or SSH from any address.
 
-### Example 7
+### Example 8
 
 ```powershell
 Get-AACFirewallRule -Fqdn www.contoso.com -Protocol Https -CsvPath .\contoso.csv
@@ -139,7 +177,7 @@ Get-AACFirewallRule -Fqdn www.contoso.com -Protocol Https -CsvPath .\contoso.csv
 
 Application rules that cover www.contoso.com over HTTPS, also saved as a CSV file.
 
-### Example 8
+### Example 9
 
 ```powershell
 $rules = Get-AACFirewallRule -NoDisplay
@@ -147,7 +185,7 @@ $rules = Get-AACFirewallRule -NoDisplay
 
 Keeps the rule objects in a variable, without showing the view.
 
-### Example 9
+### Example 10
 
 ```powershell
 Get-AACFirewallRule | Export-Csv -Path .\rules.csv -NoTypeInformation -Delimiter ';'
@@ -155,95 +193,95 @@ Get-AACFirewallRule | Export-Csv -Path .\rules.csv -NoTypeInformation -Delimiter
 
 Uses Export-Csv directly, for control over its options.
 
-## Parameters
+## PARAMETERS
 
-### -SubscriptionId
+### -Action
 
-Only get policies in these subscriptions. Defaults to every
-subscription the signed-in account can see. IP Groups and base
-policies are resolved in every subscription either way.
+Only rules in collections with one of these actions: Allow, Deny,
+DNAT.
 
-| | |
-|---|---|
-| Type | `String[]` |
-| Required | No |
-| Position | 0 |
-| Default value | `None` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 7
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
-### -FirewallPolicyName
+### -CsvPath
 
-Only get policies whose name matches one of these wildcard patterns
-(case-insensitive), e.g. 'fwpol-hub-\*'.
+Also write the rules to this CSV file. An existing file is
+overwritten; missing folders are created.
 
-| | |
-|---|---|
-| Type | `String[]` |
-| Required | No |
-| Position | 1 |
-| Default value | `None` |
-| Accepts pipeline input | No |
-| Accepts wildcards | Yes |
-
-### -SourceAddress
-
-Only rules whose source covers or overlaps one of these addresses:
-IPs, CIDR prefixes or 'a-b' ranges, IPv4 or IPv6. The rule's IP
-Groups count, and a '\*' source matches any address.
-
-| | |
-|---|---|
-| Type | `String[]` |
-| Required | No |
-| Position | 2 |
-| Default value | `None` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 9
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
 ### -DestinationAddress
 
 Only rules whose destination covers or overlaps one of these
 addresses, as for -SourceAddress.
 
-| | |
-|---|---|
-| Type | `String[]` |
-| Required | No |
-| Position | 3 |
-| Default value | `None` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 3
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
-### -Port
+### -FirewallPolicyName
 
-Only rules whose destination ports include one of these ports or
-overlap one of these ranges ('443', '8000-8080'). For application
-rules, the port of each protocol ('Https:443') counts.
+Only get policies whose name matches one of these wildcard patterns
+(case-insensitive), e.g. 'fwpol-hub-\*'.
 
-| | |
-|---|---|
-| Type | `String[]` |
-| Required | No |
-| Position | 4 |
-| Default value | `None` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
-
-### -Protocol
-
-Only rules for one of these protocols: TCP, UDP, ICMP (network and
-DNAT rules - a rule for 'Any' matches all), or Http, Https, Mssql
-(application rules).
-
-| | |
-|---|---|
-| Type | `String[]` |
-| Required | No |
-| Position | 5 |
-| Default value | `None` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 1
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
 ### -Fqdn
 
@@ -251,127 +289,280 @@ Only rules for one of these host names - '\*.contoso.com' in a rule
 covers 'www.contoso.com' - or whose FQDNs match one of these
 wildcard patterns.
 
-| | |
-|---|---|
-| Type | `String[]` |
-| Required | No |
-| Position | 6 |
-| Default value | `None` |
-| Accepts pipeline input | No |
-| Accepts wildcards | Yes |
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 6
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
-### -Action
+### -HtmlPath
 
-Only rules in collections with one of these actions: Allow, Deny,
-DNAT.
+Also write an interactive HTML report to this file. An existing file
+is overwritten; missing folders are created.
 
-| | |
-|---|---|
-| Type | `String[]` |
-| Accepted values | `Allow`, `Deny`, `DNAT` |
-| Required | No |
-| Position | 7 |
-| Default value | `None` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 11
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
-### -RuleName
+### -NoDisplay
 
-Only rules whose name matches one of these wildcard patterns.
+Return the rule objects without showing the view.
 
-| | |
-|---|---|
-| Type | `String[]` |
-| Required | No |
-| Position | 8 |
-| Default value | `None` |
-| Accepts pipeline input | No |
-| Accepts wildcards | Yes |
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
-### -CsvPath
+### -NoPaging
 
-Also write the rules to this CSV file. An existing file is
-overwritten; missing folders are created.
+Show the whole view at once instead of a screen at a time.
 
-| | |
-|---|---|
-| Type | `String` |
-| Required | No |
-| Position | 9 |
-| Default value | `None` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PassThru
+
+Show the view and also return the rule objects.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
 ### -PdfPath
 
 Also write the rules to this PDF file. An existing file is
 overwritten; missing folders are created.
 
-| | |
-|---|---|
-| Type | `String` |
-| Required | No |
-| Position | 10 |
-| Default value | `None` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 10
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Port
+
+Only rules whose destination ports include one of these ports or
+overlap one of these ranges ('443', '8000-8080'). For application
+rules, the port of each protocol ('Https:443') counts.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 4
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Protocol
+
+Only rules for one of these protocols: TCP, UDP, ICMP (network and
+DNAT rules - a rule for 'Any' matches all), or Http, Https, Mssql
+(application rules).
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 5
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -RuleName
+
+Only rules whose name matches one of these wildcard patterns.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 8
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -SourceAddress
+
+Only rules whose source covers or overlaps one of these addresses:
+IPs, CIDR prefixes or 'a-b' ranges, IPv4 or IPv6. The rule's IP
+Groups count, and a '\*' source matches any address.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 2
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -SubscriptionId
+
+Only get policies in these subscriptions. Defaults to every
+subscription the signed-in account can see. IP Groups and base
+policies are resolved in every subscription either way.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 0
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
 ### -Title
 
-The PDF's title. Defaults to 'Azure Firewall rules'.
+The PDF and HTML report's title. Defaults to 'Azure Firewall rules'.
 
-| | |
-|---|---|
-| Type | `String` |
-| Required | No |
-| Position | 11 |
-| Default value | `'Azure Firewall rules'` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
-
-### -PassThru
-
-Show the view and also return the rule objects.
-
-| | |
-|---|---|
-| Type | `SwitchParameter` |
-| Required | No |
-| Position | Named |
-| Default value | `False` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
-
-### -NoDisplay
-
-Return the rule objects without showing the view.
-
-| | |
-|---|---|
-| Type | `SwitchParameter` |
-| Required | No |
-| Position | Named |
-| Default value | `False` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
-
-### -NoPaging
-
-Show the whole view at once instead of a screen at a time.
-
-| | |
-|---|---|
-| Type | `SwitchParameter` |
-| Required | No |
-| Position | Named |
-| Default value | `False` |
-| Accepts pipeline input | No |
-| Accepts wildcards | No |
+```yaml
+Type: System.String
+DefaultValue: "'Azure Firewall rules'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 12
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
 ### CommonParameters
 
-This command supports the common parameters (`-Verbose`, `-ErrorAction`, `-WarningAction` and so on). See [about_CommonParameters](https://learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_commonparameters).
+This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable,
+-InformationAction, -InformationVariable, -OutBuffer, -OutVariable, -PipelineVariable,
+-ProgressAction, -Verbose, -WarningAction, and -WarningVariable. For more information, see
+[about_CommonParameters](https://go.microsoft.com/fwlink/?LinkID=113216).
 
-## Outputs
+## INPUTS
 
-AAC.FirewallRule (piped onward, or with -PassThru or -NoDisplay)
+## OUTPUTS
+
+### AAC.FirewallRule (piped onward, or with -PassThru or -NoDisplay)
+
+## NOTES
+
+## RELATED LINKS
+
+- [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACFirewallRule.md)
+- [about_Azure.Admin.Console](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md)

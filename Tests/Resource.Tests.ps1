@@ -50,6 +50,21 @@ Describe 'Azure Admin Console - Show-AACResource' {
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACResourceGraphQuery -ParameterFilter { $Query -match '^resourcecontainers' } -MockWith { $subscriptions }.GetNewClosure()
     }
 
+    It 'writes an interactive HTML inventory instead of the view' {
+        $inventory = "[{`"id`":`"/subscriptions/$sub/resourceGroups/rg-app/providers/Microsoft.Web/sites/app1`",`"name`":`"app1`",`"type`":`"microsoft.web/sites`",`"location`":`"uksouth`",`"resourceGroup`":`"rg-app`",`"subscriptionId`":`"$sub`",`"kind`":`"app`",`"sku`":`"`",`"tags`":`"{\`"Owner\`":\`"ops\`"}`"}]" | ConvertFrom-Json
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACResourceGraphQuery -ParameterFilter { $Query -match '\| project id, name' } -MockWith { $inventory }.GetNewClosure()
+        $html = Join-Path -Path $TestDrive -ChildPath 'inventory.html'
+        $text = (& $script:capture { Show-AACResource -HtmlPath $html }).Text
+        $text | Should -BeLike "*HTML: $html*"
+        $text | Should -Not -BeLike '*Resources by type*' -Because 'an export shows no view'
+        $model = [regex]::Match((Get-Content -LiteralPath $html -Raw), '<script id="aac-data" type="application/json">(.*?)</script>', 'Singleline').Groups[1].Value | ConvertFrom-Json
+        $row = $model.tables[0].rows[0]
+        $row.Name | Should -Be 'app1'
+        $row.SubscriptionName | Should -Be 'sub-prod'
+        $row.Tags | Should -Be 'Owner=ops'
+        $row.ResourceId | Should -BeLike '*/sites/app1'
+    }
+
     It 'returns every count, largest first, with its share' {
         $counts = (& $script:capture { Show-AACResource -PassThru }).Output
 

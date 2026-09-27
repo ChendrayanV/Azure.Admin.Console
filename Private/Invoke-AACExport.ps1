@@ -1,8 +1,8 @@
 function Invoke-AACExport {
     <#
     .SYNOPSIS
-        Writes a command's CSV and/or PDF export as steps of the progress
-        display, and returns the PDF file (if one was written).
+        Writes a command's CSV, PDF and/or HTML export as steps of the
+        progress display, and returns the PDF and HTML files written.
     .DESCRIPTION
         Every command that exports uses this, so exports look the same
         everywhere: a line per file that finishes as, for example,
@@ -10,10 +10,10 @@ function Invoke-AACExport {
           ✓ CSV: 412 recommendation(s) written to C:\out\Advisor.csv
           ✓ PDF: C:\out\Advisor.pdf
 
-        -CsvPath and -PdfPath must be full paths. The CSV is written with
+        -CsvPath, -PdfPath and -HtmlPath must be full paths. The CSV is written with
         Export-Csv (UTF-8, no type header) from -CsvObject; missing folders
         are created. -WritePdf is a script block that writes the PDF and
-        returns its file. Inside another command's progress display the
+        returns its file; -WriteHtml the same for the HTML. Inside another command's progress display the
         lines join that display; otherwise they get one of their own.
     #>
     [CmdletBinding()]
@@ -28,10 +28,14 @@ function Invoke-AACExport {
 
         [string] $PdfPath,
 
-        [scriptblock] $WritePdf
+        [scriptblock] $WritePdf,
+
+        [string] $HtmlPath,
+
+        [scriptblock] $WriteHtml
     )
 
-    if (-not $CsvPath -and -not $PdfPath) {
+    if (-not $CsvPath -and -not $PdfPath -and -not $HtmlPath) {
         return
     }
 
@@ -49,6 +53,12 @@ function Invoke-AACExport {
             Update-AACProgress -Id 'export-pdf' -Description 'Writing the PDF report' -Indeterminate
             $file = & $WritePdf
             Update-AACProgress -Id 'export-pdf' -Complete -Description "PDF: $(if ($file) { $file.FullName } else { $PdfPath })"
+            $file
+        }
+        if ($HtmlPath) {
+            Update-AACProgress -Id 'export-html' -Description 'Writing the HTML report' -Indeterminate
+            $file = & $WriteHtml
+            Update-AACProgress -Id 'export-html' -Complete -Description "HTML: $(if ($file) { $file.FullName } else { $HtmlPath })"
             $file
         }
     }

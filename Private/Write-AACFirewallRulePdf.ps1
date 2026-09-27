@@ -85,7 +85,7 @@ function Write-AACFirewallRulePdf {
     & $pdf.AddTitle "$('{0:N0}' -f $Rule.Count) rules in $policyCount firewall $(if ($policyCount -eq 1) { 'policy' } else { 'policies' }) · generated $($pdf.Generated.ToString('dddd d MMMM yyyy, HH:mm'))"
 
     $facts = [ordered]@{}
-    $session = Get-Variable -Name 'AACSession' -Scope Global -ValueOnly -ErrorAction Ignore
+    $session = $script:AACSession
     if ($session) {
         $facts['Azure account'] = [string]$session.Account
         $facts['Tenant'] = [string]$session.TenantId

@@ -14,14 +14,18 @@ Microsoft.Graph modules, and no app registration.
 - **Azure Firewall rules.** Every Firewall Policy rule (DNAT, network,
   application) with IP Groups resolved to names and addresses, shown one
   colour-coded table per rule collection.
-- **Azure estate check.** 85 live, read-only checks across every subscription
-  you can see. 75 of them follow [PSRule for Azure](https://azure.github.io/PSRule.Rules.Azure/).
-  They run as Pester tests, with a live progress display and a report.
+- **PSRule for Azure.** Its 500+ Well-Architected rules, the module's own
+  rules and your custom rules, run on the live estate. You can leave rules
+  out by name or wildcard.
+- **Application Insights.** Your application's exceptions, flattened, or any
+  KQL query, from a Log Analytics workspace or an Application Insights
+  resource.
 - **Resource and cost charts.** Colourful console charts of what you run (by
   type, region, resource group or subscription) and what it costs (month to
-  date by subscription and service, and the monthly trend).
-- **Output your way.** PowerShell objects, CSV (`Export-Csv`) or a PDF report,
-  from the same command.
+  date by subscription and service, and the monthly trend), plus a full
+  resource inventory.
+- **Output your way.** A console view, PowerShell objects, CSV, PDF or an
+  interactive HTML report, from the same command.
 
 Everything is read-only. Reader access on the subscriptions is enough (costs
 need Cost Management Reader or Reader).
@@ -34,11 +38,13 @@ Install-PSResource -Name Azure.Admin.Console     # PSResourceGet
 Install-Module -Name Azure.Admin.Console -Scope CurrentUser
 ```
 
-Pester 5.7.1 or later is installed with it. It is the only dependency.
+One module is installed with it: PSRule for Azure (PSRule.Rules.Azure 1.47
+or later, with PSRule), for `Invoke-AACPSRule`. There are no Az or
+Microsoft.Graph modules.
 
 | | Windows | Linux / macOS |
 |---|---|---|
-| Objects, CSV, estate check | PowerShell 7.2+ | PowerShell 7.2+ |
+| Console views, objects, CSV, HTML | PowerShell 7.2+ | PowerShell 7.2+ |
 | PDF reports | PowerShell 7.4+ | not supported (needs Windows fonts) |
 
 ## Quick start
@@ -47,22 +53,50 @@ Pester 5.7.1 or later is installed with it. It is the only dependency.
 Import-Module Azure.Admin.Console
 Connect-AAC                                  # opens your browser to sign in
 
-# Azure Advisor: the console view, plus CSV and PDF reports
-Get-AACAdvisorRecommendation -CsvPath .\Advisor.csv -PdfPath .\Advisor.pdf
+# Azure Advisor: the console view, or CSV, PDF and interactive HTML reports
+Get-AACAdvisorRecommendation
+Get-AACAdvisorRecommendation -CsvPath .\Advisor.csv -PdfPath .\Advisor.pdf -HtmlPath .\Advisor.html
 
-# Azure Firewall Policy rules: the console view, plus a CSV file
-Get-AACFirewallRule -CsvPath .\FirewallRules.csv
+# Azure Firewall Policy rules, as an interactive HTML report
+Get-AACFirewallRule -HtmlPath .\FirewallRules.html
 
 # Which firewall rules let 10.1.2.3 reach 10.0.0.4 on UDP 53?
 Get-AACFirewallRule -SourceAddress 10.1.2.3 -DestinationAddress 10.0.0.4 -Port 53 -Protocol UDP
 
 # What you run, and what it costs
 Show-AACResource
+Show-AACResource -HtmlPath .\Inventory.html     # every resource, with portal links
 Show-AACCost
 
-# The estate check: failures only, with a PDF copy
-Invoke-AACPester -FailedOnly -PdfPath .\Estate.pdf
+# PSRule for Azure on the live estate, as a clickable HTML report
+Invoke-AACPSRule -HtmlPath .\PSRule.html
+
+# The last 2 hours of exceptions from Application Insights
+Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-contoso-prod'
 ```
+
+### Console view or reports
+
+Every command works the same way:
+- **Console view:** at the prompt, a command draws its view. A view longer
+  than the terminal is shown a page at a time: press any key for the next
+  page, or A for the rest. `-NoPaging` turns paging off, and it's skipped
+  automatically when output is redirected.
+- **Reports:** with `-CsvPath`, `-PdfPath` or `-HtmlPath`, the report is in
+  the files. The console shows only the progress and the files written, not
+  the view. Add `-PassThru` to get the objects as well.
+- **Progress:** every command shows the same progress display: the title,
+  then one line per step with a bar, a percentage and the elapsed time, each
+  finishing with what it did.
+
+The HTML reports are single, self-contained files with no external scripts,
+styles or fonts, so they open offline and work as email attachments or
+pipeline artifacts. Each one has:
+- clickable tiles and bar charts that filter the table;
+- search, filter drop-downs, sortable columns, and grouping with subtotals;
+- Azure portal links and *Copy ID* for every resource;
+- a CSV download of exactly the rows shown;
+- light and dark themes, and a layout that works on a phone.
 
 ## Commands
 
@@ -74,7 +108,8 @@ Invoke-AACPester -FailedOnly -PdfPath .\Estate.pdf
 | [`Get-AACFirewallRule`](docs/Get-AACFirewallRule.md) | Every Azure Firewall Policy rule: a console view at the prompt (Allow in green, Deny in red), objects down a pipeline, CSV and/or PDF exports. |
 | [`Show-AACResource`](docs/Show-AACResource.md) | A colourful bar chart of your resources by type, location, resource group or subscription. |
 | [`Show-AACCost`](docs/Show-AACCost.md) | Subscription costs: month to date by subscription and by service, and a monthly trend, as charts and a table. |
-| [`Invoke-AACPester`](docs/Invoke-AACPester.md) | Runs any Pester v5 tests with a progress display, a console report and an optional PDF. With no `-Path` it runs the bundled estate check. |
+| [`Invoke-AACPSRule`](docs/Invoke-AACPSRule.md) | PSRule for Azure, the module's own rules and your custom rules on the live estate: include or exclude rules by name or wildcard, with a baseline or settings. |
+| [`Invoke-AACApplicationInsightQuery`](docs/Invoke-AACApplicationInsightQuery.md) | Application Insights exceptions, flattened, from a Log Analytics workspace or Application Insights resource, or any KQL query. |
 
 Full help:
 - **In PowerShell:** run `Get-Help <command> -Full`, or `Get-Help about_Azure.Admin.Console` for the module overview.
@@ -117,6 +152,11 @@ In the view:
 - **Savings** are green.
 - **Retirement dates** are red within 90 days, orange within 180 and gold after that.
 - **Paging:** a view longer than the terminal is shown a screen at a time. Press any key for the next page, or A for the rest. `-NoPaging` turns this off, and it's skipped automatically when output is redirected.
+
+`-HtmlPath` writes the interactive report. It has tiles for impact, resources,
+savings and retirements, and charts by category, impact, subscription and
+recommendation. Every recommendation is in one table, grouped by
+recommendation, with the savings subtotalled per group.
 
 PowerShell can't tell `$r = Get-AACAdvisorRecommendation` apart from a plain
 call. To keep the objects in a variable, add `-PassThru` or `-NoDisplay`.
@@ -172,11 +212,16 @@ Graph. It returns output the same way as `Get-AACAdvisorRecommendation`:
 - **At the prompt:** a console view.
 - **Piped onward:** the objects, with no view.
 - **`-PassThru`:** both. **`-NoDisplay`:** the objects only.
-- **`-CsvPath` and `-PdfPath`:** export in any of these modes.
+- **`-CsvPath`, `-PdfPath` and `-HtmlPath`:** the report is in the files,
+  and the console shows only the progress.
+
+The HTML report groups the rules by rule collection and flags Allow rules open
+to any source or destination (`*`, `0.0.0.0/0`). Click the tile to list just
+those rules.
 
 ```powershell
 Get-AACFirewallRule                                          # the console view
-Get-AACFirewallRule -CsvPath .\rules.csv -PdfPath .\rules.pdf # the view, plus CSV and PDF
+Get-AACFirewallRule -CsvPath .\rules.csv -PdfPath .\rules.pdf -HtmlPath .\rules.html
 Get-AACFirewallRule -FirewallPolicyName 'fwpol-hub-*' |
     Where-Object { $_.Action -eq 'Allow' -and $_.SourceAddresses -match '(^|, )\*($|,)' }
 ```
@@ -254,7 +299,13 @@ Show-AACResource                                  # by type, top 20
 Show-AACResource -By Location                     # or ResourceGroup, Subscription
 Show-AACResource -ResourceType 'microsoft.network/*' -Top 10
 Show-AACResource -By Subscription -PassThru | Export-Csv .\PerSubscription.csv
+Show-AACResource -HtmlPath .\Inventory.html        # an interactive inventory
 ```
+
+`-HtmlPath` writes an interactive inventory of every resource: name, type,
+resource group, location, subscription, kind, SKU and tags, with portal links.
+Charts by type, location, subscription and resource group filter it. This
+needs one more Resource Graph query, for the resources themselves.
 
 `Show-AACCost` reads each subscription's actual cost from the Cost Management
 Query API, broken down by month, service and resource group, with one query
@@ -271,6 +322,7 @@ instead of drawing empty charts.
 Show-AACCost                                      # month to date + last 6 months
 Show-AACCost -Months 12 -SubscriptionId '00000000-0000-0000-0000-000000000000'
 Show-AACCost -Months 12 -CsvPath .\Cost.csv -PdfPath .\Cost.pdf   # the detail and a report
+Show-AACCost -Months 12 -HtmlPath .\Cost.html                     # an interactive report
 Show-AACCost -PassThru | Export-Csv .\CostSummary.csv                  # one row per subscription
 ```
 
@@ -278,6 +330,7 @@ Show-AACCost -PassThru | Export-Csv .\CostSummary.csv                  # one row
 |---|---|
 | `-CsvPath` | The detail: one row per subscription, month, resource group and service (`SubscriptionName`, `SubscriptionId`, `Month`, `ResourceGroup`, `Service`, `Cost`, `Currency`), ready for an Excel pivot table |
 | `-PdfPath` | Landscape A4. A summary with totals, the subscription-by-month table, and this month's top services and resource groups; then a page per subscription with its services and resource groups month by month |
+| `-HtmlPath` | Tiles and charts by month, subscription, service and resource group, which filter the detail table; a subscription-by-month table; and every detail row, with the total of whatever is shown |
 | `-PassThru` | One object per subscription, with `MonthToDate`, one property per month (`2026-07`, ...), `Total`, `TopServices` and `Status` |
 
 Costs stay in each subscription's billing currency, and each currency gets its
@@ -286,109 +339,142 @@ display shows each subscription as it is read, and throttled calls are
 retried. A subscription that Cost Management can't report on, such as some
 offer types or one you lack permission for, is listed with the reason.
 
-## Azure estate check
+## PSRule for Azure
 
-`Invoke-AACPester` with no `-Path` runs `Checks\AzureEstate.Tests.ps1` from
-the module folder. It checks every resource the signed-in account can see:
+`Invoke-AACPSRule` checks your live estate with
+[PSRule for Azure](https://azure.github.io/PSRule.Rules.Azure/): its 500+
+rules, following the Azure Well-Architected Framework, on every resource,
+resource group and subscription you can see. The module's own rules and your
+custom rules run alongside them.
 
 ```powershell
 Connect-AAC
-Invoke-AACPester                                                       # everything
-Invoke-AACPester -Tag Security -FailedOnly                              # one area, failures only
-Invoke-AACPester -Data @{ ResourceType = 'microsoft.keyvault/vaults' }  # one resource type
-Invoke-AACPester -PdfPath .\Estate.pdf                                  # with a PDF report
+Invoke-AACPSRule                                                  # the console view
+Invoke-AACPSRule -SubscriptionId '00000000-0000-0000-0000-000000000000' -HtmlPath .\PSRule.html
+Invoke-AACPSRule -CsvPath .\PSRule.csv -PdfPath .\PSRule.pdf -FailedOnly
+Invoke-AACPSRule -Rule 'Azure.Storage.*', 'Azure.KeyVault.*'      # only these rules
+Invoke-AACPSRule -ExcludeRule 'Azure.Resource.UseTags', 'AAC.*'    # leave these out
+Invoke-AACPSRule -Baseline 'Azure.Pillar.Security'                 # a PSRule for Azure baseline
+Invoke-AACPSRule -FailedOnly | Group-Object RuleName | Sort-Object Count -Descending
 ```
 
-### What it checks
+The console view has tiles for objects checked, rules, passed, failed,
+"could not evaluate" and pass rate. A bar chart shows the failures by pillar.
+Then each pillar gets a table of its failing rules, most severe first, with
+the resources each one failed on and why. The HTML report opens on the
+failures, grouped by rule, with portal and rule documentation links. The PDF
+lists every failing resource under its rule, with the rule's recommendation.
 
-Each check belongs to one area: `Governance`, `Security`, `Networking` or
-`Operations`. Pick areas with `-Tag`. When a check follows a PSRule for Azure
-rule, its failure message names that rule.
+### The rules
 
-| Resource | Checks | PSRule rules |
+| Source | Rules | |
 |---|---|---|
-| Every resource | Deployed in an approved region; has the required tags | |
-| Storage accounts | Name rules and your own name format; HTTPS only; TLS 1.2+; no anonymous blob access; private containers; firewall denies by default; no shared key access; Defender malware and sensitive-data scanning (and Defender on every account, if you ask); geo or zone replication; blob, container and file-share soft delete | 15 `Azure.Storage.*` |
-| Key Vault | Vault, key and secret names; purge protection; soft delete; Azure RBAC; firewall; no All/Purge access policies; audit logs; keys rotate automatically | 10 `Azure.KeyVault.*` |
-| API Management | Name; managed identity; no SSL 3.0 / TLS 1.0 / 1.1; no weak ciphers; HTTPS-only APIs and backends; named values in Key Vault; products need a subscription and approval; no sample products; no wildcard CORS; `<base />` in API and product policies; Defender for APIs; certificates not expiring within 30 days; availability zones; multi-region with gateways enabled; minimum API version 2021-08-01; APIs and products described | 20 `Azure.APIM.*` |
-| Application Gateway | Name; WAF SKU and WAF enabled when Internet-facing; TLS 1.2 SSL policy; HTTP redirected to HTTPS; classic WAF in prevention mode, OWASP 3.x and all rules on; 2+ instances; Medium or larger; v2 SKU; WAF policy instead of classic WAF; availability zones | 13 `Azure.AppGw.*` |
-| Application Gateway WAF policies | Enabled; prevention mode; no exclusions; default and bot manager rule sets | 4 `Azure.AppGwWAF.*` |
-| Service Bus | Local (SAS key) auth disabled; TLS 1.2+; audit logs (Premium); geo-replicated, with replicas in approved regions; in use | 6 `Azure.ServiceBus.*` |
-| Application Insights | Name and your own name format; local auth disabled; workspace-based | 4 `Azure.AppInsights.*` |
-| Managed Grafana | Version 11 or later; zone redundant | 2 `Azure.Grafana.*` |
-| Logic Apps | HTTP request triggers limited to allowed caller IPs | 1 `Azure.LogicApp.*` |
-| SQL servers, App Service, managed disks | Public network access disabled; HTTPS only; customer-managed key encryption | |
-| NSGs, public IPs, virtual networks | No RDP/SSH from the Internet; public IPs attached; custom (hub) DNS servers | |
-| VMs and other monitored types | Protected by Azure Backup; diagnostic logs sent to Log Analytics | |
+| PSRule for Azure | Every rule of the installed PSRule.Rules.Azure | `-Baseline` picks one of its baselines |
+| Azure.Admin.Console | `AAC.Resource.RequiredTags`, `AAC.ResourceGroup.RequiredTags`, `AAC.Resource.AllowedTagValues` | Off until configured; in `PSRule\Rules` |
+| Custom | Your own rule files, from `-RulePath` | `*.Rule.ps1`, `*.Rule.yaml` or `*.Rule.jsonc` |
 
-### Settings
-
-Change the rules with `-Data`. Each key sets one of the check's parameters:
+`-Rule` runs only the rules named, and `-ExcludeRule` leaves rules out. Both
+take names or wildcards. `-Configuration` passes settings to every rule:
+PSRule for Azure's
+[options](https://azure.github.io/PSRule.Rules.Azure/setup/configuring-options/),
+the module's `AAC_*` settings, or your rules' own.
 
 ```powershell
-Invoke-AACPester -Tag Governance, Security -Data @{
-    SubscriptionId  = '00000000-0000-0000-0000-000000000000'
-    AllowedLocation = 'uksouth', 'ukwest', 'global'
-    RequiredTag     = 'Owner', 'CostCenter'
+Invoke-AACPSRule -Configuration @{
+    AAC_REQUIRED_TAGS                = @('Owner', 'CostCenter', 'Environment')
+    AAC_ALLOWED_TAG_VALUES           = @{ Environment = @('prod', 'test', 'dev') }
+    AZURE_RESOURCE_ALLOWED_LOCATIONS = @('uksouth', 'ukwest')
 }
 ```
 
-| Setting | Default | |
-|---|---|---|
-| `SubscriptionId` | every subscription you can see | Only check these subscriptions. |
-| `ResourceType` | every type | Only check these types; wildcards work (`'microsoft.network/*'`). |
-| `AllowedLocation` | `uksouth`, `ukwest`, `global` | Approved regions. |
-| `RequiredTag` | `Owner`, `CostCenter`, `Environment` | Tags every resource must have. |
-| `DnsServer` | any custom DNS | The DNS servers every VNet must use. |
-| `LogAnalyticsWorkspaceId` | any workspace | The workspace diagnostic logs must go to. |
-| `BackupExemptEnvironment` | `dev` | VMs with this `Environment` tag don't need a backup. |
-| `DiagnosticResourceType` | Key Vault, App Service, SQL databases, NSGs | Types that must send diagnostic logs. |
-| `AppInsightsNameFormat` | off | A case-sensitive regular expression every Application Insights name must match, such as `'^appi-'`. |
-| `StorageAccountNameFormat` | off | The same, for storage account names, such as `'^st'`. |
-| `StorageDefenderPerAccount` | `$false` | `$true` to require Defender for Storage on each account, rather than per subscription. |
+### Your own rules
 
-### Progress and cost
+Write rules the way PSRule does:
+[PowerShell, YAML or JSON](https://microsoft.github.io/PSRule/v2/authoring/writing-rules/).
+Then pass the file or folder to `-RulePath`. PSRule for Azure's binding
+applies to them too, so `-Type 'Microsoft.Storage/storageAccounts'` works. A
+`# Synopsis:` comment names the rule, and an `Azure.WAF/pillar` tag places it
+in a pillar. A help file in `en\<rule name>.md` next to it adds the severity,
+recommendation and documentation link. See `PSRule\Rules` for examples.
 
-`Invoke-AACPester` shows a live Spectre.Console progress display with a spinner, bar, percentage and elapsed time:
-
-```text
-✓ Pester: 1,204 tests - 1,150 passed, 48 failed, 6 skipped ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 00:01:12
-✓ Read 1,204 resources in 12 subscription(s)              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 00:00:04
-⠹ Security: Key Vault keys rotate automatically           ━━━━━━━━━━━━━━━━━━━━━━━━╸━━━━━━━━━━━  66% 00:00:51
+```powershell
+# .\MyRules\Contoso.Storage.Rule.ps1
+# Synopsis: Storage accounts use the Contoso naming convention.
+Rule 'Contoso.Storage.Name' -Type 'Microsoft.Storage/storageAccounts' -Tag @{ 'Azure.WAF/pillar' = 'Operational Excellence' } {
+    $Assert.Match($TargetObject, 'name', '^stcontoso')
+}
 ```
 
-The rules line names each rule as it's checked. In CI and redirected output,
-each finished step is written as a single plain line instead.
+```powershell
+Invoke-AACPSRule -RulePath .\MyRules -Rule 'Contoso.*'
+```
 
-Most settings come from three Resource Graph queries. The rest are read over
-REST, and each read is shared by every rule that needs it:
+### How it reads the estate
 
-| What | Calls |
-|---|---|
-| Diagnostic settings | One per resource of a `DiagnosticResourceType`, plus Key Vaults and Premium Service Bus namespaces |
-| Storage accounts | Up to three per account (blob services, containers, Defender settings; file services for FileStorage) |
-| Key Vault | Two per vault (keys and secrets, as metadata only; never secret values) |
-| API Management | About six per service, plus one per API and one per product |
-| Service Bus | Up to two per namespace |
-| Availability zones | One per subscription for each resource provider involved |
+PSRule for Azure normally reads its data from `Export-AzRuleData`, which
+needs the Az modules. This reads the same data with the `Connect-AAC`
+sign-in instead:
+- Resource Graph returns every resource with its properties, plus the
+  resource groups and subscriptions.
+- Azure Resource Manager provides the child settings PSRule's rules look at,
+  such as storage blob services and containers, SQL auditing and firewall
+  rules, Key Vault diagnostic settings, App Service config, and API
+  Management APIs, products and policies. It reads the same children, with
+  the same API versions, as `Export-AzRuleData` (PSRule.Rules.Azure v1.47).
 
-### Your own tests
+Reader access is enough. When a setting can't be read, the command warns and
+names it, because the rules using it may be wrong for that resource. VPN
+connection shared keys are masked before PSRule sees them. A rule that can't
+evaluate a resource is reported as "could not evaluate" for that resource,
+and every other rule still runs. PSRule runs in a `pwsh` process of its own,
+so its `YamlDotNet.dll` never clashes with the different versions that
+platyPS, powershell-yaml or Az.Aks may have loaded into your session.
 
-`Invoke-AACPester -Path .\MyTests` runs any Pester v5 tests with the same
-report. The report has:
-- a table of every test,
-- a tree grouped by file and block, with the failures called out,
-- a pass/fail chart,
-- a summary and a verdict banner.
+## Application Insights
 
-Other options:
-- `-Tag`, `-ExcludeTag` and `-TestName` filter the tests.
-- `-Data` passes values to the test files' `param()` blocks.
-- `-FailedOnly` lists only failures.
-- `-CI` writes JUnit XML.
-- `-PdfPath` saves a PDF report.
+`Invoke-AACApplicationInsightQuery` reads your application's exceptions, or
+runs any KQL query. It works against a Log Analytics workspace
+(`-LogWorkspaceName`, for workspace-based Application Insights, table
+`AppExceptions`) or an Application Insights resource
+(`-ApplicationInsightsName`, classic tables such as `exceptions`). The
+resource is found by name with Resource Graph. The query runs through Azure
+Resource Manager with the `Connect-AAC` sign-in, so there's no separate token
+and no Az module. It needs Log Analytics Reader (or Reader).
 
-Test files can add their own progress lines. See the help in `Private\Update-AACProgress.ps1`.
+```powershell
+Invoke-AACApplicationInsightQuery -SubscriptionId '00000000-0000-0000-0000-000000000000' -LogWorkspaceName 'law-contoso-prod'
+Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-contoso-prod' -Last 1d -MinimumSeverity Error -AppRoleName 'orders-api'
+Invoke-AACApplicationInsightQuery -ApplicationInsightsName 'appi-contoso-portal' -ExceptionType '*SqlException' -Search 'timeout'
+Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-contoso-prod' -Last 7d -HtmlPath .\Exceptions.html
+Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-contoso-prod' -Query 'AppRequests | where Success == false | summarize count() by Name'
+```
+
+| Parameter | Default | |
+|---|---|---|
+| `-Last` | `2h` | How far back: `30m`, `2h`, `7d` and so on. It also bounds `-Query`. |
+| `-MinimumSeverity` | all | `Verbose`, `Information`, `Warning`, `Error` or `Critical`, and worse. |
+| `-ExceptionType` | all | Exception types; wildcards work (`'*SqlException'`). |
+| `-AppRoleName` | all | Apps or cloud roles. |
+| `-Search` | none | Text in the type or messages. |
+| `-Top` | `1000` | The newest this many. |
+| `-Query` | | Any KQL instead of the exceptions query; its columns become the objects' properties. |
+
+The values you give are escaped before they go into the KQL.
+
+Each exception is flattened into one object, the same from either table:
+- **When and how bad:** time (UTC) and severity.
+- **What:** type and message, plus the outer and innermost exception.
+- **The `details` array:** the first entry's type, message and severity
+  level, the number of entries, and the top stack frame (method, file and
+  line).
+- **Where it came from:** method, assembly, problem ID, operation name and
+  ID, app/role, role instance, app version, client country and city.
+- **Sampling and extras:** item count (for sampled telemetry) and custom
+  properties.
+
+The console view has tiles, a timeline of exceptions, a severity breakdown,
+the top exception types, the top problems (a type thrown from one place) and
+the latest exceptions. `-CsvPath` and `-HtmlPath` export them.
 
 ## Troubleshooting
 
@@ -435,10 +521,12 @@ Azure.Admin.Console/
   Azure.Admin.Console.psm1   Loads lib\Spectre.Console.dll, then Private\ and Public\
   Public/                    Exported commands, one per file, with comment-based help
   Private/                   Internal helpers (REST, Resource Graph, PKCE, PDF, console views, progress)
-  Checks/                    The live Azure estate check, run by Invoke-AACPester
+  PSRule/                    PSRuleRunner.ps1 (runs PSRule in its own pwsh) and Rules\ (the AAC.* rules and their help)
+  Parked/                    Invoke-AACPester and its estate check, set aside (not loaded or packaged)
   lib/                       Vendored Spectre.Console and PDFsharp/MigraDoc (MIT)
-  en-US/                     about_Azure.Admin.Console help topic
-  docs/                      Generated Markdown help, one page per command
+  en-US/                     about_ help topic and the MAML help Get-Help shows (built by PlatyPS)
+  docs/                      Markdown help, one page per command (built by PlatyPS)
+  tools/                     Build-Help.ps1: builds docs\ and the MAML with PlatyPS (not packaged)
   Tests/                     Unit tests, no Azure needed (not packaged)
   .github/workflows/         CI and release pipelines
   build.ps1                  Docs, tests, packaging and publishing
@@ -454,20 +542,32 @@ everything on this side for real:
 | Command | Mocked | Tested for real |
 |---|---|---|
 | `Connect-AAC` | The browser (`Start-Process`) and the token endpoint (`Invoke-RestMethod`) | The PKCE code, the localhost listener receiving the redirect, state (CSRF) validation, the token exchange and the stored session |
-| `Get-AACAdvisorRecommendation`, `Get-AACFirewallRule`, `Show-AACResource` | Resource Graph (`Invoke-AACResourceGraphQuery`) with hand-built rows | Flattening, filters and search, output modes, CSV and PDF, and the console view |
-| `Show-AACCost` | The Cost Management query (`Invoke-AACCostQuery`) | Month and service totals, failed subscriptions, the charts; also the query's paging |
-| `Invoke-AACPester` | Nothing | It runs in a child `pwsh` process against a sample test file, because Pester can't run inside Pester |
+| `Get-AACAdvisorRecommendation`, `Get-AACFirewallRule`, `Show-AACResource` | Resource Graph (`Invoke-AACResourceGraphQuery`) with hand-built rows | Flattening, filters and search, output modes, CSV, PDF and HTML, and the console view |
+| `Show-AACCost` | The Cost Management query (`Invoke-AACCostQuery`) | Month and service totals, failed subscriptions, the charts, PDF and HTML; also the query's paging |
+| `Invoke-AACPSRule` | The engine (`Invoke-AACPSRuleEngine`) | Output modes, `-FailedOnly`, settings passed on, CSV and HTML |
+| PSRule for Azure data (`Get-AACRuleData`) | Azure Resource Manager (`Invoke-AACArmRequest`) | The Export-AzRuleData shape, child settings, 403/404 handling, masked shared keys, type filters |
+| PSRule runner | Nothing | Real PSRule for Azure in a child `pwsh`: the AAC.* rules, `-Type` binding for custom rules, wildcard include/exclude, a rule error not stopping the run |
+| `Invoke-AACApplicationInsightQuery` | Resource Graph and the query API (`Invoke-AACArmRequest`) | The KQL built from the parameters (with escaping), both table schemas flattened, `-Query`, errors, the view and the exports |
 
 The console views are checked by swapping the Spectre console for one that
 writes to a text buffer, then looking for what should be drawn. For a new
 command, copy the nearest test file and change its mocks.
 
 The comment-based help in each `Public\*.ps1` file is the single source of
-command help. `Get-Help` reads it directly, and `docs\` is generated from it.
+command help. The Docs task builds two things from it with
+[Microsoft.PowerShell.PlatyPS](https://github.com/PowerShell/platyPS) 1.0:
+- `docs\<Command>.md`, the PlatyPS Markdown pages;
+- `en-US\Azure.Admin.Console-help.xml`, the MAML help that `Get-Help` shows.
+  Each command points at it with `.EXTERNALHELP`.
+
+PlatyPS is needed only on the build machine, not by the installed module.
+It runs in a `pwsh` process of its own, because PlatyPS and PSRule each load a
+different `YamlDotNet.dll`. CI fails when `docs\` or `en-US\` is out of date.
 
 ```powershell
+Install-PSResource Microsoft.PowerShell.PlatyPS -Scope CurrentUser   # once, to build the help
 ./build.ps1                   # Docs + Test + Build: a validated package in out\Azure.Admin.Console
-./build.ps1 -Task Docs        # regenerate docs\ after editing help
+./build.ps1 -Task Docs        # rebuild docs\ and the MAML help after editing help
 ./build.ps1 -Task Test        # unit tests only
 ```
 

@@ -140,9 +140,9 @@ function Write-AACCostPdf {
     # --- 1. Summary ------------------------------------------------------------------------------
     & $pdf.AddTitle "$($Cost.Count) subscription(s) · actual cost$(if ($Period) { " · $Period" }) · generated $($pdf.Generated.ToString('dddd d MMMM yyyy, HH:mm'))"
     $facts = [ordered]@{}
-    if ($global:AACSession) {
-        $facts['Azure account'] = [string]$global:AACSession.Account
-        $facts['Tenant'] = [string]$global:AACSession.TenantId
+    if ($script:AACSession) {
+        $facts['Azure account'] = [string]$script:AACSession.Account
+        $facts['Tenant'] = [string]$script:AACSession.TenantId
     }
     if ($Period) { $facts['Period'] = "$Period (the last month is to date)" }
     $facts['Amounts'] = 'Actual cost as Azure Cost Management reports it, in each subscription''s billing currency - never converted. It can lag usage by a day or so.'

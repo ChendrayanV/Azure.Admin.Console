@@ -1,5 +1,6 @@
 function Invoke-AACPester {
     <#
+    .EXTERNALHELP Azure.Admin.Console-help.xml
     .SYNOPSIS
         Runs any Pester v5 tests and renders the results with Spectre.Console:
         a table of every test, a tree grouped by file and block with the
@@ -34,13 +35,41 @@ function Invoke-AACPester {
         skipped automatically when output is redirected or with -CI, and can
         be turned off with -NoPaging.
 
+        -PSRule runs PSRule for Azure (the PSRule.Rules.Azure module, 500+
+        rules following the Azure Well-Architected Framework) against the
+        live estate, with each result as a test: grouped by pillar, then
+        rule, then resource. The data it needs is read with the Connect-AAC
+        sign-in - no Az modules. See PSRuleChecks\PSRuleForAzure.Tests.ps1
+        for its -Data settings (Rule, ExcludeRule, Baseline, Configuration).
+
         -PdfPath also saves the results as an A4 PDF report - a summary
         with the verdict, pass/fail counts per check, and every test with
         its failure message - honouring -FailedOnly.
+
+        -HtmlPath saves them as a single, self-contained HTML page to open
+        in any browser: the verdict and totals, the checks that fail most,
+        and every result - searchable, filterable by outcome, grouped by
+        check or by resource, with links to each resource in the Azure
+        portal and to each PSRule rule's documentation. It works offline
+        and can be attached to a ticket or published as a pipeline artifact.
+
+        With -PdfPath or -HtmlPath the console report isn't shown: the
+        console keeps the progress (with the pass/fail counts) and the files
+        written, and the report is in the files.
     .PARAMETER Path
         One or more test files or folders. Folders are searched recursively
         for *.Tests.ps1 files. Defaults to this module's bundled Checks
-        folder (AzureEstate.Tests.ps1).
+        folder (AzureEstate.Tests.ps1), or to PSRuleChecks with -PSRule.
+    .PARAMETER PSRule
+        Run PSRule for Azure against the live estate. Needs a Connect-AAC
+        sign-in; the PSRule.Rules.Azure module is installed with this one. Without -Path it replaces the bundled estate
+        check; with -Path it runs as well as those tests.
+    .PARAMETER SubscriptionId
+        Only check these subscriptions (IDs). Defaults to every subscription
+        the signed-in account can see. It is passed to every test file that
+        declares a SubscriptionId parameter - the bundled estate check and
+        the PSRule for Azure check both do - the same as
+        -Data @{ SubscriptionId = ... }.
     .PARAMETER Tag
         Only run tests (or blocks) with at least one of these tags.
     .PARAMETER ExcludeTag
@@ -69,6 +98,9 @@ function Invoke-AACPester {
     .PARAMETER PdfPath
         Also write the results to this PDF file. Needs Windows and PowerShell
         7.4 or later.
+    .PARAMETER HtmlPath
+        Also write the results to this self-contained HTML file (honouring
+        -FailedOnly).
     .PARAMETER PassThru
         Also return the Pester result object, in addition to rendering the report.
     .EXAMPLE
@@ -80,8 +112,11 @@ function Invoke-AACPester {
         Runs the bundled estate check's governance rules, accepting resources in UK South or the "global" location.
     .EXAMPLE
         Connect-AAC
-        Invoke-AACPester -Data @{ SubscriptionId = '00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-111111111111' }
+        Invoke-AACPester -SubscriptionId '00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-111111111111'
         Runs the bundled estate check against those two subscriptions only.
+    .EXAMPLE
+        Invoke-AACPester -PSRule -SubscriptionId '00000000-0000-0000-0000-000000000000' -HtmlPath .\out\Prod.html
+        Runs PSRule for Azure against one subscription, with an HTML report.
     .EXAMPLE
         Invoke-AACPester -Path .\Tests -Tag 'Smoke' -ExcludeTag 'Slow'
         Runs only the tests tagged Smoke, leaving out any tagged Slow.
@@ -96,6 +131,13 @@ function Invoke-AACPester {
         Invoke-AACPester -PdfPath .\out\AzureEstate.pdf
         Shows the report and saves it as a PDF as well.
     .EXAMPLE
+        Connect-AAC
+        Invoke-AACPester -PSRule -HtmlPath .\out\PSRule.html
+        Runs every PSRule for Azure rule against the estate and saves a clickable HTML report.
+    .EXAMPLE
+        Invoke-AACPester -PSRule -Tag Security -FailedOnly -Data @{ Configuration = @{ AZURE_RESOURCE_ALLOWED_LOCATIONS = @('uksouth', 'ukwest') } }
+        Runs PSRule for Azure's security rules, with the regions resources may use, listing only failures.
+    .EXAMPLE
         $result = Invoke-AACPester -Path .\Tests -PassThru
         if ($result.FailedCount -gt 0) { exit 1 }
         Fails a build script when any test fails.
@@ -106,6 +148,11 @@ function Invoke-AACPester {
     param(
         [Parameter(Position = 0)]
         [string[]] $Path = (Join-Path -Path $script:AACModuleRoot -ChildPath 'Checks'),
+
+        [switch] $PSRule,
+
+        [ValidatePattern('^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$')]
+        [string[]] $SubscriptionId,
 
         [string[]] $Tag,
 
@@ -127,11 +174,27 @@ function Invoke-AACPester {
 
         [string] $PdfPath,
 
+        [string] $HtmlPath,
+
         [switch] $PassThru
     )
 
     if (-not (Get-Module -Name Pester -ListAvailable | Where-Object Version -ge '5.0.0')) {
         throw 'Pester 5.0.0 or later is required. Run: Install-Module Pester -MinimumVersion 5.0.0 -Scope CurrentUser'
+    }
+
+    if ($PSRule) {
+        $psruleChecks = Join-Path -Path $script:AACModuleRoot -ChildPath 'PSRuleChecks'
+        $Path = if ($PSBoundParameters.ContainsKey('Path')) { @($Path) + $psruleChecks } else { @($psruleChecks) }
+    }
+
+    if ($SubscriptionId) {
+        if ($Data -and $Data.ContainsKey('SubscriptionId')) {
+            throw 'Give the subscriptions either with -SubscriptionId or in -Data, not both.'
+        }
+        # A copy, so the caller's hashtable isn't changed.
+        $Data = if ($Data) { $Data.Clone() } else { @{} }
+        $Data['SubscriptionId'] = @($SubscriptionId)
     }
 
     $missingPaths = @($Path | Where-Object { -not (Test-Path -LiteralPath $_) })
@@ -222,23 +285,50 @@ function Invoke-AACPester {
         }
     }
 
-    Invoke-AACPagedOutput -NoPaging:($NoPaging -or $CI) -ScriptBlock {
-        Write-AACPesterReport -PesterResult $pesterResult -FailedOnly:$FailedOnly
+    # An export means the report is in the file: the console keeps just the
+    # progress (whose Pester line has the counts) and the files written.
+    if (-not ($PdfPath -or $HtmlPath)) {
+        Invoke-AACPagedOutput -NoPaging:($NoPaging -or $CI) -ScriptBlock {
+            Write-AACPesterReport -PesterResult $pesterResult -FailedOnly:$FailedOnly
+        }
     }
 
     if ($CI) {
         Write-AACMarkup "[grey58]JUnit results written to $([Spectre.Console.Markup]::Escape($OutputPath))[/]"
     }
 
-    if ($PdfPath) {
-        # What was run, for the PDF's summary page.
-        $detail = [ordered]@{ 'Test path' = ($Path -join ', ') }
-        if ($Tag) { $detail['Tag'] = $Tag -join ', ' }
-        if ($ExcludeTag) { $detail['Excluded tag'] = $ExcludeTag -join ', ' }
-        if ($TestName) { $detail['Test name'] = $TestName -join ', ' }
-        if ($Data) {
-            $detail['Settings'] = (@($Data.Keys | Sort-Object | ForEach-Object { "$_ = $(@($Data[$_]) -join ', ')" }) -join '; ')
+    # What was run, for the reports' summaries.
+    $detail = [ordered]@{ 'Test path' = ($Path -join ', ') }
+    if ($Tag) { $detail['Tag'] = $Tag -join ', ' }
+    if ($ExcludeTag) { $detail['Excluded tag'] = $ExcludeTag -join ', ' }
+    if ($TestName) { $detail['Test name'] = $TestName -join ', ' }
+    if ($Data) {
+        $formatValue = {
+            param($Value)
+            if ($Value -is [System.Collections.IDictionary]) {
+                '{' + (@($Value.Keys | Sort-Object | ForEach-Object { "$_ = $(@($Value[$_]) -join ', ')" }) -join '; ') + '}'
+            }
+            else {
+                @($Value) -join ', '
+            }
         }
+        $detail['Settings'] = (@($Data.Keys | Sort-Object | ForEach-Object { "$_ = $(& $formatValue $Data[$_])" }) -join '; ')
+    }
+
+    if ($HtmlPath) {
+        # Like the PDF, a failed export doesn't lose the run.
+        try {
+            $htmlFullPath = $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($HtmlPath)
+            $null = Invoke-AACExport -HtmlPath $htmlFullPath -WriteHtml {
+                Write-AACPesterReportHtml -PesterResult $pesterResult -Path $htmlFullPath -Detail $detail -FailedOnly:$FailedOnly
+            }
+        }
+        catch {
+            Write-Error -Message "Could not write the HTML report: $($_.Exception.Message)" -ErrorAction Continue
+        }
+    }
+
+    if ($PdfPath) {
         # A failed export is reported but doesn't lose the run: the console
         # report is already shown and -PassThru still returns the result.
         try {

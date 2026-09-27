@@ -1,5 +1,6 @@
 function Connect-AAC {
     <#
+    .EXTERNALHELP Azure.Admin.Console-help.xml
     .SYNOPSIS
         Signs in to Azure interactively using the OAuth 2.0 Authorization Code
         flow with PKCE and a loopback redirect - no Az or Microsoft.Graph module,
@@ -22,8 +23,8 @@ function Connect-AAC {
 
         The resulting session (access token, refresh token, expiry, signed-in
         account and tenant) is kept in this module's memory for the rest of the
-        PowerShell session and used automatically by commands like
-        Invoke-AACPester. It is not written to disk.
+        PowerShell session and used automatically by every command, such as
+        Invoke-AACPSRule. It is not written to disk.
     .PARAMETER TenantId
         The tenant to sign in to: a tenant ID (GUID), a verified domain name, or
         one of Microsoft's multi-tenant aliases 'organizations' (default, any
@@ -207,7 +208,7 @@ function Connect-AAC {
     $claimsTenantId = if ($claims) { Get-AACPropertyValue -InputObject $claims -Name 'tid' } else { $null }
     $signedInTenantId = if ($claimsTenantId) { $claimsTenantId } else { $TenantId }
 
-    $global:AACSession = [pscustomobject]@{
+    $script:AACSession = [pscustomobject]@{
         PSTypeName = 'AAC.Session'
         Account    = $account
         TenantId   = $signedInTenantId
@@ -219,10 +220,10 @@ function Connect-AAC {
         ConnectedAt  = Get-Date
     }
 
-    $summary = "[grey58]Account:[/]  $($global:AACSession.Account)`n[grey58]Tenant:[/]   $($global:AACSession.TenantId)`n[grey58]Expires:[/]  $($global:AACSession.ExpiresOn.ToString('u'))"
+    $summary = "[grey58]Account:[/]  $($script:AACSession.Account)`n[grey58]Tenant:[/]   $($script:AACSession.TenantId)`n[grey58]Expires:[/]  $($script:AACSession.ExpiresOn.ToString('u'))"
     Show-AACPanel -Content $summary -Header 'Connected' -BorderColor 'green1' -AllowMarkup
 
     if ($PassThru) {
-        return $global:AACSession
+        return $script:AACSession
     }
 }

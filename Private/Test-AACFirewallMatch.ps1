@@ -11,6 +11,7 @@ function ConvertTo-AACIpRange {
         covers every address.
     #>
     [CmdletBinding()]
+    [OutputType([hashtable])]
     param([string] $Text)
 
     $value = "$Text".Trim()

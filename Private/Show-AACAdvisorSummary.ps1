@@ -40,7 +40,7 @@ function Show-AACAdvisorSummary {
 
     # The scope line: who, where, which filters, when.
     $facts = [System.Collections.Generic.List[string]]::new()
-    $session = Get-Variable -Name 'AACSession' -Scope Global -ValueOnly -ErrorAction Ignore
+    $session = $script:AACSession
     if ($session) {
         $facts.Add("[white]$(& $escape $session.Account)[/]")
         $facts.Add("tenant $(& $escape $session.TenantId)")

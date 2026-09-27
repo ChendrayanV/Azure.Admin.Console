@@ -10,11 +10,12 @@ LONG DESCRIPTION
     your estate through Azure Resource Graph and the Azure Resource Manager
     REST API. It turns what it reads into:
 
+      - a colourful Spectre.Console view at the prompt,
       - flat PowerShell objects you can filter, group and sort,
       - CSV files written with Export-Csv (one row per item, the same
         columns on every row, ready for Excel or Power BI),
       - PDF reports laid out for people who don't use PowerShell,
-      - Pester test runs with a readable console report.
+      - interactive HTML reports that work offline.
 
     Nothing in Azure is ever changed. Reader access to the subscriptions is
     enough for every command.
@@ -33,31 +34,28 @@ COMMANDS
         A consolidated, flattened view of every Azure Advisor
         recommendation (Cost, Security, Reliability, Operational excellence,
         Performance), with estimated savings, retirement dates and
-        postponed/dismissed status. A colour-coded console view at the
-        prompt, objects down a pipeline, and CSV and/or PDF exports.
+        postponed/dismissed status.
 
     Get-AACFirewallRule
         Every Azure Firewall Policy rule (DNAT, network, application) with
-        IP Groups resolved, base policy and attached firewalls. A console
-        view at the prompt (one table per rule collection: Allow in green,
-        Deny in red, DNAT in orange), objects down a pipeline, and CSV
-        and/or PDF exports.
+        IP Groups resolved, searchable by source, destination, port and
+        protocol. Allow in green, Deny in red, DNAT in orange.
 
     Show-AACResource
         A colourful bar chart of your resources by type, location,
-        resource group or subscription.
+        resource group or subscription; -HtmlPath writes a full inventory.
 
     Show-AACCost
         Subscription costs from Cost Management: month to date by
-        subscription, service and resource group, and the monthly trend, as
-        charts and a table. -CsvPath writes the detail (per month, resource
-        group and service), -PdfPath a report.
+        subscription, service and resource group, and the monthly trend.
 
-    Invoke-AACPester
-        Runs any Pester v5 tests with a live progress display, a
-        Spectre.Console report (table, tree with failures called out,
-        chart, banner) and an optional PDF. With no -Path it runs the
-        bundled Azure estate check.
+    Invoke-AACPSRule
+        PSRule for Azure (500+ Well-Architected rules), the module's own
+        rules and your custom rules on the live estate.
+
+    Invoke-AACApplicationInsightQuery
+        Application Insights exceptions, flattened, from a Log Analytics
+        workspace or an Application Insights resource - or any KQL query.
 
     Get-Help <command> -Full shows every parameter and example.
 
@@ -65,19 +63,9 @@ GETTING STARTED
         Import-Module Azure.Admin.Console
         Connect-AAC
 
-        # Advisor: the console view
+        # Advisor: the console view, then everything to CSV, PDF and HTML
         Get-AACAdvisorRecommendation
-
-        # Advisor: everything, to CSV and PDF
-        Get-AACAdvisorRecommendation -CsvPath .\Adv.csv -PdfPath .\Adv.pdf
-
-        # Advisor: high-impact cost items, as objects
-        Get-AACAdvisorRecommendation -Category Cost -Impact High |
-            Sort-Object MonthlySavings -Descending |
-            Format-Table ResourceName, Problem, MonthlySavings, SavingsCurrency
-
-        # Firewall rules, to CSV
-        Get-AACFirewallRule -CsvPath .\FirewallRules.csv
+        Get-AACAdvisorRecommendation -CsvPath .\Adv.csv -PdfPath .\Adv.pdf -HtmlPath .\Adv.html
 
         # Firewall rules that let 10.1.2.3 reach 10.0.0.4 on UDP 53
         Get-AACFirewallRule -SourceAddress 10.1.2.3 `
@@ -87,129 +75,95 @@ GETTING STARTED
         Show-AACResource
         Show-AACCost
 
-        # The estate check, only failures, saved as a PDF
-        Invoke-AACPester -FailedOnly -PdfPath .\Estate.pdf
+        # PSRule for Azure on the live estate, as an HTML report
+        Invoke-AACPSRule -HtmlPath .\PSRule.html
 
-OUTPUT: CONSOLE VIEW, OBJECTS, CSV AND PDF
-    Get-AACAdvisorRecommendation and Get-AACFirewallRule decide by where
-    they run:
+        # The last 2 hours of exceptions
+        Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-contoso-prod'
 
-        at the prompt   a Spectre.Console view: scope, tiles for
-                        recommendations, impact, resources and savings,
-                        then a colour-coded table per category, shown a
-                        screen at a time (any key: next page, A: the
-                        rest; -NoPaging to turn paging off)
+CONSOLE VIEW, OBJECTS AND REPORTS
+    Every command decides by where it runs:
+
+        at the prompt   a Spectre.Console view, shown a screen at a time
+                        (any key: next page, A: the rest; -NoPaging to
+                        turn paging off)
         piped onward    the objects, no view (| Where-Object, ...)
         -PassThru       the view and the objects
         -NoDisplay      the objects only (scripts, scheduled tasks)
 
     PowerShell can't tell "$r = Get-AACFirewallRule" from a plain call,
     so add -PassThru or -NoDisplay to keep the objects in a variable.
-    -CsvPath and -PdfPath write their files in any of these modes.
 
-    Paths are relative to the current location, missing folders are
-    created and existing files are overwritten.
+    -CsvPath, -PdfPath and -HtmlPath write reports. With any of them the
+    console shows only the title, the progress and the files written - the
+    report is in the files. Paths are relative to the current location,
+    missing folders are created and existing files are overwritten.
 
-    The CSV is written with PowerShell's own Export-Csv (UTF-8, comma
-    separated, no type header). For other options, such as a semicolon
-    delimiter, pipe the objects to Export-Csv yourself:
+    The HTML reports are single, self-contained files that work offline:
+    clickable tiles and charts that filter the tables, search, filter
+    drop-downs, sortable columns, grouping with subtotals, Azure portal
+    links and a CSV download of the rows shown.
 
-        Get-AACAdvisorRecommendation |
-            Export-Csv .\Advisor.csv -NoTypeInformation -Delimiter ';'
+    Every command shows the same progress display: the title, then one line
+    per step with a bar, a percentage and the elapsed time. Without an
+    interactive terminal (CI, redirected output) each finished step is one
+    plain line.
 
-    At the console only a few key columns are shown. Use
-    Select-Object * or Format-List * to see every column.
+PSRULE FOR AZURE
+    Invoke-AACPSRule runs PSRule for Azure (the PSRule.Rules.Azure module,
+    installed with this one) on every resource, resource group and
+    subscription you can see, or those in -SubscriptionId.
 
-THE AZURE ESTATE CHECK
-    Checks\AzureEstate.Tests.ps1 in the module folder is a live, read-only
-    Pester check of every resource you can see: 85 checks, 75 of them
-    following PSRule for Azure (each failure names its PSRule rule).
-    Invoke-AACPester runs it when you give no -Path.
+        Invoke-AACPSRule
+        Invoke-AACPSRule -HtmlPath .\PSRule.html -FailedOnly
+        Invoke-AACPSRule -Rule 'Azure.Storage.*' -ExcludeRule 'Azure.Storage.Name'
+        Invoke-AACPSRule -Baseline 'Azure.Pillar.Security'
 
-        Invoke-AACPester                                   # everything
-        Invoke-AACPester -Tag Security -FailedOnly         # one area
-        Invoke-AACPester -Data @{ ResourceType = 'microsoft.keyvault/vaults' }
+    Rules:
+        PSRule for Azure     every rule of the installed module
+        Azure.Admin.Console  AAC.Resource.RequiredTags,
+                             AAC.ResourceGroup.RequiredTags and
+                             AAC.Resource.AllowedTagValues - off until
+                             configured (PSRule\Rules in the module folder)
+        custom               your rule files or folders, from -RulePath
 
-    Every check is in one area, a tag you can pick with -Tag:
+    -Rule and -ExcludeRule take names or wildcards. -Configuration passes
+    settings to the rules:
 
-        Governance   approved regions, required tags, resource naming
-        Security     encryption, network exposure, authentication,
-                     WAF, Defender
-        Networking   RDP/SSH from the Internet, public IPs attached,
-                     custom DNS on VNets
-        Operations   backup, logs, replication, zones, soft delete,
-                     versions
-
-    What it covers:
-
-        Every resource         region, tags
-        Storage accounts       15 Azure.Storage.* rules
-        Key Vault              10 Azure.KeyVault.* rules
-        API Management         20 Azure.APIM.* rules
-        Application Gateway    13 Azure.AppGw.* rules
-        WAF policies            4 Azure.AppGwWAF.* rules
-        Service Bus             6 Azure.ServiceBus.* rules
-        Application Insights    4 Azure.AppInsights.* rules
-        Managed Grafana         2 Azure.Grafana.* rules
-        Logic Apps              1 Azure.LogicApp.* rule
-        SQL, App Service,      public access, HTTPS only, customer-managed
-        disks, NSGs, public    keys, RDP/SSH, attached IPs, custom DNS,
-        IPs, VNets, VMs        Azure Backup, diagnostic logs
-
-SETTINGS
-    Change the check with -Data. Each key sets one of its parameters:
-
-        SubscriptionId             only these subscriptions (default: all)
-        ResourceType               only these types, wildcards work
-        AllowedLocation            approved regions
-                                   (default: uksouth, ukwest, global)
-        RequiredTag                tags every resource must have
-                                   (default: Owner, CostCenter, Environment)
-        DnsServer                  the DNS servers every VNet must use
-        LogAnalyticsWorkspaceId    the workspace diagnostic logs must reach
-        BackupExemptEnvironment    Environment tags that need no VM backup
-                                   (default: dev)
-        DiagnosticResourceType     types that must send diagnostic logs
-        AppInsightsNameFormat      regular expression for Application
-                                   Insights names (default: off)
-        StorageAccountNameFormat   regular expression for storage account
-                                   names (default: off)
-        StorageDefenderPerAccount  $true to require Defender for Storage on
-                                   each account (default: $false)
-
-        Invoke-AACPester -Tag Governance -Data @{
-            AllowedLocation = 'uksouth', 'ukwest', 'global'
-            RequiredTag     = 'Owner', 'CostCenter'
+        Invoke-AACPSRule -Configuration @{
+            AAC_REQUIRED_TAGS                = @('Owner', 'CostCenter')
+            AAC_ALLOWED_TAG_VALUES           = @{ Environment = @('prod', 'dev') }
+            AZURE_RESOURCE_ALLOWED_LOCATIONS = @('uksouth', 'ukwest')
         }
 
-PROGRESS
-    While the tests run, Invoke-AACPester shows a live progress display: a
-    line for the Pester run, and the estate check's own lines for reading
-    the estate and evaluating its rules (naming each rule as it goes), each
-    with a bar, percentage and elapsed time. Without an interactive
-    terminal (CI, redirected output) each finished step is one plain line.
-    -NoSpinner turns the display off.
+    The data PSRule needs is what Export-AzRuleData exports, read with the
+    Connect-AAC sign-in instead of the Az modules: Resource Graph for the
+    resources, then Azure Resource Manager for the child settings PSRule
+    looks at. PSRule runs in a pwsh process of its own.
 
-    Some settings aren't in Resource Graph and are read over REST, once
-    per resource however many checks use them: diagnostic settings,
-    storage blob services, containers and Defender settings, Key Vault key
-    and secret metadata (never their values), API Management APIs,
-    products, backends, named values and policies, Service Bus queues and
-    topics, and each resource provider's availability zones.
+APPLICATION INSIGHTS
+    Invoke-AACApplicationInsightQuery finds a Log Analytics workspace
+    (-LogWorkspaceName) or Application Insights resource
+    (-ApplicationInsightsName) by name and queries it through Azure
+    Resource Manager. Needs Log Analytics Reader (or Reader).
 
-YOUR OWN TESTS
-    Invoke-AACPester runs any Pester v5 tests the same way:
+        Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-prod'
+        Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-prod' `
+            -Last 1d -MinimumSeverity Error -ExceptionType '*SqlException'
+        Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-prod' `
+            -Query 'AppRequests | summarize count() by Name'
 
-        Invoke-AACPester -Path .\MyTests -Tag Smoke -CI
-
-    -Tag, -ExcludeTag and -TestName filter the tests, -Data passes values
-    to their param() blocks, -FailedOnly lists only failures, -CI writes
-    JUnit XML and -PdfPath saves a PDF report.
+    Without -Query it reads exceptions from the last -Last (default 2h),
+    narrowed by -MinimumSeverity, -ExceptionType, -AppRoleName, -Search
+    and -Top, flattened into one object each: time, severity, type and
+    message, outer and innermost exceptions, the details array's type,
+    message and severity level, the top stack frame, operation, app and
+    client. With -Query each row keeps the query's columns.
 
 REQUIREMENTS
     - PowerShell 7.2 or later. PDF export needs PowerShell 7.4 or later on
-      Windows. Objects and CSV work on Windows, Linux and macOS.
-    - Pester 5.7.1 or later. It is installed with the module.
+      Windows. Everything else works on Windows, Linux and macOS.
+    - PSRule.Rules.Azure 1.47 or later. It is installed with the module.
     - A browser for Connect-AAC, and Reader access to the subscriptions.
 
 SECURITY
@@ -233,7 +187,7 @@ TROUBLESHOOTING
         The module runs on PowerShell 7.2 or later (pwsh), not Windows
         PowerShell 5.1. Install it with: winget install Microsoft.PowerShell
 
-    "Not signed in" or a skipped estate check
+    "Not connected to Azure"
         Run Connect-AAC in the same PowerShell session first.
 
     Sign-in times out
@@ -244,17 +198,18 @@ TROUBLESHOOTING
 
     Nothing is returned
         The account may not have Reader access on the subscriptions, or the
-        filters matched nothing. Try again without -SubscriptionId,
-        -Category or -Impact.
+        filters matched nothing. Try again without -SubscriptionId or the
+        other filters.
 
     PDF export fails on Linux, macOS or PowerShell 7.2 or 7.3
         PDF export needs Windows and PowerShell 7.4 or later. Use -CsvPath
-        instead.
+        or -HtmlPath instead.
 
 SEE ALSO
     Get-Help Connect-AAC -Full
     Get-Help Get-AACAdvisorRecommendation -Full
     Get-Help Get-AACFirewallRule -Full
-    Get-Help Invoke-AACPester -Full
-    https://learn.microsoft.com/azure/advisor/
+    Get-Help Invoke-AACPSRule -Full
+    Get-Help Invoke-AACApplicationInsightQuery -Full
+    https://azure.github.io/PSRule.Rules.Azure/
     https://learn.microsoft.com/azure/governance/resource-graph/

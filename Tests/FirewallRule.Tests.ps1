@@ -136,12 +136,25 @@ Describe 'Azure Admin Console - Get-AACFirewallRule' {
             Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Show-AACFirewallRuleView -Times 1 -Exactly
         }
 
-        It 'writes the CSV in any mode' {
+        It 'writes the CSV instead of showing the view' {
             $csv = Join-Path -Path $TestDrive -ChildPath 'out/rules.csv'
             @(Get-AACFirewallRule -CsvPath $csv -NoPaging).Count | Should -Be 0
             $imported = @(Import-Csv -LiteralPath $csv)
             $imported.Count | Should -Be 5
             $imported[0].PSObject.Properties.Name | Should -Contain 'SourceIpGroupAddresses'
+            Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Show-AACFirewallRuleView -Times 0 -Exactly
+        }
+
+        It 'writes an interactive HTML report, flagging Allow rules open to any address' {
+            $html = Join-Path -Path $TestDrive -ChildPath 'out/rules.html'
+            @(Get-AACFirewallRule -HtmlPath $html -PassThru).Count | Should -Be 5 -Because '-PassThru still returns the objects'
+            Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Show-AACFirewallRuleView -Times 0 -Exactly
+            $model = [regex]::Match((Get-Content -LiteralPath $html -Raw), '<script id="aac-data" type="application/json">(.*?)</script>', 'Singleline').Groups[1].Value | ConvertFrom-Json
+            $table = $model.tables[0]
+            $table.rows.Count | Should -Be 5
+            @($table.columns.key) | Should -Contain 'Exposure'
+            @($model.tiles.label) | Should -Contain 'allow'
+            $table.rows | ForEach-Object { if ($_.Action -eq 'Allow' -and $_.Sources -match '(^|, )\*($|,|;)') { $_.Exposure | Should -Be 'Open to any' } }
         }
     }
 

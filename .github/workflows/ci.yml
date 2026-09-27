@@ -34,13 +34,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Pester and PSScriptAnalyzer
+      - name: Install the build and test modules
         run: |
           # -TrustRepository rather than Set-PSResourceRepository: on a fresh
           # runner the repository store doesn't exist yet, and
           # Set-PSResourceRepository fails before anything creates it.
           Install-PSResource -Name Pester -Version '[5.7.1,6.0)' -Scope CurrentUser -TrustRepository -Quiet
           Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -TrustRepository -Quiet
+          # A required module: the package's clean-import check needs it.
+          Install-PSResource -Name PSRule.Rules.Azure -Version '[1.47.0,2.0)' -Scope CurrentUser -TrustRepository -Quiet
           "PowerShell $($PSVersionTable.PSVersion) on $($PSVersionTable.OS)"
           Get-Module Pester, PSScriptAnalyzer -ListAvailable | Format-Table Name, Version
 
@@ -62,23 +64,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Pester and PSScriptAnalyzer
+      - name: Install the build and test modules
         run: |
           # -TrustRepository rather than Set-PSResourceRepository: on a fresh
           # runner the repository store doesn't exist yet, and
           # Set-PSResourceRepository fails before anything creates it.
           Install-PSResource -Name Pester -Version '[5.7.1,6.0)' -Scope CurrentUser -TrustRepository -Quiet
           Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -TrustRepository -Quiet
+          # A required module: the package's clean-import check needs it.
+          Install-PSResource -Name PSRule.Rules.Azure -Version '[1.47.0,2.0)' -Scope CurrentUser -TrustRepository -Quiet
 
-      # docs\ is generated from the comment-based help; a change to the help
-      # without ./build.ps1 -Task Docs fails here.
-      - name: Check docs are up to date
+      # docs\ and the MAML help are built by PlatyPS from the comment-based
+      # help; a change to the help without ./build.ps1 -Task Docs fails here.
+      - name: Check the help is up to date
         run: |
+          Install-PSResource -Name Microsoft.PowerShell.PlatyPS -Version '[1.0.3,2.0)' -Scope CurrentUser -TrustRepository -Quiet
           ./build.ps1 -Task Docs
-          git add --intent-to-add -- docs
-          git diff --ignore-cr-at-eol --exit-code -- docs
+          git add --intent-to-add -- docs en-US
+          git diff --ignore-cr-at-eol --exit-code -- docs en-US
           if ($LASTEXITCODE -ne 0) {
-              Write-Output '::error::docs/ is out of date. Run ./build.ps1 -Task Docs and commit the result.'
+              Write-Output '::error::docs/ or en-US/ is out of date. Run ./build.ps1 -Task Docs and commit the result.'
               exit 1
           }
 
