@@ -29,6 +29,9 @@ $script:AACProgressTasks = @{}
 $script:AACProgressPlain = $false
 # Set once Invoke-AACProgress has told the user how to get the Unicode display.
 $script:AACUnicodeHintShown = $false
+# The resource map's page template, ELK and icons (Get-AACResourceMapAsset),
+# read and checked once per session.
+$script:AACResourceMapAsset = $null
 
 # This module renders its UI with Spectre.Console (https://spectreconsole.net)
 # loaded directly from the vendored DLL in .\lib - no PowerShell wrapper module

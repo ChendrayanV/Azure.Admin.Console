@@ -1,0 +1,4 @@
+# Vendored files the module checks by SHA-256 before using them must reach
+# every checkout byte for byte: no line-ending conversion (core.autocrlf is
+# on by default on Windows, GitHub's Windows runners included).
+lib/** -text

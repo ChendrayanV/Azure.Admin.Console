@@ -14,6 +14,10 @@ function Disconnect-AAC {
     [CmdletBinding()]
     param()
 
+    # A failure anywhere below ends as a Spectre.Console error panel and this
+    # command's own terminating error, not a line inside the module.
+    trap { $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
+
     if (-not $script:AACSession) {
         Write-AACMarkup '[grey58]Not connected - nothing to do.[/]'
         return

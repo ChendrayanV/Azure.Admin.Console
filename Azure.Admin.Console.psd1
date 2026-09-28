@@ -1,6 +1,6 @@
 @{
     RootModule           = 'Azure.Admin.Console.psm1'
-    ModuleVersion        = '0.11.0'
+    ModuleVersion        = '0.12.0'
     GUID                 = '9923da59-cf92-4a4a-b855-f59a088a3f09'
     Author               = 'Chendrayan Venkatesan'
     CompanyName          = 'Golden Five Consulting'
@@ -32,10 +32,12 @@
         'Disconnect-AAC'
         'Get-AACAdvisorRecommendation'
         'Get-AACFirewallRule'
+        'Get-AACInventory'
         'Invoke-AACApplicationInsightQuery'
         'Invoke-AACPSRule'
         'Show-AACCost'
         'Show-AACResource'
+        'Show-AACResourceMap'
     )
     CmdletsToExport      = @()
     VariablesToExport    = @()
@@ -46,7 +48,7 @@
             Tags         = @('Azure', 'AzureAdvisor', 'AzureFirewall', 'CostManagement', 'Inventory', 'FirewallPolicy', 'ResourceGraph', 'Governance', 'Report', 'PDF', 'CSV', 'ApplicationInsights', 'LogAnalytics', 'KQL', 'PSRule', 'WellArchitected', 'HTML', 'Compliance', 'SpectreConsole', 'REST', 'PKCE', 'PSEdition_Core', 'Windows', 'Linux', 'MacOS')
             ProjectUri   = 'https://github.com/ChendrayanV/Azure.Admin.Console'
             LicenseUri   = 'https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/LICENSE'
-            ReleaseNotes = 'v0.11.0: First PowerShell Gallery release (v0.10.0 was never published). Get-AACAdvisorRecommendation (a consolidated, flattened Azure Advisor view), Get-AACFirewallRule (every Firewall Policy rule, searchable by address, port and protocol), Show-AACResource (resources and a full inventory) and Show-AACCost (costs by subscription, service and month), and Invoke-AACPSRule: PSRule for Azure, the module''s own AAC.* rules and your custom rules (-RulePath) on the live estate, without the Az modules, with -Rule/-ExcludeRule by name or wildcard. Every command has a console view, objects, and CSV, PDF and interactive HTML reports; with an export path the console shows only the progress. Help built with PlatyPS (MAML for Get-Help). Full history: CHANGELOG.md.'
+            ReleaseNotes = 'v0.12.0 - NEW Get-AACInventory: the tenant as a tree (management groups > subscriptions > resource groups > resources) with counts and the Microsoft Defender for Cloud secure score and findings by severity in colour on every node; console tree, objects, CSV, PDF and interactive HTML (searchable tree, security controls and recommendations). NEW Show-AACResourceMap: a map of one or more resource groups in the browser - Azure icons, subscription > resource group > VNet > subnet boxes, network, dependency, peering, private link, route and private DNS connections, NSGs and route tables as chips with their rules, routes and risks, unattached resources flagged - saved as PNG or JPEG. Invoke-AACApplicationInsightQuery: -TableName reads any table; uses the documented Log Analytics and Application Insights query APIs; reads every row unless -Top; a missing table''s error names the tables that exist. FIXED: Show-AACCost -PdfPath failing when a subscription has no costs (now shown as No cost); Invoke-AACApplicationInsightQuery failing on an empty result and with -ApplicationInsightsName; Get-AACFirewallRule missing rules with one address plus one IP Group address. Errors are shown as a Spectre.Console panel with the step that failed and what to do. Full history: CHANGELOG.md.'
         }
     }
 }

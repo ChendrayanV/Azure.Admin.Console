@@ -2,30 +2,31 @@ function Invoke-AACLogQuery {
     <#
     .SYNOPSIS
         Runs a KQL query against a Log Analytics workspace or an Application
-        Insights resource, through Azure Resource Manager, and returns the
-        rows as ordered hashtables.
+        Insights resource, and returns the rows as ordered hashtables.
     .DESCRIPTION
-        Azure Resource Manager proxies both query APIs, so the Connect-AAC
-        sign-in (an ARM token) is enough - no separate Log Analytics or
-        Application Insights token:
+        Uses each service's documented query API, with a token for that API
+        from the Connect-AAC sign-in (Get-AACAccessToken -Resource):
 
-          POST {workspace ID}/api/query?api-version=2020-08-01
-          POST {Application Insights ID}/api/query?api-version=2018-04-20
+          Workspace   POST https://api.loganalytics.azure.com/v1/workspaces/{workspace ID}/query
+          Component   POST https://api.applicationinsights.io/v1/apps/{app ID}/query
 
-        with { query, timespan }. -Timespan is an ISO 8601 duration ('PT2H')
-        that bounds the query as well as any time filter inside it. Only
-        the first result table is returned. Needs Log Analytics Reader (or
-        Reader) on the workspace or resource.
+        -Id is the workspace ID (its customerId GUID) or the Application
+        Insights app ID - Resolve-AACLogResource's QueryId. The body is
+        { query, timespan }: -Timespan is an ISO 8601 duration ('PT2H') that
+        bounds the query as well as any time filter inside it. Only the first
+        result table is returned. Needs Log Analytics Reader (or Reader) on
+        the workspace or resource.
     #>
     [CmdletBinding()]
     [OutputType([System.Collections.Specialized.OrderedDictionary])]
     param(
         [Parameter(Mandatory)]
-        [string] $ResourceId,
-
-        [Parameter(Mandatory)]
         [ValidateSet('Workspace', 'Component')]
         [string] $Kind,
+
+        [Parameter(Mandatory)]
+        [AllowEmptyString()]
+        [string] $Id,
 
         [Parameter(Mandatory)]
         [string] $Query,
@@ -33,14 +34,26 @@ function Invoke-AACLogQuery {
         [string] $Timespan
     )
 
-    $apiVersion = @{ Workspace = '2020-08-01'; Component = '2018-04-20' }[$Kind]
+    if (-not $Id) {
+        throw "Azure Resource Graph returned no $(if ($Kind -eq 'Workspace') { 'workspace ID (customerId)' } else { 'app ID' }) for it, so it can't be queried."
+    }
+    $api = @{
+        Workspace = @{ Uri = "https://api.loganalytics.azure.com/v1/workspaces/$Id/query"; Resource = 'https://api.loganalytics.io' }
+        Component = @{ Uri = "https://api.applicationinsights.io/v1/apps/$Id/query"; Resource = 'https://api.applicationinsights.io' }
+    }[$Kind]
     $body = @{ query = $Query }
     if ($Timespan) { $body.timespan = $Timespan }
-    $response = Invoke-AACArmRequest -Method Post -Uri "$($ResourceId)/api/query?api-version=$apiVersion" -Body ($body | ConvertTo-Json -Depth 5)
-    $table = @($response['tables'])[0]
-    if (-not $table) {
-        return
+    $uri = $api.Uri
+    Write-Verbose "POST $uri (timespan $Timespan)`n$Query"
+    $response = Invoke-AACArmRequest -Method Post -Uri $uri -Resource $api.Resource -Body ($body | ConvertTo-Json -Depth 5)
+    # A reply without result tables is not "no rows": say so rather than
+    # return an empty result that looks like a quiet workspace.
+    if (-not ($response -is [System.Collections.IDictionary] -and $response.Contains('tables') -and @($response['tables']).Count)) {
+        $shown = if ($null -eq $response) { 'an empty reply' } else { ConvertTo-Json -InputObject $response -Depth 3 -Compress }
+        if ($shown.Length -gt 300) { $shown = $shown.Substring(0, 300) + '...' }
+        throw "The $Kind query API returned no result table ($shown)."
     }
+    $table = @($response['tables'])[0]
     $columns = @($table['columns'] | ForEach-Object { [string]$_['name'] })
     foreach ($row in @($table['rows'])) {
         $record = [ordered]@{}

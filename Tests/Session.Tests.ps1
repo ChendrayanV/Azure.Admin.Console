@@ -135,4 +135,25 @@ Describe 'Azure Admin Console - access token' {
         (Get-AACTestSession).RefreshToken | Should -BeExactly 'r2'
         Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Invoke-RestMethod -ParameterFilter { $Body.grant_type -eq 'refresh_token' -and $Body.refresh_token -eq 'r1' } -Times 1 -Exactly
     }
+
+    It 'gets a token for another API (Log Analytics) from the refresh token, once, leaving the ARM token alone' {
+        Set-AACTestSession ([pscustomobject]@{ AccessToken = 'arm'; RefreshToken = 'r1'; ExpiresOn = (Get-Date).AddHours(1); TenantId = 't'; ClientId = 'c'; Scope = @('s') })
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-RestMethod -MockWith {
+            [pscustomobject]@{ access_token = 'logs'; refresh_token = 'r2'; expires_in = 3600 }
+        }
+        InModuleScope 'Azure.Admin.Console' { Get-AACAccessToken -Resource 'https://api.loganalytics.io' } | Should -BeExactly 'logs'
+        InModuleScope 'Azure.Admin.Console' { Get-AACAccessToken -Resource 'https://api.loganalytics.io' } | Should -BeExactly 'logs' -Because 'the token is kept until it nears expiry'
+        InModuleScope 'Azure.Admin.Console' { Get-AACAccessToken } | Should -BeExactly 'arm'
+        Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Invoke-RestMethod -Times 1 -Exactly -ParameterFilter {
+            $Body.grant_type -eq 'refresh_token' -and $Body.refresh_token -eq 'r1' -and $Body.scope -eq 'https://api.loganalytics.io/.default offline_access'
+        }
+        (Get-AACTestSession).RefreshToken | Should -BeExactly 'r2'
+    }
+
+    It 'says what to do when the other API''s token is refused' {
+        Set-AACTestSession ([pscustomobject]@{ AccessToken = 'arm'; RefreshToken = 'r1'; ExpiresOn = (Get-Date).AddHours(1); TenantId = 't'; ClientId = 'c'; Scope = @('s') })
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-RestMethod -MockWith { throw 'AADSTS65001: The user or administrator has not consented.' }
+        { InModuleScope 'Azure.Admin.Console' { Get-AACAccessToken -Resource 'https://api.applicationinsights.io' } } |
+            Should -Throw '*Could not get a token for https://api.applicationinsights.io*AADSTS65001*Data.Read permission*'
+    }
 }

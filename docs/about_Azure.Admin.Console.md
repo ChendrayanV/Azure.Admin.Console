@@ -50,6 +50,19 @@ COMMANDS
         A colourful bar chart of your resources by type, location,
         resource group or subscription; -HtmlPath writes a full inventory.
 
+    Get-AACInventory
+        The tenant as a tree: management groups, subscriptions, resource
+        groups and resources, with counts at every level; empty resource
+        groups flagged. A console tree, objects, and CSV, PDF and
+        interactive HTML reports (a searchable tree and four tables).
+
+    Show-AACResourceMap
+        A map of one or more resource groups, opened in your browser: the
+        resources with their Azure icons in subscription, resource group,
+        VNet and subnet boxes, with their connections, dependencies and
+        network paths (peering, private links, routes through a firewall).
+        Unattached resources are flagged. Saves as PNG or JPEG.
+
     Show-AACCost
         Subscription costs from Cost Management: month to date by
         subscription, service and resource group, and the monthly trend.
@@ -71,6 +84,9 @@ GETTING STARTED
         # Advisor: the console view, then everything to CSV, PDF and HTML
         Get-AACAdvisorRecommendation
         Get-AACAdvisorRecommendation -CsvPath .\Adv.csv -PdfPath .\Adv.pdf -HtmlPath .\Adv.html
+
+        # A map of two resource groups, in the browser
+        Show-AACResourceMap -ResourceGroupName 'rg-hub', 'rg-spoke-app'
 
         # Firewall rules that let 10.1.2.3 reach 10.0.0.4 on UDP 53
         Get-AACFirewallRule -SourceAddress 10.1.2.3 `
@@ -149,8 +165,9 @@ PSRULE FOR AZURE
 APPLICATION INSIGHTS
     Invoke-AACApplicationInsightQuery finds a Log Analytics workspace
     (-LogWorkspaceName) or Application Insights resource
-    (-ApplicationInsightsName) by name and queries it through Azure
-    Resource Manager. Needs Log Analytics Reader (or Reader).
+    (-ApplicationInsightsName) by name and queries it through the Log
+    Analytics or Application Insights query API, with a token from the
+    Connect-AAC sign-in. Needs Log Analytics Reader (or Reader).
 
         Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-prod'
         Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-prod' `
@@ -181,6 +198,16 @@ SECURITY
       file is refused.
 
 TROUBLESHOOTING
+    A command fails
+        At the console, the step that was running turns red and a panel
+        shows what failed, that step and what to do. The command then stops
+        with its own error: try/catch, $Error and -ErrorVariable work as
+        usual, and FullyQualifiedErrorId is AzureRequestFailed<status>,
+        CommandFailed or InternalError. There's no panel in non-interactive
+        output or with -ErrorAction SilentlyContinue. InternalError is a bug
+        in the module; its message gives the file and line. Please report
+        it at https://github.com/ChendrayanV/Azure.Admin.Console/issues.
+
     Symbols show as plain ASCII (*, ->, +, -)
         The console isn't UTF-8 (often code page 437 or 850), so the module
         draws its symbols in ASCII rather than letting them print as ?.

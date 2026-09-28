@@ -48,5 +48,8 @@ function Resolve-AACLogResource {
         ResourceGroup  = [string]$row.resourceGroup
         SubscriptionId = [string]$row.subscriptionId
         Location       = [string]$row.location
+        # What the query APIs address it by: the workspace ID (customerId)
+        # or the Application Insights app ID.
+        QueryId        = [string](Get-AACPropertyValue -InputObject $row -Name $(if ($Kind -eq 'Workspace') { 'customerId' } else { 'appId' }))
     }
 }

@@ -20,7 +20,7 @@ Queries Application Insights - the exceptions of the last few hours by default, 
 
 ```
 Invoke-AACApplicationInsightQuery -LogWorkspaceName <string> [-SubscriptionId <string[]>]
- [-ResourceGroupName <string>] [-Last <string>] [-MinimumSeverity <string>]
+ [-ResourceGroupName <string>] [-Last <string>] [-TableName <string>] [-MinimumSeverity <string>]
  [-ExceptionType <string[]>] [-AppRoleName <string[]>] [-Search <string>] [-Top <int>]
  [-Query <string>] [-CsvPath <string>] [-HtmlPath <string>] [-Title <string>] [-PassThru]
  [-NoDisplay] [-NoPaging]
@@ -30,7 +30,7 @@ Invoke-AACApplicationInsightQuery -LogWorkspaceName <string> [-SubscriptionId <s
 
 ```
 Invoke-AACApplicationInsightQuery -ApplicationInsightsName <string> [-SubscriptionId <string[]>]
- [-ResourceGroupName <string>] [-Last <string>] [-MinimumSeverity <string>]
+ [-ResourceGroupName <string>] [-Last <string>] [-TableName <string>] [-MinimumSeverity <string>]
  [-ExceptionType <string[]>] [-AppRoleName <string[]>] [-Search <string>] [-Top <int>]
  [-Query <string>] [-CsvPath <string>] [-HtmlPath <string>] [-Title <string>] [-PassThru]
  [-NoDisplay] [-NoPaging]
@@ -44,15 +44,20 @@ This command has no aliases.
 
 Finds the Log Analytics workspace (-LogWorkspaceName) or Application
 Insights resource (-ApplicationInsightsName) by name with Azure
-Resource Graph, then runs the query through Azure Resource Manager
-with the Connect-AAC sign-in - no Az modules and no separate Log
-Analytics token. Needs Log Analytics Reader (or Reader) on it.
+Resource Graph, then runs the query through the Log Analytics or
+Application Insights query API. Their tokens come from the
+Connect-AAC sign-in, with no second sign-in and no Az modules. Needs
+Log Analytics Reader (or Reader) on it.
 
 Without -Query it reads exceptions: the AppExceptions table of a
 workspace (workspace-based Application Insights) or the exceptions
 table of an Application Insights resource - newest first, from the
 last -Last (default 2 hours), narrowed by -MinimumSeverity,
--ExceptionType (wildcards), -AppRoleName and -Search. Each row is
+-ExceptionType (wildcards), -AppRoleName and -Search. A workspace
+only holds the exceptions of the Application Insights resources that
+send to it; when it has none, a warning names those resources, or -
+if none send there - the ones you can see and where each sends, with
+the -ApplicationInsightsName command to query one directly. Each row is
 flattened to one AAC.ApplicationInsightsException, the same for both
 tables:
 
@@ -70,6 +75,15 @@ tables:
   plus                ItemCount (sampling), CustomProperties
                       ("key=value; ..."), Source, ResourceId
 ```
+
+With -TableName it reads another table the same way - requests,
+dependencies, traces, customEvents, pageViews, availabilityResults,
+... - newest first from the last -Last, narrowed by -AppRoleName,
+-Search (any column) and -MinimumSeverity (traces), each row an
+object with the table's columns. Either schema's name works for
+either source: 'requests' on a workspace reads AppRequests, and
+'AppTraces' on an Application Insights resource reads traces. A
+workspace's other tables (e.g. ContainerLog) work too.
 
 With -Query it runs any KQL you give - against the workspace's
 tables (AppExceptions, AppRequests, AppTraces, ...) or the
@@ -127,12 +141,27 @@ A week of exceptions as an interactive HTML report.
 ### Example 5
 
 ```powershell
+Invoke-AACApplicationInsightQuery -ApplicationInsightsName 'appi-contoso-portal' -TableName requests -Last 1d -Search '/api/orders'
+A day of requests to the orders API.
+```
+
+### Example 6
+
+```powershell
+Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-contoso-prod' -TableName traces -MinimumSeverity Warning -AppRoleName 'orders-api'
+```
+
+Warnings and worse that one app traced (the workspace's AppTraces).
+
+### Example 7
+
+```powershell
 Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-contoso-prod' -Query 'AppRequests | where Success == false | summarize Failed = count() by Name | top 10 by Failed'
 ```
 
 Any KQL query: the ten most failed requests.
 
-### Example 6
+### Example 8
 
 ```powershell
 Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-contoso-prod' -NoDisplay | Group-Object ExceptionType | Sort-Object Count -Descending
@@ -167,7 +196,7 @@ HelpMessage: ''
 
 ### -AppRoleName
 
-Only exceptions from these apps / cloud roles.
+Only rows from these apps / cloud roles.
 
 ```yaml
 Type: System.String[]
@@ -297,8 +326,8 @@ HelpMessage: ''
 
 ### -MinimumSeverity
 
-Only exceptions of at least this severity: Verbose, Information,
-Warning, Error or Critical.
+Only exceptions (or, with -TableName traces, traces) of at least this
+severity: Verbose, Information, Warning, Error or Critical.
 
 ```yaml
 Type: System.String
@@ -426,7 +455,8 @@ HelpMessage: ''
 
 ### -Search
 
-Only exceptions whose type or messages contain this text.
+Only exceptions whose type or messages contain this text - or, with
+-TableName, rows with this text in any column.
 
 ```yaml
 Type: System.String
@@ -467,6 +497,32 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -TableName
+
+Read this table instead of the exceptions: requests, dependencies,
+traces, customEvents, pageViews, availabilityResults,
+performanceCounters, customMetrics, browserTimings - or their
+workspace names (AppRequests, AppTraces, ...), which work for either
+source. A workspace's other tables work too. Tab completes the
+names.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -Title
 
 The HTML report's title.
@@ -490,11 +546,13 @@ HelpMessage: ''
 
 ### -Top
 
-At most this many exceptions, newest first (default 1000).
+At most this many rows, newest first. By default every row in the
+period is read (up to the query API's own limit of 500,000 rows) and
+the view pages through them all.
 
 ```yaml
 Type: System.Int32
-DefaultValue: 1000
+DefaultValue: None
 SupportsWildcards: false
 Aliases: []
 ParameterSets:
@@ -520,7 +578,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## OUTPUTS
 
-### AAC.ApplicationInsightsException, or the query's rows with -Query (piped onward, or with -PassThru or -NoDisplay)
+### AAC.ApplicationInsightsException, or the table's or query's rows with -TableName or -Query (piped onward, or with -PassThru or -NoDisplay)
 
 ## NOTES
 

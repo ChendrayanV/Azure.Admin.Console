@@ -107,6 +107,8 @@ pipeline artifacts. Each one has:
 | [`Get-AACAdvisorRecommendation`](docs/Get-AACAdvisorRecommendation.md) | A consolidated, flattened view of Azure Advisor: a console view at the prompt, objects down a pipeline, CSV and/or PDF exports. |
 | [`Get-AACFirewallRule`](docs/Get-AACFirewallRule.md) | Every Azure Firewall Policy rule: a console view at the prompt (Allow in green, Deny in red), objects down a pipeline, CSV and/or PDF exports. |
 | [`Show-AACResource`](docs/Show-AACResource.md) | A colourful bar chart of your resources by type, location, resource group or subscription. |
+| [`Get-AACInventory`](docs/Get-AACInventory.md) | The tenant as a tree: management groups, subscriptions, resource groups and resources, with counts at every level. A console tree, objects, and CSV, PDF and interactive HTML reports. |
+| [`Show-AACResourceMap`](docs/Show-AACResourceMap.md) | A map of one or more resource groups, opened in your browser: the resources with their Azure icons, in subscription, resource group, VNet and subnet boxes, with their connections, dependencies and network paths. Saves as PNG or JPEG. |
 | [`Show-AACCost`](docs/Show-AACCost.md) | Subscription costs: month to date by subscription and by service, and a monthly trend, as charts and a table. |
 | [`Invoke-AACPSRule`](docs/Invoke-AACPSRule.md) | PSRule for Azure, the module's own rules and your custom rules on the live estate: include or exclude rules by name or wildcard, with a baseline or settings. |
 | [`Invoke-AACApplicationInsightQuery`](docs/Invoke-AACApplicationInsightQuery.md) | Application Insights exceptions, flattened, from a Log Analytics workspace or Application Insights resource, or any KQL query. |
@@ -339,6 +341,172 @@ display shows each subscription as it is read, and throttled calls are
 retried. A subscription that Cost Management can't report on, such as some
 offer types or one you lack permission for, is listed with the reason.
 
+A subscription with no cost in the period isn't an error either: a new or
+empty subscription, or one whose usage is billed elsewhere. It's left out of
+the charts and totals. Its `Status` is `No cost`, and every output says so:
+the console, the HTML report (a tile and a note) and the PDF (its own
+table).
+
+## Tenant inventory
+
+`Get-AACInventory` reads the tenant with Azure Resource Graph and shows it as a
+tree:
+
+```text
+TENANT Contoso · 5 management groups · 3 subscriptions · 5 resource groups · 17 resources
+├── MG Tenant Root Group
+│   ├── MG Landing Zones · 1 subscription · 10 resources
+│   │   └── MG Corp
+│   │       └── SUB sub-corp-apps  Enabled · 3 resource groups · 10 resources
+│   │           ├── RG rg-app  uksouth · 7 resources · disks 2, virtualmachines 2, ...
+│   │           └── RG rg-empty  uksouth  empty
+│   └── MG Platform ...
+└── SUB sub-legacy  Warned · 1 resource group · 1 resource
+```
+
+```powershell
+Get-AACInventory                                              # the whole tenant, down to resource groups
+Get-AACInventory -ManagementGroupId 'mg-landingzones' -Depth Resource
+Get-AACInventory -SubscriptionId $sub1, $sub2 -ResourceGroupName 'rg-app', 'rg-data'
+Get-AACInventory -HtmlPath .\Inventory.html -PdfPath .\Inventory.pdf -CsvPath .\Inventory.csv
+Get-AACInventory -NoDisplay | Where-Object { $_.Level -eq 'ResourceGroup' -and $_.Resources -eq 0 }   # empty resource groups
+```
+
+**How the tree is built**
+- **Counts:** every node shows the subscriptions, resource groups and
+  resources below it, and each resource group shows its most common types.
+- **Management groups** are nested as in Azure. A group with no subscriptions
+  in the result is left out, unless you ask for it with `-ManagementGroupId`.
+- **A subscription whose management group you can't read** is shown under
+  the tenant.
+- **Empty resource groups** are flagged.
+- **Scope:** `-ManagementGroupId`, `-SubscriptionId` and `-ResourceGroupName`
+  each take several values. `-Depth` (ManagementGroup, Subscription,
+  ResourceGroup or Resource) sets how deep the console tree goes. The objects
+  and exports always have everything.
+
+**Security posture** comes from Microsoft Defender for Cloud, through
+Resource Graph's `securityresources`, so Reader access is enough:
+
+| Level | Secure score |
+|---|---|
+| Subscription | Defender's own secure score (points out of the maximum) |
+| Management group, tenant | The subscriptions' scores added up, as Defender does |
+| Resource, resource group | The share of assessed recommendations that are healthy |
+
+- **Colours:** **Good** is 70% or more (green), **Fair** 40–69% (amber),
+  **Poor** under 40% (red). Findings are counted by severity on every node:
+  **H** red, **M** amber, **L** blue.
+- **Controls:** the **security controls** are listed with the **potential
+  score increase** of fixing each (their impact). The console shows the ones
+  with the most to gain.
+- **Recommendations:** every unhealthy **recommendation**, with its severity,
+  user impact, effort, category and resource.
+- **Without Defender data** (not enabled, or no access), the inventory is
+  shown without it. `-NoSecurity` skips reading it.
+
+**Output**
+- **Objects:** one `AAC.InventoryItem` per node, with Level, Path, the
+  management group, subscription and resource group it's in, type, location,
+  SKU, state, counts, most common types, secure score, rating, findings by
+  severity, top findings, tags and ID.
+- **`-CsvPath`:** every node, one row each.
+- **`-HtmlPath`:** secure score and finding tiles; charts, including
+  findings by severity and the controls with the most to gain; the hierarchy
+  as a collapsible, searchable tree, with each node's score and findings as
+  coloured pills, where clicking a node shows it in the tables; and tables of
+  management groups, subscriptions, resource groups, resources, security
+  controls and recommendations, each with its own CSV download.
+- **`-PdfPath`:** the summary, the hierarchy with coloured scores, the
+  security posture (subscription scores, controls, recommendations),
+  subscriptions, resource groups, resources by type, and the resources.
+
+## Resource map
+
+`Show-AACResourceMap` draws the resources in one or more resource groups, in
+one or more subscriptions, and opens the map in your browser:
+
+```powershell
+Show-AACResourceMap -SubscriptionId '00000000-0000-0000-0000-000000000000' -ResourceGroupName 'rg-app'
+Show-AACResourceMap -SubscriptionId $hub, $spoke -ResourceGroupName 'rg-hub', 'rg-spoke-app' -Direction TopToBottom
+Show-AACResourceMap -ResourceGroupName 'rg-app' -Theme Light -HtmlPath .\rg-app-map.html -NoBrowser
+```
+
+**What's drawn.** Each resource appears with its official Azure icon, its
+name, its product, and a useful detail such as a VM's size, an IP address or
+a disk's size.
+- **Boxes.** Resources sit in boxes: subscription, then resource group, then
+  virtual network, then subnet.
+- **Subnet placement.** A resource with an IP in a subnet is drawn in that
+  subnet: a NIC, private endpoint, firewall, gateway, Bastion, internal load
+  balancer, AKS or API Management. A VM is drawn in the subnet of its NIC.
+- **Subnet labels.** Each subnet's box shows its address prefix, how many of
+  its addresses are in use (`3 of 251 IPs used`; Azure keeps 5 in every
+  subnet) and what it's delegated to.
+
+**The connections** come from the resource IDs in each resource's properties,
+each drawn in its own style:
+
+| Connection | For example |
+|---|---|
+| Network association | A VM and its NIC, a NIC and its public IP, a subnet and its NSG, VNet integration |
+| Resource dependency | An app on its plan, a VM on its disks, a database on its server |
+| VNet peering | Two networks, with the peering state |
+| Private link | A private endpoint and the resource it serves |
+| Route (next hop) | A route table and the firewall or appliance its routes send traffic to, e.g. `0.0.0.0/0 -> 10.0.1.4` |
+| Private DNS link | A private DNS zone and the networks it's linked to |
+
+**NSGs and route tables** are drawn the way a network engineer reads them:
+as **chips** on the subnets and NICs they're applied to, not as boxes with
+long lines. An NSG shared by three subnets shows on all three.
+- **Click a chip** for its rules or routes.
+  - **An NSG** shows its inbound and outbound rules by priority, with
+    application security groups by name and the default rules folded away.
+  - **A route table** shows each route with its next hop resolved to the
+    resource that owns the IP, e.g. `10.0.1.4 -> afw-hub`, and whether
+    gateway route propagation is off.
+- **Routes from the subnet:** a subnet's routes are drawn from the subnet
+  itself to the firewall or appliance they go through, e.g. `0.0.0.0/0 via
+  rt-spoke`. The next hop is looked up in every subscription you can see, so
+  a spoke's map reaches the hub's firewall.
+- **Chip colours** flag what deserves a look:
+
+| Colour | NSG | Route table |
+|---|---|---|
+| Red: high risk | Allows every port, or a management or database port (SSH, RDP, WinRM, SMB, Telnet, FTP, SQL, MySQL, PostgreSQL, Oracle, MongoDB, Redis, Elasticsearch), from the internet (`*`, `Internet`, `0.0.0.0/0`) | A next-hop IP that no resource you can see has: the traffic may be dropped |
+| Amber: worth a review | Allows a wide port range (over 100 ports) from the internet | `0.0.0.0/0` straight to the internet, around any firewall |
+
+A legend switch shows only what's flagged, and another draws NSGs and route
+tables as **cards** with lines instead (`-NsgView Cards` starts that way).
+Each peering says what it lets through: forwarded traffic, gateway transit,
+remote gateway.
+
+**Beyond the selection.**
+- **Outside the selection:** a resource outside the chosen resource groups
+  that a chosen one uses is drawn too, in its own resource group's box, marked
+  as outside the selection. A typical case is the hub's VNet for a spoke.
+- **Unattached:** resources attached to nothing are flagged in amber. That
+  covers a NIC without a VM, a public IP without a configuration, an
+  unattached disk, or an NSG or route table on nothing.
+
+**In the browser:**
+- pan and zoom;
+- click a resource to light up its connections and see its details, with a
+  link to the Azure portal;
+- search;
+- switch left-to-right or top-to-bottom, and the Dark, Light and Blueprint
+  themes;
+- hide a kind of connection;
+- **Save PNG** or **Save JPEG**, at twice the screen's resolution, or SVG.
+
+The page is one self-contained file that opens offline. Its layout comes from
+the [Eclipse Layout Kernel](https://eclipse.dev/elk/) (`elkjs`, EPL-2.0), and
+it uses Microsoft's
+[Azure architecture icons](https://learn.microsoft.com/azure/architecture/icons/),
+under Microsoft's terms for architecture diagrams. `-PassThru` also returns
+the map's resources and connections as objects, e.g. `(... -PassThru).Nodes |
+Where-Object Orphan`.
+
 ## PSRule for Azure
 
 `Invoke-AACPSRule` checks your live estate with
@@ -437,26 +605,40 @@ runs any KQL query. It works against a Log Analytics workspace
 (`-LogWorkspaceName`, for workspace-based Application Insights, table
 `AppExceptions`) or an Application Insights resource
 (`-ApplicationInsightsName`, classic tables such as `exceptions`). The
-resource is found by name with Resource Graph. The query runs through Azure
-Resource Manager with the `Connect-AAC` sign-in, so there's no separate token
-and no Az module. It needs Log Analytics Reader (or Reader).
+resource is found by name with Resource Graph. The query runs through the Log
+Analytics or Application Insights query API (`api.loganalytics.azure.com`,
+`api.applicationinsights.io`). The token for that API comes from the
+`Connect-AAC` sign-in, so there's no second sign-in and no Az module. It needs
+Log Analytics Reader (or Reader). With an App Registration of your own
+(`Connect-AAC -ClientId`), give it the delegated **Data.Read** permission of
+the Log Analytics API and the Application Insights API.
+
+A workspace only holds the exceptions of the Application Insights resources
+that send to it. When a workspace has no exceptions, a warning says which
+resources send there. If none do, it lists the ones you can see, where each
+sends its data, and the `-ApplicationInsightsName` command to query one
+directly. The portal's `exceptions | limit 5` runs in an Application Insights
+resource, so it can show data that isn't in the workspace you queried.
 
 ```powershell
 Invoke-AACApplicationInsightQuery -SubscriptionId '00000000-0000-0000-0000-000000000000' -LogWorkspaceName 'law-contoso-prod'
 Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-contoso-prod' -Last 1d -MinimumSeverity Error -AppRoleName 'orders-api'
 Invoke-AACApplicationInsightQuery -ApplicationInsightsName 'appi-contoso-portal' -ExceptionType '*SqlException' -Search 'timeout'
 Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-contoso-prod' -Last 7d -HtmlPath .\Exceptions.html
+Invoke-AACApplicationInsightQuery -ApplicationInsightsName 'appi-contoso-portal' -TableName requests -Last 15d
+Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-contoso-prod' -TableName traces -MinimumSeverity Warning
 Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-contoso-prod' -Query 'AppRequests | where Success == false | summarize count() by Name'
 ```
 
 | Parameter | Default | |
 |---|---|---|
+| `-TableName` | `exceptions` | The table to read: `requests`, `dependencies`, `traces`, `customEvents`, `pageViews`, `availabilityResults` and so on. Either schema's name works for either source (`requests` or `AppRequests`), and Tab completes them. A workspace's other tables work too. |
 | `-Last` | `2h` | How far back: `30m`, `2h`, `7d` and so on. It also bounds `-Query`. |
-| `-MinimumSeverity` | all | `Verbose`, `Information`, `Warning`, `Error` or `Critical`, and worse. |
-| `-ExceptionType` | all | Exception types; wildcards work (`'*SqlException'`). |
+| `-MinimumSeverity` | all | `Verbose`, `Information`, `Warning`, `Error` or `Critical`, and worse. For exceptions and traces. |
+| `-ExceptionType` | all | Exception types; wildcards work (`'*SqlException'`). For exceptions. |
 | `-AppRoleName` | all | Apps or cloud roles. |
-| `-Search` | none | Text in the type or messages. |
-| `-Top` | `1000` | The newest this many. |
+| `-Search` | none | Text in the type or messages; with `-TableName`, in any column. |
+| `-Top` | all | The newest this many. By default every row in the period is read, up to the query API's limit of 500,000, and the view pages through them all. |
 | `-Query` | | Any KQL instead of the exceptions query; its columns become the objects' properties. |
 
 The values you give are escaped before they go into the KQL.
@@ -474,9 +656,48 @@ Each exception is flattened into one object, the same from either table:
 
 The console view has tiles, a timeline of exceptions, a severity breakdown,
 the top exception types, the top problems (a type thrown from one place) and
-the latest exceptions. `-CsvPath` and `-HtmlPath` export them.
+every exception, newest first. `-CsvPath` and `-HtmlPath` export them. With
+`-TableName`, the view is a table of every row, with the table's most useful
+columns first, for example time, name, result code, success and duration for
+`requests`. The objects have all the columns.
+
+If the table doesn't exist, the error panel says so and names the tables the
+source does have. The closest names come first, then how many rows each has
+in the period:
+
+```text
+There is no table 'request' in appi-contoso-portal.
+Fix  Did you mean 'requests'? Tables in appi-contoso-portal with data in the
+     last 15d: dependencies (40,211), requests (18,204), traces (9,120),
+     exceptions (57). No data: availabilityResults, customEvents, ...
+```
 
 ## Troubleshooting
+
+**When a command fails.** At the console, the progress line of the step that
+was running turns red, and a red panel says what failed, that step, and what
+to do:
+
+```text
+╭─ ✗ Invoke-AACApplicationInsightQuery failed ─────────────────────────────╮
+│ Azure refused the request (403): The client ... does not have            │
+│ authorization to perform action 'Microsoft.OperationalInsights/...'      │
+│                                                                          │
+│ Step  Running the exceptions query over the last 2h                      │
+│ Fix   Your account needs a role that allows this: ... Log Analytics      │
+│       Reader for Invoke-AACApplicationInsightQuery.                      │
+╰──────────────────────────────────────────────────────────────────────────╯
+```
+
+Then the command stops with a normal PowerShell error of its own, so
+`try`/`catch`, `$Error` and `-ErrorVariable` work as usual. Scripts can check
+its `FullyQualifiedErrorId`: `AzureRequestFailed<status>` (for example
+`AzureRequestFailed403,Show-AACCost`), `CommandFailed` or `InternalError`.
+Output that isn't an interactive console (CI, redirected) and
+`-ErrorAction SilentlyContinue` get no panel. An `InternalError` is a bug in
+the module: its message gives the module file and line. Please
+[report it](https://github.com/ChendrayanV/Azure.Admin.Console/issues) with
+that message.
 
 **`?` instead of symbols, or `+` and `-` in the progress.** Windows consoles
 often default to a legacy code page (437 or 850), which has no `●`, `→` or
@@ -589,8 +810,8 @@ It then checks the staged copy: the manifest is valid, the exports match
 2. Commit, then push a tag that matches the version:
 
    ```powershell
-   git tag v0.10.0
-   git push origin v0.10.0
+   git tag -a v0.12.0 -m "Azure.Admin.Console v0.12.0"
+   git push origin v0.12.0
    ```
 
 Only a version tag publishes. Pushes and pull requests run CI only.

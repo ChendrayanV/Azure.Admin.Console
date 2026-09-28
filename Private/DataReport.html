@@ -94,6 +94,37 @@ button.hbar:hover { background: var(--panel-2); }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; overflow-wrap: anywhere; }
 
+.tree-card { margin-top: 16px; }
+.tree-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.tree-tools .search { flex: 1 1 260px; }
+.tree { font-size: 13.5px; max-height: 620px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; padding: 6px 4px; background: var(--panel); }
+.tree ul { list-style: none; margin: 0; padding: 0 0 0 20px; }
+.tree > ul { padding-left: 4px; }
+.tree li { margin: 0; }
+.tnode { display: flex; align-items: center; gap: 8px; padding: 3px 6px; border-radius: 7px; min-width: 0; }
+.tnode:hover { background: var(--panel-2); }
+.tnode .chev { width: 16px; flex: 0 0 16px; text-align: center; color: var(--faint); cursor: pointer; user-select: none; transition: transform .12s; }
+.tnode .chev.open { transform: rotate(90deg); }
+.tnode .chev.leaf { visibility: hidden; }
+.tnode .lvl { flex: 0 0 auto; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; border-radius: 5px; padding: 1px 6px; }
+.lvl.t { background: var(--neutral-soft); color: var(--neutral); }
+.lvl.m { background: var(--violet-soft); color: var(--violet); }
+.lvl.s { background: var(--warn-soft); color: var(--warn); }
+.lvl.g { background: var(--info-soft); color: var(--info); }
+.lvl.r { background: var(--good-soft); color: var(--good); }
+.tnode .tname { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.tnode button.tname { border: 0; background: none; padding: 0; cursor: pointer; color: var(--ink); text-align: left; }
+.tnode button.tname:hover { color: var(--accent); text-decoration: underline; }
+.tnode .tdetail { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1 1 auto; }
+.tnode .tcount { color: var(--muted); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tnode .tcount b { color: var(--ink); font-weight: 650; }
+.tnode.empty .tdetail { color: var(--warn); }
+.tnode .pill { font-size: 11px; font-weight: 700; border-radius: 99px; padding: 0 7px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pill.good { background: var(--good-soft); color: var(--good); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.pill.info { background: var(--info-soft); color: var(--info); }
+.tree .tpath { color: var(--faint); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 section.tbl { margin: 18px 0 8px; }
 .tbl-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin-bottom: 8px; }
 .tbl-head h2 { font-size: 18px; margin: 0; font-weight: 650; }
@@ -172,6 +203,7 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
   <section class="tiles" id="tiles"></section>
   <div id="notices"></div>
   <section class="grid" id="charts"></section>
+  <div id="tree"></div>
   <div id="tables"></div>
 </main>
 <footer class="wrap" id="footer"></footer>
@@ -344,7 +376,7 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
 
     rows.forEach(function (r) { r._hay = cols.map(function (c) { var v = r[c.key]; return v === null || v === undefined ? '' : String(v); }).join('\n').toLowerCase(); });
 
-    function isNum(c) { return c.type === 'number' || c.type === 'money'; }
+    function isNum(c) { return c.type === 'number' || c.type === 'money' || c.type === 'score'; }
     // The total of a column over some rows, with its currency - or
     // "(mixed currencies)". Rows with no amount don't count as a currency.
     function total(c, list) {
@@ -395,6 +427,9 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
       var td = el('td', isNum(c) ? 'num' : c.type === 'wide' ? 'wide' : c.type === 'mono' ? 'mono' : c.type === 'resource' ? 'res' : c.nowrap ? 'nowrap' : '');
       if (c.type === 'badge') {
         if (v !== null && v !== undefined && v !== '') { var tone = (c.tones && c.tones[v]) || ''; var b = el('span', 'badge ' + tone); highlight(b, v); td.appendChild(b); }
+      } else if (c.type === 'score') {
+        // A 0-100 score: Good (70+) green, Fair (40-69) amber, Poor red.
+        if (v !== null && v !== undefined && v !== '') { var n2 = Number(v); td.appendChild(el('span', n2 >= 70 ? 't-good' : n2 >= 40 ? 't-warn' : 't-bad', fmtNum(n2, c.format || 'N0') + '%')); }
       } else if (isNum(c)) {
         if (v === null || v === undefined || v === '') td.appendChild(el('span', 'muted', ''));
         else { var s = el('span', c.tone ? 't-' + c.tone : (Number(v) === 0 ? 'muted' : '')); s.textContent = fmtNum(v, c.format || (c.type === 'money' ? 'N2' : 'N0')) + (c.currencyKey && r[c.currencyKey] ? ' ' + r[c.currencyKey] : ''); td.appendChild(s); }
@@ -488,6 +523,98 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
     render();
     return { section: section, setFilters: setFilters };
   }
+
+  // --- A hierarchy (tenant > management groups > subscriptions > ...) --------------------------
+  // Node: { l: level (t, m, s, g, r), n: name, d: detail, c: [[count, noun], ...],
+  //         f: { table, filters } (what clicking it shows), k: children, x: flagged }
+  if (D.tree) (function (T) {
+    var LEVEL = { t: 'TENANT', m: 'MG', s: 'SUB', g: 'RG', r: 'RES' };
+    var card = el('section', 'card tree-card');
+    card.appendChild(el('h2', null, T.title || 'Hierarchy'));
+    var tools = el('div', 'tree-tools'); card.appendChild(tools);
+    var search = el('label', 'search');
+    search.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
+    var input = el('input'); input.type = 'search'; input.placeholder = 'Find a management group, subscription, resource group or resource...'; input.setAttribute('aria-label', 'Search the hierarchy');
+    search.appendChild(input); tools.appendChild(search);
+    [['Collapse', 1], ['Management groups', 'm'], ['Subscriptions', 's'], ['Resource groups', 'g']].forEach(function (b) {
+      var btn = el('button', 'tool-btn', b[1] === 1 ? 'Collapse all' : 'Open to ' + b[0].toLowerCase()); btn.type = 'button';
+      btn.addEventListener('click', function () { input.value = ''; draw(b[1]); });
+      tools.appendChild(btn);
+    });
+    var box = el('div', 'tree'); card.appendChild(box);
+    $('tree').appendChild(card);
+    var order = ['t', 'm', 's', 'g', 'r'];
+
+    function counts(n) {
+      var s = el('span', 'tcount');
+      (n.c || []).forEach(function (c, i) {
+        if (i) s.appendChild(document.createTextNode(' · '));
+        s.appendChild(el('b', null, Number(c[0]).toLocaleString())); s.appendChild(document.createTextNode(' ' + c[1]));
+      });
+      return s;
+    }
+    // A node's security posture: its score in colour, and findings by severity.
+    function posture(row, n) {
+      if (n.p !== undefined && n.p !== null) { var p = el('span', 'pill ' + (n.p >= 70 ? 'good' : n.p >= 40 ? 'warn' : 'bad'), n.p + '%'); p.title = 'Secure score'; row.appendChild(p); }
+      [['h', 'H', 'bad', 'high'], ['m', 'M', 'warn', 'medium'], ['lo', 'L', 'info', 'low']].forEach(function (s) {
+        if (n[s[0]]) { var x = el('span', 'pill ' + s[2], s[1] + n[s[0]]); x.title = n[s[0]] + ' ' + s[3] + '-severity finding' + (n[s[0]] === 1 ? '' : 's'); row.appendChild(x); }
+      });
+    }
+    function nameOf(n) {
+      var clickable = n.f && tables[n.f.table];
+      var b = el(clickable ? 'button' : 'span', 'tname', n.n);
+      if (clickable) { b.type = 'button'; b.title = 'Show in the table below'; b.addEventListener('click', function () { focusTable(n.f.table, n.f.filters); }); }
+      return b;
+    }
+    // One node; its children are drawn when it is first opened.
+    function item(n, openTo) {
+      var li = el('li');
+      var row = el('div', 'tnode' + (n.x ? ' empty' : ''));
+      var kids = n.k || [];
+      var chev = el('span', 'chev' + (kids.length ? '' : ' leaf'), '›');
+      row.appendChild(chev);
+      row.appendChild(el('span', 'lvl ' + n.l, LEVEL[n.l]));
+      row.appendChild(nameOf(n));
+      row.appendChild(el('span', 'tdetail', n.d || ''));
+      row.appendChild(counts(n));
+      posture(row, n);
+      li.appendChild(row);
+      var ul = null;
+      function open(yes) {
+        if (!kids.length) return;
+        if (yes && !ul) { ul = el('ul'); kids.forEach(function (k) { ul.appendChild(item(k, openTo)); }); li.appendChild(ul); }
+        if (ul) ul.hidden = !yes;
+        chev.classList.toggle('open', !!yes);
+      }
+      chev.addEventListener('click', function () { open(!(ul && !ul.hidden)); });
+      // Open while the level below is above the one asked for.
+      if (openTo !== 1 && kids.length && order.indexOf(kids[0].l) <= order.indexOf(openTo)) open(true);
+      return li;
+    }
+    function draw(openTo) {
+      box.textContent = '';
+      var ul = el('ul'); ul.appendChild(item(T.root, openTo)); box.appendChild(ul);
+    }
+    // Searching: every match, with where it is.
+    function find(q) {
+      box.textContent = '';
+      var out = el('ul'), found = 0;
+      (function walk(n, path) {
+        var here = path ? path + ' / ' + n.n : n.n;
+        if (found < 500 && (n.n + ' ' + (n.d || '')).toLowerCase().indexOf(q) >= 0) {
+          var li = el('li'); var row = el('div', 'tnode');
+          row.appendChild(el('span', 'chev leaf', '›')); row.appendChild(el('span', 'lvl ' + n.l, LEVEL[n.l])); row.appendChild(nameOf(n));
+          row.appendChild(el('span', 'tpath', path)); li.appendChild(row); out.appendChild(li); found++;
+        }
+        (n.k || []).forEach(function (k) { walk(k, here); });
+      })(T.root, '');
+      if (!found) out.appendChild(el('li', 'none', 'Nothing matches.'));
+      box.appendChild(out);
+    }
+    var timer;
+    input.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(function () { var q = input.value.trim().toLowerCase(); if (q) find(q); else draw(T.openTo || 's'); }, 150); });
+    draw(T.openTo || 's');
+  })(D.tree);
 
   window.addEventListener('beforeprint', function () { document.querySelectorAll('.clamp').forEach(function (c) { c.classList.add('open'); }); });
 

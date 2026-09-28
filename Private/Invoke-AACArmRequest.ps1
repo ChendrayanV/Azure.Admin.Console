@@ -14,6 +14,10 @@ function Invoke-AACArmRequest {
         the exception's Data['StatusCode'] so callers can tell "not found"
         from "forbidden". -Uri may be a full URL or a path starting with '/'
         (https://management.azure.com is added).
+
+        -Resource calls another Azure API with the same sign-in: the token
+        audience, e.g. https://api.loganalytics.io for a Log Analytics query
+        (Get-AACAccessToken -Resource). Its errors have the same shape.
     #>
     [CmdletBinding()]
     param(
@@ -23,7 +27,9 @@ function Invoke-AACArmRequest {
         [Parameter(Mandatory)]
         [string] $Uri,
 
-        [string] $Body
+        [string] $Body,
+
+        [string] $Resource = 'https://management.azure.com'
     )
 
     if ($Uri.StartsWith('/')) {
@@ -37,7 +43,7 @@ function Invoke-AACArmRequest {
             $request = @{
                 Method      = $Method
                 Uri         = $Uri
-                Headers     = @{ Authorization = "Bearer $(Get-AACAccessToken)" }
+                Headers     = @{ Authorization = "Bearer $(Get-AACAccessToken -Resource $Resource)" }
                 ErrorAction = 'Stop'
                 Verbose     = $false
             }
@@ -65,7 +71,14 @@ function Invoke-AACArmRequest {
                 try {
                     $parsed = ConvertFrom-Json -InputObject $details -AsHashtable -ErrorAction Stop
                     if ($parsed -is [System.Collections.IDictionary] -and $parsed['error'] -is [System.Collections.IDictionary] -and $parsed['error']['message']) {
-                        $message = [string]$parsed['error']['message']
+                        # The query APIs nest the useful part ("Failed to
+                        # resolve column 'x'") in innererror: add each level.
+                        $messages = [System.Collections.Generic.List[string]]::new()
+                        for ($level = $parsed['error']; $level -is [System.Collections.IDictionary]; $level = $level['innererror']) {
+                            $text = ([string]$level['message']).Trim()
+                            if ($text -and -not $messages.Contains($text)) { $messages.Add($text) }
+                        }
+                        $message = $messages -join ' '
                     }
                 }
                 catch {

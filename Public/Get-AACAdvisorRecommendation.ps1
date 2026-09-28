@@ -177,6 +177,10 @@ function Get-AACAdvisorRecommendation {
         [switch] $NoPaging
     )
 
+    # A failure anywhere below ends as a Spectre.Console error panel and this
+    # command's own terminating error, not a line inside the module.
+    trap { $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
+
     # Piped onward (| Where-Object, | Export-Csv ...) the objects are the
     # point, so no summary is drawn over them.
     # An export means the report is in the files: the console shows only

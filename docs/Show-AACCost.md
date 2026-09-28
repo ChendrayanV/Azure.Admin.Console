@@ -55,7 +55,10 @@ period, the view says so instead of drawing empty charts.
 
 Subscriptions Cost Management can't report on (some offer types,
 such as sponsorships, or missing permission) are listed with the
-reason under the charts rather than failing the run. Cost Management
+reason under the charts rather than failing the run. A subscription
+with no cost in the period (new, empty, or billed elsewhere) is not
+an error either: its Status is 'No cost', it is left out of the
+charts and totals, and every output lists it as having no cost. Cost Management
 allows only a few queries a minute, so a progress display shows each
 subscription as it is read, and throttled requests are retried.
 
@@ -78,7 +81,8 @@ Exports:
               grouping, totals of what is shown and a CSV download
   -PassThru   one AAC.SubscriptionCost object per subscription:
               MonthToDate, one property per month ('2026-07', ...),
-              Total, TopServices and Status
+              Total, TopServices and Status ('OK', 'No cost', or
+              why the subscription couldn't be read)
 ```
 
 When any of -CsvPath, -PdfPath or -HtmlPath is given, the console

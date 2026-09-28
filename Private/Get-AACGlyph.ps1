@@ -18,6 +18,7 @@ function Get-AACGlyph {
           Arrow     →         ->
           Chevron   ›         >
           Tick      ✓         +
+          Cross     ✗         x
 
         Returns a hashtable, e.g. $glyph = Get-AACGlyph; "$($glyph.Dot)".
     #>
@@ -26,9 +27,9 @@ function Get-AACGlyph {
     param()
 
     if ([Spectre.Console.AnsiConsole]::Profile.Capabilities.Unicode) {
-        @{ Bullet = [string][char]0x25CF; Dot = [string][char]0x00B7; Arrow = [string][char]0x2192; Chevron = [string][char]0x203A; Tick = [string][char]0x2713 }
+        @{ Bullet = [string][char]0x25CF; Dot = [string][char]0x00B7; Arrow = [string][char]0x2192; Chevron = [string][char]0x203A; Tick = [string][char]0x2713; Cross = [string][char]0x2717 }
     }
     else {
-        @{ Bullet = '*'; Dot = '-'; Arrow = '->'; Chevron = '>'; Tick = '+' }
+        @{ Bullet = '*'; Dot = '-'; Arrow = '->'; Chevron = '>'; Tick = '+'; Cross = 'x' }
     }
 }

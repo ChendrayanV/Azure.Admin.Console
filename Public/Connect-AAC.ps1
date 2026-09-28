@@ -33,7 +33,11 @@ function Connect-AAC {
     .PARAMETER ClientId
         The Entra ID application (client) ID to sign in as. Defaults to the
         well-known Azure CLI public client ID so this works without an app
-        registration; see the Description for when to supply your own.
+        registration; see the Description for when to supply your own. An
+        App Registration of your own needs delegated permissions for Azure
+        Service Management (user_impersonation) and, for
+        Invoke-AACApplicationInsightQuery, the Log Analytics API and the
+        Application Insights API (Data.Read).
     .PARAMETER Scope
         The OAuth scopes to request. Defaults to Azure Resource Manager's
         default scope (https://management.azure.com/.default) plus
@@ -65,6 +69,10 @@ function Connect-AAC {
 
         [switch] $PassThru
     )
+
+    # A failure anywhere below ends as a Spectre.Console error panel and this
+    # command's own terminating error, not a line inside the module.
+    trap { $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
 
     Write-AACRule -Title 'Azure Admin Console :: Sign in' -Color 'deepskyblue3_1'
 

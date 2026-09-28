@@ -13,7 +13,7 @@ function Show-AACExceptionView {
           Top exception types      the most frequent types
           Top problems             one row per problem (type and method):
                                    count, last seen, apps, a sample message
-          Latest exceptions        the most recent, with severity badges
+          Latest exceptions        every exception, newest first, with severity badges
 
         Counts use each row's ItemCount, so sampled telemetry counts right.
         Output goes straight to the Spectre console; wrap the call in
@@ -29,8 +29,10 @@ function Show-AACExceptionView {
 
         [timespan] $Range = [timespan]::FromHours(2),
 
-        [ValidateRange(1, 200)]
-        [int] $Latest = 25
+        # How many of the newest exceptions to list; 0 (the default) lists
+        # them all - Invoke-AACPagedOutput pages them.
+        [ValidateRange(0, [int]::MaxValue)]
+        [int] $Latest = 0
     )
 
     $escape = { param($Text) [Spectre.Console.Markup]::Escape([string]$Text) }
@@ -137,7 +139,8 @@ function Show-AACExceptionView {
     [Spectre.Console.AnsiConsole]::WriteLine()
 
     # The latest exceptions.
-    $recent = @($Exception | Sort-Object -Property TimeGenerated -Descending | Select-Object -First $Latest)
+    $recent = @($Exception | Sort-Object -Property TimeGenerated -Descending)
+    if ($Latest -gt 0) { $recent = @($recent | Select-Object -First $Latest) }
     $table = [Spectre.Console.Table]::new()
     $table.Border = [Spectre.Console.TableBorder]::Rounded
     $table.BorderStyle = [Spectre.Console.Style]::Parse('grey42')

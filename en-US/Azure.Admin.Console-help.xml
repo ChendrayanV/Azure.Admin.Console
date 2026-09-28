@@ -80,7 +80,11 @@ Invoke-AACPSRule. It is not written to disk.</maml:para>
         <maml:description>
           <maml:para>The Entra ID application (client) ID to sign in as. Defaults to the
 well-known Azure CLI public client ID so this works without an app
-registration; see the Description for when to supply your own.</maml:para>
+registration; see the Description for when to supply your own. An
+App Registration of your own needs delegated permissions for Azure
+Service Management (user_impersonation) and, for
+Invoke-AACApplicationInsightQuery, the Log Analytics API and the
+Application Insights API (Data.Read).</maml:para>
         </maml:description>
         <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
         <dev:type>
@@ -1147,6 +1151,368 @@ Get-AACFirewallRule</dev:code>
   </command:command>
   <command:command>
     <command:details>
+      <command:name>Get-AACInventory</command:name>
+      <maml:description>
+        <maml:para>Inventories the tenant as a tree - management groups, subscriptions, resource groups and resources - with a Spectre.Console tree view, objects, and CSV, PDF and interactive HTML exports.</maml:para>
+      </maml:description>
+      <command:verb>Get</command:verb>
+      <command:noun>AACInventory</command:noun>
+    </command:details>
+    <maml:description>
+      <maml:para>Reads everything with Azure Resource Graph (Reader access is enough;
+no Az modules): the management groups, the subscriptions and the
+management group each is in, the resource groups and the resources.
+The tree is:
+
+  Tenant
+    Management groups (nested as in Azure)
+      Subscriptions
+        Resource groups (location, most common resource types)
+          Resources (type, location, SKU)
+
+with the number of subscriptions, resource groups and resources
+below every node. Management groups with no subscription in the result
+are left out, unless you asked for them with -ManagementGroupId. A
+subscription in a management group you can't read is shown under the
+tenant. Empty resource groups are flagged.
+
+Security posture comes from Microsoft Defender for Cloud (Resource
+Graph's securityresources; Reader or Security Reader is enough), in
+colour:
+  - each subscription's secure score - Defender's own (current / max)
+    - and management groups' and the tenant's, their subscriptions'
+    scores added up as Defender does
+  - each resource's score - the share of its assessed recommendations
+    that are healthy - and its unhealthy findings by severity, rolled
+    up to its resource group
+  - Good (70% or more) green, Fair (40-69%) amber, Poor (under 40%)
+    red; High findings red, Medium amber, Low blue, Healthy green
+  - the security controls with the potential score increase of fixing
+    each (their impact), and every unhealthy recommendation with its
+    severity, user impact, effort and resource
+Without Defender data (not enabled, or no access) the inventory is
+shown without it. -NoSecurity skips reading it.
+
+What you get depends on where the command runs:
+  at the prompt    tiles, the tree (down to -Depth; resource groups by
+                   default) and the most common resource types - a
+                   page at a time
+  piped onward     the objects, with no view
+  -PassThru        the view and the objects
+  -NoDisplay       the objects only
+One AAC.InventoryItem per node: Level (Tenant, ManagementGroup,
+Subscription, ResourceGroup, Resource), Depth, Name, Path, the
+management group, subscription and resource group it is in, Type,
+Kind, Location, SKU, State, the counts below it, TopTypes,
+SecureScore, Rating, Severity, High, Medium, Low, Findings,
+TopFindings, Tags, Id.
+
+-CsvPath writes every node as a CSV row. -HtmlPath writes an
+interactive report: tiles, charts, the hierarchy as a collapsible,
+searchable tree with each node's score and findings in colour (click
+a node to see it in the tables), and tables of management groups,
+subscriptions, resource groups, resources, security controls and
+recommendations, each with its own CSV download. -PdfPath writes a
+PDF: the summary, the hierarchy, security (scores, controls,
+recommendations), subscriptions, resource groups, resources by type
+and the resources. With any of them, the console shows only the progress and
+the files written.</maml:para>
+    </maml:description>
+    <command:syntax>
+      <command:syntaxItem>
+        <maml:name>Get-AACInventory</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="none">
+          <maml:name>ManagementGroupId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="1" aliases="none">
+          <maml:name>SubscriptionId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="2" aliases="none">
+          <maml:name>ResourceGroupName</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="3" aliases="none">
+          <maml:name>Depth</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="4" aliases="none">
+          <maml:name>CsvPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="5" aliases="none">
+          <maml:name>PdfPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="6" aliases="none">
+          <maml:name>HtmlPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="7" aliases="none">
+          <maml:name>Title</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoSecurity</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>PassThru</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoDisplay</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoPaging</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="4" aliases="none">
+        <maml:name>CsvPath</maml:name>
+        <maml:description>
+          <maml:para>Write every node - tenant, management groups, subscriptions,
+resource groups and resources - to this CSV file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="3" aliases="none">
+        <maml:name>Depth</maml:name>
+        <maml:description>
+          <maml:para>How deep the console tree goes: ManagementGroup, Subscription,
+ResourceGroup (the default) or Resource. The objects and exports
+always have everything.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+        <dev:defaultValue>'ResourceGroup'</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="6" aliases="none">
+        <maml:name>HtmlPath</maml:name>
+        <maml:description>
+          <maml:para>Write an interactive HTML report to this file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="none">
+        <maml:name>ManagementGroupId</maml:name>
+        <maml:description>
+          <maml:para>Only these management groups (their IDs, e.g. 'mg-corp') and
+everything below them.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoDisplay</maml:name>
+        <maml:description>
+          <maml:para>Return the objects without showing the view.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoPaging</maml:name>
+        <maml:description>
+          <maml:para>Show the whole view at once instead of a page at a time.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoSecurity</maml:name>
+        <maml:description>
+          <maml:para>Don't read Microsoft Defender for Cloud: no secure scores, findings
+or recommendations.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>PassThru</maml:name>
+        <maml:description>
+          <maml:para>Show the view and also return the objects.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="5" aliases="none">
+        <maml:name>PdfPath</maml:name>
+        <maml:description>
+          <maml:para>Write a PDF report to this file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="2" aliases="none">
+        <maml:name>ResourceGroupName</maml:name>
+        <maml:description>
+          <maml:para>Only these resource groups (in the subscriptions or management groups
+given, or in any you can see).</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="1" aliases="none">
+        <maml:name>SubscriptionId</maml:name>
+        <maml:description>
+          <maml:para>Only these subscriptions.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="7" aliases="none">
+        <maml:name>Title</maml:name>
+        <maml:description>
+          <maml:para>The PDF and HTML reports' title.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+        <dev:defaultValue>'Azure tenant inventory'</dev:defaultValue>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes />
+    <command:returnValues>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>AAC.InventoryItem (piped onward, or with -PassThru or -NoDisplay)</maml:name>
+        </dev:type>
+        <maml:description>
+          <maml:para />
+        </maml:description>
+      </command:returnValue>
+    </command:returnValues>
+    <maml:alertSet>
+      <maml:alert>
+        <maml:para />
+      </maml:alert>
+    </maml:alertSet>
+    <command:examples>
+      <command:example>
+        <maml:title>--------- Example 1 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Connect-AAC
+Get-AACInventory</dev:code>
+        <dev:remarks>
+          <maml:para>The whole tenant as a tree, down to resource groups.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 2 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Get-AACInventory -ManagementGroupId 'mg-landingzones' -Depth Resource</dev:code>
+        <dev:remarks>
+          <maml:para>One management group, down to every resource.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 3 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Get-AACInventory -SubscriptionId '00000000-0000-0000-0000-000000000000' -HtmlPath .\out\Inventory.html -PdfPath .\out\Inventory.pdf</dev:code>
+        <dev:remarks>
+          <maml:para>One subscription as an interactive HTML report and a PDF.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 4 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Get-AACInventory -NoDisplay | Where-Object { $_.Level -eq 'ResourceGroup' -and $_.Resources -eq 0 }</dev:code>
+        <dev:remarks>
+          <maml:para>The empty resource groups.</maml:para>
+        </dev:remarks>
+      </command:example>
+    </command:examples>
+    <command:relatedLinks>
+      <maml:navigationLink>
+        <maml:linkText>Online Version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACInventory.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>Online version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACInventory.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>about_Azure.Admin.Console</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md</maml:uri>
+      </maml:navigationLink>
+    </command:relatedLinks>
+  </command:command>
+  <command:command>
+    <command:details>
       <command:name>Invoke-AACApplicationInsightQuery</command:name>
       <maml:description>
         <maml:para>Queries Application Insights - the exceptions of the last few hours by default, or any KQL query - from a Log Analytics workspace or an Application Insights resource, with a Spectre.Console view, flattened objects, and CSV and interactive HTML exports.</maml:para>
@@ -1157,15 +1523,20 @@ Get-AACFirewallRule</dev:code>
     <maml:description>
       <maml:para>Finds the Log Analytics workspace (-LogWorkspaceName) or Application
 Insights resource (-ApplicationInsightsName) by name with Azure
-Resource Graph, then runs the query through Azure Resource Manager
-with the Connect-AAC sign-in - no Az modules and no separate Log
-Analytics token. Needs Log Analytics Reader (or Reader) on it.
+Resource Graph, then runs the query through the Log Analytics or
+Application Insights query API. Their tokens come from the
+Connect-AAC sign-in, with no second sign-in and no Az modules. Needs
+Log Analytics Reader (or Reader) on it.
 
 Without -Query it reads exceptions: the AppExceptions table of a
 workspace (workspace-based Application Insights) or the exceptions
 table of an Application Insights resource - newest first, from the
 last -Last (default 2 hours), narrowed by -MinimumSeverity,
--ExceptionType (wildcards), -AppRoleName and -Search. Each row is
+-ExceptionType (wildcards), -AppRoleName and -Search. A workspace
+only holds the exceptions of the Application Insights resources that
+send to it; when it has none, a warning names those resources, or -
+if none send there - the ones you can see and where each sends, with
+the -ApplicationInsightsName command to query one directly. Each row is
 flattened to one AAC.ApplicationInsightsException, the same for both
 tables:
 
@@ -1181,6 +1552,15 @@ tables:
   who                 ClientType, ClientCountryOrRegion, ClientCity
   plus                ItemCount (sampling), CustomProperties
                       ("key=value; ..."), Source, ResourceId
+
+With -TableName it reads another table the same way - requests,
+dependencies, traces, customEvents, pageViews, availabilityResults,
+... - newest first from the last -Last, narrowed by -AppRoleName,
+-Search (any column) and -MinimumSeverity (traces), each row an
+object with the table's columns. Either schema's name works for
+either source: 'requests' on a workspace reads AppRequests, and
+'AppTraces' on an Application Insights resource reads traces. A
+workspace's other tables (e.g. ContainerLog) work too.
 
 With -Query it runs any KQL you give - against the workspace's
 tables (AppExceptions, AppRequests, AppTraces, ...) or the
@@ -1228,6 +1608,14 @@ written.</maml:para>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
           <maml:name>Last</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>TableName</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
           <dev:type>
@@ -1363,6 +1751,14 @@ written.</maml:para>
           </dev:type>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>TableName</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
           <maml:name>MinimumSeverity</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
@@ -1472,7 +1868,7 @@ requests, traces, ...).</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
         <maml:name>AppRoleName</maml:name>
         <maml:description>
-          <maml:para>Only exceptions from these apps / cloud roles.</maml:para>
+          <maml:para>Only rows from these apps / cloud roles.</maml:para>
         </maml:description>
         <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
         <dev:type>
@@ -1536,8 +1932,8 @@ sends its data to.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
         <maml:name>MinimumSeverity</maml:name>
         <maml:description>
-          <maml:para>Only exceptions of at least this severity: Verbose, Information,
-Warning, Error or Critical.</maml:para>
+          <maml:para>Only exceptions (or, with -TableName traces, traces) of at least this
+severity: Verbose, Information, Warning, Error or Critical.</maml:para>
         </maml:description>
         <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
         <dev:type>
@@ -1599,7 +1995,8 @@ used more than once.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
         <maml:name>Search</maml:name>
         <maml:description>
-          <maml:para>Only exceptions whose type or messages contain this text.</maml:para>
+          <maml:para>Only exceptions whose type or messages contain this text - or, with
+-TableName, rows with this text in any column.</maml:para>
         </maml:description>
         <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
         <dev:type>
@@ -1618,6 +2015,21 @@ the name is used in more than one subscription.</maml:para>
         </dev:type>
       </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>TableName</maml:name>
+        <maml:description>
+          <maml:para>Read this table instead of the exceptions: requests, dependencies,
+traces, customEvents, pageViews, availabilityResults,
+performanceCounters, customMetrics, browserTimings - or their
+workspace names (AppRequests, AppTraces, ...), which work for either
+source. A workspace's other tables work too. Tab completes the
+names.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
         <maml:name>Title</maml:name>
         <maml:description>
           <maml:para>The HTML report's title.</maml:para>
@@ -1630,20 +2042,21 @@ the name is used in more than one subscription.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
         <maml:name>Top</maml:name>
         <maml:description>
-          <maml:para>At most this many exceptions, newest first (default 1000).</maml:para>
+          <maml:para>At most this many rows, newest first. By default every row in the
+period is read (up to the query API's own limit of 500,000 rows) and
+the view pages through them all.</maml:para>
         </maml:description>
         <command:parameterValue required="true" variableLength="true">System.Int32</command:parameterValue>
         <dev:type>
           <maml:name>System.Int32</maml:name>
         </dev:type>
-        <dev:defaultValue>1000</dev:defaultValue>
       </command:parameter>
     </command:parameters>
     <command:inputTypes />
     <command:returnValues>
       <command:returnValue>
         <dev:type>
-          <maml:name>AAC.ApplicationInsightsException, or the query's rows with -Query (piped onward, or with -PassThru or -NoDisplay)</maml:name>
+          <maml:name>AAC.ApplicationInsightsException, or the table's or query's rows with -TableName or -Query (piped onward, or with -PassThru or -NoDisplay)</maml:name>
         </dev:type>
         <maml:description>
           <maml:para />
@@ -1689,13 +2102,28 @@ A week of exceptions as an interactive HTML report.</dev:code>
       <command:example>
         <maml:title>--------- Example 5 ---------</maml:title>
         <maml:introduction></maml:introduction>
+        <dev:code>Invoke-AACApplicationInsightQuery -ApplicationInsightsName 'appi-contoso-portal' -TableName requests -Last 1d -Search '/api/orders'
+A day of requests to the orders API.</dev:code>
+        <dev:remarks />
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 6 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-contoso-prod' -TableName traces -MinimumSeverity Warning -AppRoleName 'orders-api'</dev:code>
+        <dev:remarks>
+          <maml:para>Warnings and worse that one app traced (the workspace's AppTraces).</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 7 ---------</maml:title>
+        <maml:introduction></maml:introduction>
         <dev:code>Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-contoso-prod' -Query 'AppRequests | where Success == false | summarize Failed = count() by Name | top 10 by Failed'</dev:code>
         <dev:remarks>
           <maml:para>Any KQL query: the ten most failed requests.</maml:para>
         </dev:remarks>
       </command:example>
       <command:example>
-        <maml:title>--------- Example 6 ---------</maml:title>
+        <maml:title>--------- Example 8 ---------</maml:title>
         <maml:introduction></maml:introduction>
         <dev:code>Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-contoso-prod' -NoDisplay | Group-Object ExceptionType | Sort-Object Count -Descending</dev:code>
         <dev:remarks>
@@ -2202,7 +2630,10 @@ period, the view says so instead of drawing empty charts.
 
 Subscriptions Cost Management can't report on (some offer types,
 such as sponsorships, or missing permission) are listed with the
-reason under the charts rather than failing the run. Cost Management
+reason under the charts rather than failing the run. A subscription
+with no cost in the period (new, empty, or billed elsewhere) is not
+an error either: its Status is 'No cost', it is left out of the
+charts and totals, and every output lists it as having no cost. Cost Management
 allows only a few queries a minute, so a progress display shows each
 subscription as it is read, and throttled requests are retried.
 
@@ -2223,7 +2654,8 @@ Exports:
               grouping, totals of what is shown and a CSV download
   -PassThru   one AAC.SubscriptionCost object per subscription:
               MonthToDate, one property per month ('2026-07', ...),
-              Total, TopServices and Status
+              Total, TopServices and Status ('OK', 'No cost', or
+              why the subscription couldn't be read)
 
 When any of -CsvPath, -PdfPath or -HtmlPath is given, the console
 shows only the progress and the files written - the report is in
@@ -2756,6 +3188,336 @@ Show-AACResource</dev:code>
       <maml:navigationLink>
         <maml:linkText>Online version</maml:linkText>
         <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Show-AACResource.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>about_Azure.Admin.Console</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md</maml:uri>
+      </maml:navigationLink>
+    </command:relatedLinks>
+  </command:command>
+  <command:command>
+    <command:details>
+      <command:name>Show-AACResourceMap</command:name>
+      <maml:description>
+        <maml:para>Draws a map of the resources in one or more resource groups - with their connections, dependencies and network paths - and opens it in your browser, ready to save as a PNG or JPEG image.</maml:para>
+      </maml:description>
+      <command:verb>Show</command:verb>
+      <command:noun>AACResourceMap</command:noun>
+    </command:details>
+    <maml:description>
+      <maml:para>Reads the resources with Azure Resource Graph (Reader access is
+enough; no Az modules) and draws them with their official Azure icons,
+laid out by the Eclipse Layout Kernel (ELK), in boxes:
+
+  subscription &gt; resource group &gt; virtual network &gt; subnet
+
+A network interface, private endpoint, firewall, gateway, Bastion,
+internal load balancer, AKS cluster or API Management service is drawn
+in the subnet it has an IP in, and a virtual machine in the subnet of
+its first network interface. Each resource shows its name, its
+product, and a detail worth seeing: a VM's size, an IP address, a
+disk's size.
+
+The lines between them come from the resource IDs in each resource's
+properties, typed by what they are:
+  Network association   NICs, IPs, subnets, NSGs, route tables, NAT,
+                        gateways, VNet integration
+  Resource dependency   an app on its plan, a VM on its disks, a
+                        database on its server, a diagnostic target
+  VNet peering          with its state
+  Private link          a private endpoint to the resource it serves
+  Route (next hop)      a route table to the firewall or appliance
+                        its routes send traffic to
+  Private DNS link      a private DNS zone linked to a network
+NSGs and route tables are drawn the way a network engineer reads them:
+as chips on the subnets and NICs they are applied to (-NsgView Cards
+draws them as resources with lines instead). Click one for its rules
+or routes. A chip is red when it opens a management or database port
+(SSH, RDP, WinRM, SMB, SQL, ...) or every port to the internet, or
+when a route's next hop is an IP no resource you can see has; amber
+for a wide port range open to the internet, or 0.0.0.0/0 straight to
+the internet. A subnet's routes are drawn from the subnet ("0.0.0.0/0
+via rt-spoke") to the firewall or appliance they go through - looked
+up across every subscription you can see, so a spoke's map reaches
+the hub's firewall. Each subnet's box also shows how many of its
+addresses are used and what it's delegated to, and each peering what
+it lets through (forwarded traffic, gateway transit, remote gateway).
+
+A resource outside the chosen resource groups that a chosen one uses
+- a VNet in the hub's resource group, say - is drawn too, in its own
+resource group's box, marked as outside the selection. Resources
+attached to nothing (a network interface without a VM, a public IP
+without a configuration, an unattached disk, an NSG or route table on
+nothing) are flagged.
+
+The map is one self-contained HTML file, written to -HtmlPath (a file
+in your temp folder by default) and opened in your default browser.
+In the browser you can:
+  - pan and zoom, and fit the map to the window
+  - click a resource or box: its connections light up and the rest
+    fades, with its details, connections and an Azure portal link
+  - find a resource by name, type, IP or resource group
+  - switch between left to right and top to bottom, and the Dark,
+    Light and Blueprint themes
+  - show or hide each kind of connection
+  - save the map as a PNG or JPEG image (or SVG), as drawn
+
+The Azure icons are Microsoft's Azure architecture icons, used under
+Microsoft's terms for architecture diagrams (lib\azure-icons\SOURCES.md).</maml:para>
+    </maml:description>
+    <command:syntax>
+      <command:syntaxItem>
+        <maml:name>Show-AACResourceMap</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="none">
+          <maml:name>SubscriptionId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="1" aliases="none">
+          <maml:name>ResourceGroupName</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="2" aliases="none">
+          <maml:name>Direction</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="3" aliases="none">
+          <maml:name>Theme</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="4" aliases="none">
+          <maml:name>NsgView</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="5" aliases="none">
+          <maml:name>ExcludeType</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="6" aliases="none">
+          <maml:name>HtmlPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="7" aliases="none">
+          <maml:name>Title</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoBrowser</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>PassThru</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="2" aliases="none">
+        <maml:name>Direction</maml:name>
+        <maml:description>
+          <maml:para>How the map flows: LeftToRight (the default) or TopToBottom. The page
+can switch it too.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+        <dev:defaultValue>'LeftToRight'</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="true" pipelineInput="false" position="5" aliases="none">
+        <maml:name>ExcludeType</maml:name>
+        <maml:description>
+          <maml:para>Resource types to leave out, e.g. 'microsoft.insights/*' for alerts
+and action groups; wildcards work.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="6" aliases="none">
+        <maml:name>HtmlPath</maml:name>
+        <maml:description>
+          <maml:para>Where to write the map. By default a file in your temp folder.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoBrowser</maml:name>
+        <maml:description>
+          <maml:para>Write the map without opening it.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="4" aliases="none">
+        <maml:name>NsgView</maml:name>
+        <maml:description>
+          <maml:para>Chips (the default): NSGs and route tables as chips on the subnets
+and NICs they're applied to. Cards: as resources, with lines to them.
+The page can switch it too.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+        <dev:defaultValue>'Chips'</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>PassThru</maml:name>
+        <maml:description>
+          <maml:para>Also return the map: its boxes, resources and connections, and the
+file's path.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="1" aliases="none">
+        <maml:name>ResourceGroupName</maml:name>
+        <maml:description>
+          <maml:para>The resource groups to map. Without -SubscriptionId they are looked
+for in every subscription you can see.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="none">
+        <maml:name>SubscriptionId</maml:name>
+        <maml:description>
+          <maml:para>The subscriptions to map. With -ResourceGroupName, the resource groups
+are looked for in these subscriptions; alone, every resource group in
+them is mapped.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="3" aliases="none">
+        <maml:name>Theme</maml:name>
+        <maml:description>
+          <maml:para>Dark (the default), Light or Blueprint. The page can switch it too.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+        <dev:defaultValue>'Dark'</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="7" aliases="none">
+        <maml:name>Title</maml:name>
+        <maml:description>
+          <maml:para>The map's title. By default, the resource groups (or subscriptions).</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes />
+    <command:returnValues>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>AAC.ResourceMap, with -PassThru</maml:name>
+        </dev:type>
+        <maml:description>
+          <maml:para />
+        </maml:description>
+      </command:returnValue>
+    </command:returnValues>
+    <maml:alertSet>
+      <maml:alert>
+        <maml:para />
+      </maml:alert>
+    </maml:alertSet>
+    <command:examples>
+      <command:example>
+        <maml:title>--------- Example 1 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Connect-AAC
+Show-AACResourceMap -SubscriptionId '00000000-0000-0000-0000-000000000000' -ResourceGroupName 'rg-app'</dev:code>
+        <dev:remarks>
+          <maml:para>One resource group's map, opened in the browser.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 2 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Show-AACResourceMap -SubscriptionId $hub, $spoke -ResourceGroupName 'rg-hub', 'rg-spoke-app', 'rg-spoke-data' -Direction TopToBottom
+A hub-and-spoke network across two subscriptions, top to bottom.</dev:code>
+        <dev:remarks />
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 3 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Show-AACResourceMap -ResourceGroupName 'rg-app' -Theme Light -HtmlPath .\out\rg-app-map.html -NoBrowser
+A light-themed map written to a file, not opened.</dev:code>
+        <dev:remarks />
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 4 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>(Show-AACResourceMap -ResourceGroupName 'rg-app' -NoBrowser -PassThru).Nodes | Where-Object Orphan</dev:code>
+        <dev:remarks>
+          <maml:para>The resources attached to nothing.</maml:para>
+        </dev:remarks>
+      </command:example>
+    </command:examples>
+    <command:relatedLinks>
+      <maml:navigationLink>
+        <maml:linkText>Online Version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Show-AACResourceMap.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>Online version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Show-AACResourceMap.md</maml:uri>
       </maml:navigationLink>
       <maml:navigationLink>
         <maml:linkText>about_Azure.Admin.Console</maml:linkText>

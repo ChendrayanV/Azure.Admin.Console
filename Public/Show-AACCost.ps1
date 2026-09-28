@@ -30,7 +30,10 @@ function Show-AACCost {
 
         Subscriptions Cost Management can't report on (some offer types,
         such as sponsorships, or missing permission) are listed with the
-        reason under the charts rather than failing the run. Cost Management
+        reason under the charts rather than failing the run. A subscription
+        with no cost in the period (new, empty, or billed elsewhere) is not
+        an error either: its Status is 'No cost', it is left out of the
+        charts and totals, and every output lists it as having no cost. Cost Management
         allows only a few queries a minute, so a progress display shows each
         subscription as it is read, and throttled requests are retried.
 
@@ -51,7 +54,8 @@ function Show-AACCost {
                       grouping, totals of what is shown and a CSV download
           -PassThru   one AAC.SubscriptionCost object per subscription:
                       MonthToDate, one property per month ('2026-07', ...),
-                      Total, TopServices and Status
+                      Total, TopServices and Status ('OK', 'No cost', or
+                      why the subscription couldn't be read)
 
         When any of -CsvPath, -PdfPath or -HtmlPath is given, the console
         shows only the progress and the files written - the report is in
@@ -130,6 +134,10 @@ function Show-AACCost {
 
         [switch] $PassThru
     )
+
+    # A failure anywhere below ends as a Spectre.Console error panel and this
+    # command's own terminating error, not a line inside the module.
+    trap { $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
 
     # Resolve paths now, relative to the caller's location, so a bad path
     # fails before any Azure call.
@@ -231,7 +239,8 @@ function Show-AACCost {
                 @{ Subscription = $subscription; Name = $name; Rows = $rows; Status = $status }
             })
         $unreadable = @($results | Where-Object { $_.Status -ne 'OK' }).Count
-        Update-AACProgress -Id 'cost' -Complete -Description ('Cost Management: {0} subscription(s) - {1} read{2}' -f $results.Count, ($results.Count - $unreadable), $(if ($unreadable) { ", $unreadable could not be read" }))
+        $costless = @($results | Where-Object { $_.Status -eq 'OK' -and -not @($_.Rows | Where-Object { [double](Get-AACPropertyValue -InputObject $_ -Name 'Cost') -ne 0 }).Count }).Count
+        Update-AACProgress -Id 'cost' -Complete -Description ('Cost Management: {0} subscription(s) - {1} read{2}{3}' -f $results.Count, ($results.Count - $unreadable), $(if ($costless) { " ($costless with no cost)" }), $(if ($unreadable) { ", $unreadable could not be read" }))
 
         # --- The detail: one row per subscription, month, resource group and service -------------
         $detail = [System.Collections.Generic.List[object]]::new()
@@ -276,6 +285,11 @@ function Show-AACCost {
                         [pscustomobject]@{ Name = $_.Name; Cost = (& $sum $_.Group 'Cost') }
                     } | Sort-Object Cost -Descending)
                 $object['TopServices'] = (@($services | Select-Object -First 3 | ForEach-Object { '{0} ({1:N2})' -f $_.Name, $_.Cost })) -join '; '
+                # Read, but nothing to show: a state of its own, not an error -
+                # kept out of the charts and totals, and listed as such.
+                if ($status -eq 'OK' -and -not @($rows | Where-Object Cost -NE 0).Count) {
+                    $status = 'No cost'
+                }
                 $object['Status'] = $status
                 [pscustomobject]$object
             })
@@ -296,9 +310,7 @@ function Show-AACCost {
 
     # An export means the report is in the files: no view.
     if ($CsvPath -or $PdfPath -or $HtmlPath) {
-        foreach ($failed in @($costs | Where-Object Status -ne 'OK')) {
-            Write-AACMarkup "[orange1]![/] [grey58]$([Spectre.Console.Markup]::Escape($failed.SubscriptionName)): $([Spectre.Console.Markup]::Escape($failed.Status))[/]"
-        }
+        Show-AACCostNotice -Cost $costs -Since $monthStarts[0]
         if ($PassThru) { $costs }
         return
     }
@@ -321,7 +333,11 @@ function Show-AACCost {
         [Spectre.Console.AnsiConsole]::WriteLine()
 
         $read = @($costs | Where-Object Status -eq 'OK')
-        if ($read.Count -eq 0) {
+        if ($read.Count -eq 0 -and @($costs | Where-Object Status -eq 'No cost').Count) {
+            Show-AACPanel -Content "[bold]Cost Management reports no cost[/] [grey58]for $(if ($costs.Count -eq 1) { 'this subscription' } else { 'these subscriptions' }) from $($monthStarts[0].ToString('MMM yyyy')) to today. Its usage may be billed to another subscription, be covered by credits, or not be processed yet.[/]" -BorderColor 'grey50' -AllowMarkup
+            [Spectre.Console.AnsiConsole]::WriteLine()
+        }
+        elseif ($read.Count -eq 0) {
             Show-AACPanel -Content '[bold]No costs could be read[/] [grey58]for these subscriptions - see the reasons below.[/]' -BorderColor 'grey50' -AllowMarkup
         }
         $currencyGroups = @($read | Group-Object -Property Currency | Sort-Object -Property Count -Descending)
@@ -414,9 +430,7 @@ function Show-AACCost {
             [Spectre.Console.AnsiConsole]::WriteLine()
         }
 
-        foreach ($failed in @($costs | Where-Object Status -ne 'OK')) {
-            Write-AACMarkup "[orange1]![/] [grey58]$(& $escape $failed.SubscriptionName): $(& $escape $failed.Status)[/]"
-        }
+        Show-AACCostNotice -Cost $costs -Since $monthStarts[0]
     }
 
     if ($PassThru) {

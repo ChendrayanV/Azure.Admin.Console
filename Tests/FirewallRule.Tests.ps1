@@ -198,6 +198,20 @@ Describe 'Azure Admin Console - Get-AACFirewallRule' {
             @(Get-AACFirewallRule -Port 443 -Protocol Https -NoDisplay).RuleName | Should -Be @('deny-internet', 'web-out')
         }
 
+        It 'counts a rule''s single address and single IP Group address as two addresses, not one text' {
+            $rule = [pscustomobject]@{
+                RuleType = 'NetworkRule'; SourceAddresses = '10.0.0.1'; SourceIpGroupAddresses = 'ipg-one: 10.1.0.0/16'
+                DestinationAddresses = '*'; DestinationIpGroupAddresses = ''; Protocols = 'Any'; DestinationPorts = '*'
+                DestinationFqdns = 'a.contoso.com'; TargetFqdns = 'b.contoso.com'; TranslatedFqdn = ''
+            }
+            InModuleScope 'Azure.Admin.Console' -Parameters @{ Rule = $rule } {
+                param($Rule)
+                Test-AACFirewallRuleMatch -Rule $Rule -SourceAddress 10.1.2.3 | Should -BeTrue
+                Test-AACFirewallRuleMatch -Rule $Rule -SourceAddress 10.0.0.1 | Should -BeTrue
+                Test-AACFirewallRuleMatch -Rule $Rule -Fqdn b.contoso.com | Should -BeTrue
+            }
+        }
+
         It 'finds application rules by host name, including wildcard FQDNs' {
             @(Get-AACFirewallRule -Fqdn www.contoso.com -NoDisplay).RuleName | Should -Be @('web-out')
             @(Get-AACFirewallRule -Fqdn www.fabrikam.com -NoDisplay) | Should -BeNullOrEmpty

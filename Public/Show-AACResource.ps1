@@ -107,6 +107,10 @@ function Show-AACResource {
         [switch] $PassThru
     )
 
+    # A failure anywhere below ends as a Spectre.Console error panel and this
+    # command's own terminating error, not a line inside the module.
+    trap { $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
+
     # Resolve the path now, relative to the caller's location, so a bad path
     # fails before any Azure call.
     $htmlFullPath = if ($HtmlPath) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($HtmlPath) }

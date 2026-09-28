@@ -26,6 +26,9 @@ function Invoke-AACProgress {
 
         An error thrown by the script block is re-thrown as-is once the
         display has closed, not wrapped in a .NET "Exception calling Start".
+        The steps that were still running stay unfinished, their text red
+        with "- failed", and the last of them is kept on the exception
+        (Data['AACStep']) for the error panel of Show-AACError.
 
         Spectre.Console draws the spinner, tick and bars with Unicode only
         when the console's output encoding is UTF-8; otherwise it falls back
@@ -79,10 +82,21 @@ function Invoke-AACProgress {
         }
         catch {
             $errorHolder.Value = $_
+            # The steps still running are the ones that failed: they stay
+            # unfinished, in red, and the error remembers the step for the
+            # panel Show-AACError draws.
+            $failed = @($script:AACProgressTasks.Values | Where-Object { -not $_.IsFinished } | Sort-Object -Property Id)
+            if ($failed.Count -and -not $_.Exception.Data.Contains('AACStep')) {
+                $_.Exception.Data['AACStep'] = [Spectre.Console.Markup]::Remove($failed[-1].Description)
+            }
+            foreach ($task in $failed) {
+                $task.IsIndeterminate = $false
+                $task.Description = "[red1]$($task.Description) - failed[/]"
+            }
         }
         finally {
             foreach ($task in $script:AACProgressTasks.Values) {
-                if (-not $task.IsFinished) {
+                if (-not $task.IsFinished -and -not $errorHolder.Value) {
                     $task.IsIndeterminate = $false
                     $task.Value = $task.MaxValue
                     $task.StopTask()

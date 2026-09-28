@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="Azure.Admin.Console Show-AACResourceMap">
+<title>/*AAC:TITLE*/</title>
+<style>
+  :root {
+    --page: #0d1117; --panel: #161b22; --panel-2: #1f2630; --line: #30363d; --text: #e6edf3; --muted: #8b949e; --accent: #4cc2ff;
+    --warn: #f0a93b; --high: #ff6b6b; --good: #3fb950; --shadow: 0 8px 24px rgba(0,0,0,.35);
+  }
+  body[data-theme="light"] { --page: #f6f8fa; --panel: #ffffff; --panel-2: #f0f3f6; --line: #d0d7de; --text: #1f2328; --muted: #59636e; --accent: #0969da; --warn: #bc4c00; --high: #cf222e; --good: #1a7f37; --shadow: 0 8px 24px rgba(140,149,159,.25); }
+  body[data-theme="blueprint"] { --page: #0b2545; --panel: #0f2f57; --panel-2: #13386a; --line: #3a6ea5; --text: #eaf4ff; --muted: #9fc3e8; --accent: #8fd3ff; --warn: #ffcf66; --high: #ff8a80; --good: #7ee2a8; --shadow: 0 8px 24px rgba(0,0,0,.35); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--page); color: var(--text); font: 13px/1.4 "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif; overflow: hidden; }
+  header { position: fixed; inset: 0 0 auto 0; z-index: 5; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 15px; font-weight: 600; white-space: nowrap; }
+  header .facts { color: var(--muted); font-size: 12px; flex: 1 1 320px; min-width: 0; }
+  header .facts b { color: var(--text); font-weight: 600; }
+  .tools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .tools input[type=search] { width: 190px; padding: 5px 9px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font: inherit; }
+  .tools button, .tools select { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font: inherit; cursor: pointer; }
+  .tools button:hover, .tools select:hover { border-color: var(--accent); }
+  .tools button.on { border-color: var(--accent); color: var(--accent); }
+  .tools .group { display: flex; gap: 0; }
+  .tools .group button { border-radius: 0; }
+  .tools .group button:first-child { border-radius: 6px 0 0 6px; }
+  .tools .group button:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
+  .tools .save { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+  body[data-theme="dark"] .tools .save, body[data-theme="blueprint"] .tools .save { color: #04111f; }
+  #stage { position: fixed; inset: 0; cursor: grab; }
+  #stage.panning { cursor: grabbing; }
+  #map { width: 100%; height: 100%; display: block; }
+  #legend { position: fixed; left: 16px; bottom: 16px; z-index: 4; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; box-shadow: var(--shadow); font-size: 12px; }
+  #legend h2 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  #legend label { display: flex; align-items: center; gap: 8px; margin: 3px 0; cursor: pointer; user-select: none; }
+  #legend svg { flex: 0 0 auto; }
+  #legend .count { color: var(--muted); margin-left: auto; padding-left: 10px; }
+  #legend .note { margin-top: 6px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  #legend .swatch { width: 12px; height: 12px; border-radius: 3px; border: 2px solid var(--warn); }
+  #legend .swatch.ext { border: 2px dashed var(--muted); }
+  #details.wide { width: 560px; }
+  #details.wide ~ #zoom { right: 592px; }
+  #details { position: fixed; top: 64px; right: 16px; bottom: 16px; width: 360px; z-index: 4; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 14px 16px; overflow: auto; display: none; }
+  #details.open { display: block; }
+  #details .head { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
+  #details .head img { width: 40px; height: 40px; }
+  #details h2 { margin: 0; font-size: 15px; word-break: break-all; }
+  #details .type { color: var(--muted); font-size: 12px; }
+  #details .close { margin-left: auto; align-self: flex-start; background: none; border: 0; color: var(--muted); font-size: 18px; cursor: pointer; }
+  #details .flag { margin: 8px 0; padding: 6px 9px; border-radius: 6px; border: 1px solid var(--warn); color: var(--warn); font-size: 12px; }
+  #details table { width: 100%; border-collapse: collapse; margin: 6px 0 10px; }
+  #details td { padding: 4px 0; vertical-align: top; border-bottom: 1px solid var(--line); font-size: 12px; }
+  #details td:first-child { color: var(--muted); width: 38%; padding-right: 8px; }
+  #details td code { word-break: break-all; font-size: 11px; }
+  #details h3 { font-size: 12px; margin: 12px 0 4px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  #details ul { list-style: none; margin: 0; padding: 0; }
+  #details li { padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 12px; cursor: pointer; }
+  #details li:hover { color: var(--accent); }
+  #details li .kind { color: var(--muted); }
+  #details .risk { margin: 8px 0; padding: 7px 10px; border-radius: 6px; font-size: 12px; }
+  #details .risk.high { border: 1px solid var(--high); color: var(--high); }
+  #details .risk.medium { border: 1px solid var(--warn); color: var(--warn); }
+  #details .risk ul { margin: 4px 0 0 16px; padding: 0; list-style: disc; }
+  #details .risk li { border: 0; padding: 1px 0; cursor: default; }
+  #details .risk li:hover { color: inherit; }
+  #details table.rules { font-size: 11.5px; }
+  #details table.rules th { text-align: left; color: var(--muted); font-weight: 600; padding: 4px 6px 4px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  #details table.rules td { padding: 4px 6px 4px 0; width: auto; color: var(--text); word-break: break-word; }
+  #details table.rules td:first-child { color: var(--muted); width: auto; }
+  #details table.rules tr.high td { color: var(--high); }
+  #details table.rules tr.medium td { color: var(--warn); }
+  #details .allow { color: var(--good); font-weight: 600; }
+  #details .deny { color: var(--high); font-weight: 600; }
+  #details details { margin-top: 6px; }
+  #details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+  #details .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+  #details .chips span { padding: 2px 8px; border-radius: 10px; border: 1px solid var(--line); font-size: 11.5px; cursor: pointer; }
+  #details .chips span.high { border-color: var(--high); color: var(--high); }
+  #details .chips span.medium { border-color: var(--warn); color: var(--warn); }
+  #legend .seg { display: flex; margin: 4px 0 6px; }
+  #legend .seg button { flex: 1; padding: 3px 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font: inherit; font-size: 11.5px; cursor: pointer; }
+  #legend .seg button:first-child { border-radius: 5px 0 0 5px; }
+  #legend .seg button:last-child { border-radius: 0 5px 5px 0; margin-left: -1px; }
+  #legend .seg button.on { border-color: var(--accent); color: var(--accent); }
+  #legend .pill { display: inline-block; width: 22px; height: 12px; border-radius: 6px; border: 2px solid var(--line); }
+  #legend .pill.high { border-color: var(--high); }
+  #legend .pill.medium { border-color: var(--warn); }
+  #details a.portal { display: inline-block; margin-top: 8px; color: var(--accent); text-decoration: none; font-weight: 600; }
+  #status { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 6; color: var(--muted); font-size: 14px; pointer-events: none; }
+  #zoom { position: fixed; right: 16px; bottom: 16px; z-index: 4; display: flex; flex-direction: column; gap: 4px; }
+  #details.open ~ #zoom { right: 392px; }
+  #zoom button { width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 16px; cursor: pointer; box-shadow: var(--shadow); }
+</style>
+</head>
+<body data-theme="dark">
+<header>
+  <h1 id="title"></h1>
+  <div class="facts" id="facts"></div>
+  <div class="tools">
+    <input type="search" id="search" placeholder="Find a resource..." aria-label="Find a resource">
+    <div class="group" role="group" aria-label="Direction">
+      <button id="dir-right" title="Left to right">&#8594; Left to right</button>
+      <button id="dir-down" title="Top to bottom">&#8595; Top to bottom</button>
+    </div>
+    <select id="theme" aria-label="Theme">
+      <option value="dark">Dark</option>
+      <option value="light">Light</option>
+      <option value="blueprint">Blueprint</option>
+    </select>
+    <button id="save-png" class="save" title="Save the map as a PNG image">Save PNG</button>
+    <button id="save-jpeg" class="save" title="Save the map as a JPEG image">Save JPEG</button>
+    <button id="save-svg" title="Save the map as an SVG drawing">SVG</button>
+  </div>
+</header>
+<div id="stage"><svg id="map" xmlns="http://www.w3.org/2000/svg"></svg></div>
+<div id="legend"></div>
+<aside id="details" aria-live="polite"></aside>
+<div id="zoom"><button id="zoom-in" title="Zoom in">+</button><button id="zoom-out" title="Zoom out">&#8722;</button><button id="zoom-fit" title="Fit to screen">&#9635;</button></div>
+<div id="status">Laying out the map...</div>
+
+<script id="aac-map" type="application/json">/*AAC:DATA*/</script>
+<script>/*AAC:ELK*/</script>
+<script>
+(function () {
+  'use strict';
+  const data = JSON.parse(document.getElementById('aac-map').textContent);
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  const NODE_W = 188, NODE_H = 112, HEADER = 50;
+
+  // --- Themes: the colours drawn into the SVG (so a saved image keeps them) ---
+  const THEMES = {
+    dark: {
+      page: '#0d1117', text: '#e6edf3', muted: '#8b949e', node: '#161b22', nodeLine: '#30363d', orphan: '#f0a93b', high: '#ff6b6b', chip: '#1c2330',
+      subscription: ['#11161d', '#3d4a5c'], resourcegroup: ['#131c2b', '#4f6fad'], vnet: ['#0f2a33', '#2fa3c8'], subnet: ['#15323a', '#38b2ac'],
+      edges: { network: '#4cc2ff', dependency: '#f6c343', peering: '#c792ea', privatelink: '#6ee7a8', route: '#ff7b72', dns: '#a5b4c8' }
+    },
+    light: {
+      page: '#ffffff', text: '#1f2328', muted: '#59636e', node: '#ffffff', nodeLine: '#d0d7de', orphan: '#bc4c00', high: '#cf222e', chip: '#f6f8fa',
+      subscription: ['#f6f8fa', '#8c959f'], resourcegroup: ['#eef4ff', '#6e8fd6'], vnet: ['#e6f6fb', '#1b95c0'], subnet: ['#e8f7f2', '#2f9e8f'],
+      edges: { network: '#0969da', dependency: '#b08800', peering: '#8250df', privatelink: '#1a7f37', route: '#cf222e', dns: '#6e7781' }
+    },
+    blueprint: {
+      page: '#0b2545', text: '#eaf4ff', muted: '#9fc3e8', node: '#0f2f57', nodeLine: '#3a6ea5', orphan: '#ffcf66', high: '#ff8a80', chip: '#123a66',
+      subscription: ['#0d2b50', '#5b8cc4'], resourcegroup: ['#10345f', '#8fb8e8'], vnet: ['#123d6d', '#8fd3ff'], subnet: ['#154677', '#b5e3ff'],
+      edges: { network: '#8fd3ff', dependency: '#ffe08a', peering: '#e0b3ff', privatelink: '#9ff0c4', route: '#ff9d94', dns: '#cfe3f7' }
+    }
+  };
+  const KINDS = [
+    ['network', 'Network association', ''],
+    ['dependency', 'Resource dependency', '6 4'],
+    ['peering', 'VNet peering', ''],
+    ['privatelink', 'Private link', '2 3'],
+    ['route', 'Route (next hop)', '8 3 2 3'],
+    ['dns', 'Private DNS link', '1 3']
+  ];
+
+  const state = {
+    direction: data.options.direction === 'DOWN' ? 'DOWN' : 'RIGHT',
+    theme: THEMES[data.options.theme] ? data.options.theme : 'dark',
+    hidden: new Set(), selected: null, layout: null, view: { x: 0, y: 0, k: 1 },
+    // NSGs and route tables: chips on what they're applied to, or cards.
+    mode: data.options.nsgView === 'cards' ? 'cards' : 'chips',
+    flaggedOnly: false
+  };
+  const CHIP_H = 20, CHIP_ROW = 28;
+  const isChipOwner = n => !!(n && n.chip);
+  const drawnAsChip = n => isChipOwner(n) && state.mode === 'chips';
+  const chipsOf = item => (item && item.chips) || [];
+  const chipWidth = c => Math.min(210, 36 + String(c.name).length * 6.4 + (c.risk ? 16 : 0));
+  const edgeVisible = e => !state.hidden.has(e.kind) && (!e.view || e.view === state.mode) &&
+    !drawnAsChip(nodesById.get(e.source)) && !drawnAsChip(nodesById.get(e.target));
+  const nodesById = new Map(data.nodes.map(n => [n.id, n]));
+  const clustersById = new Map(data.clusters.map(c => [c.id, c]));
+  const iconUri = {};
+  const icon = key => {
+    const k = data.icons[key] ? key : 'resource';
+    if (!iconUri[k]) {
+      const svg = data.icons[k] ? data.icons[k].svg : '';
+      iconUri[k] = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+    }
+    return iconUri[k];
+  };
+  const el = (name, attrs, parent) => {
+    const e = document.createElementNS(SVGNS, name);
+    for (const k in attrs || {}) if (attrs[k] !== undefined && attrs[k] !== null) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  };
+  const clip = (text, width, px) => {
+    text = String(text || '');
+    const max = Math.max(4, Math.floor(width / px));
+    return text.length > max ? text.slice(0, max - 1) + '…' : text;
+  };
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  // --- Header facts --------------------------------------------------------------------
+  document.title = data.title;
+  document.getElementById('title').textContent = data.title;
+  document.getElementById('facts').innerHTML = data.facts.map(f => esc(f).replace(/^(\d[\d,]*)/, '<b>$1</b>')).join(' &middot; ');
+
+  // --- The ELK graph -------------------------------------------------------------------
+  function elkGraph(direction) {
+    const items = new Map();
+    const root = {
+      id: 'root', children: [], edges: [],
+      layoutOptions: {
+        'elk.algorithm': 'layered',
+        'elk.direction': direction,
+        'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
+        'elk.edgeRouting': 'ORTHOGONAL',
+        'elk.layered.spacing.nodeNodeBetweenLayers': '56',
+        'elk.spacing.nodeNode': '30',
+        'elk.spacing.edgeNode': '18',
+        'elk.spacing.edgeEdge': '10',
+        'elk.spacing.componentComponent': '48',
+        'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
+        'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
+        'elk.json.shapeCoords': 'ROOT',
+        'elk.json.edgeCoords': 'ROOT'
+      }
+    };
+    const depth = c => { let d = 0; for (let p = c.parent; p && clustersById.has(p); p = clustersById.get(p).parent) d++; return d; };
+    const sorted = data.clusters.slice().sort((a, b) => depth(a) - depth(b));
+    for (const c of sorted) {
+      const chips = state.mode === 'chips' ? chipsOf(c) : [];
+      const title = [c.name].concat(c.detail || [], state.mode === 'cards' ? (c.badges || []) : []).join(' · ');
+      const chipsWidth = chips.reduce((w, x) => w + chipWidth(x) + 6, 0);
+      const minWidth = Math.min(900, Math.max(200, 52 + Math.max(String(c.name).length * 8, title.length * 6.2, chipsWidth)));
+      const top = HEADER + (chips.length ? CHIP_ROW : 0);
+      const item = {
+        id: c.id, children: [],
+        layoutOptions: {
+          'elk.padding': '[top=' + top + ',left=18,bottom=18,right=18]',
+          'elk.nodeSize.constraints': 'MINIMUM_SIZE',
+          'elk.nodeSize.minimum': '(' + Math.round(minWidth) + ',' + (top + 24) + ')'
+        }
+      };
+      items.set(c.id, item);
+      (c.parent && items.has(c.parent) ? items.get(c.parent).children : root.children).push(item);
+    }
+    for (const n of data.nodes) {
+      if (drawnAsChip(n)) continue;
+      const item = { id: n.id, width: NODE_W, height: NODE_H };
+      (n.parent && items.has(n.parent) ? items.get(n.parent).children : root.children).push(item);
+    }
+    for (const e of data.edges) {
+      if (!edgeVisible(e)) continue;
+      root.edges.push({ id: e.id, sources: [e.source], targets: [e.target] });
+    }
+    return root;
+  }
+
+  // --- Drawing ---------------------------------------------------------------------------
+  const svg = document.getElementById('map');
+  let viewport, styleEl;
+
+  function styleText(t) {
+    const edgeRules = KINDS.map(([k, , dash]) =>
+      '.edge.' + k + ' path.line{stroke:' + t.edges[k] + ';' + (dash ? 'stroke-dasharray:' + dash + ';' : '') + '}' +
+      '.edge.' + k + ' .label rect{stroke:' + t.edges[k] + ';}').join('');
+    return [
+      'text{font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;fill:' + t.text + ';}',
+      '.bg{fill:' + t.page + ';}',
+      '.cluster rect.box{stroke-width:1.6;}',
+      '.cluster.subscription rect.box{fill:' + t.subscription[0] + ';stroke:' + t.subscription[1] + ';}',
+      '.cluster.resourcegroup rect.box{fill:' + t.resourcegroup[0] + ';stroke:' + t.resourcegroup[1] + ';stroke-dasharray:7 4;}',
+      '.cluster.vnet rect.box{fill:' + t.vnet[0] + ';stroke:' + t.vnet[1] + ';}',
+      '.cluster.subnet rect.box{fill:' + t.subnet[0] + ';stroke:' + t.subnet[1] + ';stroke-dasharray:5 3;}',
+      '.cluster.external rect.box{stroke-dasharray:2 4;opacity:.75;}',
+      '.cluster .name{font-size:13px;font-weight:700;}',
+      '.cluster .detail{font-size:11px;fill:' + t.muted + ';}',
+      '.node rect.card{fill:' + t.node + ';stroke:' + t.nodeLine + ';stroke-width:1.2;}',
+      '.node.orphan rect.card{stroke:' + t.orphan + ';stroke-width:2;}',
+      '.node.external rect.card{stroke-dasharray:4 3;opacity:.85;}',
+      '.node .name{font-size:12.5px;font-weight:700;}',
+      '.node .type{font-size:11px;fill:' + t.muted + ';}',
+      '.node .fact{font-size:10.5px;fill:' + t.muted + ';font-family:"Cascadia Mono",Consolas,Menlo,monospace;}',
+      '.node .flag{fill:' + t.orphan + ';}',
+      '.node.risk-high rect.card{stroke:' + t.high + ';stroke-width:2.2;}',
+      '.node.risk-medium rect.card{stroke:' + t.orphan + ';stroke-width:2.2;}',
+      '.node.risk-high .flag{fill:' + t.high + ';}',
+      '.node .flagtext{fill:' + t.page + ';font-size:11px;font-weight:800;}',
+      '.edge path.line{fill:none;stroke-width:1.8;}',
+      '.edge.peering path.line{stroke-width:3;}',
+      '.edge .label rect{fill:' + t.page + ';stroke-width:1;}',
+      '.edge .label text{font-size:10.5px;fill:' + t.text + ';}',
+      edgeRules,
+      '.chip rect{fill:' + t.chip + ';stroke:' + t.nodeLine + ';stroke-width:1.2;}',
+      '.chip.high rect{stroke:' + t.high + ';stroke-width:2;}',
+      '.chip.medium rect{stroke:' + t.orphan + ';stroke-width:2;}',
+      '.chip text{font-size:11px;font-weight:600;}',
+      '.chip.high text{fill:' + t.high + ';}',
+      '.chip.medium text{fill:' + t.orphan + ';}',
+      '.chip .dot{fill:' + t.high + ';}',
+      '.chip.medium .dot{fill:' + t.orphan + ';}',
+      '.chip .mark{fill:' + t.page + ';font-size:9px;font-weight:800;}',
+      '.chip.selected rect{stroke:' + t.edges.network + ';stroke-width:3;}',
+      '.chip{cursor:pointer;}',
+      '.dim{opacity:.12;}',
+      '.match rect.card{stroke:' + t.edges.network + ';stroke-width:3;}',
+      '.selected rect.card{stroke:' + t.edges.network + ';stroke-width:3.5;}'
+    ].join('\n');
+  }
+
+  function markers(defs, t) {
+    for (const [k] of KINDS) {
+      const m = el('marker', { id: 'arrow-' + k, viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto-start-reverse' }, defs);
+      el('path', { d: 'M0,0 L10,5 L0,10 z', fill: t.edges[k] }, m);
+    }
+  }
+
+  function rounded(points, r) {
+    if (points.length < 3) return 'M' + points.map(p => p.x + ',' + p.y).join(' L');
+    let d = 'M' + points[0].x + ',' + points[0].y;
+    for (let i = 1; i < points.length - 1; i++) {
+      const p0 = points[i - 1], p1 = points[i], p2 = points[i + 1];
+      const d1 = Math.hypot(p1.x - p0.x, p1.y - p0.y), d2 = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      const rr = Math.min(r, d1 / 2, d2 / 2);
+      const a = { x: p1.x - (p1.x - p0.x) / d1 * rr, y: p1.y - (p1.y - p0.y) / d1 * rr };
+      const b = { x: p1.x + (p2.x - p1.x) / d2 * rr, y: p1.y + (p2.y - p1.y) / d2 * rr };
+      d += ' L' + a.x + ',' + a.y + ' Q' + p1.x + ',' + p1.y + ' ' + b.x + ',' + b.y;
+    }
+    const last = points[points.length - 1];
+    return d + ' L' + last.x + ',' + last.y;
+  }
+
+  // A chip: an NSG or route table on the subnet or NIC it is applied to.
+  function drawChip(parent, c, x, y, width) {
+    const g = el('g', { class: 'chip ' + (c.risk || '') , 'data-chip': c.id, transform: 'translate(' + x + ',' + y + ')' }, parent);
+    el('rect', { width: width, height: CHIP_H, rx: CHIP_H / 2 }, g);
+    el('image', { href: icon(c.kind === 'nsg' ? 'nsg' : 'routetable'), x: 6, y: 3, width: 14, height: 14 }, g);
+    const t = el('text', { x: 24, y: 14 }, g);
+    t.textContent = clip(c.name, width - (c.risk ? 40 : 26), 6.3);
+    if (c.risk) {
+      el('circle', { class: 'dot', cx: width - 11, cy: CHIP_H / 2, r: 6 }, g);
+      const m = el('text', { class: 'mark', x: width - 11, y: CHIP_H / 2 + 3.5, 'text-anchor': 'middle' }, g);
+      m.textContent = '!';
+    }
+    const owner = nodesById.get(c.id);
+    const tip = el('title', {}, g);
+    tip.textContent = (c.kind === 'nsg' ? 'Network security group: ' : 'Route table: ') + c.name +
+      (owner && owner.risk ? ' - ' + (owner.risk === 'high' ? 'high risk' : 'review') : '') + ' (click for its ' + (c.kind === 'nsg' ? 'rules' : 'routes') + ')';
+    g.addEventListener('click', ev => { ev.stopPropagation(); select(c.id); });
+    return g;
+  }
+
+  function draw(layout) {
+    const t = THEMES[state.theme];
+    svg.innerHTML = '';
+    const defs = el('defs', {}, svg);
+    styleEl = el('style', {}, defs);
+    styleEl.textContent = styleText(t);
+    markers(defs, t);
+    viewport = el('g', { id: 'viewport' }, svg);
+    el('rect', { class: 'bg', x: -40, y: -40, width: layout.width + 80, height: layout.height + 80 }, viewport);
+
+    const boxes = new Map();
+    (function walk(item) {
+      for (const child of item.children || []) { boxes.set(child.id, child); walk(child); }
+    })(layout);
+
+    const clusterLayer = el('g', { class: 'clusters' }, viewport);
+    const edgeLayer = el('g', { class: 'edges' }, viewport);
+    const nodeLayer = el('g', { class: 'nodes' }, viewport);
+
+    // Boxes, outermost first (they come in that order).
+    for (const c of data.clusters) {
+      const b = boxes.get(c.id);
+      if (!b) continue;
+      const g = el('g', { class: 'cluster ' + c.kind + (c.external ? ' external' : ''), 'data-id': c.id }, clusterLayer);
+      el('rect', { class: 'box', x: b.x, y: b.y, width: b.width, height: b.height, rx: c.kind === 'subscription' ? 14 : 10 }, g);
+      el('image', { href: icon(c.icon), x: b.x + 12, y: b.y + 11, width: 26, height: 26 }, g);
+      const name = el('text', { class: 'name', x: b.x + 46, y: b.y + 22 }, g);
+      name.textContent = clip(c.kind === 'subscription' ? 'Subscription: ' + c.name : c.kind === 'resourcegroup' ? 'Resource group: ' + c.name : c.name, b.width - 60, 7.4);
+      const line = [].concat(c.detail || [], state.mode === 'cards' ? (c.badges || []) : []).join('  ·  ');
+      if (line) {
+        const detail = el('text', { class: 'detail', x: b.x + 46, y: b.y + 38 }, g);
+        detail.textContent = clip(line, b.width - 60, 6.1);
+      }
+      if (state.mode === 'chips') {
+        let x = b.x + 46;
+        for (const chip of chipsOf(c)) {
+          const w = chipWidth(chip);
+          drawChip(g, chip, x, b.y + HEADER - 4, w);
+          x += w + 6;
+        }
+      }
+      g.addEventListener('click', ev => { ev.stopPropagation(); select(c.id); });
+    }
+
+    // Connections.
+    const edgeById = new Map(data.edges.map(x => [x.id, x]));
+    for (const e of layout.edges || []) {
+      const model = edgeById.get(e.id);
+      if (!model || !e.sections) continue;
+      const g = el('g', { class: 'edge ' + model.kind, 'data-id': model.id, 'data-source': model.source, 'data-target': model.target }, edgeLayer);
+      for (const s of e.sections) {
+        const points = [s.startPoint].concat(s.bendPoints || [], [s.endPoint]);
+        const attrs = { class: 'line', d: rounded(points, 7) };
+        if (model.kind !== 'network') attrs['marker-end'] = 'url(#arrow-' + model.kind + ')';
+        if (model.kind === 'peering') attrs['marker-start'] = 'url(#arrow-' + model.kind + ')';
+        el('path', attrs, g);
+        if (model.label) {
+          // On the longest straight piece.
+          let best = null, length = -1;
+          for (let i = 1; i < points.length; i++) {
+            const l = Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+            if (l > length) { length = l; best = [points[i - 1], points[i]]; }
+          }
+          const text = clip(model.label, 220, 6.2);
+          const w = text.length * 6.1 + 12, x = (best[0].x + best[1].x) / 2, y = (best[0].y + best[1].y) / 2;
+          const label = el('g', { class: 'label' }, g);
+          el('rect', { x: x - w / 2, y: y - 9, width: w, height: 18, rx: 9 }, label);
+          const tl = el('text', { x: x, y: y + 4, 'text-anchor': 'middle' }, label);
+          tl.textContent = text;
+        }
+      }
+    }
+
+    // Resources.
+    for (const n of data.nodes) {
+      const b = boxes.get(n.id);
+      if (!b || drawnAsChip(n)) continue;
+      const g = el('g', { class: 'node' + (n.orphan ? ' orphan' : '') + (n.external ? ' external' : '') + (n.risk ? ' risk-' + n.risk : ''), 'data-id': n.id, transform: 'translate(' + b.x + ',' + b.y + ')' }, nodeLayer);
+      el('rect', { class: 'card', width: NODE_W, height: NODE_H, rx: 10 }, g);
+      el('image', { href: icon(n.icon), x: NODE_W / 2 - 20, y: 9, width: 40, height: 40 }, g);
+      const name = el('text', { class: 'name', x: NODE_W / 2, y: 66, 'text-anchor': 'middle' }, g);
+      name.textContent = clip(n.name, NODE_W - 14, 7.2);
+      const type = el('text', { class: 'type', x: NODE_W / 2, y: 82, 'text-anchor': 'middle' }, g);
+      type.textContent = clip(n.typeLabel, NODE_W - 14, 6.2);
+      const facts = (n.facts || []).join(' · ');
+      if (facts) {
+        const f = el('text', { class: 'fact', x: NODE_W / 2, y: 99, 'text-anchor': 'middle' }, g);
+        f.textContent = clip(facts, NODE_W - 14, 6.3);
+      }
+      if (state.mode === 'chips') {
+        // A NIC's own NSG, on the card's top left.
+        let y = 6;
+        for (const chip of chipsOf(n)) { drawChip(g, Object.assign({}, chip, { name: chip.kind === 'nsg' ? 'NSG' : 'UDR' }), 6, y, chip.risk ? 64 : 52); y += CHIP_H + 4; }
+      }
+      if (n.orphan || n.risk) {
+        el('circle', { class: 'flag', cx: NODE_W - 12, cy: 12, r: 9 }, g);
+        const x = el('text', { class: 'flagtext', x: NODE_W - 12, y: 16, 'text-anchor': 'middle' }, g);
+        x.textContent = '!';
+      }
+      const title = el('title', {}, g);
+      title.textContent = n.name + ' (' + n.typeLabel + ')' + (n.orphan ? ' - ' + n.orphan : '') + (n.risk ? ' - ' + (n.risk === 'high' ? 'high risk' : 'worth a review') + ': click for the details' : '');
+      g.addEventListener('click', ev => { ev.stopPropagation(); select(n.id); });
+    }
+    applyHighlight();
+  }
+
+  // --- Highlight a resource and everything it's connected to -------------------------------
+  function neighbours(id) {
+    const set = new Set([id]);
+    const edges = new Set();
+    const owner = nodesById.get(id);
+    if (drawnAsChip(owner)) {
+      // A chip: what it's applied to, everything in those subnets, and the
+      // routes that start there.
+      for (const target of owner.appliedTo || []) set.add(target);
+      for (const n of data.nodes) for (const a of ancestorsOf(n.id)) if (set.has(a)) set.add(n.id);
+      for (const e of data.edges) if (edgeVisible(e) && e.kind === 'route' && set.has(e.source)) { set.add(e.target); edges.add(e.id); }
+      return { set, edges };
+    }
+    for (const e of data.edges) {
+      if (!edgeVisible(e)) continue;
+      if (e.source === id || e.target === id) { set.add(e.source); set.add(e.target); edges.add(e.id); }
+    }
+    return { set, edges };
+  }
+  function ancestorsOf(id) {
+    const out = new Set();
+    let p = nodesById.has(id) ? nodesById.get(id).parent : clustersById.has(id) ? clustersById.get(id).parent : '';
+    while (p) { out.add(p); p = clustersById.has(p) ? clustersById.get(p).parent : ''; }
+    return out;
+  }
+  function applyHighlight() {
+    const query = document.getElementById('search').value.trim().toLowerCase();
+    let keep = null, keepEdges = null, matches = new Set();
+    if (state.selected) {
+      const nb = neighbours(state.selected);
+      keep = nb.set; keepEdges = nb.edges;
+      // Inside a selected box: everything in it stays lit.
+      if (clustersById.has(state.selected)) {
+        for (const n of data.nodes) if (ancestorsOf(n.id).has(state.selected)) keep.add(n.id);
+      }
+    }
+    if (query) {
+      for (const n of data.nodes) {
+        const hay = (n.name + ' ' + n.typeLabel + ' ' + n.type + ' ' + (n.facts || []).join(' ') + ' ' + n.resourceGroup).toLowerCase();
+        if (!hay.includes(query)) continue;
+        // An NSG or route table shown as chips: what it's on.
+        if (drawnAsChip(n)) { matches.add(n.id); for (const t of n.appliedTo || []) matches.add(t); } else matches.add(n.id);
+      }
+      if (!keep) { keep = new Set(matches); keepEdges = new Set(); }
+    }
+    if (state.flaggedOnly && !keep) {
+      // Flagged only: the risky NSGs and route tables, and what they're on.
+      keep = new Set(); keepEdges = new Set();
+      for (const n of data.nodes) if (n.risk) { keep.add(n.id); for (const t of n.appliedTo || []) keep.add(t); }
+    }
+    const keepBoxes = new Set();
+    if (keep) for (const id of keep) { keepBoxes.add(id); for (const a of ancestorsOf(id)) keepBoxes.add(a); }
+    svg.querySelectorAll('.node').forEach(g => {
+      const id = g.getAttribute('data-id');
+      g.classList.toggle('dim', !!keep && !keep.has(id));
+      g.classList.toggle('match', matches.has(id));
+      g.classList.toggle('selected', id === state.selected);
+    });
+    svg.querySelectorAll('.cluster').forEach(g => {
+      const id = g.getAttribute('data-id');
+      g.classList.toggle('dim', !!keep && !keepBoxes.has(id));
+    });
+    svg.querySelectorAll('.chip').forEach(g => {
+      const id = g.getAttribute('data-chip');
+      g.classList.toggle('selected', id === state.selected);
+      g.classList.toggle('dim', !!keep && !keep.has(id) && !(state.flaggedOnly && nodesById.get(id) && nodesById.get(id).risk));
+    });
+    svg.querySelectorAll('.edge').forEach(g => g.classList.toggle('dim', !!keep && !keepEdges.has(g.getAttribute('data-id'))));
+  }
+
+  function select(id) {
+    state.selected = id;
+    applyHighlight();
+    showDetails(id);
+  }
+
+  function showDetails(id) {
+    const panel = document.getElementById('details');
+    if (!id) { panel.classList.remove('open', 'wide'); panel.innerHTML = ''; return; }
+    const n = nodesById.get(id), c = clustersById.get(id);
+    const item = n || c;
+    const kindLabel = { network: 'network', dependency: 'depends on', peering: 'peering', privatelink: 'private link', route: 'route', dns: 'private DNS' };
+    const rows = [];
+    const add = (k, v) => { if (v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && !v.length)) rows.push('<tr><td>' + esc(k) + '</td><td>' + v + '</td></tr>'); };
+    let heading, type, iconKey, portalId, extra = '';
+    const nameOf = x => { const o = nodesById.get(x) || clustersById.get(x); return o ? o.name : x.split('/').pop(); };
+    const chipList = items => '<div class="chips">' + items.map(c => '<span class="' + (c.risk || '') + '" data-go="' + esc(c.id) + '">' + (c.kind === 'nsg' ? 'NSG' : 'Route table') + ': ' + esc(c.name) + '</span>').join('') + '</div>';
+    const riskBox = (level, reasons) => reasons.length ? '<div class="risk ' + level + '"><b>' + (level === 'high' ? 'High risk' : 'Worth a review') + '</b><ul>' + reasons.map(r => '<li>' + esc(r) + '</li>').join('') + '</ul></div>' : '';
+    if (n && n.type === 'microsoft.network/networksecuritygroups') {
+      const rules = n.rules || [];
+      const row = r => '<tr class="' + (r.risk || '') + '"' + (r.reason ? ' title="' + esc(r.reason) + '"' : '') + '><td>' + r.priority + '</td><td>' + esc(r.name) + '</td><td class="' + (r.access === 'Allow' ? 'allow' : 'deny') + '">' + esc(r.access) + '</td><td>' + esc(r.protocol) + '</td><td>' + esc(r.source) + '</td><td>' + esc(r.ports) + '</td><td>' + esc(r.destination) + '</td></tr>';
+      const table = list => '<table class="rules"><tr><th>Pri</th><th>Name</th><th>Access</th><th>Proto</th><th>Source</th><th>Ports</th><th>Destination</th></tr>' + list.map(row).join('') + '</table>';
+      const section = dir => {
+        const custom = rules.filter(r => r.direction === dir && !r.isDefault), builtIn = rules.filter(r => r.direction === dir && r.isDefault);
+        return '<h3>' + dir + ' rules (' + custom.length + ')</h3>' + (custom.length ? table(custom) : '<div class="type">No rules of its own: only the defaults apply.</div>') +
+          (builtIn.length ? '<details><summary>Default rules (' + builtIn.length + ')</summary>' + table(builtIn) + '</details>' : '');
+      };
+      extra = riskBox('high', rules.filter(r => r.risk === 'high').map(r => r.name + ': ' + r.reason)) + riskBox('medium', rules.filter(r => r.risk === 'medium').map(r => r.name + ': ' + r.reason)) +
+        '<h3>Applied to (' + (n.appliedTo || []).length + ')</h3>' + ((n.appliedTo || []).length ? '<ul>' + n.appliedTo.map(t => '<li data-go="' + esc(t) + '">' + (clustersById.has(t) ? 'Subnet' : 'Network interface') + ' &middot; ' + esc(nameOf(t)) + '</li>').join('') + '</ul>' : '<div class="type">Nothing: this NSG isn\'t on a subnet or NIC.</div>') +
+        section('Inbound') + section('Outbound');
+    }
+    if (n && n.type === 'microsoft.network/routetables') {
+      const routes = n.routes || [];
+      const row = r => '<tr class="' + (r.risk || '') + '"' + (r.reason ? ' title="' + esc(r.reason) + '"' : '') + '><td>' + esc(r.prefix) + '</td><td>' + esc(r.nextHopType) + '</td><td>' + esc(r.nextHop || '') + (r.target ? ' <span data-go="' + esc(r.target) + '" style="cursor:pointer;color:var(--accent)">&rarr; ' + esc(r.targetName) + '</span>' : '') + '</td><td>' + esc(r.name) + '</td></tr>';
+      extra = riskBox('high', routes.filter(r => r.risk === 'high').map(r => r.name + ': ' + r.reason)) + riskBox('medium', routes.filter(r => r.risk === 'medium').map(r => r.name + ': ' + r.reason)) +
+        '<h3>Applied to (' + (n.appliedTo || []).length + ')</h3>' + ((n.appliedTo || []).length ? '<ul>' + n.appliedTo.map(t => '<li data-go="' + esc(t) + '">Subnet &middot; ' + esc(nameOf(t)) + '</li>').join('') + '</ul>' : '<div class="type">No subnet uses this route table.</div>') +
+        '<h3>Routes (' + routes.length + ')</h3>' + (routes.length ? '<table class="rules"><tr><th>Prefix</th><th>Next hop type</th><th>Next hop</th><th>Name</th></tr>' + routes.map(row).join('') + '</table>' : '<div class="type">No routes: the system routes apply.</div>') +
+        routes.filter(r => !r.risk && r.reason).map(r => '<div class="type">' + esc(r.reason) + '</div>').join('');
+    }
+    if (n) {
+      heading = n.name; type = n.typeLabel; iconKey = n.icon; portalId = n.id;
+      add('Type', '<code>' + esc(n.type) + '</code>');
+      add('Resource group', esc(n.resourceGroup));
+      add('Subscription', esc(n.subscription));
+      add('Location', esc(n.location));
+      add('SKU', esc(n.sku));
+      add('Kind', esc(n.kind));
+      if (n.type === 'microsoft.network/routetables') add('Gateway route propagation', n.propagation === 'off' ? 'Off (routes learned from the VPN/ExpressRoute gateway are not used)' : 'On');
+      if (chipsOf(n).length) add('Own NSG', chipList(chipsOf(n)));
+      add('Details', esc((n.facts || []).join(' · ')));
+      if (n.tags) add('Tags', Object.keys(n.tags).map(k => esc(k) + ' = ' + esc(n.tags[k])).join('<br>'));
+      add('Resource ID', '<code>' + esc(n.id) + '</code>');
+    } else {
+      heading = c.name;
+      type = { subscription: 'Subscription', resourcegroup: 'Resource group', vnet: 'Virtual network', subnet: 'Subnet' }[c.kind];
+      iconKey = c.icon;
+      if (c.kind === 'subnet') {
+        add('Address prefix', esc(c.prefix));
+        if (c.usable) add('Addresses', esc(c.used + ' of ' + c.usable + ' usable IPs in use (Azure keeps 5 in every subnet)'));
+        add('Delegated to', esc((c.delegations || []).join(', ')));
+        add('Service endpoints', esc((c.serviceEndpoints || []).join(', ')));
+        add('Private endpoint policies', esc(c.privateEndpointPolicies));
+        if (chipsOf(c).length) add('NSG and routes', chipList(chipsOf(c)));
+        add('Also on it', esc((c.badges || []).filter(b => /^NAT/.test(b)).join(', ')));
+      } else {
+        add('Details', esc([].concat(c.detail || []).join(' · ')));
+      }
+      add('ID', '<code>' + esc(c.id) + '</code>');
+      portalId = c.kind === 'subnet' ? c.id.replace(/\/subnets\/[^/]+$/, '') + '/subnets' : c.kind === 'subscription' ? c.id + '/overview' : c.id;
+    }
+    const links = data.edges.filter(e => (e.source === id || e.target === id) && (!e.view || e.view === state.mode)).map(e => {
+      const other = e.source === id ? e.target : e.source;
+      const o = nodesById.get(other) || clustersById.get(other);
+      const direction = e.kind === 'dependency' ? (e.source === id ? 'depends on' : 'used by') : kindLabel[e.kind];
+      return '<li data-go="' + esc(other) + '"><span class="kind">' + esc(direction) + '</span> &middot; ' + esc(o ? o.name : other) + (e.label ? ' <span class="kind">(' + esc(e.label) + ')</span>' : '') + '</li>';
+    });
+    panel.innerHTML =
+      '<div class="head"><img alt="" src="' + icon(iconKey) + '"><div><h2>' + esc(heading) + '</h2><div class="type">' + esc(type) + (item.external ? ' &middot; outside the selection' : '') + '</div></div>' +
+      '<button class="close" title="Close" aria-label="Close">&times;</button></div>' +
+      (n && n.orphan ? '<div class="flag">Unattached: ' + esc(n.orphan) + '</div>' : '') +
+      '<table>' + rows.join('') + '</table>' + extra +
+      (links.length ? '<h3>Connections (' + links.length + ')</h3><ul>' + links.join('') + '</ul>' : '') +
+      '<a class="portal" target="_blank" rel="noopener" href="https://portal.azure.com/#@/resource' + esc(portalId) + '">Open in the Azure portal &#8599;</a>';
+    panel.classList.add('open');
+    panel.classList.toggle('wide', !!(n && (n.type === 'microsoft.network/networksecuritygroups' || n.type === 'microsoft.network/routetables')));
+    panel.querySelector('.close').onclick = () => { state.selected = null; applyHighlight(); showDetails(null); };
+    panel.querySelectorAll('[data-go]').forEach(li => li.onclick = () => { const go = li.getAttribute('data-go'); select(go); centerOn(go); });
+  }
+
+  // --- Legend ------------------------------------------------------------------------------
+  function legend() {
+    const t = THEMES[state.theme];
+    const counts = {};
+    for (const e of data.edges) if (!e.view || e.view === state.mode) counts[e.kind] = (counts[e.kind] || 0) + 1;
+    const box = document.getElementById('legend');
+    const items = KINDS.filter(([k]) => counts[k]).map(([k, label, dash]) =>
+      '<label><input type="checkbox" data-kind="' + k + '"' + (state.hidden.has(k) ? '' : ' checked') + '>' +
+      '<svg width="34" height="10"><line x1="1" y1="5" x2="33" y2="5" stroke="' + t.edges[k] + '" stroke-width="' + (k === 'peering' ? 3 : 2) + '"' + (dash ? ' stroke-dasharray="' + dash + '"' : '') + '/></svg>' +
+      esc(label) + '<span class="count">' + counts[k] + '</span></label>');
+    const orphans = data.nodes.filter(n => n.orphan).length;
+    const outside = data.nodes.filter(n => n.external).length;
+    const owners = data.nodes.filter(isChipOwner);
+    const high = data.nodes.filter(n => n.risk === 'high').length, medium = data.nodes.filter(n => n.risk === 'medium').length;
+    const security = owners.length ?
+      '<h2 style="margin-top:10px">NSGs &amp; route tables</h2>' +
+      '<div class="seg"><button data-mode="chips"' + (state.mode === 'chips' ? ' class="on"' : '') + '>Chips</button><button data-mode="cards"' + (state.mode === 'cards' ? ' class="on"' : '') + '>Cards</button></div>' +
+      (high ? '<div class="note"><span class="pill high"></span>High risk (' + high + ')</div>' : '') +
+      (medium ? '<div class="note"><span class="pill medium"></span>Worth a review (' + medium + ')</div>' : '') +
+      (high + medium ? '<label><input type="checkbox" id="flagged"' + (state.flaggedOnly ? ' checked' : '') + '>Show only what is flagged</label>' : '<div class="note"><span class="pill"></span>Nothing flagged</div>') +
+      '<div class="note">Click a chip for its rules or routes</div>' : '';
+    box.innerHTML = '<h2>Connections</h2>' + (items.join('') || '<div class="note">No connections</div>') +
+      (orphans ? '<div class="note"><span class="swatch"></span>Unattached (' + orphans + ')</div>' : '') +
+      (outside ? '<div class="note"><span class="swatch ext"></span>Outside the selection (' + outside + ')</div>' : '') + security;
+    box.querySelectorAll('input[data-kind]').forEach(cb => cb.onchange = () => {
+      if (cb.checked) state.hidden.delete(cb.dataset.kind); else state.hidden.add(cb.dataset.kind);
+      run();
+    });
+    box.querySelectorAll('button[data-mode]').forEach(b => b.onclick = () => { if (state.mode !== b.dataset.mode) { state.mode = b.dataset.mode; state.selected = null; showDetails(null); run(); } });
+    const flagged = box.querySelector('#flagged');
+    if (flagged) flagged.onchange = () => { state.flaggedOnly = flagged.checked; applyHighlight(); };
+  }
+
+  // --- Pan and zoom --------------------------------------------------------------------------
+  const stage = document.getElementById('stage');
+  function applyView() { if (viewport) viewport.setAttribute('transform', 'translate(' + state.view.x + ',' + state.view.y + ') scale(' + state.view.k + ')'); }
+  function fit() {
+    if (!state.layout) return;
+    const top = document.querySelector('header').offsetHeight + 16;
+    const right = document.getElementById('details').classList.contains('open') ? 392 : 16;
+    const w = window.innerWidth - 16 - right, h = window.innerHeight - top - 16;
+    const k = Math.min(1.25, w / (state.layout.width + 40), h / (state.layout.height + 40));
+    state.view = { k: k, x: 16 + (w - state.layout.width * k) / 2, y: top + (h - state.layout.height * k) / 2 };
+    applyView();
+  }
+  function centerOn(id) {
+    let g = svg.querySelector('[data-id="' + CSS.escape(id) + '"]');
+    // An NSG or route table shown as a chip: the first thing it's on.
+    if (!g && nodesById.has(id) && (nodesById.get(id).appliedTo || []).length) g = svg.querySelector('[data-id="' + CSS.escape(nodesById.get(id).appliedTo[0]) + '"]');
+    if (!g) return;
+    const bb = g.getBBox();
+    const k = Math.max(state.view.k, 0.9);
+    state.view = { k: k, x: window.innerWidth / 2 - (bb.x + bb.width / 2) * k, y: window.innerHeight / 2 - (bb.y + bb.height / 2) * k };
+    // Nodes are translated groups: getBBox is local, so add the translation.
+    const tr = g.getAttribute('transform');
+    if (tr) {
+      const m = /translate\(([-\d.]+),([-\d.]+)\)/.exec(tr);
+      if (m) { state.view.x -= parseFloat(m[1]) * k; state.view.y -= parseFloat(m[2]) * k; }
+    }
+    applyView();
+  }
+  function zoomAt(factor, cx, cy) {
+    const k = Math.max(0.05, Math.min(4, state.view.k * factor));
+    state.view.x = cx - (cx - state.view.x) * (k / state.view.k);
+    state.view.y = cy - (cy - state.view.y) * (k / state.view.k);
+    state.view.k = k;
+    applyView();
+  }
+  stage.addEventListener('wheel', ev => { ev.preventDefault(); zoomAt(ev.deltaY < 0 ? 1.12 : 1 / 1.12, ev.clientX, ev.clientY); }, { passive: false });
+  let drag = null;
+  stage.addEventListener('mousedown', ev => { drag = { x: ev.clientX, y: ev.clientY, vx: state.view.x, vy: state.view.y, moved: false }; stage.classList.add('panning'); });
+  window.addEventListener('mousemove', ev => {
+    if (!drag) return;
+    const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+    state.view.x = drag.vx + dx; state.view.y = drag.vy + dy; applyView();
+  });
+  window.addEventListener('mouseup', () => { stage.classList.remove('panning'); setTimeout(() => { drag = null; }, 0); });
+  svg.addEventListener('click', () => { if (drag && drag.moved) return; state.selected = null; applyHighlight(); showDetails(null); });
+  document.getElementById('zoom-in').onclick = () => zoomAt(1.25, window.innerWidth / 2, window.innerHeight / 2);
+  document.getElementById('zoom-out').onclick = () => zoomAt(0.8, window.innerWidth / 2, window.innerHeight / 2);
+  document.getElementById('zoom-fit').onclick = fit;
+
+  // --- Toolbar -------------------------------------------------------------------------------
+  const search = document.getElementById('search');
+  search.addEventListener('input', applyHighlight);
+  search.addEventListener('keydown', ev => {
+    if (ev.key !== 'Enter') return;
+    const first = svg.querySelector('.node.match');
+    if (first) centerOn(first.getAttribute('data-id'));
+  });
+  const dirButtons = { RIGHT: document.getElementById('dir-right'), DOWN: document.getElementById('dir-down') };
+  for (const d in dirButtons) dirButtons[d].onclick = () => { if (state.direction !== d) { state.direction = d; run(); } };
+  const themeSelect = document.getElementById('theme');
+  themeSelect.value = state.theme;
+  themeSelect.onchange = () => { state.theme = themeSelect.value; document.body.dataset.theme = state.theme; draw(state.layout); applyView(); legend(); };
+
+  // --- Save as PNG, JPEG or SVG ------------------------------------------------------------------
+  function exportSvg() {
+    const pad = 24;
+    const w = Math.ceil(state.layout.width + pad * 2), h = Math.ceil(state.layout.height + pad * 2);
+    const clone = svg.cloneNode(true);
+    clone.setAttribute('xmlns', SVGNS);
+    clone.setAttribute('width', w); clone.setAttribute('height', h);
+    clone.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    clone.removeAttribute('id'); clone.removeAttribute('style');
+    const vp = clone.querySelector('#viewport');
+    vp.setAttribute('transform', 'translate(' + pad + ',' + pad + ')');
+    clone.querySelectorAll('.dim,.match,.selected').forEach(e => e.classList.remove('dim', 'match', 'selected'));
+    clone.querySelectorAll('title').forEach(e => e.remove());
+    const bg = clone.querySelector('rect.bg');
+    bg.setAttribute('x', -pad); bg.setAttribute('y', -pad); bg.setAttribute('width', w); bg.setAttribute('height', h);
+    return { text: '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(clone), width: w, height: h };
+  }
+  function fileName(ext) {
+    return (data.title || 'resource-map').replace(/[^\w.-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') + '.' + ext;
+  }
+  function download(blob, name) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+  function saveImage(type) {
+    const s = exportSvg();
+    // As sharp as the browser allows: twice the size, within canvas limits.
+    const scale = Math.max(0.25, Math.min(2, 16000 / Math.max(s.width, s.height), Math.sqrt(120e6 / (s.width * s.height))));
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(s.width * scale); canvas.height = Math.round(s.height * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = THEMES[state.theme].page;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('The image could not be made')), type, 0.92);
+      };
+      img.onerror = () => reject(new Error('The drawing could not be loaded'));
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(s.text);
+    });
+  }
+  document.getElementById('save-png').onclick = () => saveImage('image/png').then(b => download(b, fileName('png'))).catch(e => alert(e.message));
+  document.getElementById('save-jpeg').onclick = () => saveImage('image/jpeg').then(b => download(b, fileName('jpg'))).catch(e => alert(e.message));
+  document.getElementById('save-svg').onclick = () => download(new Blob([exportSvg().text], { type: 'image/svg+xml' }), fileName('svg'));
+  window.AACResourceMap = { saveImage: saveImage, exportSvg: exportSvg, state: state };
+
+  // --- Lay out and draw --------------------------------------------------------------------------
+  const elk = new ELK();
+  const status = document.getElementById('status');
+  function run() {
+    status.style.display = 'flex';
+    status.textContent = 'Laying out the map...';
+    for (const d in dirButtons) dirButtons[d].classList.toggle('on', d === state.direction);
+    return elk.layout(elkGraph(state.direction)).then(layout => {
+      state.layout = layout;
+      draw(layout);
+      legend();
+      fit();
+      status.style.display = 'none';
+      document.body.dataset.ready = 'true';
+    }).catch(err => {
+      status.textContent = 'The map could not be laid out: ' + (err && err.message ? err.message : err);
+      document.body.dataset.ready = 'error';
+    });
+  }
+  document.body.dataset.theme = state.theme;
+  window.addEventListener('resize', fit);
+  run();
+})();
+</script>
+</body>
+</html>

@@ -169,6 +169,10 @@ function Invoke-AACPSRule {
         [switch] $NoPaging
     )
 
+    # A failure anywhere below ends as a Spectre.Console error panel and this
+    # command's own terminating error, not a line inside the module.
+    trap { $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
+
     # An export means the report is in the files: the console shows only the
     # title, the progress and the files written.
     $pipedOnward = $MyInvocation.PipelinePosition -lt $MyInvocation.PipelineLength

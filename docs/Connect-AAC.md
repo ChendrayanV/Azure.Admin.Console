@@ -73,7 +73,11 @@ Signs in to a specific tenant using your own App Registration.
 
 The Entra ID application (client) ID to sign in as. Defaults to the
 well-known Azure CLI public client ID so this works without an app
-registration; see the Description for when to supply your own.
+registration; see the Description for when to supply your own. An
+App Registration of your own needs delegated permissions for Azure
+Service Management (user_impersonation) and, for
+Invoke-AACApplicationInsightQuery, the Log Analytics API and the
+Application Insights API (Data.Read).
 
 ```yaml
 Type: System.String

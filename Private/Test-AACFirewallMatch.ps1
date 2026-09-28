@@ -151,6 +151,9 @@ function Test-AACFirewallRuleMatch {
         [string[]] $Fqdn
     )
 
+    # Lists are joined as @(...) + @(...): a script block's output is
+    # unrolled, and one item on each side would otherwise be added as text
+    # ('10.0.0.1' + '10.1.0.0/16').
     $list = { param([string] $Text) @("$Text" -split ',\s*' | Where-Object { $_ }) }
     # "name: a, b | name2: c" -> a, b, c
     $groupAddresses = {
@@ -162,11 +165,11 @@ function Test-AACFirewallRuleMatch {
     }
 
     if ($SourceAddress) {
-        $addresses = @((& $list $Rule.SourceAddresses) + @(& $groupAddresses $Rule.SourceIpGroupAddresses))
+        $addresses = @(& $list $Rule.SourceAddresses) + @(& $groupAddresses $Rule.SourceIpGroupAddresses)
         if (-not (Test-AACAddressMatch -Search $SourceAddress -RuleAddress $addresses)) { return $false }
     }
     if ($DestinationAddress) {
-        $addresses = @((& $list $Rule.DestinationAddresses) + @(& $groupAddresses $Rule.DestinationIpGroupAddresses))
+        $addresses = @(& $list $Rule.DestinationAddresses) + @(& $groupAddresses $Rule.DestinationIpGroupAddresses)
         if (-not (Test-AACAddressMatch -Search $DestinationAddress -RuleAddress $addresses)) { return $false }
     }
 
@@ -183,7 +186,7 @@ function Test-AACFirewallRuleMatch {
         if (-not ('Any' -in $protocols -or @($Protocol | Where-Object { $_ -in $protocols }).Count -gt 0)) { return $false }
     }
     if ($Fqdn) {
-        $ruleFqdns = @((& $list $Rule.DestinationFqdns) + (& $list $Rule.TargetFqdns) + (& $list $Rule.TranslatedFqdn))
+        $ruleFqdns = @(& $list $Rule.DestinationFqdns) + @(& $list $Rule.TargetFqdns) + @(& $list $Rule.TranslatedFqdn)
         $covered = @(foreach ($name in $Fqdn) {
                 foreach ($ruleFqdn in $ruleFqdns) {
                     if ($name -like $ruleFqdn -or $ruleFqdn -like $name) { $true }

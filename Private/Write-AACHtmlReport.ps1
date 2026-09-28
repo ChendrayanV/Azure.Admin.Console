@@ -26,13 +26,24 @@ function Write-AACHtmlReport {
                     Columns: @{ Key; Label; Type; Facet; Hidden; Tones;
                     Format; Sum; CurrencyKey; IdKey; Href; Text; Soon }.
                     Types: text (default), wide (long text, clamped), mono,
-                    number, money, date (Soon: red within 90 days, orange
+                    number, money, score (0-100 as a percentage: 70+
+                    green, 40-69 amber, under 40 red), date (Soon: red within 90 days, orange
                     within 180), datetime (date and time, local), badge (Tones = @{ Value = 'bad' }), link
                     (https only), resource (the name with Azure portal and
                     copy-ID buttons from the IdKey column, ResourceId by
                     default). Facet columns get a filter drop-down; Sum
                     columns are totalled for the rows shown and per group.
           -Notice   @{ Tone; Text } lines under the tiles.
+          -Tree     @{ Title; OpenTo = 's'; Root = node } a collapsible,
+                    searchable hierarchy above the tables. Node: @{ l = 't'|
+                    'm'|'s'|'g'|'r' (tenant, management group, subscription,
+                    resource group, resource); n = name; d = detail;
+                    c = @(@(count, 'noun'), ...); f = @{ table; filters }
+                    (clicking the name filters that table); k = children;
+                    x = flagged (e.g. an empty resource group); p = a 0-100
+                    score, drawn as a coloured pill; h, m, lo = high,
+                    medium and low findings, as red, amber and blue pills }. Children
+                    are drawn when a node is opened, so big trees stay fast.
 
         Every table can be searched, filtered, sorted (click a header),
         grouped (with subtotals) and downloaded as CSV - the rows shown, all
@@ -58,7 +69,9 @@ function Write-AACHtmlReport {
 
         [object[]] $Table = @(),
 
-        [object[]] $Notice = @()
+        [object[]] $Notice = @(),
+
+        [System.Collections.IDictionary] $Tree
     )
 
     $fullPath = $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
@@ -125,10 +138,13 @@ function Write-AACHtmlReport {
             })
         tables        = @($tables)
     }
+    if ($Tree) {
+        $model['tree'] = [ordered]@{ title = $Tree.Title; openTo = $(if ($Tree.Contains('OpenTo')) { $Tree.OpenTo } else { 's' }); root = $Tree.Root }
+    }
 
     # EscapeHtml turns < > & ' into \u escapes, so no value can close the
     # <script> element the data sits in.
-    $json = ConvertTo-Json -InputObject $model -Depth 8 -Compress -EscapeHandling EscapeHtml
+    $json = ConvertTo-Json -InputObject $model -Depth 40 -Compress -EscapeHandling EscapeHtml
     $template = [System.IO.File]::ReadAllText((Join-Path -Path $script:AACModuleRoot -ChildPath 'Private/DataReport.html'))
     $html = $template.Replace('__AAC_TITLE__', [System.Net.WebUtility]::HtmlEncode($Title)).Replace('__AAC_DATA__', $json)
 

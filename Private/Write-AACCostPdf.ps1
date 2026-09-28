@@ -114,7 +114,12 @@ function Write-AACCostPdf {
                     [pscustomobject]@{ Name = $(if ($_.Name) { $_.Name } else { $Empty }); Cost = (& $sum $_.Group 'Cost') }
                 } | Where-Object Cost -gt 0 | Sort-Object Cost -Descending | Select-Object -First 10)
         }
-        $sides = @((& $top 'Service' '(no service)'), (& $top 'ResourceGroup' '(no resource group)'))
+        # Each side is its own array: a script block's output is unrolled, so
+        # an empty side (a subscription with no costs this month) would
+        # otherwise be no value at all rather than an empty list.
+        $services = @(& $top 'Service' '(no service)')
+        $resourceGroups = @(& $top 'ResourceGroup' '(no resource group)')
+        $sides = $services, $resourceGroups
         $count = [Math]::Max($sides[0].Count, $sides[1].Count)
         if ($count -eq 0) { return }
         $table = & $pdf.NewTable @(7.4, 2.6, 1.6, 1.0, 7.4, 2.6, 1.6)
@@ -202,9 +207,24 @@ function Write-AACCostPdf {
         $section.AddParagraph("Top services and resource groups this month ($currency)", 'Heading3') | Out-Null
         & $addShareTables $rows
     }
+    $noCost = @($Cost | Where-Object Status -EQ 'No cost')
     if ($read.Count -eq 0) {
-        $none = $section.AddParagraph('No costs could be read for these subscriptions.')
+        $none = $section.AddParagraph($(if ($noCost.Count) { 'Cost Management reports no cost for these subscriptions in this period.' } else { 'No costs could be read for these subscriptions.' }))
         $none.Format.Font.Color = $colors.Muted
+    }
+    # Read, but nothing to chart: listed, not treated as an error.
+    if ($noCost.Count) {
+        $section.AddParagraph('Subscriptions with no cost in this period', 'Heading2') | Out-Null
+        $note = $section.AddParagraph('Their usage may be billed to another subscription, be covered by credits, or not be processed yet.')
+        $note.Format.Font.Color = $colors.Muted
+        $note.Format.SpaceAfter = & $pt 4
+        $table = & $pdf.NewTable @(7.0, ($pdf.PageWidth - 7.0))
+        & $pdf.AddHeaderRow $table @('Subscription', 'Subscription ID')
+        foreach ($item in $noCost) {
+            $row = & $pdf.AddBodyRow $table
+            $row.Cells[0].AddParagraph($item.SubscriptionName) | Out-Null
+            $row.Cells[1].AddParagraph([string]$item.SubscriptionId).Format.Font.Color = $colors.Muted
+        }
     }
 
     # --- 2. A page per subscription ------------------------------------------------------------------
@@ -223,7 +243,7 @@ function Write-AACCostPdf {
     }
 
     # --- 3. What couldn't be read ---------------------------------------------------------------------
-    $failed = @($Cost | Where-Object Status -ne 'OK')
+    $failed = @($Cost | Where-Object { $_.Status -notin 'OK', 'No cost' })
     if ($failed) {
         $section.AddParagraph('Subscriptions that could not be read', 'Heading2') | Out-Null
         $table = & $pdf.NewTable @(7.0, ($pdf.PageWidth - 7.0))

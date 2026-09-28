@@ -38,10 +38,12 @@ Describe 'Azure Admin Console - Module scaffold' {
             'Disconnect-AAC'
             'Get-AACAdvisorRecommendation'
             'Get-AACFirewallRule'
+            'Get-AACInventory'
             'Invoke-AACApplicationInsightQuery'
             'Invoke-AACPSRule'
             'Show-AACCost'
             'Show-AACResource'
+            'Show-AACResourceMap'
         )
         @((Get-Command -Module 'Azure.Admin.Console').Name | Sort-Object) | Should -Be @($expectedFunctions | Sort-Object)
         Get-Command -Name 'Invoke-AACPester' -ErrorAction Ignore | Should -BeNullOrEmpty -Because 'Invoke-AACPester is parked (Parked\README.md)'

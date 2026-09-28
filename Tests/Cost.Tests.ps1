@@ -177,6 +177,32 @@ Describe 'Azure Admin Console - Show-AACCost' {
         $text | Should -Not -BeLike '*Month to date by*' -Because 'an export shows no view'
     }
 
+    It 'writes the PDF when a subscription has no costs at all (its own currency-less group)' -Skip:(-not $script:canWritePdf) {
+        # A subscription with no cost rows has no currency, so the PDF gives it
+        # a summary of its own - with no services or resource groups in it.
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACCostQuery -ParameterFilter { $SubscriptionId -eq '44444444-4444-4444-4444-444444444444' } -MockWith { }
+        $pdf = Join-Path -Path $TestDrive -ChildPath 'cost-empty.pdf'
+        { $null = & $script:capture { Show-AACCost -PdfPath $pdf -Months 3 } } | Should -Not -Throw
+        (Get-Item -LiteralPath $pdf).Length | Should -BeGreaterThan 1000
+    }
+
+    It 'shows a subscription with no cost as such - objects, console and HTML - without an error' {
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACCostQuery -ParameterFilter { $SubscriptionId -eq '44444444-4444-4444-4444-444444444444' } -MockWith { }
+        $run = & $script:capture { Show-AACCost -Months 3 -NoPaging -PassThru }
+        ($run.Output | Where-Object SubscriptionName -EQ 'sub-web').Status | Should -BeExactly 'No cost'
+        ($run.Output | Where-Object SubscriptionName -EQ 'sub-prod').Status | Should -BeExactly 'OK'
+        $run.Text | Should -BeLike '*3 subscription(s) - 2 read (1 with no cost), 1 could not be read*'
+        $run.Text | Should -BeLike '*sub-web: no cost since*'
+        $run.Text | Should -Not -BeLike '*no currency*' -Because 'a subscription with no cost gets no charts of its own'
+        $run.Text | Should -Not -BeLike '*! sub-web*' -Because 'no cost is not an error'
+
+        $html = Join-Path -Path $TestDrive -ChildPath 'no-cost.html'
+        $null = & $script:capture { Show-AACCost -Months 3 -HtmlPath $html }
+        $model = [regex]::Match((Get-Content -LiteralPath $html -Raw), '<script id="aac-data" type="application/json">(.*?)</script>', 'Singleline').Groups[1].Value | ConvertFrom-Json
+        ($model.tiles | Where-Object label -EQ 'with no cost').value | Should -Be '1'
+        @($model.notices | Where-Object { $_.text -like 'sub-web: no cost since*' }).tone | Should -Be 'info'
+    }
+
     It 'writes an interactive HTML report of the detail' {
         $html = Join-Path -Path $TestDrive -ChildPath 'cost.html'
         $text = (& $script:capture { Show-AACCost -HtmlPath $html -Months 3 }).Text

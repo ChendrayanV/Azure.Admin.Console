@@ -81,14 +81,21 @@ function Write-AACCostHtml {
         $charts.Add(@{ Title = "Month to date by service$suffix"; Items = @(& $top 'Service'); Format = 'N2'; Suffix = $currency; Table = 'detail'; Column = 'Service'; Tone = 'warn' })
         $charts.Add(@{ Title = "Month to date by resource group$suffix"; Items = @(& $top 'ResourceGroup'); Format = 'N2'; Suffix = $currency; Table = 'detail'; Column = 'ResourceGroup'; Tone = 'info' })
     }
-    $tiles.Add(@{ Value = '{0:N0}' -f $read.Count; Label = 'subscriptions read'; Tone = 'neutral'; Table = 'subscriptions' })
+    $noCost = @($Cost | Where-Object Status -EQ 'No cost')
+    $tiles.Add(@{ Value = '{0:N0}' -f $read.Count; Label = 'subscriptions with cost'; Tone = 'neutral'; Table = 'subscriptions' })
+    if ($noCost.Count) {
+        $tiles.Add(@{ Value = '{0:N0}' -f $noCost.Count; Label = 'with no cost'; Tone = 'neutral'; Table = 'subscriptions'; Filters = @{ Status = 'No cost' } })
+    }
 
-    $notices = @(foreach ($failed in @($Cost | Where-Object Status -ne 'OK')) {
+    # A subscription with no cost is a note, not a warning; one that couldn't
+    # be read is a warning with the reason.
+    $notices = @(
+        foreach ($item in $noCost) {
+            @{ Tone = 'info'; Text = "$($item.SubscriptionName): no cost since $($monthKeys[0]). Its usage may be billed to another subscription, be covered by credits, or not be processed yet." }
+        }
+        foreach ($failed in @($Cost | Where-Object { $_.Status -notin 'OK', 'No cost' })) {
             @{ Tone = 'warn'; Text = "$($failed.SubscriptionName): $($failed.Status)" }
         })
-    if ($read.Count -gt 0 -and (& $sum $read 'Total') -eq 0) {
-        $notices += @{ Tone = 'info'; Text = 'Cost Management reports no cost for this period. The usage may be billed to another subscription, be covered by credits, or not be processed yet.' }
-    }
 
     # Subscription by month: one money column per month.
     $monthColumns = @(foreach ($key in $monthKeys) {
