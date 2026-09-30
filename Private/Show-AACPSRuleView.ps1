@@ -7,7 +7,10 @@ function Show-AACPSRuleView {
         could not evaluate, pass rate), failures by Well-Architected pillar,
         then one table per pillar with each failing rule - most severe
         first, then most failures - its severity, name and title, how many
-        resources failed, which (the first few) and why.
+        resources failed, and each of them with its full reason, wrapped
+        (up to -MaxResource per rule; the rest are counted, and -PassThru,
+        -CsvPath and -HtmlPath have them all). -Notice lines (a rule that
+        checked nothing, say) come after the tiles.
 
           ── Security · 14 rules failed on 32 resources ──────────────────────
           │ Severity  │ Rule                          │ Failed │ Resources        │
@@ -29,7 +32,11 @@ function Show-AACPSRuleView {
 
         [int] $Objects,
 
-        [string[]] $Warning = @()
+        [string[]] $Warning = @(),
+
+        [string[]] $Notice = @(),
+
+        [int] $MaxResource = 50
     )
 
     $escape = { param($Text) [Spectre.Console.Markup]::Escape([string]$Text) }
@@ -76,10 +83,13 @@ function Show-AACPSRuleView {
     )
     [Spectre.Console.AnsiConsole]::WriteLine()
 
+    foreach ($line in @($Notice | Where-Object { $_ })) {
+        Write-AACMarkup "[deepskyblue1]i[/] [grey70]$(& $escape $line)[/]"
+    }
     foreach ($line in $Warning | Select-Object -First 5) {
         Write-AACMarkup "[orange1]![/] [grey58]$(& $escape $line)[/]"
     }
-    if (@($Warning).Count -gt 5) { Write-AACMarkup "[grey58]  ... and $(@($Warning).Count - 5) more settings that could not be read[/]" }
+    if (@($Warning).Count -gt 5) { Write-AACMarkup "[grey58]  ... and $(@($Warning).Count - 5) more settings that could not be read - -HtmlPath lists them all[/]" }
 
     $problems = @($failed + $errors)
     if ($problems.Count -eq 0) {
@@ -126,13 +136,15 @@ function Show-AACPSRuleView {
             $ruleText = "[bold]$(& $escape $first.RuleName)[/]"
             if ($first.Title) { $ruleText += "`n[grey58]$(& $escape $first.Title)[/]" }
             if ($first.Source -ne 'PSRule for Azure') { $ruleText += "`n[italic mediumpurple2]$(& $escape $first.Source)[/]" }
-            $shown = @($group.Group | Select-Object -First 3)
+            # Every resource with its whole reason - the cell wraps - up to
+            # -MaxResource; the rest counted, with where to find them.
+            $shown = @($group.Group | Select-Object -First $MaxResource)
             $lines = @(foreach ($item in $shown) {
                     $mark = if ($item.Outcome -eq 'Error') { "[orange1]$($glyph.Bullet)[/] " } else { '' }
                     "$mark[white]$(& $escape $item.ResourceName)[/] [grey50]$(& $escape $item.ResourceGroup)[/]"
-                    if ($item.Reason) { "  [grey58]$(& $escape ($item.Reason.Substring(0, [Math]::Min(110, $item.Reason.Length))))[/]" }
+                    if ($item.Reason) { "  [grey58]$(& $escape $item.Reason)[/]" }
                 })
-            if ($group.Count -gt $shown.Count) { $lines += "[grey50]and $($group.Count - $shown.Count) more[/]" }
+            if ($group.Count -gt $shown.Count) { $lines += "[grey50]... and $($group.Count - $shown.Count) more: -PassThru, -CsvPath or -HtmlPath lists them all[/]" }
             $cells = @(
                 [Spectre.Console.Markup]::new($severity)
                 [Spectre.Console.Markup]::new($ruleText)

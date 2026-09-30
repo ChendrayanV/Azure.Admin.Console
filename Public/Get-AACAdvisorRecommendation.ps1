@@ -178,8 +178,10 @@ function Get-AACAdvisorRecommendation {
     )
 
     # A failure anywhere below ends as a Spectre.Console error panel and this
-    # command's own terminating error, not a line inside the module.
-    trap { $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
+    # command's own terminating error, not a line inside the module. A stopped
+    # pipeline (Select-Object -First, Ctrl+C) is no failure: just return - a
+    # rethrow would stop the caller's whole script, not only this command.
+    trap { if ($_.Exception -is [System.Management.Automation.PipelineStoppedException]) { return }; $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
 
     # Piped onward (| Where-Object, | Export-Csv ...) the objects are the
     # point, so no summary is drawn over them.
@@ -197,7 +199,8 @@ function Get-AACAdvisorRecommendation {
     $pdfFullPath = if ($PdfPath) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($PdfPath) }
     $htmlFullPath = if ($HtmlPath) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($HtmlPath) }
 
-    $headers = @{ Authorization = "Bearer $(Get-AACAccessToken)" }
+    # Signed in? (Get-AACAccessToken says what to do when not.)
+    $null = Get-AACAccessToken
 
     # advisorresources also holds suppressions, configurations and scores,
     # so the type filter matters. Nested fields are flattened here; only the
@@ -237,12 +240,17 @@ advisorresources
         Write-AACRule -Title 'Azure Admin Console :: Azure Advisor' -Color 'deepskyblue3_1'
     }
     $data = Invoke-AACProgress -ScriptBlock {
-        Update-AACProgress -Id 'read' -Total 3 -Description 'Reading Advisor recommendations from Azure Resource Graph'
-        $recommendationRows = @(Invoke-AACResourceGraphQuery -SubscriptionId $SubscriptionId -Headers $headers -Query $recommendationQuery)
-        Update-AACProgress -Id 'read' -Increment 1 -Description 'Reading postponed and dismissed recommendations'
-        $suppressionRows = @(Invoke-AACResourceGraphQuery -SubscriptionId $SubscriptionId -Headers $headers -Query $suppressionQuery)
-        Update-AACProgress -Id 'read' -Increment 1 -Description 'Reading subscription names'
-        $subscriptionRows = @(Invoke-AACResourceGraphQuery -Headers $headers -Query $subscriptionQuery)
+        # The three queries at once (Invoke-AACGraphBatch); subscription
+        # names tenant-wide.
+        Update-AACProgress -Id 'read' -Total 3 -Description 'Reading Advisor recommendations, postponed and dismissed ones, and subscription names'
+        $batch = Invoke-AACGraphBatch -AsObject -SubscriptionId $SubscriptionId -Query ([ordered]@{
+                recommendations = $recommendationQuery
+                suppressions    = $suppressionQuery
+                subscriptions   = @{ Tenant = $true; Query = $subscriptionQuery }
+            }) -OnProgress { param($Name, $Done, $Total) Update-AACProgress -Id 'read' -Increment 1 -Description "Read the $Name ($Done of $Total queries)" }
+        $recommendationRows = @($batch.Rows['recommendations'])
+        $suppressionRows = @($batch.Rows['suppressions'])
+        $subscriptionRows = @($batch.Rows['subscriptions'])
         $subscriptionCount = @($recommendationRows | ForEach-Object { $_.subscriptionId } | Select-Object -Unique).Count
         Update-AACProgress -Id 'read' -Complete -Description ('Read {0:N0} Advisor recommendation(s) in {1:N0} subscription(s)' -f $recommendationRows.Count, $subscriptionCount)
         @{ Recommendations = $recommendationRows; Suppressions = $suppressionRows; Subscriptions = $subscriptionRows }

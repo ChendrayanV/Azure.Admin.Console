@@ -22,10 +22,23 @@ function Get-AACRuleData {
              Export-AzRuleData doesn't by default. Shared keys on network
              connections are masked, as Export-AzRuleData does.
 
+             The reads run in parallel (Invoke-AACArmParallel, 12 at a time),
+             a level at a time across every resource: each resource's
+             expansion runs first to find what it needs, those reads go out
+             together, and it runs again with their results - until nothing
+             new is needed (an API Management service needs three rounds:
+             its APIs, then each API's operations and policies, then each
+             operation's policy). A last run puts the results together, in
+             the same order as reading them one by one would.
+
         Reader on the subscriptions is enough. A child that can't be read
         (usually 403 - Reader can't list some settings) is left out and
         reported in Warnings, so the caller can say which results may be
         affected; the resource itself is still returned.
+
+        -NoExpand reads only step 1: names, types, tags and properties, for
+        rules that need no child settings (the module's AAC.* rules). With
+        -ResourceType, Resource Graph returns only those types.
 
         Returns @{ Resources = <hashtables>; Warnings = <strings> }.
         Progress goes to the Invoke-AACProgress display when one is running
@@ -40,7 +53,10 @@ function Get-AACRuleData {
         # Only these resource types (wildcards work). Resource groups and
         # subscriptions are included only when no type is given, or when
         # their own type matches.
-        [string[]] $ResourceType = @()
+        [string[]] $ResourceType = @(),
+
+        # Don't read the child settings (step 2).
+        [switch] $NoExpand
     )
 
     $warnings = [System.Collections.Generic.List[string]]::new()
@@ -64,13 +80,21 @@ function Get-AACRuleData {
         $ResourceType.Count -eq 0 -or @($ResourceType | Where-Object { $Type -like $_ }).Count -gt 0
     }
 
+    # -ResourceType in the query itself, so only those types come back: each
+    # name or wildcard as a case-insensitive regular expression.
+    $typeFilter = if ($ResourceType.Count) {
+        $alternatives = @($ResourceType | ForEach-Object { ([regex]::Escape($_) -replace '\\\*', '.*' -replace '\\\?', '.') -replace '"', '' })
+        "| where type matches regex @`"(?i)^($($alternatives -join '|'))$`"`n"
+    }
+    else { '' }
+
     Update-AACProgress -Id 'psrule-read' -Total 3 -Description 'Reading resources from Azure Resource Graph'
     $resources = [System.Collections.Generic.List[object]]::new()
-    foreach ($row in @(& $graph @'
+    foreach ($row in @(& $graph @"
 Resources
-| project id, name, type, kind, location, resourceGroup, subscriptionId, tenantId, tags, sku, plan, zones, identity, managedBy, extendedLocation, properties
+$typeFilter| project id, name, type, kind, location, resourceGroup, subscriptionId, tenantId, tags, sku, plan, zones, identity, managedBy, extendedLocation, properties
 | order by type asc, name asc
-'@)) {
+"@)) {
         if (-not (& $wanted $row['type'])) {
             continue
         }
@@ -131,47 +155,47 @@ ResourceContainers
         $parts = $Id.Trim('/').Split('/')
         if ($parts.Count -ge 2) { "$($parts[-2])/$($parts[-1])" } else { $Id }
     }
+    # Reads come from $cache; one not read yet is noted in $needed (and
+    # returns nothing) - Invoke-AACArmParallel then reads them all at once.
+    # Warnings are only noted on the last run, so each is noted once.
+    $cache = @{}
+    $needed = [System.Collections.Generic.HashSet[string]]::new()
+    $final = $false
     $list = {
         param([string] $Id, [string] $Child, [string] $ApiVersion)
         $uri = if ($Child.StartsWith('/')) { "$Id$($Child)?api-version=$ApiVersion" } else { "$Id/$($Child)?api-version=$ApiVersion" }
-        try {
-            while ($uri) {
-                $response = Invoke-AACArmRequest -Uri $uri
-                $uri = $null
-                if ($response -is [System.Collections.IDictionary]) {
-                    if ($response.Contains('value')) {
-                        foreach ($item in @($response['value'])) {
-                            if ($item -is [System.Collections.IDictionary]) { $item }
-                        }
-                        $uri = $response['nextLink']
-                    }
-                    elseif ($response.Contains('id')) {
-                        $response
-                    }
-                }
+        if (-not $cache.Contains($uri)) { [void]$needed.Add($uri); return }
+        $result = $cache[$uri]
+        if ($result.Error) {
+            if ($final -and $result.Status -notin 400, 404) {
+                $warnings.Add("$(& $describe $Id): could not read $($Child.TrimStart('/')) ($(if ($result.Status) { "HTTP $($result.Status)" } else { 'no response' })): $($result.Error)")
             }
+            return
         }
-        catch {
-            $status = [int]$_.Exception.Data['StatusCode']
-            if ($status -notin 400, 404) {
-                $warnings.Add("$(& $describe $Id): could not read $($Child.TrimStart('/')) ($(if ($status) { "HTTP $status" } else { 'no response' })): $($_.Exception.Message)")
-            }
+        if ($null -ne $result.Items) {
+            foreach ($item in $result.Items) { if ($item -is [System.Collections.IDictionary]) { $item } }
+        }
+        elseif ($result.Body -is [System.Collections.IDictionary] -and $result.Body.Contains('id')) {
+            $result.Body
         }
     }
     $getOne = {
         param([string] $Id, [string] $ApiVersion)
-        try {
-            Invoke-AACArmRequest -Uri "$($Id)?api-version=$ApiVersion"
-        }
-        catch {
-            $status = [int]$_.Exception.Data['StatusCode']
-            if ($status -ne 404) {
-                $warnings.Add("$(& $describe $Id): could not read it ($(if ($status) { "HTTP $status" } else { 'no response' })): $($_.Exception.Message)")
+        $uri = "$($Id)?api-version=$ApiVersion"
+        if (-not $cache.Contains($uri)) { [void]$needed.Add($uri); return }
+        $result = $cache[$uri]
+        if ($result.Error) {
+            if ($final -and $result.Status -ne 404) {
+                $warnings.Add("$(& $describe $Id): could not read it ($(if ($result.Status) { "HTTP $($result.Status)" } else { 'no response' })): $($result.Error)")
             }
+            return
         }
+        $result.Body
     }
     $add = {
         param([System.Collections.IDictionary] $Parent, [object[]] $Children)
+        # Finding what is needed changes nothing; the last run adds.
+        if (-not $final) { return }
         $items = @($Children | Where-Object { $_ -is [System.Collections.IDictionary] })
         if ($items.Count -eq 0) {
             return
@@ -404,15 +428,31 @@ ResourceContainers
         }
     }
 
-    $toExpand = @($resources | Where-Object { $expand.ContainsKey(([string]$_['type']).ToLowerInvariant()) })
+    $toExpand = @(if (-not $NoExpand) { $resources | Where-Object { $expand.ContainsKey(([string]$_['type']).ToLowerInvariant()) } })
     if ($toExpand.Count -gt 0) {
-        Update-AACProgress -Id 'psrule-expand' -Total $toExpand.Count -Description ('Reading the settings of {0:N0} resources' -f $toExpand.Count)
-        foreach ($resource in $toExpand) {
-            Update-AACProgress -Id 'psrule-expand' -Description "Reading settings: $($resource['name'])"
-            & $expand[([string]$resource['type']).ToLowerInvariant()] $resource
-            Update-AACProgress -Id 'psrule-expand' -Increment 1
+        Update-AACProgress -Id 'psrule-expand' -Indeterminate -Description ('Reading the settings of {0:N0} resources' -f $toExpand.Count)
+        $calls = 0
+        # Find what is needed, read it all in parallel, and again with the
+        # results - a level of children at a time - until nothing is new.
+        for ($round = 1; $round -le 8; $round++) {
+            $needed.Clear()
+            foreach ($resource in $toExpand) { & $expand[([string]$resource['type']).ToLowerInvariant()] $resource }
+            if ($needed.Count -eq 0) { break }
+            $batch = @($needed)
+            $before = $calls
+            # The callback runs inside Invoke-AACArmParallel, called from
+            # here, so it sees $before, $round and $toExpand.
+            $read = Invoke-AACArmParallel -Uri $batch -OnProgress {
+                param($Done, $Total)
+                Update-AACProgress -Id 'psrule-expand' -Total ($before + $Total) -Increment 1 -Description ('Reading the settings of {0:N0} resources: {1:N0} calls (level {2})' -f $toExpand.Count, ($before + $Done), $round)
+            }
+            foreach ($key in $read.Keys) { $cache[$key] = $read[$key] }
+            $calls += $batch.Count
         }
-        Update-AACProgress -Id 'psrule-expand' -Complete -Description ('Read the settings of {0:N0} resources{1}' -f $toExpand.Count, $(if ($warnings.Count) { " ($($warnings.Count) could not be read)" }))
+        # The last run: every read is in the cache; put the children in place.
+        $final = $true
+        foreach ($resource in $toExpand) { & $expand[([string]$resource['type']).ToLowerInvariant()] $resource }
+        Update-AACProgress -Id 'psrule-expand' -Complete -Description ('Read the settings of {0:N0} resources in {1:N0} calls{2}' -f $toExpand.Count, $calls, $(if ($warnings.Count) { " ($($warnings.Count) could not be read)" }))
     }
 
     @{

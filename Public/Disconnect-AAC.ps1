@@ -15,8 +15,10 @@ function Disconnect-AAC {
     param()
 
     # A failure anywhere below ends as a Spectre.Console error panel and this
-    # command's own terminating error, not a line inside the module.
-    trap { $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
+    # command's own terminating error, not a line inside the module. A stopped
+    # pipeline (Select-Object -First, Ctrl+C) is no failure: just return - a
+    # rethrow would stop the caller's whole script, not only this command.
+    trap { if ($_.Exception -is [System.Management.Automation.PipelineStoppedException]) { return }; $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
 
     if (-not $script:AACSession) {
         Write-AACMarkup '[grey58]Not connected - nothing to do.[/]'

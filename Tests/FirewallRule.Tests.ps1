@@ -14,6 +14,7 @@ BeforeDiscovery {
 
 Describe 'Azure Admin Console - Get-AACFirewallRule' {
     BeforeAll {
+        . (Join-Path -Path $PSScriptRoot -ChildPath 'Fixtures/GraphBatchShim.ps1')
         # Runs a script block with the Spectre console swapped for one that
         # writes plain text into a buffer, and returns that text.
         $script:renderToText = {
@@ -88,6 +89,7 @@ Describe 'Azure Admin Console - Get-AACFirewallRule' {
         $subscriptions = "[{`"subscriptionId`":`"$sub`",`"name`":`"sub-connectivity`"}]" | ConvertFrom-Json
 
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Get-AACAccessToken -MockWith { 'fake-token' }
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACGraphBatch -MockWith { & $script:graphBatchShim $Query $SubscriptionId $ManagementGroupId $AsObject $AllowFailure }
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Write-AACMarkup -MockWith { }
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACResourceGraphQuery -ParameterFilter { $Query -match 'rulecollectiongroups' } -MockWith { $rows }.GetNewClosure()
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACResourceGraphQuery -ParameterFilter { $Query -match "firewallpolicies'" } -MockWith { $policies }.GetNewClosure()

@@ -108,14 +108,17 @@ function Show-AACResource {
     )
 
     # A failure anywhere below ends as a Spectre.Console error panel and this
-    # command's own terminating error, not a line inside the module.
-    trap { $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
+    # command's own terminating error, not a line inside the module. A stopped
+    # pipeline (Select-Object -First, Ctrl+C) is no failure: just return - a
+    # rethrow would stop the caller's whole script, not only this command.
+    trap { if ($_.Exception -is [System.Management.Automation.PipelineStoppedException]) { return }; $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
 
     # Resolve the path now, relative to the caller's location, so a bad path
     # fails before any Azure call.
     $htmlFullPath = if ($HtmlPath) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($HtmlPath) }
 
-    $headers = @{ Authorization = "Bearer $(Get-AACAccessToken)" }
+    # Signed in? (Get-AACAccessToken says what to do when not.)
+    $null = Get-AACAccessToken
 
     # Wildcards -> one KQL regular expression over the lower-case type.
     $filter = if ($ResourceType) {
@@ -132,18 +135,22 @@ function Show-AACResource {
     # The title first, then a line per step - as every command shows them.
     Write-AACRule -Title 'Azure Admin Console :: Azure resources' -Color 'deepskyblue3_1'
     $data = Invoke-AACProgress -ScriptBlock {
-        Update-AACProgress -Id 'read' -Total $(if ($HtmlPath) { 4 } else { 3 }) -Description 'Counting resources in Azure Resource Graph'
-        $countRows = @(Invoke-AACResourceGraphQuery -SubscriptionId $SubscriptionId -Headers $headers -Query "Resources $filter | summarize n = count() by $groupBy")
-        Update-AACProgress -Id 'read' -Increment 1 -Description 'Counting types, locations and resource groups'
-        $totalRows = @(Invoke-AACResourceGraphQuery -SubscriptionId $SubscriptionId -Headers $headers -Query "Resources $filter | summarize resources = count(), types = dcount(tolower(type)), locations = dcount(tolower(location)), groups = dcount(strcat(subscriptionId, '/', tolower(resourceGroup))), subscriptions = dcount(subscriptionId)")
-        Update-AACProgress -Id 'read' -Increment 1 -Description 'Reading subscription names'
-        $subscriptionRows = @(Invoke-AACResourceGraphQuery -Headers $headers -Query "resourcecontainers | where type =~ 'microsoft.resources/subscriptions' | project subscriptionId, name")
-        # The HTML inventory lists the resources themselves.
-        $inventoryRows = @()
-        if ($HtmlPath) {
-            Update-AACProgress -Id 'read' -Increment 1 -Description 'Reading the resources for the inventory'
-            $inventoryRows = @(Invoke-AACResourceGraphQuery -SubscriptionId $SubscriptionId -Headers $headers -Query "Resources $filter | project id, name, type = tolower(type), location = tolower(location), resourceGroup, subscriptionId, kind, sku = tostring(sku.name), tags = tostring(tags) | order by name asc")
+        # The queries at once (Invoke-AACGraphBatch); subscription names
+        # tenant-wide, and - for the HTML inventory - the resources themselves.
+        $queries = [ordered]@{
+            counts        = "Resources $filter | summarize n = count() by $groupBy"
+            totals        = "Resources $filter | summarize resources = count(), types = dcount(tolower(type)), locations = dcount(tolower(location)), groups = dcount(strcat(subscriptionId, '/', tolower(resourceGroup))), subscriptions = dcount(subscriptionId)"
+            subscriptions = @{ Tenant = $true; Query = "resourcecontainers | where type =~ 'microsoft.resources/subscriptions' | project subscriptionId, name" }
         }
+        if ($HtmlPath) {
+            $queries['inventory'] = "Resources $filter | project id, name, type = tolower(type), location = tolower(location), resourceGroup, subscriptionId, kind, sku = tostring(sku.name), tags = tostring(tags) | order by name asc"
+        }
+        Update-AACProgress -Id 'read' -Total $queries.Count -Description 'Counting resources in Azure Resource Graph'
+        $batch = Invoke-AACGraphBatch -AsObject -SubscriptionId $SubscriptionId -Query $queries -OnProgress { param($Name, $Done, $Total) Update-AACProgress -Id 'read' -Increment 1 -Description "Read the $Name ($Done of $Total queries)" }
+        $countRows = @($batch.Rows['counts'])
+        $totalRows = @($batch.Rows['totals'])
+        $subscriptionRows = @($batch.Rows['subscriptions'])
+        $inventoryRows = @(if ($HtmlPath) { $batch.Rows['inventory'] })
         $resourceTotal = 0
         foreach ($row in $countRows) { $resourceTotal += [int]$row.n }
         Update-AACProgress -Id 'read' -Complete -Description ('Counted {0:N0} resource(s) in {1:N0} group(s) by {2}' -f $resourceTotal, $countRows.Count, $By.ToLowerInvariant())

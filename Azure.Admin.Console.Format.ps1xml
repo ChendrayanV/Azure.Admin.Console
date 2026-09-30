@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    How Azure.Admin.Console's objects look at the prompt: a few columns, with
+    long text (reasons, recommendations, messages) wrapped rather than cut
+    off with '...'. Every property is still there: Format-List *,
+    Select-Object * and Export-Csv show them all.
+-->
+<Configuration>
+  <ViewDefinitions>
+
+    <View>
+      <Name>AAC.PSRuleResult</Name>
+      <ViewSelectedBy><TypeName>AAC.PSRuleResult</TypeName></ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader><Label>Outcome</Label><Width>7</Width></TableColumnHeader>
+          <TableColumnHeader><Label>RuleName</Label><Width>34</Width></TableColumnHeader>
+          <TableColumnHeader><Label>ResourceName</Label><Width>30</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Reason</Label></TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <Wrap />
+            <TableColumnItems>
+              <TableColumnItem><PropertyName>Outcome</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>RuleName</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>ResourceName</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Reason</PropertyName></TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+
+    <View>
+      <Name>AAC.AdvisorRecommendation</Name>
+      <ViewSelectedBy><TypeName>AAC.AdvisorRecommendation</TypeName></ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader><Label>Category</Label><Width>22</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Impact</Label><Width>6</Width></TableColumnHeader>
+          <TableColumnHeader><Label>ResourceName</Label><Width>30</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Problem</Label></TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <Wrap />
+            <TableColumnItems>
+              <TableColumnItem><PropertyName>Category</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Impact</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>ResourceName</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Problem</PropertyName></TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+
+    <View>
+      <Name>AAC.ApplicationInsightsException</Name>
+      <ViewSelectedBy><TypeName>AAC.ApplicationInsightsException</TypeName></ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader><Label>TimeGenerated</Label><Width>20</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Severity</Label><Width>11</Width></TableColumnHeader>
+          <TableColumnHeader><Label>ExceptionType</Label><Width>36</Width></TableColumnHeader>
+          <TableColumnHeader><Label>AppRoleName</Label><Width>20</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Message</Label></TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <Wrap />
+            <TableColumnItems>
+              <TableColumnItem><PropertyName>TimeGenerated</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Severity</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>ExceptionType</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>AppRoleName</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Message</PropertyName></TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+
+    <View>
+      <Name>AAC.InventoryItem</Name>
+      <ViewSelectedBy><TypeName>AAC.InventoryItem</TypeName></ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader><Label>Level</Label><Width>16</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Name</Label></TableColumnHeader>
+          <TableColumnHeader><Label>Resources</Label><Width>9</Width><Alignment>Right</Alignment></TableColumnHeader>
+          <TableColumnHeader><Label>SecureScore</Label><Width>11</Width><Alignment>Right</Alignment></TableColumnHeader>
+          <TableColumnHeader><Label>CostMonthToDate</Label><Width>15</Width><Alignment>Right</Alignment></TableColumnHeader>
+          <TableColumnHeader><Label>Currency</Label><Width>8</Width></TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <Wrap />
+            <TableColumnItems>
+              <TableColumnItem><PropertyName>Level</PropertyName></TableColumnItem>
+              <!-- Indented by depth, so the table reads as the tree. -->
+              <TableColumnItem><ScriptBlock>('  ' * [int]$_.Depth) + $_.Name</ScriptBlock></TableColumnItem>
+              <TableColumnItem><PropertyName>Resources</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>SecureScore</PropertyName></TableColumnItem>
+              <TableColumnItem><ScriptBlock>if ($null -ne $_.CostMonthToDate) { '{0:N2}' -f $_.CostMonthToDate }</ScriptBlock></TableColumnItem>
+              <TableColumnItem><PropertyName>Currency</PropertyName></TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+
+    <View>
+      <Name>AAC.NetworkSecurityGroup</Name>
+      <ViewSelectedBy><TypeName>AAC.NetworkSecurityGroup</TypeName></ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader><Label>Name</Label><Width>30</Width></TableColumnHeader>
+          <TableColumnHeader><Label>ResourceGroup</Label><Width>26</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Risk</Label><Width>6</Width></TableColumnHeader>
+          <TableColumnHeader><Label>High</Label><Width>4</Width><Alignment>Right</Alignment></TableColumnHeader>
+          <TableColumnHeader><Label>Medium</Label><Width>6</Width><Alignment>Right</Alignment></TableColumnHeader>
+          <TableColumnHeader><Label>Low</Label><Width>4</Width><Alignment>Right</Alignment></TableColumnHeader>
+          <TableColumnHeader><Label>AppliedTo</Label></TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <Wrap />
+            <TableColumnItems>
+              <TableColumnItem><PropertyName>Name</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>ResourceGroup</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Risk</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>High</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Medium</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Low</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>AppliedTo</PropertyName></TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+
+    <View>
+      <Name>AAC.NsgFinding</Name>
+      <ViewSelectedBy><TypeName>AAC.NsgFinding</TypeName></ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader><Label>Severity</Label><Width>8</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Nsg</Label><Width>26</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Rule</Label><Width>24</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Detail</Label></TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <Wrap />
+            <TableColumnItems>
+              <TableColumnItem><PropertyName>Severity</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Nsg</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Rule</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Detail</PropertyName></TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+
+    <View>
+      <Name>AAC.EntraGroupMember</Name>
+      <ViewSelectedBy><TypeName>AAC.EntraGroupMember</TypeName></ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader><Label>GroupName</Label><Width>28</Width></TableColumnHeader>
+          <TableColumnHeader><Label>MemberName</Label><Width>28</Width></TableColumnHeader>
+          <TableColumnHeader><Label>MemberType</Label><Width>10</Width></TableColumnHeader>
+          <TableColumnHeader><Label>UserType</Label><Width>8</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Membership</Label><Width>10</Width></TableColumnHeader>
+          <TableColumnHeader><Label>UserPrincipalName</Label></TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <Wrap />
+            <TableColumnItems>
+              <TableColumnItem><PropertyName>GroupName</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>MemberName</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>MemberType</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>UserType</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Membership</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>UserPrincipalName</PropertyName></TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+
+    <View>
+      <Name>AAC.SecurityFinding</Name>
+      <ViewSelectedBy><TypeName>AAC.SecurityFinding</TypeName></ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader><Label>Severity</Label><Width>8</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Section</Label><Width>14</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Resource</Label><Width>28</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Title</Label></TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <Wrap />
+            <TableColumnItems>
+              <TableColumnItem><PropertyName>Severity</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Section</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Resource</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Title</PropertyName></TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+
+    <View>
+      <Name>AAC.PolicyState</Name>
+      <ViewSelectedBy><TypeName>AAC.PolicyState</TypeName></ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader><Label>ComplianceState</Label><Width>12</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Resource</Label><Width>28</Width></TableColumnHeader>
+          <TableColumnHeader><Label>ResourceGroup</Label><Width>22</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Policy</Label></TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <Wrap />
+            <TableColumnItems>
+              <TableColumnItem><PropertyName>ComplianceState</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Resource</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>ResourceGroup</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Policy</PropertyName></TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+
+    <View>
+      <Name>AAC.SkuAvailability</Name>
+      <ViewSelectedBy><TypeName>AAC.SkuAvailability</TypeName></ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader><Label>Location</Label><Width>14</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Sku</Label><Width>26</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Status</Label><Width>15</Width></TableColumnHeader>
+          <TableColumnHeader><Label>vCPUs</Label><Width>5</Width><Alignment>Right</Alignment></TableColumnHeader>
+          <TableColumnHeader><Label>MemoryGB</Label><Width>8</Width><Alignment>Right</Alignment></TableColumnHeader>
+          <TableColumnHeader><Label>Zones</Label><Width>6</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Reason</Label></TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <Wrap />
+            <TableColumnItems>
+              <TableColumnItem><PropertyName>Location</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Sku</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Status</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>vCPUs</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>MemoryGB</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Zones</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Reason</PropertyName></TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+
+  </ViewDefinitions>
+</Configuration>

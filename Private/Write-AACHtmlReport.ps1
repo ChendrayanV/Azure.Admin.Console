@@ -13,7 +13,9 @@ function Write-AACHtmlReport {
           -Tile     @{ Value; Label; Tone; Table; Filters = @{ Column = 'Value' } }
                     Tone is good, bad, warn, info, violet or neutral. With
                     Table (and Filters), clicking the tile filters that table.
-          -Chart    @{ Title; Items = @(@{ Label; Value; Display; Tone; Filter });
+          -Chart    @{ Title; Kind ('bar', the default, or 'donut': each item's
+                    share, the total in the middle - CenterLabel under it);
+                    Items = @(@{ Label; Value; Display; Tone; Filter });
                        Format = 'N0'|'N2'; Suffix; Table; Column; BaseFilters;
                        Wide }
                     Horizontal bars; with Table and Column, clicking a bar
@@ -36,13 +38,16 @@ function Write-AACHtmlReport {
           -Notice   @{ Tone; Text } lines under the tiles.
           -Tree     @{ Title; OpenTo = 's'; Root = node } a collapsible,
                     searchable hierarchy above the tables. Node: @{ l = 't'|
-                    'm'|'s'|'g'|'r' (tenant, management group, subscription,
-                    resource group, resource); n = name; d = detail;
+                    'm'|'s'|'g'|'r'|'d' (tenant, management group,
+                    subscription, resource group, resource, deleted
+                    resources); n = name; d = detail;
                     c = @(@(count, 'noun'), ...); f = @{ table; filters }
                     (clicking the name filters that table); k = children;
                     x = flagged (e.g. an empty resource group); p = a 0-100
                     score, drawn as a coloured pill; h, m, lo = high,
-                    medium and low findings, as red, amber and blue pills }. Children
+                    medium and low findings, as red, amber and blue pills;
+                    co = a cost, drawn as a green pill (amber with cx), with
+                    ct as its tooltip }. Children
                     are drawn when a node is opened, so big trees stay fast.
 
         Every table can be searched, filtered, sorted (click a header),

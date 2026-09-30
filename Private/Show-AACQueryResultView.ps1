@@ -74,7 +74,8 @@ function Show-AACQueryResultView {
         $cells = foreach ($name in $shownColumns) {
             $value = $item.$name
             $text = if ($value -is [datetime]) { $value.ToLocalTime().ToString('yyyy-MM-dd HH:mm:ss') } elseif ($null -eq $value) { '' } else { [string]$value }
-            if ($text.Length -gt 120) { $text = $text.Substring(0, 117) + '...' }
+            # Cells wrap; only a very long value (a JSON blob, a stack trace) is shortened.
+            if ($text.Length -gt 600) { $text = $text.Substring(0, 597) + '...' }
             [Spectre.Console.Markup]::new("$(if ($numeric[$name]) { '[bold]' } else { '[white]' })$(& $escape $text)[/]")
         }
         [Spectre.Console.TableExtensions]::AddRow($table, [Spectre.Console.Rendering.IRenderable[]]@($cells)) | Out-Null

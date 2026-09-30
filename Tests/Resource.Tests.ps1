@@ -12,6 +12,7 @@ BeforeDiscovery {
 
 Describe 'Azure Admin Console - Show-AACResource' {
     BeforeAll {
+        . (Join-Path -Path $PSScriptRoot -ChildPath 'Fixtures/GraphBatchShim.ps1')
         # Runs a script block with the Spectre console writing plain text into
         # a buffer; returns the text and whatever the script block output.
         $script:capture = {
@@ -48,6 +49,7 @@ Describe 'Azure Admin Console - Show-AACResource' {
         $subscriptions = "[{`"subscriptionId`":`"$sub`",`"name`":`"sub-prod`"}]" | ConvertFrom-Json
 
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Get-AACAccessToken -MockWith { 'fake-token' }
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACGraphBatch -MockWith { & $script:graphBatchShim $Query $SubscriptionId $ManagementGroupId $AsObject $AllowFailure }
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACResourceGraphQuery -ParameterFilter { $Query -match 'by name = tolower\(type\)' } -MockWith { $byType }.GetNewClosure()
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACResourceGraphQuery -ParameterFilter { $Query -match 'by subscriptionId, name = tolower\(resourceGroup\)' } -MockWith { $byGroup }.GetNewClosure()
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACResourceGraphQuery -ParameterFilter { $Query -match 'dcount' } -MockWith { $totals }.GetNewClosure()

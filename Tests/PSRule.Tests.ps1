@@ -42,27 +42,28 @@ Describe 'Azure Admin Console - Get-AACRuleData' {
             }
             @{ data = $rows }
         }
-        # ARM reads (-Method is left at its Get default, so the filter
-        # can't test for 'Get'): blob services and containers; anything
-        # else is empty.
-        Mock -ModuleName 'Azure.Admin.Console' Invoke-AACArmRequest -ParameterFilter { $Method -ne 'Post' } -MockWith {
+        # ARM reads, which Get-AACRuleData sends in parallel: blob services
+        # and containers; a 404 and a 403; anything else is empty.
+        $script:fakeGet = {
+            param([string] $Uri)
             if ($Uri.StartsWith("$blobServiceId/containers?")) {
                 return @{ value = @(@{ id = "$blobServiceId/containers/logs"; name = 'logs'; type = 'Microsoft.Storage/storageAccounts/blobServices/containers' }) }
             }
             if ($Uri.StartsWith("$storageId/blobServices?")) {
                 return @{ value = @(@{ id = $blobServiceId; name = 'default'; type = 'Microsoft.Storage/storageAccounts/blobServices'; properties = @{ deleteRetentionPolicy = @{ enabled = $true } } }) }
             }
-            if ($Uri -like '*DefenderForStorageSettings*') {
-                $exception = [System.Exception]::new('Not found')
-                $exception.Data['StatusCode'] = 404
-                throw $exception
-            }
-            if ($Uri -like "$vaultId/providers/microsoft.insights/diagnosticSettings?*") {
-                $exception = [System.Exception]::new('The client does not have authorization')
-                $exception.Data['StatusCode'] = 403
-                throw $exception
-            }
+            if ($Uri -like '*DefenderForStorageSettings*') { return @{ Status = 404; Error = 'Not found' } }
+            if ($Uri -like "$vaultId/providers/microsoft.insights/diagnosticSettings?*") { return @{ Status = 403; Error = 'The client does not have authorization' } }
             @{ value = @() }
+        }
+        Mock -ModuleName 'Azure.Admin.Console' Invoke-AACArmParallel -MockWith {
+            $results = @{}
+            foreach ($item in $Uri) {
+                $answer = & $script:fakeGet $item
+                $results[$item] = if ($answer.Contains('Error')) { @{ Status = $answer.Status; Body = $null; Items = $null; Error = $answer.Error } }
+                else { @{ Status = 200; Body = $answer; Items = $(if ($answer.Contains('value')) { [System.Collections.Generic.List[object]]@($answer['value']) }); Error = '' } }
+            }
+            $results
         }
     }
 
@@ -108,7 +109,48 @@ Describe 'Azure Admin Console - Get-AACRuleData' {
         $data = InModuleScope 'Azure.Admin.Console' { Get-AACRuleData -ResourceType 'microsoft.keyvault/*' }
         @($data.Resources).Count | Should -Be 1
         $data.Resources[0]['name'] | Should -Be 'kv-data'
-        Should -Invoke -ModuleName 'Azure.Admin.Console' Invoke-AACArmRequest -ParameterFilter { $Uri -like '*blobServices*' } -Times 0 -Exactly
+        Should -Invoke -ModuleName 'Azure.Admin.Console' Invoke-AACArmParallel -ParameterFilter { @($Uri | Where-Object { $_ -like '*blobServices*' }).Count -gt 0 } -Times 0 -Exactly
+    }
+
+    It 'asks Resource Graph for -ResourceType only, and reads no child settings with -NoExpand' {
+        $data = InModuleScope 'Azure.Admin.Console' { Get-AACRuleData -ResourceType 'Microsoft.Storage/*' -NoExpand }
+        @($data.Resources).Count | Should -Be 1
+        $data.Resources[0]['name'] | Should -Be 'stdata01'
+        @($data.Resources[0].Keys) | Should -Not -Contain 'resources' -Because 'no child settings were read'
+        Should -Invoke -ModuleName 'Azure.Admin.Console' Invoke-AACArmRequest -ParameterFilter {
+            $Method -eq 'Post' -and (ConvertFrom-Json -InputObject $Body -AsHashtable).query -match [regex]::Escape('| where type matches regex @"(?i)^(Microsoft\.Storage/.*)$"')
+        } -Times 1 -Exactly
+        Should -Invoke -ModuleName 'Azure.Admin.Console' Invoke-AACArmParallel -Times 0 -Exactly
+    }
+}
+
+Describe 'Azure Admin Console - Get-AACPSRulePlan' {
+    It 'reads names, types and tags only when only the module''s rules run' {
+        $plan = InModuleScope 'Azure.Admin.Console' { Get-AACPSRulePlan -Rule 'AAC.*' }
+        $plan.Expand | Should -BeFalse
+        $plan.ResourceType.Count | Should -Be 0 -Because 'the tag rules check every type'
+        (InModuleScope 'Azure.Admin.Console' { Get-AACPSRulePlan -Rule 'Azure.Storage.*' }).Expand | Should -BeTrue
+        (InModuleScope 'Azure.Admin.Console' { Get-AACPSRulePlan }).Expand | Should -BeTrue
+        (InModuleScope 'Azure.Admin.Console' { Get-AACPSRulePlan -Rule 'AAC.*' -Baseline 'Azure.Default' }).Expand | Should -BeTrue
+        (InModuleScope 'Azure.Admin.Console' { Get-AACPSRulePlan -Rule 'Contoso.*' -NoExpand }).Expand | Should -BeFalse
+    }
+
+    It 'reads only the types the naming rule checks, with -Configuration''s changes' {
+        $plan = InModuleScope 'Azure.Admin.Console' { Get-AACPSRulePlan -Rule 'AAC.Resource.Naming' }
+        $plan.Expand | Should -BeFalse
+        $plan.ResourceType | Should -Contain 'Microsoft.Resources/resourceGroups'
+        $plan.ResourceType | Should -Contain 'Microsoft.Storage/storageAccounts'
+        $plan.ResourceType.Count | Should -BeGreaterThan 20
+        $changed = InModuleScope 'Azure.Admin.Console' { Get-AACPSRulePlan -Rule 'AAC.Resource.Naming' -Configuration @{ AAC_NAMING_PATTERNS = @{ 'Microsoft.Web/sites' = ''; 'Microsoft.Contoso/widgets' = '^wg-' } } }
+        $changed.ResourceType | Should -Not -Contain 'Microsoft.Web/sites'
+        $changed.ResourceType | Should -Contain 'Microsoft.Contoso/widgets'
+        (InModuleScope 'Azure.Admin.Console' { Get-AACPSRulePlan -Rule 'AAC.Resource.Naming' -ResourceType 'Microsoft.Storage/*' }).ResourceType | Should -Be @('Microsoft.Storage/*') -Because '-ResourceType wins'
+        (InModuleScope 'Azure.Admin.Console' { Get-AACPSRulePlan -Rule 'AAC.*' -ExcludeRule 'AAC.Resource.RequiredTags', 'AAC.ResourceGroup.RequiredTags', 'AAC.Resource.AllowedTagValues' }).ResourceType.Count | Should -BeGreaterThan 20
+    }
+
+    It 'refuses a file path or an unknown AAC rule in -Rule, saying what to use' {
+        { InModuleScope 'Azure.Admin.Console' { Get-AACPSRulePlan -Rule '.\PSRule\Rules\AAC.Naming.Rule.ps1' } } | Should -Throw '*looks like a file*-RulePath*'
+        { InModuleScope 'Azure.Admin.Console' { Get-AACPSRulePlan -Rule 'AAC.Naming' } } | Should -Throw '*no rule named ''AAC.Naming''*AAC.Resource.Naming*'
     }
 }
 
@@ -205,6 +247,25 @@ Describe 'Azure Admin Console - PSRule runner: custom rules and exclusions' {
         ($run.Results | Where-Object { $_.RuleName -eq 'AAC.Resource.AllowedTagValues' -and $_.Name -eq 'st1' }).Reason | Should -BeLike "*'staging'*"
     }
 
+    It 'checks names against the convention, -Configuration''s patterns first' -Skip:(-not (Get-Module -Name 'PSRule.Rules.Azure' -ListAvailable)) {
+        $run = & $script:runWith @{
+            Rule = @('AAC.Resource.Naming'); ExcludeRule = @(); Baseline = ''; RulePath = @($script:bundled)
+            Configuration = @{ AAC_NAMING_PATTERNS = @{ 'Microsoft.Resources/resourceGroups' = '^rg-'; 'Microsoft.Storage/storageAccounts' = '^st[a-z0-9]+$' } }
+        }
+        $run.Exit | Should -Be 0 -Because ($run.Output -join ' ')
+        $naming = @($run.Results | Where-Object RuleName -EQ 'AAC.Resource.Naming')
+        ($naming | Where-Object Name -EQ 'rg').Outcome | Should -Be 'Fail'
+        ($naming | Where-Object Name -EQ 'rg').Reason | Should -BeExactly "The name doesn't match '^rg-', the naming convention for Microsoft.Resources/resourceGroups."
+        ($naming | Where-Object Name -EQ 'st1').Outcome | Should -Be 'Pass' -Because 'the type matches whatever its case'
+        $naming[0].Link | Should -BeLike '*AAC.Resource.Naming.md'
+        $default = & $script:runWith @{ Rule = @('AAC.Resource.Naming'); ExcludeRule = @(); Baseline = ''; RulePath = @($script:bundled); Configuration = @{} }
+        $default.Exit | Should -Be 0 -Because ($default.Output -join ' ')
+        ($default.Results | Where-Object { $_.RuleName -eq 'AAC.Resource.Naming' -and $_.Name -eq 'rg' }).Outcome | Should -Be 'Fail' -Because 'it runs without configuration, with the CAF defaults'
+        ($default.Results | Where-Object { $_.RuleName -eq 'AAC.Resource.Naming' -and $_.Name -eq 'st1' }).Reason | Should -Match ([regex]::Escape("doesn't match '^st[a-z0-9]{3,22}$', the naming convention for Microsoft.Storage/storageAccounts"))
+        $off = & $script:runWith @{ Rule = @('AAC.Resource.Naming'); ExcludeRule = @(); Baseline = ''; RulePath = @($script:bundled); Configuration = @{ AAC_NAMING_PATTERNS = @{ 'Microsoft.Resources/resourceGroups' = '' } } }
+        @($off.Results | Where-Object { $_.RuleName -eq 'AAC.Resource.Naming' -and $_.Name -eq 'rg' -and $_.Outcome -in 'Pass', 'Fail' }).Count | Should -Be 0 -Because "'' turns a type off"
+    }
+
     It 'finds the rules'' help under the invariant culture too (Linux with LANG=C.UTF-8)' -Skip:(-not (Get-Module -Name 'PSRule.Rules.Azure' -ListAvailable)) {
         $run = & $script:runWith -Culture '' -Settings @{
             Rule = @('AAC.Resource.RequiredTags', 'Azure.Storage.MinTLS'); ExcludeRule = @(); Baseline = ''; RulePath = @($script:bundled)
@@ -276,6 +337,28 @@ Describe 'Azure Admin Console - Invoke-AACPSRule' {
         }
     }
 
+    It 'reads only what the module''s naming rule needs' {
+        $null = Invoke-AACPSRule -NoDisplay -Rule 'AAC.Resource.Naming'
+        Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACPSRuleEngine -Times 1 -Exactly -ParameterFilter {
+            $NoExpand -and @($ResourceType) -contains 'Microsoft.Resources/resourceGroups'
+        }
+        $null = Invoke-AACPSRule -NoDisplay
+        Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACPSRuleEngine -Times 1 -Exactly -ParameterFilter { -not $NoExpand -and -not $ResourceType }
+    }
+
+    It 'says when a tag rule asked for has no tags to check' {
+        $null = Invoke-AACPSRule -NoDisplay -Rule 'AAC.*' -WarningVariable warnings -WarningAction SilentlyContinue
+        "$warnings" | Should -BeLike '*AAC.Resource.RequiredTags*checked nothing*AAC_REQUIRED_TAGS*Get-AACTagDefault*'
+        $null = Invoke-AACPSRule -NoDisplay -Rule 'AAC.*' -Configuration @{ AAC_REQUIRED_TAGS = @('Owner'); AAC_ALLOWED_TAG_VALUES = @{ Env = @('prod') } } -WarningVariable quiet -WarningAction SilentlyContinue
+        "$quiet" | Should -Not -BeLike '*checked nothing*'
+    }
+
+    It 'says so when no rule matches -Rule, and refuses a rule file there' {
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACPSRuleEngine -MockWith { @{ Results = @(); Warnings = @(); Rules = 0; Objects = 3; Version = '1.47.0' } }
+        { Invoke-AACPSRule -NoDisplay -Rule 'Azure.Nothing.*' } | Should -Throw "*No rule matches -Rule 'Azure.Nothing.*'*"
+        { Invoke-AACPSRule -NoDisplay -Rule '.\PSRule\Rules\AAC.Naming.Rule.ps1' } | Should -Throw '*looks like a file*'
+    }
+
     It 'refuses a -RulePath that does not exist' {
         { Invoke-AACPSRule -NoDisplay -RulePath (Join-Path $TestDrive 'no-such-rules') } | Should -Throw '*does not exist*'
     }
@@ -291,5 +374,35 @@ Describe 'Azure Admin Console - Invoke-AACPSRule' {
         $model.tables[0].group | Should -Be 'RuleName'
         $model.tables[0].rows.Count | Should -Be 4
         ($model.tiles | Where-Object label -EQ 'failed').value | Should -Be '2'
+    }
+}
+
+Describe 'Azure Admin Console - PSRule view' {
+    It 'lists every failing resource with its whole reason, wrapped, and the notices' {
+        $real = [Spectre.Console.AnsiConsole]::Console
+        $buffer = [System.IO.StringWriter]::new()
+        $settings = [Spectre.Console.AnsiConsoleSettings]::new()
+        $settings.Out = [Spectre.Console.AnsiConsoleOutput]::new($buffer)
+        $settings.Ansi = [Spectre.Console.AnsiSupport]::No
+        $console = [Spectre.Console.AnsiConsole]::Create($settings)
+        $console.Profile.Width = 120
+        $long = 'The name doesn''t match ''^id-'', the naming convention for Microsoft.ManagedIdentity/userAssignedIdentities - and this reason goes on well past one hundred and ten characters to END-OF-REASON.'
+        $results = @(1..8 | ForEach-Object {
+                [pscustomobject]@{ Outcome = 'Fail'; Pillar = 'Operational Excellence'; RuleName = 'AAC.Resource.Naming'; Title = 'Names follow the naming convention'; Severity = 'Awareness'; ResourceName = "id-contoso-$_"; ResourceGroup = 'rg-app'; Reason = $long; Source = 'Azure.Admin.Console'; ResourceId = "/x/$_" }
+            })
+        try {
+            [Spectre.Console.AnsiConsole]::Console = $console
+            InModuleScope 'Azure.Admin.Console' -Parameters @{ R = $results } {
+                param($R)
+                Show-AACPSRuleView -Result $R -Rules 1 -Objects 8 -Notice @('AAC.Resource.RequiredTags checked nothing: no tags are named.') -MaxResource 6
+            }
+        }
+        finally { [Spectre.Console.AnsiConsole]::Console = $real }
+        $text = $buffer.ToString()
+        foreach ($n in 1..6) { $text | Should -BeLike "*id-contoso-$n*" }
+        $text | Should -Not -BeLike '*id-contoso-7*'
+        $text | Should -BeLike '*and 2 more: -PassThru, -CsvPath or -HtmlPath*'
+        ([regex]::Matches($text, 'END-OF-REASON')).Count | Should -Be 6 -Because 'reasons are wrapped, not cut off'
+        $text | Should -BeLike '*RequiredTags checked nothing*'
     }
 }

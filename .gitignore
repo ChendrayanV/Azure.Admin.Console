@@ -3,3 +3,6 @@ out/
 TestResults/
 release-notes.md
 *.zip
+
+# Local release script (git add, commit, push, tag) - not part of the repo
+Release.ps1

@@ -321,19 +321,17 @@ Describe 'Azure Admin Console - errors' {
     It 'passes on the query API''s own reason for a bad query, innermost detail included' {
         InModuleScope 'Azure.Admin.Console' {
             Mock Get-AACAccessToken { 'fake-token' }
-            Mock Invoke-WebRequest {
+            Mock Send-AACHttpRequest {
                 $response = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::BadRequest)
-                $exception = [Microsoft.PowerShell.Commands.HttpResponseException]::new('Response status code does not indicate success: 400 (Bad Request).', $response)
-                $record = [System.Management.Automation.ErrorRecord]::new($exception, 'WebCmdletWebResponseException', 'InvalidOperation', $null)
-                $record.ErrorDetails = [System.Management.Automation.ErrorDetails]::new('{"error":{"message":"The request had some invalid properties","code":"BadArgumentError","innererror":{"code":"SemanticError","message":"A semantic error occurred.","innererror":{"code":"SEM0100","message":"Failed to resolve column Nope"}}}}')
-                throw $record
+                $response.Content = [System.Net.Http.StringContent]::new('{"error":{"message":"The request had some invalid properties","code":"BadArgumentError","innererror":{"code":"SemanticError","message":"A semantic error occurred.","innererror":{"code":"SEM0100","message":"Failed to resolve column Nope"}}}}')
+                [System.Threading.Tasks.Task]::FromResult($response)
             }
             $failure = $null
             try { Invoke-AACLogQuery -Kind Workspace -Id 'aaaaaaaa-0000-0000-0000-000000000001' -Query 'AppRequests | where Nope > 1' } catch { $failure = $_ }
             $failure.Exception.Message | Should -BeExactly 'The request had some invalid properties A semantic error occurred. Failed to resolve column Nope'
             $failure.Exception.Data['StatusCode'] | Should -Be 400
             Should -Invoke Get-AACAccessToken -ParameterFilter { $Resource -eq 'https://api.loganalytics.io' }
-            Should -Invoke Invoke-WebRequest -ParameterFilter { $Uri -eq 'https://api.loganalytics.azure.com/v1/workspaces/aaaaaaaa-0000-0000-0000-000000000001/query' }
+            Should -Invoke Send-AACHttpRequest -Times 1 -Exactly -ParameterFilter { $Uri -eq 'https://api.loganalytics.azure.com/v1/workspaces/aaaaaaaa-0000-0000-0000-000000000001/query' -and $Token -eq 'fake-token' } -Because 'a 400 is not retried'
         }
     }
 

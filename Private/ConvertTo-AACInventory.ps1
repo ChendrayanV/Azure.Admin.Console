@@ -29,6 +29,21 @@ function ConvertTo-AACInventory {
             added up, as Defender does (sum of current / sum of max)
         Rating: Good (70% or more), Fair (40-69%), Poor (under 40%).
 
+        With -Cost (Cost Management rows by ResourceId and SubscriptionId,
+        monthly), every node also has its actual cost month to date and last
+        month (CostMonthToDate, CostLastMonth) and its Currency:
+          - a resource: its own cost; a cost row for a child resource (a
+            database of a server, say) goes to the closest resource above it
+          - costs of resources no longer in Azure, and charges not tied to a
+            resource, go to a 'Deleted resources' line under their
+            subscription (Level DeletedResources)
+          - every level above: its children's costs added up - in their one
+            currency; never converted, so a node whose children are billed
+            in different currencies has Currency 'mixed' and no total
+          - a subscription whose cost couldn't be read says why (CostStatus)
+        With -ResourceGroupName in effect (FilterGroups), cost rows outside
+        the resource groups read are left out.
+
         Returns a hashtable:
           Root   the tenant node; every node is a hashtable with Level, Id,
                  Name, DisplayName, Detail, Children and the rolled-up counts
@@ -40,6 +55,7 @@ function ConvertTo-AACInventory {
                  controls per subscription, with the potential score increase
                  of fixing each, and every unhealthy recommendation with the
                  resource it is on
+        TopSpend (with -Cost) the resources that cost the most this month
     #>
     [CmdletBinding()]
     [OutputType([hashtable])]
@@ -71,7 +87,13 @@ function ConvertTo-AACInventory {
         # unhealthy), Summary (resourceId, healthy, unhealthy, high, medium,
         # low) and Recommendations (resourceId, subscriptionId, name,
         # severity, impact, effort, categories, cause).
-        [hashtable] $Security
+        [hashtable] $Security,
+
+        # Cost Management: Rows (ResourceId, SubscriptionId, BillingMonth,
+        # Cost, Currency), Status (subscription ID -> 'OK', 'No cost' or why
+        # it couldn't be read), ThisMonth and LastMonth ('yyyy-MM'), and
+        # FilterGroups (only rows in the resource groups read).
+        [hashtable] $Cost
     )
 
     function Get-Value($Row, [string] $Key) {
@@ -101,6 +123,8 @@ function ConvertTo-AACInventory {
             # Security posture (Defender for Cloud).
             SecureScore = $null; ScoreCurrent = 0.0; ScoreMax = 0.0; OfficialScore = $false
             Healthy = 0; Unhealthy = 0; High = 0; Medium = 0; Low = 0; Severity = ''; Rating = ''; TopFindings = ''
+            # Cost (Cost Management).
+            CostMonthToDate = 0.0; CostLastMonth = 0.0; Currency = ''; Currencies = @{}; CostStatus = ''; DeletedCount = 0
         }
     }
 
@@ -215,49 +239,99 @@ function ConvertTo-AACInventory {
             if (-not $sub) { continue }
             $sub.ScoreCurrent = [double](Get-Value $row 'current'); $sub.ScoreMax = [double](Get-Value $row 'max'); $sub.OfficialScore = $sub.ScoreMax -gt 0
         }
-        # Controls: the potential increase of the subscription's score (in
-        # percentage points) if the control were fully healthy.
-        $controls = @(foreach ($row in @($Security.Controls)) {
-                $sub = $subscriptions[(& $lower (& $text $row 'subscriptionId'))]
-                if (-not $sub) { continue }
-                $current = [double](Get-Value $row 'current'); $max = [double](Get-Value $row 'max')
-                [pscustomobject][ordered]@{
-                    PSTypeName        = 'AAC.SecurityControl'
-                    Control           = & $text $row 'control'
-                    SubscriptionName  = $sub.Name
-                    SubscriptionId    = $sub.SubscriptionId
-                    Current           = [Math]::Round($current, 2)
-                    Max               = [Math]::Round($max, 2)
-                    Score             = $(if ($max -gt 0) { [Math]::Round(100 * $current / $max) } else { $null })
-                    PotentialIncrease = $(if ($sub.ScoreMax -gt 0) { [Math]::Round(100 * ($max - $current) / $sub.ScoreMax, 1) } else { 0 })
-                    HealthyResources  = [int](Get-Value $row 'healthy')
-                    UnhealthyResources = [int](Get-Value $row 'unhealthy')
-                }
-            })
-        $severityRank = @{ High = 0; Medium = 1; Low = 2 }
-        $recommendations = @(foreach ($row in @($Security.Recommendations)) {
-                $node = $byId[(& $lower (& $text $row 'resourceId'))]
+        # Controls and recommendations: the same objects Get-AACSecurityPosture
+        # returns (ConvertTo-AACSecurityControl, ConvertTo-AACSecurityRecommendation),
+        # kept to the subscriptions and resources in this inventory.
+        $names = @{}
+        $maxima = @{}
+        foreach ($key in $subscriptions.Keys) { $names[$key] = $subscriptions[$key].Name; $maxima[$key] = $subscriptions[$key].ScoreMax }
+        $controls = @(ConvertTo-AACSecurityControl -Row @($Security.Controls) -ScoreMax $maxima -SubscriptionName $names)
+        $recommendations = @(foreach ($item in @(ConvertTo-AACSecurityRecommendation -Row @($Security.Recommendations) -SubscriptionName $names)) {
+                $node = $byId[([string]$item.ResourceId).ToLowerInvariant()]
                 if (-not $node -or $node.Level -notin 'Resource', 'Subscription', 'ResourceGroup') { continue }
-                [pscustomobject][ordered]@{
-                    PSTypeName       = 'AAC.SecurityRecommendation'
-                    Recommendation   = & $text $row 'name'
-                    Severity         = & $text $row 'severity'
-                    Impact           = & $text $row 'impact'
-                    Effort           = & $text $row 'effort'
-                    Category         = & $text $row 'categories'
-                    Resource         = $node.DisplayName
-                    Type             = $node.Type
-                    ResourceGroup    = $node.ResourceGroup
-                    SubscriptionName = $node.SubscriptionName
-                    SubscriptionId   = $node.SubscriptionId
-                    Cause            = & $text $row 'cause'
-                    ResourceId       = $node.Id
-                }
+                # As the tree names it.
+                $item.Resource = $node.DisplayName; $item.Type = $node.Type; $item.ResourceGroup = $node.ResourceGroup
+                $item.SubscriptionName = $node.SubscriptionName; $item.SubscriptionId = $node.SubscriptionId; $item.ResourceId = $node.Id
+                $item
             })
-        $recommendations = @($recommendations | Sort-Object -Property @{ Expression = { if ($severityRank.Contains($_.Severity)) { $severityRank[$_.Severity] } else { 3 } } }, Recommendation, Resource)
         foreach ($group in @($recommendations | Where-Object { $_.Type } | Group-Object -Property { ([string]$_.ResourceId).ToLowerInvariant() })) {
             $node = $byId[$group.Name]
             if ($node) { $node.TopFindings = (@($group.Group | Select-Object -First 3 | ForEach-Object { $_.Recommendation })) -join '; ' }
+        }
+    }
+
+    # --- Cost (Cost Management) -------------------------------------------------------------------------
+    $hasCost = $null -ne $Cost
+    $unplaced = 0
+    if ($hasCost) {
+        $invariant = [cultureinfo]::InvariantCulture
+        $monthOf = {
+            param($Value)
+            if ($Value -is [datetime]) { return $Value.ToString('yyyy-MM', $invariant) }
+            if ($Value -is [datetimeoffset]) { return $Value.UtcDateTime.ToString('yyyy-MM', $invariant) }
+            $raw = ([string]$Value).Trim()
+            if ($raw -match '^(\d{4})(\d{2})\d{2}$') { return "$($Matches[1])-$($Matches[2])" }
+            if ($raw -match '^(\d{4})-(\d{2})') { return "$($Matches[1])-$($Matches[2])" }
+            ''
+        }
+        $resourcesById = @{}
+        $walk = [System.Collections.Generic.Stack[object]]::new()
+        $walk.Push($root)
+        while ($walk.Count) {
+            $node = $walk.Pop()
+            if ($node.Level -eq 'Resource' -and $node.Id) { $resourcesById[(& $lower $node.Id)] = $node }
+            foreach ($child in $node.Children) { $walk.Push($child) }
+        }
+        $deleted = @{}
+        $deletedIds = @{}
+        $addCost = {
+            param($Node, [string] $Month, [double] $Amount, [string] $Currency)
+            if ($Month -eq $Cost.ThisMonth) { $Node.CostMonthToDate += $Amount }
+            elseif ($Month -eq $Cost.LastMonth) { $Node.CostLastMonth += $Amount }
+            else { return }
+            if ($Currency) { $Node.Currencies[$Currency] = $true }
+        }
+        foreach ($row in @($Cost.Rows)) {
+            $amount = [double](Get-Value $row 'Cost')
+            $month = & $monthOf (Get-Value $row 'BillingMonth')
+            if (-not $month) { $month = & $monthOf (Get-Value $row 'UsageDate') }
+            if (-not $month) { $unplaced++; continue }
+            $currency = & $text $row 'Currency'
+            $resourceId = & $lower (& $text $row 'ResourceId')
+            # The resource, or the closest one above it (a server for its database).
+            $node = $null
+            for ($id = $resourceId; $id -match '/providers/.+/.+/.+'; $id = $id -replace '/[^/]+/[^/]+$', '') {
+                if ($resourcesById.Contains($id)) { $node = $resourcesById[$id]; break }
+            }
+            if ($node) { & $addCost $node $month $amount $currency; continue }
+            # Not in the inventory: a deleted resource, or a charge not tied to one.
+            $subscriptionId = & $lower (& $text $row 'SubscriptionId')
+            if (-not $subscriptionId -and $resourceId -match '^/subscriptions/([^/]+)') { $subscriptionId = $Matches[1] }
+            if (-not $subscriptions.Contains($subscriptionId)) { continue }
+            if ($Cost['FilterGroups']) {
+                if ($resourceId -notmatch '^/subscriptions/[^/]+/resourcegroups/([^/]+)') { continue }
+                if (-not $resourceGroups.Contains("$subscriptionId/$($Matches[1])")) { continue }
+            }
+            if (-not $deleted.Contains($subscriptionId)) {
+                $sub = $subscriptions[$subscriptionId]
+                $node = & $newNode 'DeletedResources' "/subscriptions/$subscriptionId/deletedresources" 'Deleted resources' ''
+                $node.SubscriptionId = $sub.SubscriptionId; $node.SubscriptionName = $sub.Name; $node.ManagementGroup = $sub.ManagementGroup
+                $node.Parent = $sub
+                $sub.Children.Add($node)
+                $deleted[$subscriptionId] = $node
+                $deletedIds[$subscriptionId] = [System.Collections.Generic.HashSet[string]]::new()
+            }
+            if ($resourceId) { [void]$deletedIds[$subscriptionId].Add($resourceId) }
+            & $addCost $deleted[$subscriptionId] $month $amount $currency
+        }
+        foreach ($key in @($deleted.Keys)) {
+            $node = $deleted[$key]
+            $node.DeletedCount = $deletedIds[$key].Count
+            # Nothing charged in the period: no line.
+            if ($node.CostMonthToDate -eq 0 -and $node.CostLastMonth -eq 0) { [void]$node.Parent.Children.Remove($node) }
+        }
+        foreach ($key in @($subscriptions.Keys)) {
+            $subscriptions[$key].CostStatus = if ($Cost['Status'] -and $Cost['Status'].Contains($key)) { [string]$Cost['Status'][$key] } else { 'Not read' }
         }
     }
 
@@ -267,9 +341,10 @@ function ConvertTo-AACInventory {
         $Node.TypeCounts = @{}
         $Node.ManagementGroups = 0; $Node.Subscriptions = 0; $Node.ResourceGroups = 0; $Node.Resources = 0
         $Node.Keep = $Node.Level -eq 'ManagementGroup' -and ($keep -contains (& $lower $Node.Name))
-        if ($Node.Level -ne 'Resource') {
+        if ($Node.Level -notin 'Resource', 'DeletedResources') {
             $Node.Healthy = 0; $Node.Unhealthy = 0; $Node.High = 0; $Node.Medium = 0; $Node.Low = 0
             if (-not $Node.OfficialScore) { $Node.ScoreCurrent = 0.0; $Node.ScoreMax = 0.0 }
+            $Node.CostMonthToDate = 0.0; $Node.CostLastMonth = 0.0; $Node.Currencies = @{}
         }
         foreach ($child in @($Node.Children)) {
             Measure-Node $child
@@ -281,6 +356,8 @@ function ConvertTo-AACInventory {
             }
             if ($child.Level -eq 'ManagementGroup' -and $child.Keep) { $Node.Keep = $true }
             $Node.Healthy += $child.Healthy; $Node.Unhealthy += $child.Unhealthy
+            $Node.CostMonthToDate += $child.CostMonthToDate; $Node.CostLastMonth += $child.CostLastMonth
+            foreach ($currency in $child.Currencies.Keys) { $Node.Currencies[$currency] = $true }
             $Node.High += $child.High; $Node.Medium += $child.Medium; $Node.Low += $child.Low
             # A management group's and the tenant's score: their subscriptions' added up.
             if ($Node.Level -in 'Tenant', 'ManagementGroup' -and $child.Level -in 'Subscription', 'ManagementGroup') {
@@ -305,7 +382,7 @@ function ConvertTo-AACInventory {
     Measure-Node $root
 
     # Order: management groups, then subscriptions, then groups and resources, by name.
-    $order = @{ ManagementGroup = 0; Subscription = 1; ResourceGroup = 2; Resource = 3 }
+    $order = @{ ManagementGroup = 0; Subscription = 1; ResourceGroup = 2; Resource = 3; DeletedResources = 4 }
     function Complete-Node($Node, [string] $Path, [int] $Depth, $Items) {
         $Node.Depth = $Depth
         $Node.Path = if ($Path) { "$Path / $($Node.DisplayName)" } else { $Node.DisplayName }
@@ -319,12 +396,17 @@ function ConvertTo-AACInventory {
             $Node.Severity = if ($Node.High) { 'High' } elseif ($Node.Medium) { 'Medium' } elseif ($Node.Low) { 'Low' } elseif ($assessed) { 'Healthy' } else { '' }
             $Node.Rating = if ($null -eq $Node.SecureScore) { '' } elseif ($Node.SecureScore -ge 70) { 'Good' } elseif ($Node.SecureScore -ge 40) { 'Fair' } else { 'Poor' }
         }
+        # One currency, or 'mixed' - never added across currencies.
+        $Node.Currency = if ($Node.Currencies.Count -eq 1) { @($Node.Currencies.Keys)[0] } elseif ($Node.Currencies.Count -gt 1) { 'mixed' } else { '' }
+        # Read, but nothing charged in the period: a state of its own, as Show-AACCost says it.
+        if ($Node.Level -eq 'Subscription' -and $Node.CostStatus -eq 'OK' -and $Node.CostMonthToDate -eq 0 -and $Node.CostLastMonth -eq 0) { $Node.CostStatus = 'No cost' }
         $Node.Detail = switch ($Node.Level) {
             'Tenant' { $TenantId }
             'ManagementGroup' { $Node.Name }
             'Subscription' { (@($Node.SubscriptionId, $Node.State) | Where-Object { $_ }) -join ' · ' }
             'ResourceGroup' { (@($Node.Location, $(if ($Node.Resources -eq 0) { 'empty' })) | Where-Object { $_ }) -join ' · ' }
             'Resource' { (@(($Node.Type -replace '^microsoft\.', ''), $Node.Location, $Node.Sku) | Where-Object { $_ }) -join ' · ' }
+            'DeletedResources' { "costs of resources no longer in Azure$(if ($Node.DeletedCount) { " ($($Node.DeletedCount))" }), and charges not tied to a resource" }
         }
         $Items.Add([pscustomobject][ordered]@{
                 PSTypeName       = 'AAC.InventoryItem'
@@ -356,6 +438,10 @@ function ConvertTo-AACInventory {
                 Low              = $Node.Low
                 Findings         = $Node.Unhealthy
                 TopFindings      = $Node.TopFindings
+                CostMonthToDate  = $(if ($hasCost -and $Node.Currency -ne 'mixed') { [Math]::Round($Node.CostMonthToDate, 2) } else { $null })
+                CostLastMonth    = $(if ($hasCost -and $Node.Currency -ne 'mixed') { [Math]::Round($Node.CostLastMonth, 2) } else { $null })
+                Currency         = $Node.Currency
+                CostStatus       = $Node.CostStatus
                 Tags             = $Node.Tags
                 Id               = $Node.Id
             })
@@ -385,8 +471,21 @@ function ConvertTo-AACInventory {
             Medium           = $root.Medium
             Low              = $root.Low
             Assessed         = @($all | Where-Object { $_.Level -eq 'Resource' -and $null -ne $_.SecureScore }).Count
+            HasCost          = $hasCost
+            # Totals per currency, largest first (never converted).
+            Cost             = @(if ($hasCost) {
+                    $all | Where-Object { $_.Level -in 'Resource', 'DeletedResources' -and $_.Currency } | Group-Object -Property Currency | ForEach-Object {
+                        $monthToDate = 0.0; $lastMonth = 0.0
+                        foreach ($item in $_.Group) { $monthToDate += [double]$item.CostMonthToDate; $lastMonth += [double]$item.CostLastMonth }
+                        [pscustomobject]@{ Currency = $_.Name; MonthToDate = [Math]::Round($monthToDate, 2); LastMonth = [Math]::Round($lastMonth, 2) }
+                    } | Sort-Object -Property MonthToDate -Descending
+                })
+            CostUnplaced     = $unplaced
         }
         Controls        = $controls
         Recommendations = $recommendations
+        # Get-AACInventory -Insight adds it (ConvertTo-AACInventoryInsight).
+        Insight         = $null
+        TopSpend        = @(if ($hasCost) { $all | Where-Object { $_.Level -eq 'Resource' -and $_.CostMonthToDate -gt 0 } | Sort-Object -Property @{ Expression = 'CostMonthToDate'; Descending = $true }, Name | Select-Object -First 15 })
     }
 }

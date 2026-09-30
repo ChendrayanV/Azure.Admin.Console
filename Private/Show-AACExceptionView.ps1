@@ -128,10 +128,10 @@ function Show-AACExceptionView {
         $sample = $problem.Sample
         $cells = @(
             [Spectre.Console.Markup]::new("[bold indianred1]$('{0:N0}' -f $problem.Count)[/]")
-            [Spectre.Console.Markup]::new("[white]$(& $escape (& $clip $sample.ExceptionType 70))[/]$(if ($sample.Method) { "`n[grey50]at $(& $escape (& $clip $sample.Method 70))[/]" })")
+            [Spectre.Console.Markup]::new("[white]$(& $escape (& $clip $sample.ExceptionType 200))[/]$(if ($sample.Method) { "`n[grey50]at $(& $escape (& $clip $sample.Method 200))[/]" })")
             [Spectre.Console.Markup]::new("[grey70]$(if ($problem.Last) { $problem.Last.ToLocalTime().ToString('HH:mm:ss') })[/]")
-            [Spectre.Console.Markup]::new("[deepskyblue1]$(& $escape (& $clip $problem.Apps 60))[/]")
-            [Spectre.Console.Markup]::new("[grey70]$(& $escape (& $clip $sample.Message 140))[/]")
+            [Spectre.Console.Markup]::new("[deepskyblue1]$(& $escape (& $clip $problem.Apps 200))[/]")
+            [Spectre.Console.Markup]::new("[grey70]$(& $escape (& $clip $sample.Message 600))[/]")
         )
         [Spectre.Console.TableExtensions]::AddRow($table, [Spectre.Console.Rendering.IRenderable[]]$cells) | Out-Null
     }
@@ -153,15 +153,15 @@ function Show-AACExceptionView {
     }
     foreach ($item in $recent) {
         $severity = if ($badge.ContainsKey([string]$item.Severity)) { $badge[[string]$item.Severity] } else { "[grey70]$(& $escape $item.Severity)[/]" }
-        $what = "[white]$(& $escape (& $clip $item.ExceptionType 60))[/]"
-        if ($item.Message) { $what += "`n[grey58]$(& $escape (& $clip $item.Message 120))[/]" }
-        if ($item.StackTop) { $what += "`n[grey42]at $(& $escape (& $clip $item.StackTop 100))[/]" }
+        $what = "[white]$(& $escape (& $clip $item.ExceptionType 200))[/]"
+        if ($item.Message) { $what += "`n[grey58]$(& $escape (& $clip $item.Message 600))[/]" }
+        if ($item.StackTop) { $what += "`n[grey42]at $(& $escape (& $clip $item.StackTop 300))[/]" }
         $cells = @(
             [Spectre.Console.Markup]::new("[grey70]$(if ($item.TimeGenerated) { $item.TimeGenerated.ToLocalTime().ToString('HH:mm:ss') })[/]")
             [Spectre.Console.Markup]::new($severity)
             [Spectre.Console.Markup]::new($what)
-            [Spectre.Console.Markup]::new("[deepskyblue1]$(& $escape (& $clip $item.OperationName 50))[/]")
-            [Spectre.Console.Markup]::new("[green3]$(& $escape $item.AppRoleName)[/]$(if ($item.AppRoleInstance) { "`n[grey50]$(& $escape (& $clip $item.AppRoleInstance 24))[/]" })")
+            [Spectre.Console.Markup]::new("[deepskyblue1]$(& $escape (& $clip $item.OperationName 200))[/]")
+            [Spectre.Console.Markup]::new("[green3]$(& $escape $item.AppRoleName)[/]$(if ($item.AppRoleInstance) { "`n[grey50]$(& $escape (& $clip $item.AppRoleInstance 100))[/]" })")
         )
         [Spectre.Console.TableExtensions]::AddRow($table, [Spectre.Console.Rendering.IRenderable[]]$cells) | Out-Null
     }

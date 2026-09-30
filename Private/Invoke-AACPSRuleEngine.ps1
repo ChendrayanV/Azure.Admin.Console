@@ -34,7 +34,8 @@ function Invoke-AACPSRuleEngine {
         [string[]] $ExcludeRule = @(),
         [string] $Baseline,
         [hashtable] $Configuration = @{},
-        [string[]] $RulePath = @()
+        [string[]] $RulePath = @(),
+        [switch] $NoExpand
     )
 
     $installed = Get-Module -Name 'PSRule.Rules.Azure' -ListAvailable | Sort-Object -Property Version -Descending | Select-Object -First 1
@@ -43,7 +44,7 @@ function Invoke-AACPSRuleEngine {
     }
 
     # --- Read the estate, as Export-AzRuleData would ------------------------------------
-    $data = Get-AACRuleData -SubscriptionId $SubscriptionId -ResourceType $ResourceType
+    $data = Get-AACRuleData -SubscriptionId $SubscriptionId -ResourceType $ResourceType -NoExpand:$NoExpand
 
     # PSRule's PowerShell rules need objects, and the estate goes to the
     # runner as JSON. Keys differing only by case ('Owner' and 'owner'

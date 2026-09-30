@@ -22,7 +22,7 @@ Checks your live Azure estate with PSRule for Azure - its Azure Well-Architected
 Invoke-AACPSRule [[-SubscriptionId] <string[]>] [[-ResourceType] <string[]>] [[-Rule] <string[]>]
  [[-ExcludeRule] <string[]>] [[-Baseline] <string>] [[-Configuration] <hashtable>]
  [[-RulePath] <string[]>] [[-CsvPath] <string>] [[-PdfPath] <string>] [[-HtmlPath] <string>]
- [[-Title] <string>] [-FailedOnly] [-PassThru] [-NoDisplay] [-NoPaging]
+ [[-Title] <string>] [-NoExpand] [-FailedOnly] [-PassThru] [-NoDisplay] [-NoPaging]
 ```
 
 ## ALIASES
@@ -47,8 +47,13 @@ The rules that run:
                       (-Baseline picks one of its baselines)
   Azure.Admin.Console the module's own AAC.* rules (PSRule\Rules):
                       required tags on resources and resource
-                      groups, and allowed tag values - each off
-                      until its setting is given in -Configuration
+                      groups and allowed tag values - the tags
+                      named in -Configuration or in
+                      Get-AACTagDefault (PSRule\Rules\AAC.Tags.Rule.ps1);
+                      with none named they check nothing, and the
+                      view says so - and naming conventions (on by default: the
+                      Cloud Adoption Framework abbreviations, or
+                      AAC_NAMING_PATTERNS)
   custom              your own PSRule rule files (*.Rule.ps1,
                       *.Rule.yaml, *.Rule.jsonc) from -RulePath
 ```
@@ -151,12 +156,20 @@ Adds the module's tag rules and PSRule for Azure's allowed regions.
 ### Example 7
 
 ```powershell
+Invoke-AACPSRule -Rule 'AAC.Resource.Naming'
+```
+
+Checks names against the Cloud Adoption Framework abbreviations, reading only the types it checks.
+
+### Example 8
+
+```powershell
 Invoke-AACPSRule -RulePath .\MyRules -ExcludeRule 'AAC.*'
 ```
 
 Runs your own rules from .\MyRules with PSRule for Azure's, without the module's.
 
-### Example 8
+### Example 9
 
 ```powershell
 Invoke-AACPSRule -FailedOnly | Group-Object RuleName | Sort-Object Count -Descending | Select-Object -First 10 Count, Name
@@ -320,6 +333,32 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -NoExpand
+
+Read only what Resource Graph returns - names, types, tags and
+properties - not the child settings PSRule for Azure's rules need
+(diagnostic settings, blob services, API Management APIs, ...: one
+to hundreds of calls per resource). For your own -RulePath rules
+that look only at those fields. Runs of only the module's AAC.\*
+rules do this without asking.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -NoPaging
 
 Show the whole view at once instead of a page at a time.
@@ -409,7 +448,11 @@ HelpMessage: ''
 
 ### -Rule
 
-Only run these rules: names or wildcards, e.g. 'Azure.KeyVault.\*'.
+Only run these rules: names or wildcards, e.g. 'Azure.KeyVault.\*' or
+'AAC.Resource.Naming' - not file paths (use -RulePath for rule
+files). A -Rule that matches no rule is an error. With only the
+module's AAC.\* rules, just names, types and tags are read - and for
+AAC.Resource.Naming alone, just the types it checks.
 
 ```yaml
 Type: System.String[]
@@ -431,7 +474,8 @@ HelpMessage: ''
 ### -RulePath
 
 Custom PSRule rule files, or folders of them (\*.Rule.ps1,
-\*.Rule.yaml, \*.Rule.jsonc), to run with the others.
+\*.Rule.yaml, \*.Rule.jsonc), to run with the others. The module's own
+AAC.\* rules always load; don't pass them here.
 
 ```yaml
 Type: System.String[]

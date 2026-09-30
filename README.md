@@ -14,9 +14,30 @@ Microsoft.Graph modules, and no app registration.
 - **Azure Firewall rules.** Every Firewall Policy rule (DNAT, network,
   application) with IP Groups resolved to names and addresses, shown one
   colour-coded table per rule collection.
+- **Tenant inventory.** Management groups, subscriptions, resource groups
+  and resources as one tree, with counts, the Defender for Cloud secure score
+  and findings, and - with `-Cost` - what everything costs, at every level.
+- **Security posture.** Microsoft Defender for Cloud and Azure Policy in
+  one report: secure scores, recommendations by control with remediation
+  links, active alerts, Defender plans, regulatory compliance traced to the
+  failing resources, and policy compliance.
+- **Network security groups.** Every NSG assessed: where it's applied, every
+  rule in evaluation order, flow logs and diagnostic settings, and findings
+  by severity with what to do.
+- **Azure Policy compliance.** Every resource's policy states, with their
+  initiative, assignment and effect - by management group, subscription or
+  resource group - and compliance per assignment, policy and scope.
+- **Entra ID group membership.** Who is in your groups - direct members and
+  everyone in nested groups - flattened to one row per group and member,
+  with guests and disabled accounts flagged. Read from Microsoft Graph.
+- **Resource map.** A diagram of one or more resource groups in your
+  browser, with Azure icons, VNets and subnets, network paths, NSGs and
+  route tables. Saves as PNG or JPEG.
 - **PSRule for Azure.** Its 500+ Well-Architected rules, the module's own
-  rules and your custom rules, run on the live estate. You can leave rules
-  out by name or wildcard.
+  naming and tag rules, and your custom rules, run on the live estate. You
+  can leave rules out by name or wildcard.
+- **Fast.** One pooled HTTPS connection for every call, and independent
+  reads in parallel within each Azure API's limits.
 - **Application Insights.** Your application's exceptions, flattened, or any
   KQL query, from a Log Analytics workspace or an Application Insights
   resource.
@@ -28,7 +49,8 @@ Microsoft.Graph modules, and no app registration.
   interactive HTML report, from the same command.
 
 Everything is read-only. Reader access on the subscriptions is enough (costs
-need Cost Management Reader or Reader).
+need Cost Management Reader or Reader; group membership needs an account
+allowed to read groups in Entra ID, as tenant members are by default).
 
 ## Install
 
@@ -68,8 +90,32 @@ Show-AACResource
 Show-AACResource -HtmlPath .\Inventory.html     # every resource, with portal links
 Show-AACCost
 
+# The tenant as a tree, with secure scores and costs
+Get-AACInventory -Cost -HtmlPath .\Inventory.html
+
+# Defender for Cloud and Azure Policy: scores, recommendations, alerts, plans, compliance
+Get-AACSecurityPosture -HtmlPath .\Security.html
+
+# Every network security group, assessed
+Get-AACNetworkSecurityGroup
+
+# Azure Policy: every resource's compliance, for one management group
+Get-AACPolicyState -ManagementGroupId 'mg-landingzones' -HtmlPath .\Policy.html
+
+# Which VM sizes a new three-zone AKS node pool can use, and why not
+Get-AACSkuAvailability -ClusterName 'aks-contoso' -Zone 1, 2, 3 -Series D, E -NodeCount 3
+
+# Who is in your Entra ID groups, nested groups included
+Get-AACEntraGroupMembership -GroupNameStartsWith 'grp-' -HtmlPath .\Groups.html
+
+# A diagram of a resource group, in your browser
+Show-AACResourceMap -ResourceGroupName 'rg-app'
+
 # PSRule for Azure on the live estate, as a clickable HTML report
 Invoke-AACPSRule -HtmlPath .\PSRule.html
+
+# Just the module's naming and tag rules - quick: names, types and tags only
+Invoke-AACPSRule -Rule 'AAC.*'
 
 # The last 2 hours of exceptions from Application Insights
 Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-contoso-prod'
@@ -85,9 +131,20 @@ Every command works the same way:
 - **Reports:** with `-CsvPath`, `-PdfPath` or `-HtmlPath`, the report is in
   the files. The console shows only the progress and the files written, not
   the view. Add `-PassThru` to get the objects as well.
+- **Objects:** piped onward, or with `-NoDisplay`, a command returns its
+  objects and draws no view. Stopping early is fine:
+  `Get-AACSkuAvailability -Location uksouth | Select-Object -First 5` ends the
+  command quietly and the rest of your script carries on.
 - **Progress:** every command shows the same progress display: the title,
   then one line per step with a bar, a percentage and the elapsed time, each
   finishing with what it did.
+
+**Nothing is cut off.** Console views wrap long text - reasons,
+recommendations, messages - rather than truncating it, and list every
+finding; the PSRule view lists up to 50 resources per rule and says how many
+more there are. The objects' default tables at the prompt wrap too
+(`Azure.Admin.Console.Format.ps1xml`), and `Format-List *` or
+`Select-Object *` shows every property.
 
 The HTML reports are single, self-contained files with no external scripts,
 styles or fonts, so they open offline and work as email attachments or
@@ -107,10 +164,15 @@ pipeline artifacts. Each one has:
 | [`Get-AACAdvisorRecommendation`](docs/Get-AACAdvisorRecommendation.md) | A consolidated, flattened view of Azure Advisor: a console view at the prompt, objects down a pipeline, CSV and/or PDF exports. |
 | [`Get-AACFirewallRule`](docs/Get-AACFirewallRule.md) | Every Azure Firewall Policy rule: a console view at the prompt (Allow in green, Deny in red), objects down a pipeline, CSV and/or PDF exports. |
 | [`Show-AACResource`](docs/Show-AACResource.md) | A colourful bar chart of your resources by type, location, resource group or subscription. |
-| [`Get-AACInventory`](docs/Get-AACInventory.md) | The tenant as a tree: management groups, subscriptions, resource groups and resources, with counts at every level. A console tree, objects, and CSV, PDF and interactive HTML reports. |
+| [`Get-AACInventory`](docs/Get-AACInventory.md) | The tenant as a tree: management groups, subscriptions, resource groups and resources, with counts, the Defender for Cloud secure score and - with `-Cost` - the cost at every level. A console tree, objects, and CSV, PDF and interactive HTML reports. |
+| [`Get-AACSecurityPosture`](docs/Get-AACSecurityPosture.md) | Microsoft Defender for Cloud and Azure Policy in one report: secure scores, recommendations grouped by control with remediation links, active alerts, Defender plans, regulatory compliance traced to the failing resources, and policy compliance per assignment - one list of findings. A console view, objects, and CSV, PDF and interactive HTML reports. |
+| [`Get-AACSkuAvailability`](docs/Get-AACSkuAvailability.md) | Which VM sizes you can use for virtual machines or AKS node pools in a region and its availability zones - the subscription's restrictions, vCPU quota and AKS's rules - and why a size can't be used; an AKS cluster's node pools. Read-only REST, nothing deployed. A console view, objects, and CSV, PDF and interactive HTML reports. |
+| [`Get-AACPolicyState`](docs/Get-AACPolicyState.md) | Azure Policy compliance for every resource - one row per resource and policy, with initiative, assignment, effect and when it was evaluated - by management group, subscription or resource group, with compliance per assignment, policy, subscription and resource group. A console view, objects, and CSV, PDF and interactive HTML reports. |
+| [`Get-AACNetworkSecurityGroup`](docs/Get-AACNetworkSecurityGroup.md) | A detailed assessment of network security groups: associations, every rule, flow logs and diagnostic settings, and findings by severity (open to the internet, shadowed rules, subnet and NIC conflicts, logging gaps). A console view, objects, and CSV, PDF and interactive HTML reports. |
+| [`Get-AACEntraGroupMembership`](docs/Get-AACEntraGroupMembership.md) | Entra ID groups and everyone in them - direct and through nested groups - one row per group and member, with type, source, guests and disabled accounts. A console view with each group's members as a tree, objects, and CSV, PDF and interactive HTML reports. |
 | [`Show-AACResourceMap`](docs/Show-AACResourceMap.md) | A map of one or more resource groups, opened in your browser: the resources with their Azure icons, in subscription, resource group, VNet and subnet boxes, with their connections, dependencies and network paths. Saves as PNG or JPEG. |
 | [`Show-AACCost`](docs/Show-AACCost.md) | Subscription costs: month to date by subscription and by service, and a monthly trend, as charts and a table. |
-| [`Invoke-AACPSRule`](docs/Invoke-AACPSRule.md) | PSRule for Azure, the module's own rules and your custom rules on the live estate: include or exclude rules by name or wildcard, with a baseline or settings. |
+| [`Invoke-AACPSRule`](docs/Invoke-AACPSRule.md) | PSRule for Azure, the module's own naming and tag rules and your custom rules on the live estate: include or exclude rules by name or wildcard, with a baseline or settings. Runs of only the module's rules read just names, types and tags. |
 | [`Invoke-AACApplicationInsightQuery`](docs/Invoke-AACApplicationInsightQuery.md) | Application Insights exceptions, flattened, from a Log Analytics workspace or Application Insights resource, or any KQL query. |
 
 Full help:
@@ -370,6 +432,8 @@ Get-AACInventory -ManagementGroupId 'mg-landingzones' -Depth Resource
 Get-AACInventory -SubscriptionId $sub1, $sub2 -ResourceGroupName 'rg-app', 'rg-data'
 Get-AACInventory -HtmlPath .\Inventory.html -PdfPath .\Inventory.pdf -CsvPath .\Inventory.csv
 Get-AACInventory -NoDisplay | Where-Object { $_.Level -eq 'ResourceGroup' -and $_.Resources -eq 0 }   # empty resource groups
+Get-AACInventory -Cost -HtmlPath .\Inventory.html                # with what everything costs
+Get-AACInventory -Insight -Cost -HtmlPath .\Inventory.html       # plus the estate's mix and what needs attention
 ```
 
 **How the tree is built**
@@ -405,11 +469,35 @@ Resource Graph's `securityresources`, so Reader access is enough:
 - **Without Defender data** (not enabled, or no access), the inventory is
   shown without it. `-NoSecurity` skips reading it.
 
+**Cost** (`-Cost`) comes from Azure Cost Management, so it needs Cost
+Management Reader (or Reader) on the subscriptions. Every node shows its
+actual cost month to date and last month:
+
+```text
+└── SUB sub-corp-apps  3 resource groups · 10 resources  212.00 USD MTD · last month 150.00 USD
+    ├── RG rg-app  7 resources  150.00 USD MTD · last month 150.00 USD
+    └── DEL Deleted resources  costs of resources no longer in Azure (2), and charges not tied to a resource  32.00 USD MTD
+```
+
+- **Queries:** one for the whole tenant root group (or `-ManagementGroupId`)
+  when the billing account allows it (Enterprise Agreement, Microsoft
+  Customer Agreement); otherwise one per subscription, 3 at a time, retried
+  as Cost Management's throttling headers ask.
+- **Every charge placed:** a child resource's cost goes to the closest
+  resource above it; costs of deleted resources, and charges not tied to a
+  resource, go under their subscription as **Deleted resources**.
+- **Never converted:** amounts stay in each subscription's billing
+  currency. A level whose subscriptions are billed in different currencies
+  says so instead of adding them up.
+- **Unreadable subscriptions** (some offer types, or no permission) say why
+  in `CostStatus`; the rest of the inventory is unaffected.
+
 **Output**
 - **Objects:** one `AAC.InventoryItem` per node, with Level, Path, the
   management group, subscription and resource group it's in, type, location,
   SKU, state, counts, most common types, secure score, rating, findings by
-  severity, top findings, tags and ID.
+  severity, top findings, cost (`CostMonthToDate`, `CostLastMonth`,
+  `Currency`, `CostStatus`), tags and ID.
 - **`-CsvPath`:** every node, one row each.
 - **`-HtmlPath`:** secure score and finding tiles; charts, including
   findings by severity and the controls with the most to gain; the hierarchy
@@ -420,6 +508,237 @@ Resource Graph's `securityresources`, so Reader access is enough:
 - **`-PdfPath`:** the summary, the hierarchy with coloured scores, the
   security posture (subscription scores, controls, recommendations),
   subscriptions, resource groups, resources by type, and the resources.
+
+## Security posture
+
+`Get-AACSecurityPosture` reads Microsoft Defender for Cloud and Azure Policy
+with Azure Resource Graph (`securityresources`, `policyresources`), every
+query at once. Reader or Security Reader is enough.
+
+```powershell
+Get-AACSecurityPosture                                                 # every section, every subscription
+Get-AACSecurityPosture -Tag @{ Environment = 'Prod' } -HtmlPath .\Security.html
+Get-AACSecurityPosture -Section Alerts, Plans                          # just the alerts and the Defender plans
+Get-AACSecurityPosture -Section Compliance -Standard '*ISO*' -PdfPath .\ISO.pdf
+Get-AACSecurityPosture -NoDisplay | Where-Object { $_.Section -eq 'Recommendation' -and $_.Severity -eq 'High' } | Group-Object Title
+```
+
+| Section | What it shows |
+|---|---|
+| `Score` | Each subscription's secure score - Defender's points, added up across subscriptions as Defender does - and the controls with the potential increase of fixing each |
+| `Recommendations` | Every unhealthy recommendation on each resource: severity, the secure score control it belongs to, category, description, remediation steps and its portal page |
+| `Alerts` | Active and in-progress security alerts: severity, intent, resource, age and the alert's page |
+| `Plans` | Which Defender plans are on or off in each subscription |
+| `Compliance` | Each regulatory standard's passed and failed controls; a failed control is traced to the resources failing the recommendations behind it |
+| `Policy` | Azure Policy compliance per assignment (display names, even for management group assignments), and every non-compliant resource with the policy and its effect |
+
+**One list of findings** (`AAC.SecurityFinding`), the same in the objects,
+CSV, HTML and PDF: Section, Severity, Title, Category, Control, the
+resource, State, Detail, the portal link and since when - most severe first.
+`-ResourceGroupName` and `-Tag` narrow the findings to those resources (tag
+values match exactly, not as substrings); scores, plans and standards are
+per subscription. It tells you when Defender plans are off, because then an
+empty alert list doesn't mean nothing happened.
+
+For every policy state in detail - compliant ones too - use
+`Get-AACPolicyState`; both commands read the same query.
+
+`Get-AACInventory` and `Get-AACSecurityPosture` share their Defender queries
+and objects: the inventory puts each node's score and findings in the tree,
+and this command is the posture itself.
+
+## Azure Policy compliance
+
+`Get-AACPolicyState` reads the Azure Policy states with one Azure Resource
+Graph KQL query (`policyresources`), with the policies' and initiatives'
+display names. The assignments' names, scopes and enforcement are read
+tenant-wide, because many are assigned at a management group. Reader is
+enough.
+
+```powershell
+Get-AACPolicyState                                                           # every subscription you can see
+Get-AACPolicyState -ManagementGroupId 'mg-landingzones'                      # every subscription under a management group
+Get-AACPolicyState -SubscriptionId $sub -ResourceGroupName 'rg-app', 'rg-data'
+Get-AACPolicyState -ComplianceState NonCompliant -HtmlPath .\Policy.html -PdfPath .\Policy.pdf -CsvPath .\Policy.csv
+Get-AACPolicyState -ComplianceState NonCompliant -NoDisplay | Group-Object Policy | Sort-Object Count -Descending
+```
+
+| Scope | |
+|---|---|
+| `-ManagementGroupId` | Every subscription under these management groups |
+| `-SubscriptionId` | These subscriptions |
+| `-ResourceGroupName` | Only these resource groups, with either of the above or on its own |
+| `-ComplianceState` | Only NonCompliant, Compliant, Exempt, Unknown, Conflict or Error states - filtered in the query |
+
+**One row per resource and policy** (`AAC.PolicyState`): compliance state,
+resource, type, resource group, subscription, location, policy, initiative,
+assignment, where it is assigned (management group, subscription or resource
+group, by name), enforcement, effect and when it was evaluated.
+
+From those rows:
+- each **resource** takes the state that ranks first across its policies,
+  as the Azure portal does: Non-compliant, Compliant, Error, Conflicting,
+  Protected, Exempt, Unknown;
+- **compliance (%)** is the portal's: (compliant + exempt + unknown +
+  protected resources) / every resource evaluated; *Not started* states
+  aren't counted;
+- compliance **per assignment** (least compliant first, with enforcement),
+  **per subscription**, **per resource group** and **per policy**.
+
+The console shows tiles, compliance by subscription and by resource group,
+the assignments, and every non-compliant resource grouped by policy. The
+HTML report has a donut of the states and charts that filter tables of
+resources, states, assignments, policies, subscriptions and resource groups.
+The PDF has the summary, the scopes, the assignments and the non-compliant
+resources by policy. `-CsvPath` writes every state.
+
+## VM size availability (virtual machines and AKS)
+
+`Get-AACSkuAvailability` answers "can I use this VM size here?" before you
+deploy: for virtual machines, or for AKS node pools. It only reads - Reader
+is enough, and nothing is created - over REST:
+
+| Read | From |
+|---|---|
+| The sizes offered in the region, their zones and capabilities, and what's restricted for your subscription (the region, or single zones) | `Microsoft.Compute/skus` |
+| Each family's and the region's vCPU quota | `Microsoft.Compute/locations/{region}/usages` |
+| Which physical zone each logical zone is (it differs between subscriptions) | the subscription's locations |
+| An AKS cluster's region and node pools (`-ClusterName`) | Azure Resource Graph |
+
+```powershell
+Get-AACSkuAvailability -Location uksouth -Zone 1, 2, 3 -Series D, E               # D and E series usable in all three zones
+Get-AACSkuAvailability -ClusterName 'aks-contoso' -Zone 1, 2, 3 -NodeCount 3      # a new 3-node, 3-zone pool on a cluster
+Get-AACSkuAvailability -Service Aks -Location uksouth, ukwest -Architecture Arm64 -HtmlPath .\Skus.html
+Get-AACSkuAvailability -Location westeurope -Zone 1, 2, 3 -NoDisplay |
+    Where-Object { $_.Status -eq 'Available' -and $_.vCPUs -eq 4 -and $_.MemoryGB -ge 16 }
+```
+
+Each size gets a **status**, the first that applies, with the reason:
+
+| Status | Why |
+|---|---|
+| `Restricted` | Not offered to your subscription in the region (`NotAvailableForSubscription`) |
+| `NotSupported` | `-Service Aks` (or `-ClusterName`): fewer than 2 vCPUs, which AKS can't use |
+| `ZoneUnavailable` | None of the `-Zone` zones can host it (not offered there, or restricted for you) |
+| `Partial` | Some of the `-Zone` zones can't |
+| `NoQuota` | The family's or the region's free vCPUs are fewer than vCPUs x `-NodeCount` |
+| `Available` | Nothing stops it |
+
+For AKS it also notes sizes with less than 4 GB (user node pools only) and
+burstable B-series sizes (not recommended for system node pools). With
+`-ClusterName` the region and subscription are the cluster's, the sizes its
+node pools use are marked, and each pool is shown with its size's status now
+and the family's free vCPUs - whether it can scale out.
+
+Narrow the sizes with `-Series` (the letters of the name: `D`, `E`, `NC`,
+`DC`; wildcards allowed), `-Sku` (`Standard_D4s_v5`, `D4s_v5` or `*s_v5`) and
+`-Architecture x64|Arm64`. Each row (`AAC.SkuAvailability`) has the size's
+vCPUs, memory, zones (and the ones missing), family and regional free vCPUs,
+architecture, ephemeral OS disk, accelerated networking, premium storage,
+Spot, GPUs, data disks and Hyper-V generations.
+
+The console shows tiles, the zone mapping, the vCPU quota (most used first),
+the cluster's node pools and each size, usable first. The HTML report has a
+donut of the statuses and charts that filter tables of sizes, quota, zones and
+node pools; the PDF has the same. `-CsvPath` writes every size.
+
+What no read can tell you is whether there's capacity at the moment you
+deploy (`ZonalAllocationFailed` and similar); nothing here deploys to find
+out. More services (disks, storage, SQL, PostgreSQL and MySQL flexible
+server, App Service) will follow the same pattern.
+
+## Entra ID group membership
+
+`Get-AACEntraGroupMembership` reads Entra ID groups and their members from
+Microsoft Graph and follows nested groups to the end:
+
+```powershell
+Get-AACEntraGroupMembership -GroupName 'grp-finance', 'grp-hr'            # these groups, by exact name
+Get-AACEntraGroupMembership -GroupNameStartsWith 'grp-azure-'             # every group whose name starts with this
+Get-AACEntraGroupMembership                                                # every group in the tenant
+Get-AACEntraGroupMembership -GroupNameStartsWith 'grp-' -HtmlPath .\Groups.html -CsvPath .\Groups.csv -PdfPath .\Groups.pdf
+Get-AACEntraGroupMembership -GroupNameStartsWith 'grp-' -NoDisplay | Where-Object UserType -EQ 'Guest'   # the guests, and through which group
+```
+
+```text
+grp-finance  Security - Cloud - 3 direct - 3 users
+|-- Ada Lovelace  ada@contoso.example
+|-- Gus Guest  gus_fabrikam.example#EXT#@contoso.example   GUEST
+`-- GROUP grp-finance-emea
+    |-- Grace Hopper  grace@contoso.example   DISABLED
+    `-- Service principal app-payroll
+```
+
+**One row per group and member** (`AAC.EntraGroupMember`), the same in the
+objects, CSV, HTML and PDF: the group (name, type - Microsoft 365, Security,
+Mail-enabled security, Distribution, dynamic, role-assignable - and whether
+it's cloud or synced from on-premises AD), the member (name, type - user,
+group, device, service principal, contact - user principal name, mail,
+member or guest, enabled or disabled, job title, department), and how it's
+in the group: **Direct**, **Nested** (with **Via**, the path of nested
+groups, and the depth), or **Empty** for a group with no members, so every
+group appears. A group met again on its own path (a loop) is listed but not
+followed twice. The console and reports also show each group's totals:
+direct members, nested groups, and unique users, guests and disabled
+accounts at every level.
+
+**Sign-in.** It uses your `Connect-AAC` sign-in - no second prompt: a
+Microsoft Graph token is taken from it silently, the way Application
+Insights gets its Log Analytics token.
+- Your account needs to be allowed to read groups in Entra ID, which members
+  of the tenant are by default (guests, or tenants that restrict it, may
+  not be).
+- With an App Registration of your own (`Connect-AAC -ClientId`), give it
+  Microsoft Graph's delegated **Group.Read.All** and **User.Read.All**
+  permissions.
+- Reads run 8 at a time, a level of nesting at a time, each group read
+  once however many groups it's nested in; throttling waits as Graph asks.
+  A group whose members can't be read is reported, and the rest carry on.
+
+`-CsvPath` (alias `-OutputPath`) writes the rows; with no export parameter
+the command shows the console view, as every command does.
+
+## Network security groups
+
+`Get-AACNetworkSecurityGroup` assesses network security groups the way an
+auditor would. Without parameters it covers every NSG you can see.
+
+```powershell
+Get-AACNetworkSecurityGroup                                                  # every NSG
+Get-AACNetworkSecurityGroup -SubscriptionId $sub -ResourceGroupName 'rg-network' -Name 'nsg-web', 'nsg-app'
+Get-AACNetworkSecurityGroup -HtmlPath .\NSG.html -PdfPath .\NSG.pdf -CsvPath .\NSG-rules.csv
+(Get-AACNetworkSecurityGroup -NoDisplay).Findings | Where-Object Severity -EQ 'High'
+```
+
+**What each NSG records**
+
+| Area | What's captured |
+|---|---|
+| Metadata | Name, resource ID, subscription, resource group, location, tags |
+| Associations | The subnets (VNet, prefix) and network interfaces (VM, private IP) it's applied to, and how many VMs it protects through either - charted as "VMs protected per NSG" to show how standard the perimeter is |
+| Rules | Every rule, custom and default, in the order Azure evaluates them: priority, direction, protocol, source, source port, destination, destination port and action. Application security groups are shown by name. |
+| Telemetry | Diagnostic settings (Log Analytics workspace, storage account, event hub; log categories), and flow logs with retention and Traffic Analytics. Either an NSG flow log or a virtual network flow log on its VNet, subnet or NIC counts. |
+
+**Findings**, each with what to do:
+
+| Severity | Finding |
+|---|---|
+| High | An inbound Allow from `*`, `Internet` or `0.0.0.0/0` to every port, or to a management or database port (SSH, RDP, WinRM, SMB, SQL, Redis, …) |
+| Medium | A wide port range open to the internet. An NSG on no subnet and no NIC. **A NIC NSG and its subnet's NSG that disagree:** Azure evaluates both, so if one allows what the other denies, the traffic is blocked. No flow log, or a disabled one. |
+| Low | ICMP from the internet. Everything allowed from the virtual network. **A shadowed rule:** an earlier rule covers it, so it never applies. Flow logs kept under 90 days. No diagnostic settings. |
+| Info | Flow logs without Traffic Analytics. Only an NSG flow log (NSG flow logs retire on 30 September 2027). Over 800 of the 1,000 rules an NSG can hold. |
+
+**Output**
+- **At the prompt:** tiles, the NSGs ordered by risk, the High and Medium
+  findings, and, for up to three NSGs, each one in detail with its rules.
+- **Objects:** `AAC.NetworkSecurityGroup`, carrying their rules, findings,
+  associations and logging.
+- **`-CsvPath`:** every rule, with its risk and finding.
+- **`-HtmlPath`:** tables of NSGs, findings, rules, associations and logging,
+  each with a CSV download.
+- **`-PdfPath`:** a summary, the findings, and a page per NSG with its rules.
+- **`-NoDiagnosticSetting`:** skips the diagnostic-settings calls (one per
+  NSG).
 
 ## Resource map
 
@@ -538,7 +857,8 @@ lists every failing resource under its rule, with the rule's recommendation.
 | Source | Rules | |
 |---|---|---|
 | PSRule for Azure | Every rule of the installed PSRule.Rules.Azure | `-Baseline` picks one of its baselines |
-| Azure.Admin.Console | `AAC.Resource.RequiredTags`, `AAC.ResourceGroup.RequiredTags`, `AAC.Resource.AllowedTagValues` | Off until configured; in `PSRule\Rules` |
+| Azure.Admin.Console | `AAC.Resource.RequiredTags`, `AAC.ResourceGroup.RequiredTags`, `AAC.Resource.AllowedTagValues` | Check the tags named in `Get-AACTagDefault` (`PSRule\Rules\AAC.Tags.Rule.ps1`, empty as shipped) or in `AAC_REQUIRED_TAGS` / `AAC_ALLOWED_TAG_VALUES`; with no tags named they check nothing, and the command says so |
+| Azure.Admin.Console | `AAC.Resource.Naming` | On by default: the Cloud Adoption Framework abbreviations (`rg-`, `vnet-`, `kv-`, `st...`), or your own with `AAC_NAMING_PATTERNS` |
 | Custom | Your own rule files, from `-RulePath` | `*.Rule.ps1`, `*.Rule.yaml` or `*.Rule.jsonc` |
 
 `-Rule` runs only the rules named, and `-ExcludeRule` leaves rules out. Both
@@ -554,6 +874,62 @@ Invoke-AACPSRule -Configuration @{
     AZURE_RESOURCE_ALLOWED_LOCATIONS = @('uksouth', 'ukwest')
 }
 ```
+
+**Insights** (`-Insight`) add what the estate is made of and what needs
+attention, from the same parallel Resource Graph read (about 11 more
+queries):
+
+| | |
+|---|---|
+| **Mix** | VM sizes, operating systems (Windows Server 2022, Ubuntu 22.04, ... - from the VM's instance view, or its image), VM power states, Azure VMs and Azure Arc servers, storage account replication, database tiers (Azure SQL DTU / vCore / serverless, Cosmos DB, PostgreSQL, MySQL), tag coverage |
+| **Needs attention** | Unattached disks (with their size), unused public IPs and NICs, VMs **stopped but still billed** (stopped in the OS, not deallocated), disconnected Arc servers, classic resources (retired), subnets 80% full or more, VPN and ExpressRoute connections down, empty resource groups - each with its cost this month when `-Cost` is given too |
+| **Network** | Every subnet's used and usable IPs (Azure keeps 5 per subnet), and the VPN and ExpressRoute connections with their status |
+
+The console shows them as proportion charts and a table; the HTML report as
+donut charts that filter a machines table, and tables of what needs
+attention, subnets and connections; the PDF as a page of its own.
+
+**Tags.** The tag rules check the tags you name. Name them for one run with
+`-Configuration`, or for every run in `Get-AACTagDefault` in
+`PSRule\Rules\AAC.Tags.Rule.ps1`:
+
+```powershell
+function global:Get-AACTagDefault {
+    @{
+        RequiredTags  = @('Owner', 'CostCenter', 'Environment')
+        AllowedValues = @{ Environment = @('prod', 'test', 'dev') }
+    }
+}
+```
+
+`-Configuration` wins over the defaults. When a tag rule you asked for has
+no tags to check, the view (and `-HtmlPath`, or a warning with `-NoDisplay`)
+says so instead of leaving it out silently.
+
+**Naming conventions.** `AAC.Resource.Naming` checks the names of resource
+groups and about 30 common resource types against Microsoft's
+[Cloud Adoption Framework abbreviations](https://learn.microsoft.com/azure/cloud-adoption-framework/ready/azure-best-practices/resource-abbreviations),
+with no setting needed. Run on its own, it reads only the types it checks and
+no child settings: a few Resource Graph queries, however large the estate.
+Names Azure creates and manages (`MC_*`, `NetworkWatcherRG`, ...) are skipped.
+
+```powershell
+Invoke-AACPSRule -Rule 'AAC.Resource.Naming'                       # the defaults
+Invoke-AACPSRule -Rule 'AAC.Resource.Naming' -Configuration @{
+    AAC_NAMING_PATTERNS = @{ 'Microsoft.Compute/virtualMachines' = '^vm-(prod|test|dev)-'; 'Microsoft.Web/sites' = '' }   # '' = don't check
+    AAC_NAMING_IGNORE   = @('^legacy-')
+}
+```
+
+To change the defaults for everyone who uses your copy of the module, edit
+the table in `PSRule\Rules\AAC.Naming.Rule.ps1` (`Get-AACNamingDefault`), one
+line per type. To keep your own convention without editing the module, set
+it once in your profile:
+`$PSDefaultParameterValues['Invoke-AACPSRule:Configuration'] = @{ AAC_NAMING_PATTERNS = @{ ... } }`.
+
+`-Rule` takes rule names, not files: the module's rules always load, and
+`-RulePath` adds rule files of your own. A `-Rule` that matches no rule is an
+error rather than an empty result.
 
 ### Your own rules
 
@@ -589,6 +965,10 @@ sign-in instead:
   rules, Key Vault diagnostic settings, App Service config, and API
   Management APIs, products and policies. It reads the same children, with
   the same API versions, as `Export-AzRuleData` (PSRule.Rules.Azure v1.47).
+
+When only the module's `AAC.*` rules run, the child settings aren't read:
+those rules look only at names, types and tags. `-NoExpand` does the same for
+your own rules that need nothing more.
 
 Reader access is enough. When a setting can't be read, the command warns and
 names it, because the rules using it may be wrong for that resource. VPN
@@ -699,6 +1079,11 @@ the module: its message gives the module file and line. Please
 [report it](https://github.com/ChendrayanV/Azure.Admin.Console/issues) with
 that message.
 
+**"The pipeline has been stopped."** Before v0.13.0, piping a command to
+`Select-Object -First` (or anything else that stops a pipeline early) ended
+it with this error and a red panel. It isn't a failure: update to v0.13.0 or
+later, where the command just stops. Ctrl+C still stops everything.
+
 **`?` instead of symbols, or `+` and `-` in the progress.** Windows consoles
 often default to a legacy code page (437 or 850), which has no `●`, `→` or
 `✓`. The module detects this: in such a console it draws its symbols in plain
@@ -722,8 +1107,10 @@ Microsoft.PowerShell`) and run it as `pwsh`.
 ## Design and security
 
 - **No Az / Microsoft.Graph modules.** Every Azure call is a plain REST call
-  (`Invoke-RestMethod` / `Invoke-WebRequest`) to Azure Resource Manager and
-  Azure Resource Graph.
+  to Azure Resource Manager, Resource Graph and Cost Management, through one
+  pooled `HttpClient`. Independent calls run in parallel, within each API's
+  limits: Resource Manager 12 at a time, Resource Graph 4, Cost Management 3.
+  Throttled calls wait as long as Azure's retry headers ask.
 - **No app registration and no secrets.** The sign-in uses the authorization
   code flow with PKCE (RFC 7636) and a one-shot localhost listener. Tokens stay
   in memory for the session and are never written to disk.
@@ -763,11 +1150,19 @@ everything on this side for real:
 | Command | Mocked | Tested for real |
 |---|---|---|
 | `Connect-AAC` | The browser (`Start-Process`) and the token endpoint (`Invoke-RestMethod`) | The PKCE code, the localhost listener receiving the redirect, state (CSRF) validation, the token exchange and the stored session |
-| `Get-AACAdvisorRecommendation`, `Get-AACFirewallRule`, `Show-AACResource` | Resource Graph (`Invoke-AACResourceGraphQuery`) with hand-built rows | Flattening, filters and search, output modes, CSV, PDF and HTML, and the console view |
-| `Show-AACCost` | The Cost Management query (`Invoke-AACCostQuery`) | Month and service totals, failed subscriptions, the charts, PDF and HTML; also the query's paging |
-| `Invoke-AACPSRule` | The engine (`Invoke-AACPSRuleEngine`) | Output modes, `-FailedOnly`, settings passed on, CSV and HTML |
-| PSRule for Azure data (`Get-AACRuleData`) | Azure Resource Manager (`Invoke-AACArmRequest`) | The Export-AzRuleData shape, child settings, 403/404 handling, masked shared keys, type filters |
-| PSRule runner | Nothing | Real PSRule for Azure in a child `pwsh`: the AAC.* rules, `-Type` binding for custom rules, wildcard include/exclude, a rule error not stopping the run |
+| The transport (`Invoke-AACHttp`, `Invoke-AACArmParallel`, `Invoke-AACGraphBatch`) | The single HTTP send (`Send-AACHttpRequest`), or nothing (a local test server) | Retries as Azure's retry headers ask (`Retry-After`, Cost Management's and Resource Graph's own), paging (`nextLink`, `$skipToken`), the throttle limit, Azure's error messages, failures allowed per query |
+| `Get-AACAdvisorRecommendation`, `Get-AACFirewallRule`, `Show-AACResource` | Resource Graph, with hand-built rows (through a shim that runs each batched query one by one) | Flattening, filters and search, output modes, CSV, PDF and HTML, and the console view |
+| `Get-AACInventory` | Resource Graph and Cost Management, with a made-up Contoso tenant | The tree and its rolled-up counts, secure scores, cost (management group scope and the per-subscription fallback, deleted resources, currencies), insights (the mix, what needs attention, subnets), the views and the exports |
+| `Get-AACPolicyState` | Resource Graph, with made-up policy states | The KQL and its filters, management group, subscription and resource group scope, each resource's verdict, compliance per assignment, scope and policy, the view and the exports |
+| `Get-AACSkuAvailability` | The parallel ARM reads and Resource Graph, with made-up Compute SKUs, usage and zones | Region and zone restrictions, zones asked for, family and regional quota, AKS's rules, series, size and architecture filters, a cluster's node pools, errors, the view and the exports |
+| `Get-AACSecurityPosture` | Resource Graph, with made-up Defender for Cloud and Azure Policy rows | Findings across sections, scores, compliance traced to resources, plans, policy compliance, resource group and tag narrowing, the queries per section, the view and the exports |
+| `Get-AACNetworkSecurityGroup` | Resource Graph and the parallel ARM reads | Rule evaluation, associations and VMs protected, NIC-and-subnet conflicts, flow logs, findings, the view and the exports |
+| `Show-AACResourceMap` | Resource Graph, with a made-up hub-and-spoke estate | Boxes, placement, connections, network paths, NSGs and route tables, the page |
+| `Get-AACEntraGroupMembership` | Microsoft Graph (`Send-AACHttpRequest`), with made-up groups | Name filters and OData quoting, paging, nested groups and loops, a group that can't be read, the Connect-AAC Graph token, the view and the exports |
+| `Show-AACCost` | Cost Management (`Invoke-AACCostBatch`, through a shim) | Month and service totals, failed subscriptions, the charts, PDF and HTML; also the query's paging |
+| `Invoke-AACPSRule` | The engine (`Invoke-AACPSRuleEngine`) | Output modes, `-FailedOnly`, settings passed on, CSV and HTML; what is read for the rules asked for; `-Rule` checks; the view listing every resource |
+| PSRule for Azure data (`Get-AACRuleData`) | Azure Resource Manager (`Invoke-AACArmRequest`, `Invoke-AACArmParallel`) | The Export-AzRuleData shape, child settings, 403/404 handling, masked shared keys, type filters in the query, `-NoExpand` |
+| PSRule runner | Nothing | Real PSRule for Azure in a child `pwsh`: the AAC.* rules (naming with its defaults, tags), `-Type` binding for custom rules, wildcard include/exclude, a rule error not stopping the run |
 | `Invoke-AACApplicationInsightQuery` | Resource Graph and the query API (`Invoke-AACArmRequest`) | The KQL built from the parameters (with escaping), both table schemas flattened, `-Query`, errors, the view and the exports |
 
 The console views are checked by swapping the Spectre console for one that
@@ -810,8 +1205,8 @@ It then checks the staged copy: the manifest is valid, the exports match
 2. Commit, then push a tag that matches the version:
 
    ```powershell
-   git tag -a v0.12.0 -m "Azure.Admin.Console v0.12.0"
-   git push origin v0.12.0
+   git tag -a v0.13.0 -m "Azure.Admin.Console v0.13.0"
+   git push origin v0.13.0
    ```
 
 Only a version tag publishes. Pushes and pull requests run CI only.

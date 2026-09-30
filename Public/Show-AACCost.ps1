@@ -10,7 +10,7 @@ function Show-AACCost {
         Connect-AAC sign-in (no Az modules), for each subscription's actual
         cost over the last -Months months (this month so far included),
         broken down by month, service and resource group - one query per
-        subscription. The view:
+        subscription, three at a time. The view:
 
           ── Azure Admin Console :: Azure cost ──────────────────────────
           account · tenant · subscriptions · period · when
@@ -136,8 +136,10 @@ function Show-AACCost {
     )
 
     # A failure anywhere below ends as a Spectre.Console error panel and this
-    # command's own terminating error, not a line inside the module.
-    trap { $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
+    # command's own terminating error, not a line inside the module. A stopped
+    # pipeline (Select-Object -First, Ctrl+C) is no failure: just return - a
+    # rethrow would stop the caller's whole script, not only this command.
+    trap { if ($_.Exception -is [System.Management.Automation.PipelineStoppedException]) { return }; $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
 
     # Resolve paths now, relative to the caller's location, so a bad path
     # fails before any Azure call.
@@ -220,23 +222,18 @@ function Show-AACCost {
         Update-AACProgress -Id 'subscriptions' -Complete -Description ('Found {0} subscription(s)' -f $subscriptions.Count)
 
         # Cost Management allows only a few queries a minute: one per
-        # subscription, each named as it is read.
+        # subscription, three at a time, each named as it finishes.
         Update-AACProgress -Id 'cost' -Total $subscriptions.Count -Description "Reading costs for $($subscriptions.Count) subscription(s)"
-        $index = 0
+        $names = @{}
+        foreach ($subscription in $subscriptions) { $names["/subscriptions/$($subscription.subscriptionId)"] = if ($subscription.name) { $subscription.name } else { $subscription.subscriptionId } }
+        $read = Invoke-AACCostBatch -Scope @($subscriptions | ForEach-Object { "/subscriptions/$($_.subscriptionId)" }) -Body $query -OnProgress {
+            param($Scope, $Status, $Done, $Total)
+            Update-AACProgress -Id 'cost' -Increment 1 -Description "Read costs: $($names[$Scope]) ($Done of $Total)"
+        }
         $results = @(foreach ($subscription in $subscriptions) {
-                $index++
-                $name = if ($subscription.name) { $subscription.name } else { $subscription.subscriptionId }
-                Update-AACProgress -Id 'cost' -Description "Reading costs: $name ($index of $($subscriptions.Count))"
-                $rows = @()
-                $status = 'OK'
-                try {
-                    $rows = @(Invoke-AACCostQuery -SubscriptionId $subscription.subscriptionId -Body $query)
-                }
-                catch {
-                    $status = [string]$_.Exception.Message
-                }
-                Update-AACProgress -Id 'cost' -Increment 1
-                @{ Subscription = $subscription; Name = $name; Rows = $rows; Status = $status }
+                $scope = "/subscriptions/$($subscription.subscriptionId)"
+                $entry = if ($read.Contains($scope)) { $read[$scope] } else { @{ Rows = @(); Status = 'Not read.' } }
+                @{ Subscription = $subscription; Name = $names[$scope]; Rows = @($entry.Rows); Status = $entry.Status }
             })
         $unreadable = @($results | Where-Object { $_.Status -ne 'OK' }).Count
         $costless = @($results | Where-Object { $_.Status -eq 'OK' -and -not @($_.Rows | Where-Object { [double](Get-AACPropertyValue -InputObject $_ -Name 'Cost') -ne 0 }).Count }).Count

@@ -16,6 +16,7 @@ BeforeDiscovery {
 
 Describe 'Azure Admin Console - Show-AACCost' {
     BeforeAll {
+        . (Join-Path -Path $PSScriptRoot -ChildPath 'Fixtures/GraphBatchShim.ps1')
         $script:capture = {
             param([scriptblock] $Render, [switch] $Ascii)
             $real = [Spectre.Console.AnsiConsole]::Console
@@ -52,6 +53,7 @@ Describe 'Azure Admin Console - Show-AACCost' {
     }
 
     BeforeEach {
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACCostBatch -MockWith { & $script:costBatchShim $Scope $Body }
         $prod = '11111111-1111-1111-1111-111111111111'
         $web = '44444444-4444-4444-4444-444444444444'
         $dev = '22222222-2222-2222-2222-222222222222'
@@ -230,20 +232,11 @@ Describe 'Azure Admin Console - Invoke-AACCostQuery' {
     It 'turns Cost Management columns and rows into objects and follows nextLink' {
         InModuleScope 'Azure.Admin.Console' {
             Mock Get-AACAccessToken { 'fake-token' }
-            Mock Invoke-RestMethod -ParameterFilter { $Uri -like '*api-version=2023-11-01' } -MockWith {
-                [pscustomobject]@{ properties = [pscustomobject]@{
-                        columns  = @([pscustomobject]@{ name = 'Cost' }, [pscustomobject]@{ name = 'ServiceName' }, [pscustomobject]@{ name = 'Currency' })
-                        rows     = @(, @(10.5, 'Storage', 'USD'))
-                        nextLink = 'https://management.azure.com/next-page'
-                    }
-                }
+            Mock Invoke-AACHttp -ParameterFilter { $Uri -like '*api-version=2023-11-01' } -MockWith {
+                @{ Status = 200; Content = '{"properties":{"columns":[{"name":"Cost"},{"name":"ServiceName"},{"name":"BillingMonth"},{"name":"Currency"}],"rows":[[10.5,"Storage","2026-08-01T00:00:00","USD"]],"nextLink":"https://management.azure.com/next-page"}}' }
             }
-            Mock Invoke-RestMethod -ParameterFilter { $Uri -eq 'https://management.azure.com/next-page' } -MockWith {
-                [pscustomobject]@{ properties = [pscustomobject]@{
-                        columns = @([pscustomobject]@{ name = 'Cost' }, [pscustomobject]@{ name = 'ServiceName' }, [pscustomobject]@{ name = 'Currency' })
-                        rows    = @(, @(2, 'Key Vault', 'USD'))
-                    }
-                }
+            Mock Invoke-AACHttp -ParameterFilter { $Uri -eq 'https://management.azure.com/next-page' } -MockWith {
+                @{ Status = 200; Content = '{"properties":{"columns":[{"name":"Cost"},{"name":"ServiceName"},{"name":"BillingMonth"},{"name":"Currency"}],"rows":[[2,"Key Vault","2026-09-01T00:00:00","USD"]]}}' }
             }
 
             $rows = @(Invoke-AACCostQuery -SubscriptionId '11111111-1111-1111-1111-111111111111' -Body @{ type = 'ActualCost' })
@@ -251,6 +244,8 @@ Describe 'Azure Admin Console - Invoke-AACCostQuery' {
             $rows[0].ServiceName | Should -BeExactly 'Storage'
             $rows[0].Cost | Should -Be 10.5
             $rows[1].ServiceName | Should -BeExactly 'Key Vault'
+            $rows[0].BillingMonth | Should -BeOfType [datetime] -Because 'ISO months arrive as dates, as they did from Invoke-RestMethod'
+            Should -Invoke Invoke-AACHttp -ParameterFilter { $Method -eq 'Post' -and ($Body | ConvertFrom-Json).type -eq 'ActualCost' } -Times 2 -Exactly
         }
     }
 }

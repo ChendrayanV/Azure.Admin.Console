@@ -33,7 +33,7 @@ Asks the Azure Cost Management Query API, over REST with the
 Connect-AAC sign-in (no Az modules), for each subscription's actual
 cost over the last -Months months (this month so far included),
 broken down by month, service and resource group - one query per
-subscription. The view:
+subscription, three at a time. The view:
 
 ```text
   ── Azure Admin Console :: Azure cost ──────────────────────────

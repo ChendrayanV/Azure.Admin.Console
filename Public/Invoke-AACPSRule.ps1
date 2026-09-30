@@ -21,8 +21,13 @@ function Invoke-AACPSRule {
                               (-Baseline picks one of its baselines)
           Azure.Admin.Console the module's own AAC.* rules (PSRule\Rules):
                               required tags on resources and resource
-                              groups, and allowed tag values - each off
-                              until its setting is given in -Configuration
+                              groups and allowed tag values - the tags
+                              named in -Configuration or in
+                              Get-AACTagDefault (PSRule\Rules\AAC.Tags.Rule.ps1);
+                              with none named they check nothing, and the
+                              view says so - and naming conventions (on by default: the
+                              Cloud Adoption Framework abbreviations, or
+                              AAC_NAMING_PATTERNS)
           custom              your own PSRule rule files (*.Rule.ps1,
                               *.Rule.yaml, *.Rule.jsonc) from -RulePath
         -Rule runs only the rules named, and -ExcludeRule leaves rules out;
@@ -69,7 +74,11 @@ function Invoke-AACPSRule {
         Case-insensitive; wildcards work. Resource groups and subscriptions
         are checked only when no type is given.
     .PARAMETER Rule
-        Only run these rules: names or wildcards, e.g. 'Azure.KeyVault.*'.
+        Only run these rules: names or wildcards, e.g. 'Azure.KeyVault.*' or
+        'AAC.Resource.Naming' - not file paths (use -RulePath for rule
+        files). A -Rule that matches no rule is an error. With only the
+        module's AAC.* rules, just names, types and tags are read - and for
+        AAC.Resource.Naming alone, just the types it checks.
     .PARAMETER ExcludeRule
         Leave out these rules: names or wildcards, e.g. 'Azure.Resource.UseTags'
         or 'AAC.*'.
@@ -83,7 +92,15 @@ function Invoke-AACPSRule {
         custom rules' own.
     .PARAMETER RulePath
         Custom PSRule rule files, or folders of them (*.Rule.ps1,
-        *.Rule.yaml, *.Rule.jsonc), to run with the others.
+        *.Rule.yaml, *.Rule.jsonc), to run with the others. The module's own
+        AAC.* rules always load; don't pass them here.
+    .PARAMETER NoExpand
+        Read only what Resource Graph returns - names, types, tags and
+        properties - not the child settings PSRule for Azure's rules need
+        (diagnostic settings, blob services, API Management APIs, ...: one
+        to hundreds of calls per resource). For your own -RulePath rules
+        that look only at those fields. Runs of only the module's AAC.*
+        rules do this without asking.
     .PARAMETER FailedOnly
         Return and export only the failures (and rules that couldn't be
         evaluated). The counts still cover every result.
@@ -123,6 +140,9 @@ function Invoke-AACPSRule {
         Invoke-AACPSRule -Configuration @{ AAC_REQUIRED_TAGS = @('Owner', 'CostCenter'); AAC_ALLOWED_TAG_VALUES = @{ Environment = @('prod', 'test', 'dev') }; AZURE_RESOURCE_ALLOWED_LOCATIONS = @('uksouth', 'ukwest') }
         Adds the module's tag rules and PSRule for Azure's allowed regions.
     .EXAMPLE
+        Invoke-AACPSRule -Rule 'AAC.Resource.Naming'
+        Checks names against the Cloud Adoption Framework abbreviations, reading only the types it checks.
+    .EXAMPLE
         Invoke-AACPSRule -RulePath .\MyRules -ExcludeRule 'AAC.*'
         Runs your own rules from .\MyRules with PSRule for Azure's, without the module's.
     .EXAMPLE
@@ -152,6 +172,8 @@ function Invoke-AACPSRule {
 
         [string[]] $RulePath,
 
+        [switch] $NoExpand,
+
         [switch] $FailedOnly,
 
         [string] $CsvPath,
@@ -170,8 +192,10 @@ function Invoke-AACPSRule {
     )
 
     # A failure anywhere below ends as a Spectre.Console error panel and this
-    # command's own terminating error, not a line inside the module.
-    trap { $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
+    # command's own terminating error, not a line inside the module. A stopped
+    # pipeline (Select-Object -First, Ctrl+C) is no failure: just return - a
+    # rethrow would stop the caller's whole script, not only this command.
+    trap { if ($_.Exception -is [System.Management.Automation.PipelineStoppedException]) { return }; $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
 
     # An export means the report is in the files: the console shows only the
     # title, the progress and the files written.
@@ -193,6 +217,10 @@ function Invoke-AACPSRule {
             $full
         })
 
+    # What the rules need read - and a -Rule that can't match anything -
+    # worked out before any Azure call.
+    $plan = Get-AACPSRulePlan -Rule @($Rule | Where-Object { $_ }) -ExcludeRule @($ExcludeRule | Where-Object { $_ }) -RulePath $rulePaths -Baseline $Baseline -ResourceType @($ResourceType | Where-Object { $_ }) -Configuration $Configuration -NoExpand:$NoExpand
+
     # Fails with a clear message before anything is drawn.
     $null = Get-AACAccessToken
 
@@ -202,7 +230,8 @@ function Invoke-AACPSRule {
     $run = Invoke-AACProgress -ScriptBlock {
         $engine = @{
             SubscriptionId = @($SubscriptionId | Where-Object { $_ })
-            ResourceType   = @($ResourceType | Where-Object { $_ })
+            ResourceType   = @($plan.ResourceType)
+            NoExpand       = -not $plan.Expand
             Rule           = @($Rule | Where-Object { $_ })
             ExcludeRule    = @($ExcludeRule | Where-Object { $_ })
             Baseline       = $Baseline
@@ -212,6 +241,9 @@ function Invoke-AACPSRule {
         Invoke-AACPSRuleEngine @engine
     }
     $results = @($run.Results)
+    if ($Rule -and $run.Rules -eq 0) {
+        throw "No rule matches -Rule $(($Rule | ForEach-Object { "'$_'" }) -join ', ')$(if ($ExcludeRule) { " (after -ExcludeRule)" }). Use rule names or wildcards: 'AAC.*' for the module's rules, 'Azure.Storage.*' for PSRule for Azure's - or run without -Rule to list them all."
+    }
     $listed = if ($FailedOnly) { @($results | Where-Object Outcome -NE 'Pass') } else { $results }
 
     # What was checked, for the view and the reports.
@@ -223,6 +255,7 @@ function Invoke-AACPSRule {
     if ($ExcludeRule) { $scope['Excluded rules'] = $ExcludeRule -join ', ' }
     if ($Baseline) { $scope['Baseline'] = $Baseline }
     if ($RulePath) { $scope['Custom rules'] = $RulePath -join ', ' }
+    if ($plan.Read) { $scope['Read'] = $plan.Read }
     if ($Configuration.Count) {
         $scope['Settings'] = (@($Configuration.Keys | Sort-Object | ForEach-Object {
                     $value = $Configuration[$_]
@@ -232,19 +265,19 @@ function Invoke-AACPSRule {
     }
     $scope['PSRule for Azure'] = $run.Version
 
-    foreach ($warning in $run.Warnings) {
-        if (-not $showView) { Write-Warning $warning }
+    foreach ($warning in @($plan.Notice) + @($run.Warnings)) {
+        if ($warning -and -not $showView) { Write-Warning $warning }
     }
 
     $null = Invoke-AACExport -CsvPath $csvFullPath -CsvObject $listed -Noun 'result' -PdfPath $pdfFullPath -WritePdf {
         Write-AACPSRulePdf -Result $results -Path $pdfFullPath -Title $Title -Detail $scope -Rules $run.Rules -Objects $run.Objects
     } -HtmlPath $htmlFullPath -WriteHtml {
-        Write-AACPSRuleHtml -Result $results -Path $htmlFullPath -Title $Title -Detail $scope -Rules $run.Rules -Objects $run.Objects -Warning $run.Warnings -FailedOnly:$FailedOnly
+        Write-AACPSRuleHtml -Result $results -Path $htmlFullPath -Title $Title -Detail $scope -Rules $run.Rules -Objects $run.Objects -Warning (@($plan.Notice) + @($run.Warnings) | Where-Object { $_ }) -FailedOnly:$FailedOnly
     }
 
     if ($showView) {
         Invoke-AACPagedOutput -NoPaging:$NoPaging -ScriptBlock {
-            Show-AACPSRuleView -Result $results -Scope $scope -Rules $run.Rules -Objects $run.Objects -Warning $run.Warnings
+            Show-AACPSRuleView -Result $results -Scope $scope -Rules $run.Rules -Objects $run.Objects -Warning $run.Warnings -Notice $plan.Notice
             Write-AACMarkup '[grey42]Add -PassThru (or pipe the command) for the objects; -CsvPath, -PdfPath or -HtmlPath for a report.[/]'
         }
     }

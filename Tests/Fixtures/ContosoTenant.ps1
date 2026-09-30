@@ -97,3 +97,43 @@ function Get-AACContosoTenant {
         )
     }
 }
+
+<#
+    Cost Management rows for the Contoso tenant (grouped by ResourceId and
+    SubscriptionId, monthly), this month and last:
+      sub-connectivity (USD)  afw-hub 800 / 900
+      sub-corp-apps (USD)     vm-web-01 100 / 150, vm-web-02 50 / 0,
+                              a database of sql-orders 30 / 0 (billed to its
+                              server), a deleted VM in rg-app 20, a deleted
+                              resource in rg-other 7, a charge with no
+                              resource 5
+      sub-legacy (EUR)        asp-old 10 / 0
+#>
+function Get-AACContosoCost {
+    $thisMonth = [datetime]::new((Get-Date).Year, (Get-Date).Month, 1)
+    $lastMonth = $thisMonth.AddMonths(-1)
+    $connectivity = '11111111-1111-1111-1111-111111111111'
+    $corp = '22222222-2222-2222-2222-222222222222'
+    $legacy = '33333333-3333-3333-3333-333333333333'
+    $row = {
+        param($Sub, [string] $Path, [datetime] $Month, [double] $Cost, [string] $Currency = 'USD')
+        [pscustomobject]@{ Cost = $Cost; BillingMonth = $Month; ResourceId = $(if ($Path) { "/subscriptions/$Sub/resourcegroups/$Path".ToLowerInvariant() } else { '' }); SubscriptionId = $Sub; Currency = $Currency }
+    }
+    @{
+        ThisMonth = $thisMonth.ToString('yyyy-MM', [cultureinfo]::InvariantCulture)
+        LastMonth = $lastMonth.ToString('yyyy-MM', [cultureinfo]::InvariantCulture)
+        Rows      = @(
+            & $row $connectivity 'rg-hub/providers/Microsoft.Network/azureFirewalls/afw-hub' $thisMonth 800
+            & $row $connectivity 'rg-hub/providers/Microsoft.Network/azureFirewalls/afw-hub' $lastMonth 900
+            & $row $corp 'rg-app/providers/Microsoft.Compute/virtualMachines/vm-web-01' $thisMonth 100
+            & $row $corp 'rg-app/providers/Microsoft.Compute/virtualMachines/vm-web-01' $lastMonth 150
+            & $row $corp 'rg-app/providers/Microsoft.Compute/virtualMachines/vm-web-02' $thisMonth 50
+            & $row $corp 'rg-data/providers/Microsoft.Sql/servers/sql-orders/databases/sqldb-billing' $thisMonth 30
+            & $row $corp 'rg-app/providers/Microsoft.Compute/virtualMachines/vm-gone' $thisMonth 20
+            & $row $corp 'rg-other/providers/Microsoft.Storage/storageAccounts/stgone' $thisMonth 7
+            & $row $corp '' $thisMonth 5
+            & $row $legacy 'rg-old/providers/Microsoft.Web/serverFarms/asp-old' $thisMonth 10 'EUR'
+        )
+        Status    = @{ $connectivity = 'OK'; $corp = 'OK'; $legacy = 'OK' }
+    }
+}

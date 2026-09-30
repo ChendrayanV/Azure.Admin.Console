@@ -15,6 +15,7 @@ BeforeDiscovery {
 }
 
 BeforeAll {
+    . (Join-Path -Path $PSScriptRoot -ChildPath 'Fixtures/GraphBatchShim.ps1')
     . (Join-Path -Path $PSScriptRoot -ChildPath 'Fixtures/ContosoEstate.ps1')
     $script:estate = @(Get-AACContosoEstate)
     $script:hubSub = '11111111-1111-1111-1111-111111111111'
@@ -268,6 +269,7 @@ Describe 'Azure Admin Console - resource map page' {
 Describe 'Azure Admin Console - Show-AACResourceMap' {
     BeforeEach {
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Get-AACAccessToken -MockWith { 'fake-token' }
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACGraphBatch -MockWith { & $script:graphBatchShim $Query $SubscriptionId $ManagementGroupId $AsObject $AllowFailure }
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Open-AACFile -MockWith { }
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACArmRequest -MockWith {
             $query = ($Body | ConvertFrom-Json).query

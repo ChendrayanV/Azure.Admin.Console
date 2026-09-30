@@ -70,6 +70,7 @@ $docs = Join-Path $root 'docs'
 $packageItems = @(
     "$moduleName.psd1"
     "$moduleName.psm1"
+    "$moduleName.Format.ps1xml"
     'Public'
     'Private'
     'PSRule'

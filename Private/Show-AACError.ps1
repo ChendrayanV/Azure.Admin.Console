@@ -6,7 +6,11 @@ function Show-AACError {
     .DESCRIPTION
         Every exported command starts with
 
-          trap { $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
+          trap { if ($_.Exception -is [System.Management.Automation.PipelineStoppedException]) { return }; $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
+
+        A stopped pipeline (Select-Object -First, Ctrl+C) never reaches this
+        function: the trap returns, because rethrowing that exception would
+        stop the caller's whole script instead of just this command.
 
         so a failure anywhere inside it - its own checks, Azure, an export -
         ends the same way. At an interactive console, a red panel:
@@ -90,7 +94,7 @@ function Show-AACError {
     }
     elseif ($message -match 'Connect-AAC') { '' }
     elseif ($status -eq 401) { 'Azure no longer accepts the sign-in. Run Connect-AAC again.' }
-    elseif ($status -eq 403) { 'Your account needs a role that allows this: Reader on the subscriptions for most commands, Cost Management Reader for Show-AACCost, Log Analytics Reader for Invoke-AACApplicationInsightQuery.' }
+    elseif ($status -eq 403) { 'Your account needs a role that allows this: Reader on the subscriptions for most commands, Cost Management Reader for Show-AACCost, Log Analytics Reader for Invoke-AACApplicationInsightQuery; permission to read groups in Entra ID for Get-AACEntraGroupMembership.' }
     elseif ($status -eq 404) { 'Check the name, and the subscription (-SubscriptionId) it is in.' }
     elseif ($status -eq 429) { 'Azure is throttling requests. Wait a minute, then try again - or narrow the scope with -SubscriptionId.' }
     elseif ($status -ge 500) { 'Azure had a problem of its own. Try again in a few minutes.' }

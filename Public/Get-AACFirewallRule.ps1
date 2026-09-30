@@ -201,8 +201,10 @@ function Get-AACFirewallRule {
     )
 
     # A failure anywhere below ends as a Spectre.Console error panel and this
-    # command's own terminating error, not a line inside the module.
-    trap { $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
+    # command's own terminating error, not a line inside the module. A stopped
+    # pipeline (Select-Object -First, Ctrl+C) is no failure: just return - a
+    # rethrow would stop the caller's whole script, not only this command.
+    trap { if ($_.Exception -is [System.Management.Automation.PipelineStoppedException]) { return }; $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
 
     # Piped onward (| Where-Object, | Export-Csv ...) the objects are the
     # point, so no view is drawn over them.
@@ -220,7 +222,8 @@ function Get-AACFirewallRule {
     $pdfFullPath = if ($PdfPath) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($PdfPath) }
     $htmlFullPath = if ($HtmlPath) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($HtmlPath) }
 
-    $headers = @{ Authorization = "Bearer $(Get-AACAccessToken)" }
+    # Signed in? (Get-AACAccessToken says what to do when not.)
+    $null = Get-AACAccessToken
 
     $ruleQuery = @'
 networkresources
@@ -255,16 +258,20 @@ resources
         Write-AACRule -Title 'Azure Admin Console :: Azure Firewall' -Color 'deepskyblue3_1'
     }
     $data = Invoke-AACProgress -ScriptBlock {
-        Update-AACProgress -Id 'read' -Total 4 -Description 'Reading firewall policy rules from Azure Resource Graph'
-        $ruleRows = @(Invoke-AACResourceGraphQuery -SubscriptionId $SubscriptionId -Headers $headers -Query $ruleQuery)
-        # Base policies, IP Groups and subscription names can live in any
-        # subscription, so these three are read tenant-wide.
-        Update-AACProgress -Id 'read' -Increment 1 -Description 'Reading firewall policies'
-        $policyRows = @(Invoke-AACResourceGraphQuery -Headers $headers -Query $policyQuery)
-        Update-AACProgress -Id 'read' -Increment 1 -Description 'Reading IP Groups'
-        $ipGroupRows = @(Invoke-AACResourceGraphQuery -Headers $headers -Query $ipGroupQuery)
-        Update-AACProgress -Id 'read' -Increment 1 -Description 'Reading subscription names'
-        $subscriptionRows = @(Invoke-AACResourceGraphQuery -Headers $headers -Query $subscriptionQuery)
+        # The four queries at once (Invoke-AACGraphBatch). Base policies, IP
+        # Groups and subscription names can live in any subscription, so
+        # those three are read tenant-wide.
+        Update-AACProgress -Id 'read' -Total 4 -Description 'Reading firewall policy rules, policies, IP Groups and subscription names'
+        $batch = Invoke-AACGraphBatch -AsObject -SubscriptionId $SubscriptionId -Query ([ordered]@{
+                rules         = $ruleQuery
+                policies      = @{ Tenant = $true; Query = $policyQuery }
+                ipGroups      = @{ Tenant = $true; Query = $ipGroupQuery }
+                subscriptions = @{ Tenant = $true; Query = $subscriptionQuery }
+            }) -OnProgress { param($Name, $Done, $Total) Update-AACProgress -Id 'read' -Increment 1 -Description "Read the $Name ($Done of $Total queries)" }
+        $ruleRows = @($batch.Rows['rules'])
+        $policyRows = @($batch.Rows['policies'])
+        $ipGroupRows = @($batch.Rows['ipGroups'])
+        $subscriptionRows = @($batch.Rows['subscriptions'])
         $policyCount = @($ruleRows | ForEach-Object { $_.firewallPolicyId } | Select-Object -Unique).Count
         Update-AACProgress -Id 'read' -Complete -Description ('Read {0:N0} firewall rule(s) in {1:N0} policy(ies), {2:N0} IP Group(s)' -f $ruleRows.Count, $policyCount, $ipGroupRows.Count)
         @{ Rules = $ruleRows; Policies = $policyRows; IpGroups = $ipGroupRows; Subscriptions = $subscriptionRows }

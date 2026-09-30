@@ -21,7 +21,8 @@ Inventories the tenant as a tree - management groups, subscriptions, resource gr
 ```
 Get-AACInventory [[-ManagementGroupId] <string[]>] [[-SubscriptionId] <string[]>]
  [[-ResourceGroupName] <string[]>] [[-Depth] <string>] [[-CsvPath] <string>] [[-PdfPath] <string>]
- [[-HtmlPath] <string>] [[-Title] <string>] [-NoSecurity] [-PassThru] [-NoDisplay] [-NoPaging]
+ [[-HtmlPath] <string>] [[-Title] <string>] [-NoSecurity] [-Cost] [-Insight] [-PassThru]
+ [-NoDisplay] [-NoPaging]
 ```
 
 ## ALIASES
@@ -70,6 +71,48 @@ colour:
 Without Defender data (not enabled, or no access) the inventory is
 shown without it. -NoSecurity skips reading it.
 
+-Cost adds what everything costs, from Azure Cost Management (Cost
+Management Reader, or Reader, on the subscriptions): the actual cost
+month to date and last month of every resource, rolled up to its
+resource group, subscription, management groups and the tenant.
+
+```text
+  - Asked once for the whole scope when Cost Management allows it -
+    the tenant root management group, or -ManagementGroupId (an
+    Enterprise Agreement or Microsoft Customer Agreement) - and
+    otherwise once per subscription, three at a time.
+  - Costs of resources that no longer exist, and charges not tied to
+    a resource, are shown under their subscription as 'Deleted
+    resources'.
+  - Amounts are in each subscription's billing currency and never
+    converted: a level whose subscriptions are billed in different
+    currencies shows 'mixed' rather than a total.
+  - A subscription whose cost can't be read (some offer types, or no
+    permission) says why; the rest of the inventory is unaffected.
+```
+
+-Insight adds what the estate is made of and what needs attention,
+from the same parallel Resource Graph read:
+
+```text
+  - the mix: VM sizes, operating systems (Windows Server 2022, Ubuntu
+    22.04, ...), VM power states, Azure VMs and Azure Arc servers,
+    storage account replication (LRS, ZRS, GRS, ...), database tiers
+    (Azure SQL DTU, vCore or serverless, Cosmos DB, PostgreSQL,
+    MySQL) and tag coverage (the tags the module's tag rules require,
+    or else the most used)
+  - needs attention: unattached disks, unused public IPs and NICs,
+    VMs stopped but still billed (not deallocated), disconnected Arc
+    servers, classic (retired) resources, subnets 80% full or more,
+    VPN and ExpressRoute connections down, empty resource groups -
+    each with its cost this month when -Cost is given too
+  - every subnet's used and usable IPs (Azure keeps 5 per subnet),
+    and the VPN and ExpressRoute connections
+```
+
+As proportion charts and a table at the console, donut charts and
+tables in the HTML report, and a page in the PDF.
+
 What you get depends on where the command runs:
 
 ```text
@@ -86,7 +129,9 @@ Subscription, ResourceGroup, Resource), Depth, Name, Path, the
 management group, subscription and resource group it is in, Type,
 Kind, Location, SKU, State, the counts below it, TopTypes,
 SecureScore, Rating, Severity, High, Medium, Low, Findings,
-TopFindings, Tags, Id.
+TopFindings, CostMonthToDate, CostLastMonth, Currency, CostStatus,
+Tags, Id. With -Cost, a DeletedResources item per subscription with
+such costs.
 
 -CsvPath writes every node as a CSV row. -HtmlPath writes an
 interactive report: tiles, charts, the hierarchy as a collapsible,
@@ -129,12 +174,50 @@ One subscription as an interactive HTML report and a PDF.
 ### Example 4
 
 ```powershell
+Get-AACInventory -Insight -Cost -HtmlPath .\out\Inventory.html
+```
+
+The tenant with its mix, what needs attention and what that costs this month.
+
+### Example 5
+
+```powershell
+Get-AACInventory -Cost -HtmlPath .\out\Inventory.html
+```
+
+The tenant with what every resource, group and subscription costs.
+
+### Example 6
+
+```powershell
 Get-AACInventory -NoDisplay | Where-Object { $_.Level -eq 'ResourceGroup' -and $_.Resources -eq 0 }
 ```
 
 The empty resource groups.
 
 ## PARAMETERS
+
+### -Cost
+
+Also read what everything costs - month to date and last month -
+from Azure Cost Management, and show it at every level.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
 ### -CsvPath
 
@@ -193,6 +276,32 @@ Aliases: []
 ParameterSets:
 - Name: (All)
   Position: 6
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Insight
+
+Also read what the estate is made of and what needs attention - VM
+sizes, operating systems, power states, Azure Arc servers, storage
+replication, database tiers, tag coverage; unattached disks, unused
+public IPs and NICs, VMs stopped but still billed, classic resources,
+nearly full subnets, VPN and ExpressRoute status - and show it in
+every output.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false

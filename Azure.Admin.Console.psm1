@@ -32,6 +32,9 @@ $script:AACUnicodeHintShown = $false
 # The resource map's page template, ELK and icons (Get-AACResourceMapAsset),
 # read and checked once per session.
 $script:AACResourceMapAsset = $null
+# The HttpClient Invoke-AACArmParallel sends its requests through - one per
+# session, so connections are pooled and reused.
+$script:AACHttpClient = $null
 
 # This module renders its UI with Spectre.Console (https://spectreconsole.net)
 # loaded directly from the vendored DLL in .\lib - no PowerShell wrapper module

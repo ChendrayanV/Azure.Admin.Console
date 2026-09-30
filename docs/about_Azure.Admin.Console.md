@@ -53,8 +53,15 @@ COMMANDS
     Get-AACInventory
         The tenant as a tree: management groups, subscriptions, resource
         groups and resources, with counts at every level; empty resource
-        groups flagged. A console tree, objects, and CSV, PDF and
-        interactive HTML reports (a searchable tree and four tables).
+        groups flagged; the Defender for Cloud secure score and, with -Cost,
+        the cost month to date and last month at every level. A console
+        tree, objects, and CSV, PDF and interactive HTML reports.
+
+    Get-AACNetworkSecurityGroup
+        A detailed assessment of network security groups: associations,
+        every rule, flow logs and diagnostic settings, and findings by
+        severity - open to the internet, shadowed rules, subnet and NIC
+        NSGs that disagree, unassociated NSGs, logging gaps.
 
     Show-AACResourceMap
         A map of one or more resource groups, opened in your browser: the
@@ -69,7 +76,27 @@ COMMANDS
 
     Invoke-AACPSRule
         PSRule for Azure (500+ Well-Architected rules), the module's own
-        rules and your custom rules on the live estate.
+        naming and tag rules (AAC.*) and your custom rules on the live
+        estate. -Rule 'AAC.*' reads only names, types and tags.
+
+    Get-AACSecurityPosture
+        Microsoft Defender for Cloud and Azure Policy in one report: secure
+        scores, recommendations, alerts, Defender plans, regulatory and
+        policy compliance - one list of findings.
+
+    Get-AACSkuAvailability
+        Which VM sizes you can use for virtual machines or AKS node pools in
+        a region and its availability zones - restrictions, vCPU quota and
+        AKS's rules - and why not. Read-only.
+
+    Get-AACPolicyState
+        Azure Policy compliance for every resource - one row per resource
+        and policy - by management group, subscription or resource group.
+
+    Get-AACEntraGroupMembership
+        Entra ID groups and everyone in them - direct and through nested
+        groups - one row per group and member, from Microsoft Graph with the
+        Connect-AAC sign-in.
 
     Invoke-AACApplicationInsightQuery
         Application Insights exceptions, flattened, from a Log Analytics
@@ -207,6 +234,12 @@ TROUBLESHOOTING
         output or with -ErrorAction SilentlyContinue. InternalError is a bug
         in the module; its message gives the file and line. Please report
         it at https://github.com/ChendrayanV/Azure.Admin.Console/issues.
+
+    "The pipeline has been stopped."
+        Before v0.13.0, piping a command to Select-Object -First ended it
+        with this error. It isn't a failure: from v0.13.0 the command just
+        stops and the rest of the script carries on. Ctrl+C still stops
+        everything.
 
     Symbols show as plain ASCII (*, ->, +, -)
         The console isn't UTF-8 (often code page 437 or 850), so the module

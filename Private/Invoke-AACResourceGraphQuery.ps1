@@ -40,18 +40,21 @@ function Invoke-AACResourceGraphQuery {
 
     do {
         $requestBody = @{
-            query = $Query
+            query   = $Query
+            options = @{ '$top' = 1000 }
         }
         if ($SubscriptionId) {
             $requestBody.subscriptions = @($SubscriptionId)
         }
         if ($skipToken) {
-            $requestBody.options = @{ '$skipToken' = $skipToken }
+            $requestBody.options['$skipToken'] = $skipToken
         }
 
-        $response = Invoke-RestMethod -Uri 'https://management.azure.com/providers/Microsoft.ResourceGraph/resources?api-version=2022-10-01' `
-            -Method Post -Headers $Headers -ContentType 'application/json' `
-            -Body ($requestBody | ConvertTo-Json -Depth 10) -ErrorAction Stop -Verbose:$false
+        # Through the pooled HttpClient (Invoke-AACHttp: retries, Azure's own
+        # errors); rows as objects, as Invoke-RestMethod gave them. -Headers
+        # is kept for callers; the token comes from Get-AACAccessToken.
+        $content = (Invoke-AACHttp -Method Post -Uri '/providers/Microsoft.ResourceGraph/resources?api-version=2022-10-01' -Body ($requestBody | ConvertTo-Json -Depth 10)).Content
+        $response = ConvertFrom-Json -InputObject $content -Depth 100
 
         foreach ($item in $response.data) {
             $collected.Add($item)

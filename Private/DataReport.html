@@ -87,6 +87,13 @@ button.hbar:hover { background: var(--panel-2); }
 .hbar .count { text-align: right; font-variant-numeric: tabular-nums; font-weight: 650; font-size: 13px; }
 .hbar .track { grid-column: 1 / -1; height: 6px; border-radius: 99px; background: var(--panel-2); overflow: hidden; }
 .hbar .track span { display: block; height: 100%; border-radius: 99px; background: var(--info-bar); }
+.donut { display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: center; }
+.donut svg { width: 132px; height: 132px; flex: 0 0 132px; }
+.donut svg text { font: 650 7px system-ui, sans-serif; fill: var(--ink); }
+.donut svg text.sub { font-weight: 400; font-size: 3.4px; fill: var(--muted); }
+.donut .legend { flex: 1 1 180px; min-width: 0; }
+.donut .legend .hbar { grid-template-columns: auto minmax(0, 1fr) auto; }
+.donut .swatch { width: 10px; height: 10px; border-radius: 3px; }
 .hbar .track span.good { background: var(--good-bar); } .hbar .track span.bad { background: var(--bad-bar); }
 .hbar .track span.warn { background: var(--warn-bar); } .hbar .track span.violet { background: var(--violet-bar); }
 .hbar .track span.neutral { background: var(--neutral-bar); }
@@ -112,6 +119,9 @@ button.hbar:hover { background: var(--panel-2); }
 .lvl.s { background: var(--warn-soft); color: var(--warn); }
 .lvl.g { background: var(--info-soft); color: var(--info); }
 .lvl.r { background: var(--good-soft); color: var(--good); }
+.lvl.d { background: var(--warn-soft); color: var(--warn); }
+.pill.cost { background: var(--good-soft); color: var(--good); font-weight: 650; }
+.pill.cost.x { background: var(--warn-soft); color: var(--warn); }
 .tnode .tname { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .tnode button.tname { border: 0; background: none; padding: 0; cursor: pointer; color: var(--ink); text-align: left; }
 .tnode button.tname:hover { color: var(--accent); text-decoration: underline; }
@@ -280,23 +290,61 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
   });
   (D.notices || []).forEach(function (n) { $('notices').appendChild(el('div', 'notice ' + (n.tone || 'info'), n.text)); });
 
+  // A bar (or a donut's legend row) that filters its table when clicked.
+  function chartRow(c, i) {
+    var clickable = c.table && c.column && tables[c.table] && i.filter !== null;
+    var b = el(clickable ? 'button' : 'div', 'hbar');
+    if (clickable) {
+      b.type = 'button'; b.title = 'Show ' + i.label + ' in the table';
+      b.addEventListener('click', function () {
+        var f = {}, k;
+        for (k in (c.baseFilters || {})) f[k] = c.baseFilters[k];
+        f[c.column] = i.filter !== undefined ? i.filter : i.label;
+        focusTable(c.table, f);
+      });
+    }
+    return b;
+  }
+  // Donut: each item's share of the total, the total in the middle, and a
+  // legend of counts and percentages - plain SVG, no library.
+  var DONUT = ['var(--info-bar)', 'var(--violet-bar)', 'var(--good-bar)', 'var(--warn-bar)', 'var(--bad-bar)', 'var(--neutral-bar)', '#14b8a6', '#ec4899', '#84cc16', '#f97316', '#6366f1', '#a16207'];
+  var TONE = { good: 'var(--good-bar)', bad: 'var(--bad-bar)', warn: 'var(--warn-bar)', info: 'var(--info-bar)', violet: 'var(--violet-bar)', neutral: 'var(--neutral-bar)' };
+  function donut(card, c) {
+    var total = c.items.reduce(function (t, i) { return t + Math.abs(i.value); }, 0);
+    var wrap = el('div', 'donut'), ns = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(ns, 'svg'); svg.setAttribute('viewBox', '0 0 42 42'); svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', c.title);
+    var ring = function (color, pct, offset) {
+      var ci = document.createElementNS(ns, 'circle');
+      ci.setAttribute('cx', '21'); ci.setAttribute('cy', '21'); ci.setAttribute('r', '15.9155'); ci.setAttribute('fill', 'none');
+      ci.setAttribute('stroke', color); ci.setAttribute('stroke-width', '6');
+      ci.setAttribute('stroke-dasharray', pct + ' ' + (100 - pct)); ci.setAttribute('stroke-dashoffset', String(offset));
+      svg.appendChild(ci);
+    };
+    ring('var(--panel-2)', 100, 0);
+    var at = 25, legend = el('div', 'legend');
+    c.items.forEach(function (i, n) {
+      var color = TONE[i.tone] || DONUT[n % DONUT.length];
+      var pct = total ? 100 * Math.abs(i.value) / total : 0;
+      if (pct > 0) ring(color, pct, at);
+      at = (at - pct + 100) % 100;
+      var b = chartRow(c, i);
+      var sw = el('span', 'swatch'); sw.style.background = color; b.appendChild(sw);
+      b.appendChild(el('span', 'name', i.label));
+      b.appendChild(el('span', 'count', (i.display !== undefined ? i.display : fmtNum(i.value, c.format)) + ' · ' + (total ? Math.round(pct) : 0) + '%'));
+      legend.appendChild(b);
+    });
+    var t = document.createElementNS(ns, 'text'); t.setAttribute('x', '21'); t.setAttribute('y', '22'); t.setAttribute('text-anchor', 'middle'); t.textContent = fmtNum(total, c.format); svg.appendChild(t);
+    if (c.centerLabel) { var u = document.createElementNS(ns, 'text'); u.setAttribute('x', '21'); u.setAttribute('y', '27'); u.setAttribute('text-anchor', 'middle'); u.setAttribute('class', 'sub'); u.textContent = c.centerLabel; svg.appendChild(u); }
+    wrap.appendChild(svg); wrap.appendChild(legend); card.appendChild(wrap);
+  }
   (D.charts || []).forEach(function (c) {
     var card = el('div', 'card' + (c.wide ? ' wide' : ''));
     card.appendChild(el('h2', null, c.title));
     if (!c.items.length) { card.appendChild(el('div', 'muted', 'Nothing to show.')); }
+    if (c.kind === 'donut' && c.items.length) { donut(card, c); $('charts').appendChild(card); return; }
     var max = Math.max.apply(null, c.items.map(function (i) { return Math.abs(i.value); }).concat([0]));
     c.items.forEach(function (i) {
-      var clickable = c.table && c.column && tables[c.table] && i.filter !== null;
-      var b = el(clickable ? 'button' : 'div', 'hbar');
-      if (clickable) {
-        b.type = 'button'; b.title = 'Show ' + i.label + ' in the table';
-        b.addEventListener('click', function () {
-          var f = {}, k;
-          for (k in (c.baseFilters || {})) f[k] = c.baseFilters[k];
-          f[c.column] = i.filter !== undefined ? i.filter : i.label;
-          focusTable(c.table, f);
-        });
-      }
+      var b = chartRow(c, i);
       b.appendChild(el('span', 'name', i.label));
       b.appendChild(el('span', 'count', (i.display !== undefined ? i.display : fmtNum(i.value, c.format)) + (c.suffix ? ' ' + c.suffix : '')));
       var tr = el('span', 'track'); var fill = el('span', i.tone || c.tone || ''); fill.style.width = (max ? Math.max(2, 100 * Math.abs(i.value) / max) : 0) + '%'; tr.appendChild(fill); b.appendChild(tr);
@@ -525,10 +573,11 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
   }
 
   // --- A hierarchy (tenant > management groups > subscriptions > ...) --------------------------
-  // Node: { l: level (t, m, s, g, r), n: name, d: detail, c: [[count, noun], ...],
-  //         f: { table, filters } (what clicking it shows), k: children, x: flagged }
+  // Node: { l: level (t, m, s, g, r, d), n: name, d: detail, c: [[count, noun], ...],
+  //         f: { table, filters } (what clicking it shows), k: children, x: flagged,
+  //         co / ct / cx: cost text, its tooltip, and whether it is a warning }
   if (D.tree) (function (T) {
-    var LEVEL = { t: 'TENANT', m: 'MG', s: 'SUB', g: 'RG', r: 'RES' };
+    var LEVEL = { t: 'TENANT', m: 'MG', s: 'SUB', g: 'RG', r: 'RES', d: 'DEL' };
     var card = el('section', 'card tree-card');
     card.appendChild(el('h2', null, T.title || 'Hierarchy'));
     var tools = el('div', 'tree-tools'); card.appendChild(tools);
@@ -543,7 +592,7 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
     });
     var box = el('div', 'tree'); card.appendChild(box);
     $('tree').appendChild(card);
-    var order = ['t', 'm', 's', 'g', 'r'];
+    var order = ['t', 'm', 's', 'g', 'r', 'd'];
 
     function counts(n) {
       var s = el('span', 'tcount');
@@ -577,6 +626,7 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
       row.appendChild(nameOf(n));
       row.appendChild(el('span', 'tdetail', n.d || ''));
       row.appendChild(counts(n));
+      if (n.co) { var cp = el('span', 'pill cost' + (n.cx ? ' x' : ''), n.co); if (n.ct) cp.title = n.ct; row.appendChild(cp); }
       posture(row, n);
       li.appendChild(row);
       var ul = null;

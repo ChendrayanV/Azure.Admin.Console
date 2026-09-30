@@ -40,6 +40,41 @@ function Get-AACInventory {
         Without Defender data (not enabled, or no access) the inventory is
         shown without it. -NoSecurity skips reading it.
 
+        -Cost adds what everything costs, from Azure Cost Management (Cost
+        Management Reader, or Reader, on the subscriptions): the actual cost
+        month to date and last month of every resource, rolled up to its
+        resource group, subscription, management groups and the tenant.
+          - Asked once for the whole scope when Cost Management allows it -
+            the tenant root management group, or -ManagementGroupId (an
+            Enterprise Agreement or Microsoft Customer Agreement) - and
+            otherwise once per subscription, three at a time.
+          - Costs of resources that no longer exist, and charges not tied to
+            a resource, are shown under their subscription as 'Deleted
+            resources'.
+          - Amounts are in each subscription's billing currency and never
+            converted: a level whose subscriptions are billed in different
+            currencies shows 'mixed' rather than a total.
+          - A subscription whose cost can't be read (some offer types, or no
+            permission) says why; the rest of the inventory is unaffected.
+
+        -Insight adds what the estate is made of and what needs attention,
+        from the same parallel Resource Graph read:
+          - the mix: VM sizes, operating systems (Windows Server 2022, Ubuntu
+            22.04, ...), VM power states, Azure VMs and Azure Arc servers,
+            storage account replication (LRS, ZRS, GRS, ...), database tiers
+            (Azure SQL DTU, vCore or serverless, Cosmos DB, PostgreSQL,
+            MySQL) and tag coverage (the tags the module's tag rules require,
+            or else the most used)
+          - needs attention: unattached disks, unused public IPs and NICs,
+            VMs stopped but still billed (not deallocated), disconnected Arc
+            servers, classic (retired) resources, subnets 80% full or more,
+            VPN and ExpressRoute connections down, empty resource groups -
+            each with its cost this month when -Cost is given too
+          - every subnet's used and usable IPs (Azure keeps 5 per subnet),
+            and the VPN and ExpressRoute connections
+        As proportion charts and a table at the console, donut charts and
+        tables in the HTML report, and a page in the PDF.
+
         What you get depends on where the command runs:
           at the prompt    tiles, the tree (down to -Depth; resource groups by
                            default) and the most common resource types - a
@@ -52,7 +87,9 @@ function Get-AACInventory {
         management group, subscription and resource group it is in, Type,
         Kind, Location, SKU, State, the counts below it, TopTypes,
         SecureScore, Rating, Severity, High, Medium, Low, Findings,
-        TopFindings, Tags, Id.
+        TopFindings, CostMonthToDate, CostLastMonth, Currency, CostStatus,
+        Tags, Id. With -Cost, a DeletedResources item per subscription with
+        such costs.
 
         -CsvPath writes every node as a CSV row. -HtmlPath writes an
         interactive report: tiles, charts, the hierarchy as a collapsible,
@@ -79,6 +116,16 @@ function Get-AACInventory {
     .PARAMETER NoSecurity
         Don't read Microsoft Defender for Cloud: no secure scores, findings
         or recommendations.
+    .PARAMETER Insight
+        Also read what the estate is made of and what needs attention - VM
+        sizes, operating systems, power states, Azure Arc servers, storage
+        replication, database tiers, tag coverage; unattached disks, unused
+        public IPs and NICs, VMs stopped but still billed, classic resources,
+        nearly full subnets, VPN and ExpressRoute status - and show it in
+        every output.
+    .PARAMETER Cost
+        Also read what everything costs - month to date and last month -
+        from Azure Cost Management, and show it at every level.
     .PARAMETER CsvPath
         Write every node - tenant, management groups, subscriptions,
         resource groups and resources - to this CSV file.
@@ -105,6 +152,12 @@ function Get-AACInventory {
         Get-AACInventory -SubscriptionId '00000000-0000-0000-0000-000000000000' -HtmlPath .\out\Inventory.html -PdfPath .\out\Inventory.pdf
         One subscription as an interactive HTML report and a PDF.
     .EXAMPLE
+        Get-AACInventory -Insight -Cost -HtmlPath .\out\Inventory.html
+        The tenant with its mix, what needs attention and what that costs this month.
+    .EXAMPLE
+        Get-AACInventory -Cost -HtmlPath .\out\Inventory.html
+        The tenant with what every resource, group and subscription costs.
+    .EXAMPLE
         Get-AACInventory -NoDisplay | Where-Object { $_.Level -eq 'ResourceGroup' -and $_.Resources -eq 0 }
         The empty resource groups.
     .OUTPUTS
@@ -127,6 +180,10 @@ function Get-AACInventory {
 
         [switch] $NoSecurity,
 
+        [switch] $Cost,
+
+        [switch] $Insight,
+
         [string] $CsvPath,
 
         [string] $PdfPath,
@@ -143,8 +200,10 @@ function Get-AACInventory {
     )
 
     # A failure anywhere below ends as a Spectre.Console error panel and this
-    # command's own terminating error, not a line inside the module.
-    trap { $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
+    # command's own terminating error, not a line inside the module. A stopped
+    # pipeline (Select-Object -First, Ctrl+C) is no failure: just return - a
+    # rethrow would stop the caller's whole script, not only this command.
+    trap { if ($_.Exception -is [System.Management.Automation.PipelineStoppedException]) { return }; $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
 
     $pipedOnward = $MyInvocation.PipelinePosition -lt $MyInvocation.PipelineLength
     $interactive = -not $NoDisplay -and -not $pipedOnward
@@ -157,23 +216,6 @@ function Get-AACInventory {
     $htmlFullPath = & $resolve $HtmlPath
     $quote = { param([string] $Text) "'" + ($Text -replace '\\', '\\' -replace "'", "\'") + "'" }
 
-    # Resource Graph through ARM: rows as hashtables (tags whose keys differ
-    # only by case are fine), following $skipToken; scoped to subscriptions
-    # or management groups when given.
-    $graph = {
-        param([string] $Query, [switch] $Tenant)
-        $body = @{ query = $Query; options = @{ resultFormat = 'objectArray' } }
-        if (-not $Tenant) {
-            if ($SubscriptionId) { $body.subscriptions = @($SubscriptionId) }
-            elseif ($ManagementGroupId) { $body.managementGroups = @($ManagementGroupId) }
-        }
-        do {
-            $response = Invoke-AACArmRequest -Method Post -Uri '/providers/Microsoft.ResourceGraph/resources?api-version=2022-10-01' -Body ($body | ConvertTo-Json -Depth 10)
-            $response['data']
-            $skipToken = $response['$skipToken']
-            $body.options['$skipToken'] = $skipToken
-        } while ($skipToken)
-    }
     $groupFilter = if ($ResourceGroupName) { "($((@($ResourceGroupName | ForEach-Object { & $quote $_ })) -join ', '))" } else { '' }
 
     if ($interactive) {
@@ -182,7 +224,7 @@ function Get-AACInventory {
     $state = Invoke-AACProgress -ScriptBlock {
         $null = Get-AACAccessToken
         $notices = [System.Collections.Generic.List[string]]::new()
-        Update-AACProgress -Id 'read' -Total $(if ($NoSecurity) { 5 } else { 6 }) -Description 'Reading the tenant'
+        Update-AACProgress -Id 'read' -Total $((5 + $(if ($NoSecurity) { 0 } else { 4 }) + $(if ($Insight) { 11 } else { 0 }))) -Description 'Reading the tenant, its management groups, subscriptions, resource groups and resources'
         $tenantId = if ($script:AACSession) { [string]$script:AACSession.TenantId } else { '' }
         $tenantName = ''
         try {
@@ -191,13 +233,40 @@ function Get-AACInventory {
             if ($match) { $tenantName = (@([string]$match['displayName'], [string]$match['defaultDomain']) | Where-Object { $_ } | Select-Object -First 1) }
         }
         catch { Write-Debug "The tenant's name couldn't be read: $($_.Exception.Message)" }
+        Update-AACProgress -Id 'read' -Increment 1
 
-        Update-AACProgress -Id 'read' -Increment 1 -Description 'Reading the management groups'
-        $groups = @()
-        try {
-            $groups = @(& $graph "resourcecontainers | where type =~ 'microsoft.management/managementgroups' | project id, name, displayName = tostring(properties.displayName), parentId = tostring(properties.details.parent.id)" -Tenant)
+        # Every Resource Graph query at once (Invoke-AACGraphBatch): rows as
+        # hashtables, scoped to the subscriptions or management groups given;
+        # the management groups across the tenant, for the path above them.
+        $queries = [ordered]@{
+            groups         = @{ Tenant = $true; Query = "resourcecontainers | where type =~ 'microsoft.management/managementgroups' | project id, name, displayName = tostring(properties.displayName), parentId = tostring(properties.details.parent.id)" }
+            subscriptions  = "resourcecontainers | where type =~ 'microsoft.resources/subscriptions' | project subscriptionId, name, state = tostring(properties.state), parentGroup = tostring(properties.managementGroupAncestorsChain[0].name), quotaId = tostring(properties.subscriptionPolicies.quotaId), tags"
+            resourceGroups = "resourcecontainers | where type =~ 'microsoft.resources/subscriptions/resourcegroups'$(if ($groupFilter) { " and name in~ $groupFilter" }) | project id, name, subscriptionId, location, state = tostring(properties.provisioningState), managedBy, tags"
+            resources      = "resources$(if ($groupFilter) { " | where resourceGroup in~ $groupFilter" }) | project id, name, type, kind, location, resourceGroup, subscriptionId, sku = tostring(sku.name), zones, tags"
         }
-        catch { $notices.Add("The management groups couldn't be read ($($_.Exception.Message -replace '\s+', ' ')), so subscriptions are shown under the tenant.") }
+        # Microsoft Defender for Cloud: secure scores, controls, and each
+        # resource's assessments (a summary, and the unhealthy ones).
+        $securityNames = @('Scores', 'Controls', 'Summary', 'Recommendations')
+        if (-not $NoSecurity) {
+            # The shared Defender for Cloud queries (Get-AACDefenderQuery).
+            $defender = Get-AACDefenderQuery -Name $securityNames
+            foreach ($name in $securityNames) { $queries[$name] = $defender[$name] }
+        }
+        $labels = @{ groups = 'the management groups'; subscriptions = 'the subscriptions'; resourceGroups = 'the resource groups'; resources = 'the resources'; insightVms = 'the virtual machines'; insightArc = 'the Azure Arc servers'; insightDisks = 'the disks'; insightPublicIps = 'the public IPs'; insightNics = 'the network interfaces'; insightStorage = 'the storage accounts'; insightDatabases = 'the databases'; insightSubnets = 'the subnets'; insightConnections = 'the VPN and ExpressRoute connections'; insightCircuits = 'the ExpressRoute circuits'; insightClassic = 'the classic resources' }
+        # The insights' queries (Get-AACInsightQuery), in the same batch.
+        $insightNames = @()
+        if ($Insight) {
+            $insightQueries = Get-AACInsightQuery -GroupFilter $(if ($groupFilter) { " | where resourceGroup in~ $groupFilter" } else { '' })
+            $insightNames = @($insightQueries.Keys)
+            foreach ($name in $insightNames) { $queries[$name] = $insightQueries[$name] }
+        }
+        $batch = Invoke-AACGraphBatch -Query $queries -SubscriptionId $SubscriptionId -ManagementGroupId $ManagementGroupId -AllowFailure (@('groups') + $securityNames + $insightNames) -OnProgress {
+            param($Name, $Done, $Total)
+            Update-AACProgress -Id 'read' -Increment 1 -Description "Read $(if ($labels.Contains($Name)) { $labels[$Name] } else { 'Microsoft Defender for Cloud' }) ($Done of $Total queries)"
+        }
+
+        $groups = @($batch.Rows['groups'])
+        if ($batch.Errors.Contains('groups')) { $notices.Add("The management groups couldn't be read ($($batch.Errors['groups'] -replace '\s+', ' ')), so subscriptions are shown under the tenant.") }
         if (-not $groups.Count) { $notices.Add('No management groups are visible to this account, so subscriptions are shown under the tenant.') }
         # With -ManagementGroupId: those groups, the groups below them, and
         # the groups above them (the path from the tenant).
@@ -209,11 +278,8 @@ function Get-AACInventory {
             foreach ($name in $missing) { Write-Warning "No management group with the ID '$name' was found; it's left out." }
         }
 
-        Update-AACProgress -Id 'read' -Increment 1 -Description 'Reading the subscriptions'
-        $subscriptions = @(& $graph "resourcecontainers | where type =~ 'microsoft.resources/subscriptions' | project subscriptionId, name, state = tostring(properties.state), parentGroup = tostring(properties.managementGroupAncestorsChain[0].name), quotaId = tostring(properties.subscriptionPolicies.quotaId), tags")
-
-        Update-AACProgress -Id 'read' -Increment 1 -Description 'Reading the resource groups'
-        $resourceGroups = @(& $graph "resourcecontainers | where type =~ 'microsoft.resources/subscriptions/resourcegroups'$(if ($groupFilter) { " and name in~ $groupFilter" }) | project id, name, subscriptionId, location, state = tostring(properties.provisioningState), managedBy, tags")
+        $subscriptions = @($batch.Rows['subscriptions'])
+        $resourceGroups = @($batch.Rows['resourceGroups'])
         if ($ResourceGroupName) {
             $found = @($resourceGroups | ForEach-Object { [string]$_['name'] })
             $missing = @($ResourceGroupName | Where-Object { $name = $_; -not @($found | Where-Object { $_ -eq $name }).Count })
@@ -223,35 +289,43 @@ function Get-AACInventory {
             $withGroups = @($resourceGroups | ForEach-Object { ([string]$_['subscriptionId']).ToLowerInvariant() } | Select-Object -Unique)
             $subscriptions = @($subscriptions | Where-Object { ([string]$_['subscriptionId']).ToLowerInvariant() -in $withGroups })
         }
+        $resources = @($batch.Rows['resources'])
 
-        Update-AACProgress -Id 'read' -Increment 1 -Description 'Reading the resources'
-        $resources = @(& $graph "resources$(if ($groupFilter) { " | where resourceGroup in~ $groupFilter" }) | project id, name, type, kind, location, resourceGroup, subscriptionId, sku = tostring(sku.name), zones, tags")
-        # Microsoft Defender for Cloud: secure scores, controls, and each
-        # resource's assessments (a summary, and the unhealthy ones).
         $security = $null
         if (-not $NoSecurity) {
-            Update-AACProgress -Id 'read' -Increment 1 -Description 'Reading Microsoft Defender for Cloud: secure scores and recommendations'
-            try {
-                $assessments = "securityresources | where type =~ 'microsoft.security/assessments' | extend resourceId = tolower(coalesce(tostring(properties.resourceDetails.Id), tostring(properties.resourceDetails.ResourceId))), status = tostring(properties.status.code), severity = tostring(properties.metadata.severity)"
-                $security = @{
-                    Scores          = @(& $graph "securityresources | where type =~ 'microsoft.security/securescores' and name == 'ascScore' | project subscriptionId, current = todouble(properties.score.current), max = todouble(properties.score.max)")
-                    Controls        = @(& $graph "securityresources | where type =~ 'microsoft.security/securescores/securescorecontrols' | project subscriptionId, control = tostring(properties.displayName), current = todouble(properties.score.current), max = todouble(properties.score.max), healthy = toint(properties.healthyResourceCount), unhealthy = toint(properties.unhealthyResourceCount)")
-                    Summary         = @(& $graph "$assessments | where status in ('Healthy', 'Unhealthy') | summarize healthy = countif(status == 'Healthy'), unhealthy = countif(status == 'Unhealthy'), high = countif(status == 'Unhealthy' and severity == 'High'), medium = countif(status == 'Unhealthy' and severity == 'Medium'), low = countif(status == 'Unhealthy' and severity == 'Low') by resourceId")
-                    Recommendations = @(& $graph "$assessments | where status == 'Unhealthy' | project resourceId, subscriptionId, name = tostring(properties.displayName), severity, impact = tostring(properties.metadata.userImpact), effort = tostring(properties.metadata.implementationEffort), categories = strcat_array(properties.metadata.categories, ', '), cause = tostring(properties.status.cause)")
-                }
+            $failed = @($securityNames | Where-Object { $batch.Errors.Contains($_) })
+            if ($failed.Count) {
+                $notices.Add("Microsoft Defender for Cloud couldn't be read ($($batch.Errors[$failed[0]] -replace '\s+', ' ')), so there are no secure scores.")
+            }
+            else {
+                $security = @{}
+                foreach ($name in $securityNames) { $security[$name] = @($batch.Rows[$name]) }
                 if (-not @(@($security.Scores) + @($security.Summary) | Where-Object { $_ }).Count) {
                     $notices.Add('No Microsoft Defender for Cloud data was found in this scope (not enabled, or no access), so there are no secure scores.')
                 }
             }
-            catch {
-                $security = $null
-                $notices.Add("Microsoft Defender for Cloud couldn't be read ($($_.Exception.Message -replace '\s+', ' ')), so there are no secure scores.")
-            }
         }
         Update-AACProgress -Id 'read' -Complete -Description ('Read {0:N0} management group(s), {1:N0} subscription(s), {2:N0} resource group(s) and {3:N0} resource(s)' -f $groups.Count, $subscriptions.Count, $resourceGroups.Count, $resources.Count)
 
+        # --- Cost (Cost Management) ----------------------------------------------------------------
+        $costData = $null
+        if ($Cost) {
+            $costData = Read-AACInventoryCost -TenantId $tenantId -Subscription $subscriptions -ManagementGroupId $ManagementGroupId -PerSubscription:($SubscriptionId -or $ResourceGroupName)
+            $costData.FilterGroups = [bool]$ResourceGroupName
+            foreach ($notice in @($costData.Notice)) { $notices.Add($notice) }
+        }
+
         Update-AACProgress -Id 'tree' -Description 'Building the tree' -Indeterminate
-        $inventory = ConvertTo-AACInventory -TenantId $tenantId -TenantName $tenantName -ManagementGroup $groups -Subscription $subscriptions -ResourceGroup $resourceGroups -Resource $resources -KeepManagementGroup @($ManagementGroupId | Where-Object { $_ }) -Security $security
+        $inventory = ConvertTo-AACInventory -TenantId $tenantId -TenantName $tenantName -ManagementGroup $groups -Subscription $subscriptions -ResourceGroup $resourceGroups -Resource $resources -KeepManagementGroup @($ManagementGroupId | Where-Object { $_ }) -Security $security -Cost $costData
+        if ($Insight) {
+            $rows = @{}
+            foreach ($name in $insightNames) { $rows[$name] = @($batch.Rows[$name]) }
+            $unread = @($insightNames | Where-Object { $batch.Errors.Contains($_) })
+            if ($unread.Count) { $notices.Add("Some insights couldn't be read ($(($unread | ForEach-Object { $_ -replace '^insight', '' }) -join ', ')): $($batch.Errors[$unread[0]] -replace '\s+', ' ')") }
+            # Tag coverage: the tags the module's tag rules require (Get-AACTagDefault), if any.
+            $required = @((Get-AACRuleDefault -File 'AAC.Tags.Rule.ps1' -Function 'Get-AACTagDefault')['RequiredTags'] | Where-Object { $_ })
+            $inventory.Insight = ConvertTo-AACInventoryInsight -Rows $rows -Item $inventory.Items -RequiredTag $required
+        }
         $inventory.Notice = $notices.ToArray()
         $posture = if ($inventory.Stats.HasSecurity -and $null -ne $inventory.Stats.SecureScore) { ", secure score $($inventory.Stats.SecureScore)%" } else { '' }
         Update-AACProgress -Id 'tree' -Complete -Description ('Tree: {0:N0} management group(s) > {1:N0} subscription(s) > {2:N0} resource group(s) > {3:N0} resource(s){4}' -f $inventory.Stats.ManagementGroups, $inventory.Stats.Subscriptions, $inventory.Stats.ResourceGroups, $inventory.Stats.Resources, $posture)
@@ -260,6 +334,7 @@ function Get-AACInventory {
             Scope = if ($ManagementGroupId) { "management group(s) $($ManagementGroupId -join ', ')" } elseif ($SubscriptionId) { "subscription(s) $($SubscriptionId -join ', ')" } else { 'the whole tenant (everything the account can see)' }
         }
         if ($ResourceGroupName) { $scope['Resource groups'] = $ResourceGroupName -join ', ' }
+        if ($costData) { $scope['Cost'] = $costData.Period }
         $null = Invoke-AACExport -CsvPath $csvFullPath -CsvObject @($inventory.Items | Select-Object -Property * -ExcludeProperty Depth) -Noun 'item' -PdfPath $pdfFullPath -WritePdf {
             Write-AACInventoryPdf -Inventory $inventory -Path $pdfFullPath -Title $Title -Detail $scope
         } -HtmlPath $htmlFullPath -WriteHtml {

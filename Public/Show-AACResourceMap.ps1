@@ -140,8 +140,10 @@ function Show-AACResourceMap {
     )
 
     # A failure anywhere below ends as a Spectre.Console error panel and this
-    # command's own terminating error, not a line inside the module.
-    trap { $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
+    # command's own terminating error, not a line inside the module. A stopped
+    # pipeline (Select-Object -First, Ctrl+C) is no failure: just return - a
+    # rethrow would stop the caller's whole script, not only this command.
+    trap { if ($_.Exception -is [System.Management.Automation.PipelineStoppedException]) { return }; $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
 
     if (-not $SubscriptionId -and -not $ResourceGroupName) {
         throw 'Say what to map: -SubscriptionId, -ResourceGroupName, or both.'
@@ -154,18 +156,11 @@ function Show-AACResourceMap {
     }
     $quote = { param([string] $Text) "'" + ($Text -replace '\\', '\\' -replace "'", "\'") + "'" }
 
-    # Resource Graph through ARM: rows as hashtables (tags whose keys differ
-    # only by case are fine), following $skipToken.
+    # Resource Graph queries, several at once (Invoke-AACGraphBatch): rows
+    # as hashtables (tags whose keys differ only by case are fine).
     $graph = {
-        param([string] $Query, [string[]] $Subscriptions)
-        $body = @{ query = $Query; options = @{ resultFormat = 'objectArray' } }
-        if ($Subscriptions) { $body.subscriptions = @($Subscriptions) }
-        do {
-            $response = Invoke-AACArmRequest -Method Post -Uri '/providers/Microsoft.ResourceGraph/resources?api-version=2022-10-01' -Body ($body | ConvertTo-Json -Depth 10)
-            $response['data']
-            $skipToken = $response['$skipToken']
-            $body.options['$skipToken'] = $skipToken
-        } while ($skipToken)
+        param([System.Collections.IDictionary] $Query, [string[]] $Subscriptions)
+        (Invoke-AACGraphBatch -Query $Query -SubscriptionId $Subscriptions).Rows
     }
     $columns = '| project id, name, type, kind, location, resourceGroup, subscriptionId, sku, properties, tags'
 
@@ -176,12 +171,18 @@ function Show-AACResourceMap {
 
         # --- What to map ------------------------------------------------------------------------
         Update-AACProgress -Id 'scope' -Description 'Finding the subscriptions and resource groups' -Indeterminate
+        # The subscriptions, resource groups and resources together.
+        $groupFilter = if ($ResourceGroupName) { " and resourceGroup in~ ($((@($ResourceGroupName | ForEach-Object { & $quote $_ })) -join ', '))" } else { '' }
+        $read = & $graph ([ordered]@{
+                subscriptions = "resourcecontainers | where type =~ 'microsoft.resources/subscriptions' | project subscriptionId, name"
+                groups        = "resourcecontainers | where type =~ 'microsoft.resources/subscriptions/resourcegroups'$($groupFilter -replace 'resourceGroup', 'name') | project name, subscriptionId"
+                resources     = "resources | where isnotempty(resourceGroup)$groupFilter $columns"
+            }) $SubscriptionId
         $subscriptionNames = @{}
-        foreach ($row in @(& $graph "resourcecontainers | where type =~ 'microsoft.resources/subscriptions' | project subscriptionId, name" $SubscriptionId)) {
+        foreach ($row in @($read['subscriptions'])) {
             $subscriptionNames[([string]$row['subscriptionId']).ToLowerInvariant()] = [string]$row['name']
         }
-        $groupFilter = if ($ResourceGroupName) { " and resourceGroup in~ ($((@($ResourceGroupName | ForEach-Object { & $quote $_ })) -join ', '))" } else { '' }
-        $groups = @(& $graph "resourcecontainers | where type =~ 'microsoft.resources/subscriptions/resourcegroups'$($groupFilter -replace 'resourceGroup', 'name') | project name, subscriptionId" $SubscriptionId)
+        $groups = @($read['groups'])
         if ($ResourceGroupName) {
             $missing = @($ResourceGroupName | Where-Object { $name = $_; -not @($groups | Where-Object { [string]$_['name'] -eq $name }).Count })
             if ($missing.Count -eq $ResourceGroupName.Count) {
@@ -193,7 +194,7 @@ function Show-AACResourceMap {
 
         # --- The resources, and those outside the selection they use ----------------------------
         Update-AACProgress -Id 'read' -Description 'Reading the resources from Azure Resource Graph' -Indeterminate
-        $resources = @(& $graph "resources | where isnotempty(resourceGroup)$groupFilter $columns" $SubscriptionId)
+        $resources = @($read['resources'])
         $known = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
         foreach ($row in $resources) { [void]$known.Add([string]$row['id']) }
         $referenced = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
@@ -203,11 +204,17 @@ function Show-AACResourceMap {
                 if (-not $known.Contains($match.Value)) { [void]$referenced.Add($match.Value) }
             }
         }
+        # Those outside it, 200 IDs a query, the queries at once.
         $external = [System.Collections.Generic.List[object]]::new()
         $ids = @($referenced)
+        $chunks = [ordered]@{}
         for ($i = 0; $i -lt $ids.Count; $i += 200) {
             $chunk = $ids[$i..([Math]::Min($i + 199, $ids.Count - 1))]
-            foreach ($row in @(& $graph "resources | where id in~ ($((@($chunk | ForEach-Object { & $quote $_ })) -join ', ')) $columns" @())) { $external.Add($row) }
+            $chunks["chunk$i"] = "resources | where id in~ ($((@($chunk | ForEach-Object { & $quote $_ })) -join ', ')) $columns"
+        }
+        if ($chunks.Count) {
+            $read = & $graph $chunks @()
+            foreach ($name in @($chunks.Keys)) { foreach ($row in @($read[$name])) { $external.Add($row) } }
         }
         # Route next hops (a firewall or appliance IP) that nothing read so far
         # has: look for their owner in every subscription, so a spoke's routes
@@ -223,7 +230,7 @@ function Show-AACResourceMap {
         if ($hops) {
             $types = "'microsoft.network/azurefirewalls', 'microsoft.network/networkinterfaces', 'microsoft.network/loadbalancers', 'microsoft.network/applicationgateways'"
             $filter = (@($hops | ForEach-Object { "properties contains $(& $quote $_)" })) -join ' or '
-            foreach ($row in @(& $graph "resources | where type in~ ($types) | where $filter $columns" @())) {
+            foreach ($row in @((& $graph @{ hops = "resources | where type in~ ($types) | where $filter $columns" } @())['hops'])) {
                 if (-not $known.Contains([string]$row['id']) -and -not @($external | Where-Object { [string]$_['id'] -eq [string]$row['id'] }).Count) { $external.Add($row) }
             }
         }
