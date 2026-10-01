@@ -4,7 +4,7 @@ All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never pu
 
 ## v0.13.0
 
-A detailed network security group assessment, what everything costs in the tenant inventory, and faster reads throughout: Azure calls share one pooled HTTPS connection, and independent queries run in parallel.
+Azure Policy - what is assigned and how compliant it is - blob storage sized by container, which VM sizes you can use, a detailed network security group assessment, what everything costs in the tenant inventory, and faster reads throughout: Azure calls share one pooled HTTPS connection, and independent queries run in parallel.
 
 ### Fixed
 
@@ -26,6 +26,16 @@ A detailed network security group assessment, what everything costs in the tenan
 
 ### New
 
+- `Get-AACAssignedPolicy` - every Azure Policy assignment and its parameters, one row per assignment and parameter (`AAC.AssignedPolicy`): the default, assigned and effective value, where the value comes from, allowed values, the scope (inherited from a management group or not), enforcement, policy or initiative, built-in or custom, category - and `ResourceType`, the resource types the policy targets, read from its rule's type conditions with parameters resolved (for an initiative, from the member policies that use each parameter).
+  - **Fast:** the assignments, the definitions and initiatives they assign, and the initiatives' members come from Azure Resource Graph in a few queries, not one call per assignment; a definition it doesn't return is read from Resource Manager.
+  - **Scope:** `-SubscriptionId` or `-ManagementGroupId` list what applies there, including assignments inherited from the management groups above; `-AssignmentName` filters by name or display name (wildcards).
+  - **Output:** a console view (assignments by scope, resource types, each assignment's parameters as a tree), objects, `-CsvPath` and `-HtmlPath`.
+- `Get-AACStorageAccountContainerSize` - how much is stored in every blob container of your storage accounts. Storage accounts from Azure Resource Graph, containers from Azure Resource Manager (Reader is enough), blobs from the blob service.
+  - **Per container** (`AAC.StorageContainerSize`): blobs, size and size per access tier (Hot, Cool, Cold, Archive, no tier), snapshots, previous versions and soft-deleted blobs with their sizes (`-IncludeSnapshot`, `-IncludeVersion`, `-IncludeDeleted`), Data Lake directories, the newest change, public access, the `-Top` largest blobs, and - with `-IncludeBlob` - every blob (`AzureAdminConsole.StorageBlob`).
+  - **Fast:** containers are read in parallel (`-ThrottleLimit`, 16 by default) over pooled HTTPS connections, 5,000 blobs a page; each page is read by a small C# parser compiled on first use (about 275,000 blobs a second) and added up as it arrives, so memory stays flat. The parser reads each response body itself: PowerShell hands the arguments of every .NET method it calls to AMSI, and passing a 2 MB page as a string cost more than parsing it. Throttling is retried as Azure Storage asks.
+  - **`-AuthMode`:** `EntraId` (Storage Blob Data Reader), `AccountSas` (a 4-hour read-and-list account SAS from `listAccountSas`, kept in memory only) or `Auto` (Entra ID, then an account SAS where Entra ID lacks a data role). What can't be read is reported with Azure Storage's reason and what to do.
+  - **Output:** a console view (tiles, size by tier, the largest containers, accounts and containers as a tree with size bars, the largest blobs, what couldn't be read), objects, `-CsvPath` (containers), `-BlobCsvPath` (every blob) and `-HtmlPath`.
+- `Invoke-AACHttpBatch` sends headers of its own, sends requests authorized by their URI (a SAS) without a token, and with `-AsResponse` hands the unread response to `-OnResponse`; Azure Storage's XML errors are read as `Code: message`.
 - `Get-AACSkuAvailability` - which VM sizes you can use for virtual machines or AKS node pools, in a region and its availability zones, and why not. Read-only, over REST (Reader, nothing deployed): `Microsoft.Compute/skus` (offered zones, the subscription's region and zone restrictions, capabilities), the vCPU usage (family and regional quota), the subscription's zone mapping (logical to physical), and with `-ClusterName` the AKS cluster and its node pools (Resource Graph).
   - **Status per size**, with the reason: `Restricted`, `NotSupported` (AKS: under 2 vCPUs), `ZoneUnavailable`, `Partial` (some of `-Zone`), `NoQuota` (vCPUs x `-NodeCount`), `Available`. AKS notes: under 4 GB is for user pools only; B-series isn't for system pools.
   - **Filters:** `-Location` (several), `-Zone`, `-Series`, `-Sku` (wildcards, with or without `Standard_`), `-Architecture`, `-SubscriptionId` (several), `-Service VirtualMachine|Aks`.

@@ -18,7 +18,9 @@ LONG DESCRIPTION
       - interactive HTML reports that work offline.
 
     Nothing in Azure is ever changed. Reader access to the subscriptions is
-    enough for every command.
+    enough for every command but one: Get-AACStorageAccountContainerSize
+    reads blobs, which needs a data role (Storage Blob Data Reader) or an
+    account SAS (-AuthMode).
 
 COMMANDS
     Connect-AAC
@@ -88,6 +90,22 @@ COMMANDS
         Azure Policy compliance for every resource - one row per resource
         and policy - by management group, subscription or resource group.
 
+    Get-AACAssignedPolicy
+        What is assigned: every Azure Policy assignment and its parameters,
+        one row per assignment and parameter - the default, assigned and
+        effective value - with the resource types the policy applies to,
+        read from its rule with the parameters resolved. With
+        -SubscriptionId or -ManagementGroupId, the assignments inherited
+        from the management groups above are included and marked.
+
+    Get-AACStorageAccountContainerSize
+        How much is stored in every blob container: blobs, bytes, access
+        tiers, snapshots, versions and deleted blobs, the newest change and
+        the largest blobs. Containers are read in parallel, 5,000 blobs a
+        page, and added up as the pages arrive (about 275,000 blobs a
+        second). -AuthMode EntraId (Storage Blob Data Reader), AccountSas
+        or Auto.
+
     Get-AACEntraGroupMembership
         Entra ID groups and everyone in them - direct and through nested
         groups - one row per group and member, from Microsoft Graph with the
@@ -117,6 +135,12 @@ GETTING STARTED
         # What you run, and what it costs
         Show-AACResource
         Show-AACCost
+
+        # What is assigned to a subscription, with every parameter's value
+        Get-AACAssignedPolicy -SubscriptionId '00000000-0000-0000-0000-000000000000'
+
+        # Every blob container, with its size and access tiers
+        Get-AACStorageAccountContainerSize -AuthMode Auto -HtmlPath .\Storage.html
 
         # PSRule for Azure on the live estate, as an HTML report
         Invoke-AACPSRule -HtmlPath .\PSRule.html
@@ -204,11 +228,32 @@ APPLICATION INSIGHTS
     message and severity level, the top stack frame, operation, app and
     client. With -Query each row keeps the query's columns.
 
+BLOB STORAGE
+    Get-AACStorageAccountContainerSize finds the storage accounts with Azure
+    Resource Graph and lists their containers through Azure Resource
+    Manager (Reader is enough), then lists the blobs from each account's
+    blob service, which needs data access:
+
+        -AuthMode EntraId     the default: your sign-in, with the Storage
+                              Blob Data Reader role (or Contributor or
+                              Owner of the data) on the account
+        -AuthMode AccountSas  a read-and-list account SAS, valid 4 hours,
+                              from listAccountSas - needs permission to list
+                              the account's keys; kept in memory only
+        -AuthMode Auto        Entra ID, then an account SAS for the accounts
+                              that refuse Entra ID for want of a data role
+
+    Accounts behind a firewall or private endpoint can only be read from a
+    network they allow. Whatever couldn't be read is listed with Azure
+    Storage's reason and what to do about it.
+
 REQUIREMENTS
     - PowerShell 7.2 or later. PDF export needs PowerShell 7.4 or later on
       Windows. Everything else works on Windows, Linux and macOS.
     - PSRule.Rules.Azure 1.47 or later. It is installed with the module.
     - A browser for Connect-AAC, and Reader access to the subscriptions.
+      Get-AACStorageAccountContainerSize also needs data access to the
+      blobs (see BLOB STORAGE).
 
 SECURITY
     - The sign-in is kept only in memory for the PowerShell session. It is
@@ -261,6 +306,12 @@ TROUBLESHOOTING
         filters matched nothing. Try again without -SubscriptionId or the
         other filters.
 
+    AuthorizationPermissionMismatch (Get-AACStorageAccountContainerSize)
+        Your sign-in has no data role on the storage account. Give it
+        Storage Blob Data Reader, or run with -AuthMode Auto or AccountSas.
+        AuthorizationFailure means the account's firewall refused this
+        network.
+
     PDF export fails on Linux, macOS or PowerShell 7.2 or 7.3
         PDF export needs Windows and PowerShell 7.4 or later. Use -CsvPath
         or -HtmlPath instead.
@@ -271,5 +322,7 @@ SEE ALSO
     Get-Help Get-AACFirewallRule -Full
     Get-Help Invoke-AACPSRule -Full
     Get-Help Invoke-AACApplicationInsightQuery -Full
+    Get-Help Get-AACAssignedPolicy -Full
+    Get-Help Get-AACStorageAccountContainerSize -Full
     https://azure.github.io/PSRule.Rules.Azure/
     https://learn.microsoft.com/azure/governance/resource-graph/

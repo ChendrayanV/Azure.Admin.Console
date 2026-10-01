@@ -271,5 +271,85 @@
       </TableControl>
     </View>
 
+    <View>
+      <Name>AAC.StorageContainerSize</Name>
+      <ViewSelectedBy><TypeName>AAC.StorageContainerSize</TypeName></ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader><Label>StorageAccount</Label><Width>24</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Container</Label><Width>30</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Status</Label><Width>7</Width></TableColumnHeader>
+          <TableColumnHeader><Label>BlobCount</Label><Width>12</Width><Alignment>Right</Alignment></TableColumnHeader>
+          <TableColumnHeader><Label>Size</Label><Width>12</Width><Alignment>Right</Alignment></TableColumnHeader>
+          <TableColumnHeader><Label>Error</Label></TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <Wrap />
+            <TableColumnItems>
+              <TableColumnItem><PropertyName>StorageAccount</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Container</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Status</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>BlobCount</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>SizeText</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Error</PropertyName></TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+
+    <View>
+      <Name>AzureAdminConsole.StorageBlob</Name>
+      <ViewSelectedBy><TypeName>AzureAdminConsole.StorageBlob</TypeName></ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader><Label>StorageAccount</Label><Width>24</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Container</Label><Width>24</Width></TableColumnHeader>
+          <TableColumnHeader><Label>AccessTier</Label><Width>10</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Size</Label><Width>12</Width><Alignment>Right</Alignment></TableColumnHeader>
+          <TableColumnHeader><Label>Name</Label></TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <Wrap />
+            <TableColumnItems>
+              <TableColumnItem><PropertyName>StorageAccount</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Container</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>AccessTier</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>SizeText</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Name</PropertyName></TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+
+    <View>
+      <Name>AAC.AssignedPolicy</Name>
+      <ViewSelectedBy><TypeName>AAC.AssignedPolicy</TypeName></ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader><Label>Assignment</Label><Width>30</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Parameter</Label><Width>26</Width></TableColumnHeader>
+          <TableColumnHeader><Label>From</Label><Width>8</Width></TableColumnHeader>
+          <TableColumnHeader><Label>EffectiveValue</Label><Width>36</Width></TableColumnHeader>
+          <TableColumnHeader><Label>ResourceType</Label></TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <Wrap />
+            <TableColumnItems>
+              <TableColumnItem><PropertyName>AssignmentDisplayName</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>ParameterName</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>ValueSource</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>EffectiveValue</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>ResourceType</PropertyName></TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+
   </ViewDefinitions>
 </Configuration>

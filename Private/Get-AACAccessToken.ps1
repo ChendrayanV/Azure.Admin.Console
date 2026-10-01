@@ -79,7 +79,7 @@ function Get-AACAccessToken {
         if ($isArm) {
             throw "Failed to refresh the Azure access token: $($reason.TrimEnd('.')). Run Connect-AAC again."
         }
-        $permission = if ($Resource -like 'https://graph.microsoft.com*') { "Microsoft Graph's delegated Group.Read.All and User.Read.All permissions" } else { "this API's delegated Data.Read permission" }
+        $permission = if ($Resource -like 'https://graph.microsoft.com*') { "Microsoft Graph's delegated Group.Read.All and User.Read.All permissions" } elseif ($Resource -like 'https://storage.azure.com*') { "Azure Storage's delegated user_impersonation permission" } else { "this API's delegated Data.Read permission" }
         throw "Could not get a token for $Resource from the Azure sign-in: $($reason.TrimEnd('.')). Run Connect-AAC again; with an App Registration of your own (-ClientId), give it $permission."
     }
 

@@ -102,8 +102,14 @@ Get-AACNetworkSecurityGroup
 # Azure Policy: every resource's compliance, for one management group
 Get-AACPolicyState -ManagementGroupId 'mg-landingzones' -HtmlPath .\Policy.html
 
+# What is assigned: every policy assignment, its parameter values and resource types
+Get-AACAssignedPolicy -SubscriptionId '00000000-0000-0000-0000-000000000000' -CsvPath .\AssignedPolicy.csv
+
 # Which VM sizes a new three-zone AKS node pool can use, and why not
 Get-AACSkuAvailability -ClusterName 'aks-contoso' -Zone 1, 2, 3 -Series D, E -NodeCount 3
+
+# How much is in every blob container, by access tier, with the largest blobs
+Get-AACStorageAccountContainerSize -AuthMode Auto -HtmlPath .\Storage.html
 
 # Who is in your Entra ID groups, nested groups included
 Get-AACEntraGroupMembership -GroupNameStartsWith 'grp-' -HtmlPath .\Groups.html
@@ -167,8 +173,10 @@ pipeline artifacts. Each one has:
 | [`Get-AACInventory`](docs/Get-AACInventory.md) | The tenant as a tree: management groups, subscriptions, resource groups and resources, with counts, the Defender for Cloud secure score and - with `-Cost` - the cost at every level. A console tree, objects, and CSV, PDF and interactive HTML reports. |
 | [`Get-AACSecurityPosture`](docs/Get-AACSecurityPosture.md) | Microsoft Defender for Cloud and Azure Policy in one report: secure scores, recommendations grouped by control with remediation links, active alerts, Defender plans, regulatory compliance traced to the failing resources, and policy compliance per assignment - one list of findings. A console view, objects, and CSV, PDF and interactive HTML reports. |
 | [`Get-AACSkuAvailability`](docs/Get-AACSkuAvailability.md) | Which VM sizes you can use for virtual machines or AKS node pools in a region and its availability zones - the subscription's restrictions, vCPU quota and AKS's rules - and why a size can't be used; an AKS cluster's node pools. Read-only REST, nothing deployed. A console view, objects, and CSV, PDF and interactive HTML reports. |
+| [`Get-AACAssignedPolicy`](docs/Get-AACAssignedPolicy.md) | Every Azure Policy assignment and its parameters - the default, assigned and effective value of each - with the resource types the policy applies to (its rule's type conditions, parameters resolved), one row per assignment and parameter. Assignments inherited from management groups included. A console view, objects, and CSV and interactive HTML reports. |
 | [`Get-AACPolicyState`](docs/Get-AACPolicyState.md) | Azure Policy compliance for every resource - one row per resource and policy, with initiative, assignment, effect and when it was evaluated - by management group, subscription or resource group, with compliance per assignment, policy, subscription and resource group. A console view, objects, and CSV, PDF and interactive HTML reports. |
 | [`Get-AACNetworkSecurityGroup`](docs/Get-AACNetworkSecurityGroup.md) | A detailed assessment of network security groups: associations, every rule, flow logs and diagnostic settings, and findings by severity (open to the internet, shadowed rules, subnet and NIC conflicts, logging gaps). A console view, objects, and CSV, PDF and interactive HTML reports. |
+| [`Get-AACStorageAccountContainerSize`](docs/Get-AACStorageAccountContainerSize.md) | How much is stored in every blob container of your storage accounts: blobs, bytes, access tiers (Hot, Cool, Cold, Archive), snapshots, versions and deleted blobs, the newest change and the largest blobs - read in parallel, a page of 5,000 blobs at a time. Entra ID or a short-lived account SAS. A console view with every account and container as a tree, objects, and CSV and interactive HTML reports. |
 | [`Get-AACEntraGroupMembership`](docs/Get-AACEntraGroupMembership.md) | Entra ID groups and everyone in them - direct and through nested groups - one row per group and member, with type, source, guests and disabled accounts. A console view with each group's members as a tree, objects, and CSV, PDF and interactive HTML reports. |
 | [`Show-AACResourceMap`](docs/Show-AACResourceMap.md) | A map of one or more resource groups, opened in your browser: the resources with their Azure icons, in subscription, resource group, VNet and subnet boxes, with their connections, dependencies and network paths. Saves as PNG or JPEG. |
 | [`Show-AACCost`](docs/Show-AACCost.md) | Subscription costs: month to date by subscription and by service, and a monthly trend, as charts and a table. |
@@ -592,6 +600,34 @@ resources, states, assignments, policies, subscriptions and resource groups.
 The PDF has the summary, the scopes, the assignments and the non-compliant
 resources by policy. `-CsvPath` writes every state.
 
+### Assigned policies and their parameters
+
+`Get-AACPolicyState` is about compliance; `Get-AACAssignedPolicy` is about
+what is assigned. It reads the assignments, the definitions and initiatives
+they assign and the initiatives' member policies with Azure Resource Graph -
+a handful of queries however many assignments there are (Reader, no Az
+modules) - and flattens them to one row per assignment and parameter:
+
+```powershell
+Get-AACAssignedPolicy                                                          # everything you can see
+Get-AACAssignedPolicy -SubscriptionId '00000000-0000-0000-0000-000000000000'    # what applies to one subscription
+Get-AACAssignedPolicy -ManagementGroupId 'mg-landingzones' -HtmlPath .\AssignedPolicy.html
+Get-AACAssignedPolicy -NoDisplay | Where-Object ValueSource -EQ 'Assigned'      # the parameters set on the assignment
+```
+
+| Column | What it is |
+|---|---|
+| `DefaultValue`, `AssignedValue`, `EffectiveValue` | The definition's default, the assignment's value, and the one that applies (assigned, else default). Lists are joined with `, `, objects written as compact JSON |
+| `ValueSource` | `Assigned`, `Default` or `Not set` |
+| `ResourceType` | What the policy targets: the types in its rule's `"field": "type"` conditions, with `[parameters()]` resolved to the effective values; else the types of the aliases it reads; else `All except ...` (a rule that only leaves types out, such as *Allowed resource types*) or `All`. For an initiative, the types of the member policies that use the row's parameter (`All` when one of them applies to every type) |
+| `ScopeType`, `ScopeName`, `Inherited` | Where it is assigned. With `-SubscriptionId` or `-ManagementGroupId`, assignments inherited from the management groups above are included and marked `Inherited` |
+| `DefinitionType`, `PolicyType`, `Category`, `EnforcementMode`, `NotScopes` | Policy or initiative, built-in or custom, its category, whether it is enforced, and the scopes left out |
+
+A policy without parameters is one row with no parameter, so every
+assignment is listed. The console view shows the assignments by scope, the
+resource types with the most assignments, and each assignment's parameters
+as a tree (assigned values in green, defaults in grey).
+
 ## VM size availability (virtual machines and AKS)
 
 `Get-AACSkuAvailability` answers "can I use this VM size here?" before you
@@ -739,6 +775,55 @@ Get-AACNetworkSecurityGroup -HtmlPath .\NSG.html -PdfPath .\NSG.pdf -CsvPath .\N
 - **`-PdfPath`:** a summary, the findings, and a page per NSG with its rules.
 - **`-NoDiagnosticSetting`:** skips the diagnostic-settings calls (one per
   NSG).
+
+## Storage container sizes
+
+`Get-AACStorageAccountContainerSize` adds up every blob in every container
+of your storage accounts. It finds the accounts with Azure Resource Graph,
+lists their containers through Azure Resource Manager (Reader is enough),
+then lists the blobs from the blob service itself:
+
+```powershell
+Get-AACStorageAccountContainerSize                                                  # every account you can see
+Get-AACStorageAccountContainerSize -StorageAccountName 'stlogs*' -ContainerName 'insights-*'
+Get-AACStorageAccountContainerSize -AuthMode Auto -IncludeSnapshot -IncludeVersion -HtmlPath .\Storage.html
+Get-AACStorageAccountContainerSize -StorageAccountName 'stbackup01' -BlobCsvPath .\Blobs.csv  # every blob, to CSV
+Get-AACStorageAccountContainerSize -NoDisplay | Sort-Object Size -Descending | Select-Object -First 10
+```
+
+**Built for large estates.** The containers are read side by side, 16 at a
+time by default (`-ThrottleLimit`, up to 64), over the module's pooled HTTPS
+connections; each container's pages of 5,000 blobs follow each other. Each
+page is read by a small parser compiled on first use (C#, through Add-Type:
+about 275,000 blobs a second, no XML document) and added up as it arrives,
+so memory stays flat however many blobs there are - unless `-IncludeBlob`
+or `-BlobCsvPath` keep every one (a few hundred bytes a blob). Throttling is
+retried as Azure Storage asks. The view ends with how many blobs were read a
+second.
+
+**Reading blobs needs data access**, which Reader alone doesn't give:
+
+| `-AuthMode` | Reads with | You need |
+|---|---|---|
+| `EntraId` (default) | your `Connect-AAC` sign-in, with a token for Azure Storage | Storage Blob Data Reader (or Contributor or Owner) on the account, resource group or subscription |
+| `AccountSas` | a read-and-list account SAS for the blob service, valid for 4 hours, from `listAccountSas` - kept in memory, never shown or written | permission to list the account's keys (Contributor, Storage Account Contributor), and shared key access allowed on the account |
+| `Auto` | Entra ID, then an account SAS for the accounts that refuse Entra ID for want of a data role | either |
+
+Accounts behind a firewall or private endpoint can be read only from a
+network they allow. Whatever can't be read is listed with Azure Storage's
+reason and what to do about it.
+
+One row per container (`AAC.StorageContainerSize`): blobs, size and size per
+tier (Hot, Cool, Cold, Archive, and no tier for page, append and premium
+blobs), snapshots, previous versions and soft-deleted blobs with their
+sizes (`-IncludeSnapshot`, `-IncludeVersion`, `-IncludeDeleted`), Data Lake
+directories, the newest change, public access, status and error, and the
+`-Top` largest blobs (10). The console view: tiles, the size by access tier,
+the largest containers, every subscription, account and container as a tree
+with a size bar coloured by its main tier, the largest blobs, and what
+couldn't be read. `-HtmlPath` writes tables of the accounts, containers and
+largest blobs with charts that filter them; `-CsvPath` the containers,
+`-BlobCsvPath` every blob.
 
 ## Resource map
 
@@ -1158,6 +1243,8 @@ everything on this side for real:
 | `Get-AACSecurityPosture` | Resource Graph, with made-up Defender for Cloud and Azure Policy rows | Findings across sections, scores, compliance traced to resources, plans, policy compliance, resource group and tag narrowing, the queries per section, the view and the exports |
 | `Get-AACNetworkSecurityGroup` | Resource Graph and the parallel ARM reads | Rule evaluation, associations and VMs protected, NIC-and-subnet conflicts, flow logs, findings, the view and the exports |
 | `Show-AACResourceMap` | Resource Graph, with a made-up hub-and-spoke estate | Boxes, placement, connections, network paths, NSGs and route tables, the page |
+| `Get-AACAssignedPolicy` | Resource Graph and the parallel ARM reads, with a made-up tenant (management groups, an initiative, a missing definition) | Default, assigned and effective values, resource types from rules (parameters resolved, negated and alias-only rules, initiatives), inherited assignments for a subscription or management group, name filters, the view and the exports |
+| `Get-AACStorageAccountContainerSize` | Resource Graph, the container listing and the blob service (`Send-AACHttpRequest`, with List Blobs XML pages) | The page parser (tiers, snapshots, versions, deleted blobs, Data Lake directories, encoded names, the largest blobs), paging, Entra ID and account SAS, `-AuthMode Auto`, Azure Storage's errors and what to do, filters, the view and the exports |
 | `Get-AACEntraGroupMembership` | Microsoft Graph (`Send-AACHttpRequest`), with made-up groups | Name filters and OData quoting, paging, nested groups and loops, a group that can't be read, the Connect-AAC Graph token, the view and the exports |
 | `Show-AACCost` | Cost Management (`Invoke-AACCostBatch`, through a shim) | Month and service totals, failed subscriptions, the charts, PDF and HTML; also the query's paging |
 | `Invoke-AACPSRule` | The engine (`Invoke-AACPSRuleEngine`) | Output modes, `-FailedOnly`, settings passed on, CSV and HTML; what is read for the rules asked for; `-Rule` checks; the view listing every resource |

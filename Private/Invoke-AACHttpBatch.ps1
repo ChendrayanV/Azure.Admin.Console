@@ -7,12 +7,20 @@ function Invoke-AACHttpBatch {
         The engine under Invoke-AACGraphBatch (Resource Graph) and
         Invoke-AACCostBatch (Cost Management). -Request is a list of
         @{ Key; Uri; Body } (POST with a JSON body, or GET without one); a
-        path starting with '/' goes to https://management.azure.com.
+        path starting with '/' goes to https://management.azure.com. A
+        request with Anonymous = $true is sent without a token - its URI
+        carries its own authorization (an Azure Storage SAS). -Header is
+        sent with every request.
 
         For every successful response -OnResponse is called with (key,
         response text) and returns the next page's request - @{ Uri; Body } -
-        or nothing when that key is done. -OnDone is called with (key, error
-        message; empty when it succeeded, done, total) as each key finishes.
+        or nothing when that key is done. With -AsResponse it gets the
+        HttpResponseMessage instead of its text, unread - for a .NET parser
+        that reads the body itself: PowerShell hands the arguments of every
+        .NET method it calls to AMSI, so passing a page of megabytes as a
+        string argument costs a few hundred milliseconds. -OnDone is called
+        with (key, error message; empty when it succeeded, done, total) as
+        each key finishes.
 
         Throttling (429), server errors (5xx) and dropped connections are
         retried up to four times per page, waiting as long as Azure's retry
@@ -38,14 +46,20 @@ function Invoke-AACHttpBatch {
 
         # The token audience (Get-AACAccessToken -Resource), e.g.
         # https://graph.microsoft.com for Microsoft Graph.
-        [string] $Resource = 'https://management.azure.com'
+        [string] $Resource = 'https://management.azure.com',
+
+        # Sent with every request, e.g. @{ 'x-ms-version' = '2023-11-03' }.
+        [System.Collections.IDictionary] $Header,
+
+        # -OnResponse gets the HttpResponseMessage, not its text.
+        [switch] $AsResponse
     )
 
     $errors = @{}
     $queue = [System.Collections.Generic.List[object]]::new()
     foreach ($item in $Request) {
         $errors[$item.Key] = ''
-        $queue.Add(@{ Key = $item.Key; Uri = [string]$item.Uri; Body = $item.Body; Attempt = 1; NotBefore = [datetime]::MinValue; Task = $null })
+        $queue.Add(@{ Key = $item.Key; Uri = [string]$item.Uri; Body = $item['Body']; Anonymous = [bool]$item['Anonymous']; Attempt = 1; NotBefore = [datetime]::MinValue; Task = $null })
     }
     $total = $queue.Count
     $done = 0
@@ -60,8 +74,10 @@ function Invoke-AACHttpBatch {
             # A request that can't even be sent (no token, a bad URL) is a
             # failed task like any other - retried, then reported.
             try {
-                $send = @{ Method = $(if ($null -ne $job.Body) { 'Post' } else { 'Get' }); Uri = $job.Uri; Token = (Get-AACAccessToken -Resource $Resource) }
+                $send = @{ Method = $(if ($null -ne $job.Body) { 'Post' } else { 'Get' }); Uri = $job.Uri }
+                if (-not $job.Anonymous) { $send.Token = Get-AACAccessToken -Resource $Resource }
                 if ($null -ne $job.Body) { $send.Body = [string]$job.Body }
+                if ($Header) { $send.Header = $Header }
                 $job.Task = Send-AACHttpRequest @send
                 if ($null -eq $job.Task) { throw 'The request could not be sent.' }
             }
@@ -93,7 +109,10 @@ function Invoke-AACHttpBatch {
         else {
             $response = $job.Task.Result
             $status = [int]$response.StatusCode
-            $content = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+            # (A success with -AsResponse is read by -OnResponse itself.)
+            if (-not ($AsResponse -and $status -ge 200 -and $status -lt 300)) {
+                $content = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+            }
         }
         try {
             if (($status -eq 0 -or $status -eq 429 -or $status -ge 500) -and $job.Attempt -lt 5) {
@@ -105,7 +124,7 @@ function Invoke-AACHttpBatch {
             $message = ''
             if ($status -ge 200 -and $status -lt 300) {
                 try {
-                    $next = & $OnResponse $job.Key $content
+                    $next = if ($AsResponse) { & $OnResponse $job.Key $response } else { & $OnResponse $job.Key $content }
                 }
                 catch {
                     $next = $null
