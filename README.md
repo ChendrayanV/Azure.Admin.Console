@@ -7,6 +7,11 @@
 Azure admin reports and checks from PowerShell, over plain REST. No Az or
 Microsoft.Graph modules, and no app registration.
 
+<video width="320" height="240" controls>
+  <source src="D:\repos\Azure.Admin.Console.Demo\video\Azure.Admin.Console-demo.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
 - **Azure Advisor report.** Every Advisor recommendation (Cost, Security,
   Reliability, Operational excellence, Performance) flattened to one row per
   resource, with estimated savings, retirement dates and postponed/dismissed
