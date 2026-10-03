@@ -1,0 +1,68 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.5",
+  "timestamp": "2026-10-01T10:00:00Z",
+  "applyable": true,
+  "complete": true,
+  "errored": false,
+  "planned_values": { "root_module": {} },
+  "resource_drift": [
+    {
+      "address": "azurerm_network_security_group.web",
+      "mode": "managed", "type": "azurerm_network_security_group", "name": "web",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["update"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-net/providers/Microsoft.Network/networkSecurityGroups/nsg-web", "name": "nsg-web", "location": "uksouth", "resource_group_name": "rg-contoso-net",
+          "security_rule": [ { "name": "allow-https", "priority": 100, "access": "Allow", "source_address_prefix": "Internet", "destination_port_range": "443" } ] },
+        "after": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-net/providers/Microsoft.Network/networkSecurityGroups/nsg-web", "name": "nsg-web", "location": "uksouth", "resource_group_name": "rg-contoso-net",
+          "security_rule": [ { "name": "allow-https", "priority": 100, "access": "Allow", "source_address_prefix": "Internet", "destination_port_range": "443" },
+                             { "name": "temp-rdp-from-anywhere", "priority": 110, "access": "Allow", "source_address_prefix": "*", "destination_port_range": "3389" } ] },
+        "after_unknown": {}, "before_sensitive": {}, "after_sensitive": {}
+      }
+    },
+    {
+      "address": "azurerm_storage_container.reports",
+      "mode": "managed", "type": "azurerm_storage_container", "name": "reports",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["delete"],
+        "before": { "id": "https://stcontosodiag.blob.core.windows.net/reports", "name": "reports", "container_access_type": "private" },
+        "after": null, "after_unknown": {}, "before_sensitive": {}, "after_sensitive": false
+      }
+    }
+  ],
+  "resource_changes": [
+    {
+      "address": "azurerm_network_security_group.web",
+      "mode": "managed", "type": "azurerm_network_security_group", "name": "web",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["update"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-net/providers/Microsoft.Network/networkSecurityGroups/nsg-web", "name": "nsg-web", "location": "uksouth", "resource_group_name": "rg-contoso-net",
+          "security_rule": [ { "name": "allow-https", "priority": 100, "access": "Allow", "source_address_prefix": "Internet", "destination_port_range": "443" },
+                             { "name": "temp-rdp-from-anywhere", "priority": 110, "access": "Allow", "source_address_prefix": "*", "destination_port_range": "3389" } ] },
+        "after": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-net/providers/Microsoft.Network/networkSecurityGroups/nsg-web", "name": "nsg-web", "location": "uksouth", "resource_group_name": "rg-contoso-net",
+          "security_rule": [ { "name": "allow-https", "priority": 100, "access": "Allow", "source_address_prefix": "Internet", "destination_port_range": "443" } ] },
+        "after_unknown": {}, "before_sensitive": {}, "after_sensitive": {}
+      }
+    },
+    {
+      "address": "azurerm_storage_container.reports",
+      "mode": "managed", "type": "azurerm_storage_container", "name": "reports",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": { "name": "reports", "storage_account_name": "stcontosodiag", "container_access_type": "private" },
+        "after_unknown": { "id": true, "resource_manager_id": true }, "before_sensitive": false, "after_sensitive": {}
+      }
+    }
+  ],
+  "relevant_attributes": [
+    { "resource": "azurerm_network_security_group.web", "attribute": ["security_rule"] }
+  ],
+  "output_changes": {},
+  "prior_state": {},
+  "configuration": {}
+}

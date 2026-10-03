@@ -8,7 +8,7 @@ Azure admin reports and checks from PowerShell, over plain REST. No Az or
 Microsoft.Graph modules, and no app registration.
 
 <video width="320" height="240" controls>
-  <source src="D:\repos\Azure.Admin.Console.Demo\video\Azure.Admin.Console-demo.mp4" type="video/mp4">
+  <source src=".\video\Azure.Admin.Console-demo.mp4" type="video/mp4">
   Your browser does not support the video tag.
 </video>
 
@@ -116,6 +116,9 @@ Get-AACSkuAvailability -ClusterName 'aks-contoso' -Zone 1, 2, 3 -Series D, E -No
 # How much is in every blob container, by access tier, with the largest blobs
 Get-AACStorageAccountContainerSize -AuthMode Auto -HtmlPath .\Storage.html
 
+# What a Terraform plan changes, down to each attribute (offline, no sign-in)
+Get-AACTerraformPlan -Path .\plan.json
+
 # Who is in your Entra ID groups, nested groups included
 Get-AACEntraGroupMembership -GroupNameStartsWith 'grp-' -HtmlPath .\Groups.html
 
@@ -127,6 +130,15 @@ Invoke-AACPSRule -HtmlPath .\PSRule.html
 
 # Just the module's naming and tag rules - quick: names, types and tags only
 Invoke-AACPSRule -Rule 'AAC.*'
+
+# A storage account, idempotently: plan, Azure Policy and PSRule gates, then apply (no template)
+Deploy-AACStorageAccount -SubscriptionId <subscription> -ResourceGroupName rg-data -ConfigurationPath .\Examples\storage-account.psd1 -WhatIf
+
+# Which resources' logs don't reach Log Analytics - and what is misconfigured
+Get-AACDiagnosticSetting -ExpectedWorkspace 'law-central' -HtmlPath .\Diagnostics.html
+
+# A Log Analytics workspace: table sizes, settings, recommendations, insights
+Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId 'law-contoso-prod' -HtmlPath .\Workspace.html
 
 # The last 2 hours of exceptions from Application Insights
 Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-contoso-prod'
@@ -160,16 +172,25 @@ more there are. The objects' default tables at the prompt wrap too
 The HTML reports are single, self-contained files with no external scripts,
 styles or fonts, so they open offline and work as email attachments or
 pipeline artifacts. Each one has:
+- tables that start collapsed: click a table's title (or press Enter on it)
+  to show or hide it, or use *Expand all* / *Collapse all*; a tile, chart or
+  tree link opens the table it filters, and printing shows every table;
 - clickable tiles and bar charts that filter the table;
 - search, filter drop-downs, sortable columns, and grouping with subtotals;
 - Azure portal links and *Copy ID* for every resource;
 - a CSV download of exactly the rows shown;
 - light and dark themes, and a layout that works on a phone.
 
+The PDF reports open with the bookmarks panel showing: one bookmark per
+section and table, nested, and collapsed so the panel starts as a short list
+of sections. A PDF can't hide its tables the way a web page can, so the
+bookmarks are how you jump to the one you want.
+
 ## Commands
 
 | Command | What it does |
 |---|---|
+| [`Deploy-AACStorageAccount`](docs/Deploy-AACStorageAccount.md) | Creates or updates a storage account - containers, file shares, queues, tables, lifecycle rules, private endpoints, diagnostic settings, role assignments, a lock and blobs - idempotently with the Azure REST APIs, no ARM, Bicep or Terraform template. AVM's parameter names and defaults; a plan (create, update, can't change in place, drift); gates: the name, Azure Policy (`checkPolicyRestrictions` on every write's exact body) and PSRule for Azure; then apply and verify. The only command that writes. |
 | [`Connect-AAC`](docs/Connect-AAC.md) | Signs in with a browser (OAuth 2.0 + PKCE, localhost redirect). Uses the Azure CLI's pre-consented public client ID unless you pass `-ClientId`. |
 | [`Disconnect-AAC`](docs/Disconnect-AAC.md) | Forgets the sign-in. It was only ever in memory. |
 | [`Get-AACAdvisorRecommendation`](docs/Get-AACAdvisorRecommendation.md) | A consolidated, flattened view of Azure Advisor: a console view at the prompt, objects down a pipeline, CSV and/or PDF exports. |
@@ -182,10 +203,13 @@ pipeline artifacts. Each one has:
 | [`Get-AACPolicyState`](docs/Get-AACPolicyState.md) | Azure Policy compliance for every resource - one row per resource and policy, with initiative, assignment, effect and when it was evaluated - by management group, subscription or resource group, with compliance per assignment, policy, subscription and resource group. A console view, objects, and CSV, PDF and interactive HTML reports. |
 | [`Get-AACNetworkSecurityGroup`](docs/Get-AACNetworkSecurityGroup.md) | A detailed assessment of network security groups: associations, every rule, flow logs and diagnostic settings, and findings by severity (open to the internet, shadowed rules, subnet and NIC conflicts, logging gaps). A console view, objects, and CSV, PDF and interactive HTML reports. |
 | [`Get-AACStorageAccountContainerSize`](docs/Get-AACStorageAccountContainerSize.md) | How much is stored in every blob container of your storage accounts: blobs, bytes, access tiers (Hot, Cool, Cold, Archive), snapshots, versions and deleted blobs, the newest change and the largest blobs - read in parallel, a page of 5,000 blobs at a time. Entra ID or a short-lived account SAS. A console view with every account and container as a tree, objects, and CSV and interactive HTML reports. |
+| [`Get-AACTerraformPlan`](docs/Get-AACTerraformPlan.md) | A Terraform plan in JSON (`terraform show -json`), flattened: what will be created, updated, replaced, deleted, read, imported and moved - and why - down to each attribute's before and after value, with the outputs and what changed outside Terraform. Sensitive values are never shown. Offline: no sign-in. A console view, objects, and CSV and interactive HTML reports. |
+| [`Get-AACDiagnosticSetting`](docs/Get-AACDiagnosticSetting.md) | Every resource's diagnostic settings, flattened, and the resources whose logs don't reach a Log Analytics workspace: each one's status (exported, partial, not to a workspace, no setting), what's missing and why, and misconfigurations (deleted workspaces, nothing enabled, logs sent twice, another region, unexpected workspace, retired retention). Storage services and subscription activity logs included. A console view, objects, and CSV, PDF and interactive HTML reports. |
 | [`Get-AACEntraGroupMembership`](docs/Get-AACEntraGroupMembership.md) | Entra ID groups and everyone in them - direct and through nested groups - one row per group and member, with type, source, guests and disabled accounts. A console view with each group's members as a tree, objects, and CSV, PDF and interactive HTML reports. |
 | [`Show-AACResourceMap`](docs/Show-AACResourceMap.md) | A map of one or more resource groups, opened in your browser: the resources with their Azure icons, in subscription, resource group, VNet and subnet boxes, with their connections, dependencies and network paths. Saves as PNG or JPEG. |
 | [`Show-AACCost`](docs/Show-AACCost.md) | Subscription costs: month to date by subscription and by service, and a monthly trend, as charts and a table. |
 | [`Invoke-AACPSRule`](docs/Invoke-AACPSRule.md) | PSRule for Azure, the module's own naming and tag rules and your custom rules on the live estate: include or exclude rules by name or wildcard, with a baseline or settings. Runs of only the module's rules read just names, types and tags. |
+| [`Invoke-AACLogAnalyticsWorkspaceAssessment`](docs/Invoke-AACLogAnalyticsWorkspaceAssessment.md) | A Log Analytics workspace assessed: billable and not billable tables with their size, plan and retention; every workspace setting; recommendations (Azure Advisor's and its own: cost, reliability, security); data collection rules; and the Workspace Insights views - Overview, Usage, Health, Agents, Query Audit, Data Collection Rules, Change Log. Read-only. A console view, an object, and CSV and interactive HTML reports. |
 | [`Invoke-AACApplicationInsightQuery`](docs/Invoke-AACApplicationInsightQuery.md) | Application Insights exceptions, flattened, from a Log Analytics workspace or Application Insights resource, or any KQL query. |
 
 Full help:
@@ -830,6 +854,44 @@ couldn't be read. `-HtmlPath` writes tables of the accounts, containers and
 largest blobs with charts that filter them; `-CsvPath` the containers,
 `-BlobCsvPath` every blob.
 
+## Terraform plans
+
+`Get-AACTerraformPlan` reads a whole Terraform plan - every resource
+change, the outputs and the drift - and flattens it so you can see what
+changes before you apply it. It works offline: no Azure sign-in, and no
+Terraform on the machine that reads it.
+
+```powershell
+terraform plan -out tfplan
+terraform show -json tfplan > plan.json
+
+Get-AACTerraformPlan -Path .\plan.json                                    # the view
+Get-AACTerraformPlan -Path .\plan.json -Action Delete, Replace -NoDisplay # what is destroyed, and why
+Get-AACTerraformPlan -Path .\plan.json -ExpandAttribute -NoDisplay | Where-Object ForcesReplacement
+Get-AACTerraformPlan -Path .\plan.json -HtmlPath .\Plan.html -CsvPath .\Plan.csv -ExpandAttribute
+```
+
+One row per resource (`AAC.TerraformChange`): the action (Create, Update,
+Replace, Delete, Read, Import, Move, Forget), the address and module, the
+Azure name, resource group, location and ID, why it's replaced or deleted,
+the attributes that force a replacement, and the attributes that change.
+`-ExpandAttribute` gives one row per attribute instead
+(`AAC.TerraformAttributeChange`), with its before and after value. Nested
+values are flattened to a path - `tags["cost.centre"]`,
+`site_config[0].always_on`, `security_rule[name=ssh].access`, and
+`policy_rule{json}.then.effect` inside a JSON-encoded string. Blocks in a
+list are matched by content, then by name, so a rule added to an NSG
+doesn't show every rule after it as changed.
+
+The plan JSON holds sensitive values in clear text. They are never shown,
+returned or written: they read `(sensitive)`. The view opens with
+Terraform's own summary line (`Plan: 2 to add, 5 to change, 2 to destroy.`),
+then a table per action - deletes and replacements first - with each
+resource's attribute changes as `+`, `-` and `~` lines, the outputs, and what
+changed outside Terraform. `-HtmlPath` writes tables of the resources, every
+attribute change, the outputs and the drift, with tiles and charts that
+filter them.
+
 ## Resource map
 
 `Show-AACResourceMap` draws the resources in one or more resource groups, in
@@ -1142,6 +1204,166 @@ Fix  Did you mean 'requests'? Tables in appi-contoso-portal with data in the
      exceptions (57). No data: availabilityResults, customEvents, ...
 ```
 
+## Deploying a storage account
+
+`Deploy-AACStorageAccount` creates or updates a storage account and what's in
+it - idempotently, like a Bicep or Terraform deployment, but with the Azure REST
+APIs directly: no ARM, Bicep or Terraform template. It is the module's only
+command that writes; everything else reads.
+
+```powershell
+# The plan and the gates - nothing is written
+Deploy-AACStorageAccount -SubscriptionId <subscription> -ResourceGroupName rg-data -ConfigurationPath .\Examples\storage-account.psd1 -WhatIf
+
+# Plan, gates, ask, apply, verify. Run it again: "No changes", nothing written.
+Deploy-AACStorageAccount -SubscriptionId <subscription> -ResourceGroupName rg-data -ConfigurationPath .\Examples\storage-account.psd1
+
+# Quick: a name, two containers and a file - AVM's defaults for the rest
+Deploy-AACStorageAccount -SubscriptionId <subscription> -ResourceGroupName rg-data -Name stcontosoweb -Container web, logs -Blob @{ container = 'web'; path = '.\index.html'; contentType = 'text/html' } -Setting @{ networkAcls = @{ ipRules = @('203.0.113.10') } }
+
+# A failing PSRule rule blocks: deploy with the suggested fixes instead (checked again)
+Deploy-AACStorageAccount -SubscriptionId <subscription> -ResourceGroupName rg-data -Name stcontosoweb -Container web -UseSuggestedFix -WhatIf
+
+# In a pipeline: apply without asking unless a gate blocks, keep the plan
+Deploy-AACStorageAccount -SubscriptionId <subscription> -ResourceGroupName rg-data -ConfigurationPath .\Examples\storage-account.parameters.json -Force -PlanPath .\plan.json
+```
+
+**The configuration** uses the [Azure Verified Module](https://github.com/Azure/bicep-registry-modules/tree/main/avm/res/storage/storage-account)'s
+parameter names, in a `.psd1` or `.json` file - an AVM parameters file works as
+it is - and/or as parameters (`-Name`, `-Container`, `-FileShare`, `-Queue`,
+`-Table`, `-Blob`, `-Tag`, `-Setting` for the rest). AVM's defaults apply, and,
+as with Bicep, are enforced on every run: StorageV2, Standard_GRS, Hot, TLS 1.2,
+HTTPS only, no public blob access, infrastructure encryption, network rules
+that deny by default (with the AzureServices bypass), blob and container soft
+delete. AVM parameters it doesn't support yet (customer-managed keys,
+identities, local users, object replication...) are refused by name rather
+than ignored. See `Examples\`.
+
+**How it stays idempotent without a template:**
+
+| Step | What happens |
+|---|---|
+| Plan | Everything that should exist is read (GET) and compared property by property, only on what the configuration manages. Azure's own fields (a rule's state, a category's retention policy) and what it leaves out (false values) aren't changes. Each resource is Create, Update, No change, **Replace** (a property Azure can't change in place: location, kind, hierarchical namespace, infrastructure encryption, zonal or Premium redundancy) or **Drift** (containers, shares, queues, tables that exist but aren't configured - left alone, or deleted with `-Prune`) |
+| Gates | **Name** (`checkNameAvailability`); **Azure Policy**: the assignments that apply to storage in the resource group, and Azure Policy's verdict on the exact body of every write (`checkPolicyRestrictions`) - Deny blocks, Audit is reported, Modify and Append changes are shown; **PSRule for Azure** - and the module's naming and tag rules - on the account as it will be, with its services and containers (shift left) |
+| Decide | Blocked stops before anything is written: a name taken, an immutable change, a policy Deny, **a PSRule rule that fails** (or PSRule not running), `-FailOn Audit`/`Drift`. Otherwise it asks (`-Force` or `-Confirm:$false` in a pipeline); `-WhatIf` stops after the plan |
+| Apply | In dependency order - account, services, containers and the rest, private endpoints, diagnostic settings, role assignments, the lock last, blobs. PUT to create; PATCH with only what changed; long-running operations followed. Role assignments are named from scope, principal and role (like Bicep's `guid()`), and an existing one is adopted, so none is duplicated. Blobs upload only when their MD5 differs |
+| Verify | Everything read and compared again: it must now plan no changes. What Azure changed by itself (a Modify policy) is reported |
+
+**A failing PSRule rule blocks the deployment, and says how to fix it.** Each
+failing rule comes with its fix: the setting and value in the configuration
+(`allowSharedKeyAccess = $false`, `networkAcls.defaultAction = 'Deny'`, a GRS or
+GZRS SKU, soft delete, a container's `publicAccess = 'None'`...) - or, when no
+setting can fix it, what to do (Defender for Storage on the subscription, tags
+only you can give, a name that can't change). The view gathers every setting
+into a configuration snippet to paste; `-UseSuggestedFix` deploys with them -
+the plan and every gate are checked again on the fixed configuration. A rule
+that doesn't apply to an account is excluded on purpose with `-ExcludeRule`;
+`-SkipPSRule` deploys without checking. With AVM's defaults alone, two rules
+fail - `Azure.Storage.LocalAuth` (AVM leaves shared key access on) and
+`Azure.Resource.UseTags` - so a first deployment needs `allowSharedKeyAccess = $false`
+and tags.
+
+It isn't a transaction: the first failure stops the run, what came before
+stays, and running again carries on from there. Needs Contributor (or Storage
+Account Contributor) on the resource group, which must exist; User Access
+Administrator for role assignments; Storage Blob Data Contributor and network
+access to the account for blob uploads.
+
+## Diagnostic settings
+
+`Get-AACDiagnosticSetting` finds the resources whose logs don't reach Log
+Analytics. Read-only, in three steps:
+
+1. **Every resource in scope**, with one KQL query (Azure Resource Graph), and
+   the subscriptions for their activity log. A storage account's logs are set
+   on its blob, file, queue and table services, which Resource Graph doesn't
+   list: they are added.
+2. **Which resources have logs**: Azure's own list of a resource's diagnostic
+   categories (`diagnosticSettingsCategories`), read once per resource type and
+   kind - not per resource.
+3. **The diagnostic settings** of every resource that has logs (the
+   [Diagnostic Settings - List](https://learn.microsoft.com/rest/api/monitor/diagnostic-settings/list)
+   API, 2021-05-01-preview), 12 at a time (`-ThrottleLimit`).
+
+```powershell
+Get-AACDiagnosticSetting -SubscriptionId 00000000-0000-0000-0000-000000000000
+Get-AACDiagnosticSetting -ManagementGroupId 'mg-landingzones' -ExpectedWorkspace 'law-central' -HtmlPath .\Diagnostics.html -PdfPath .\Diagnostics.pdf
+Get-AACDiagnosticSetting -NotExportedOnly -NoDisplay | Group-Object ResourceType | Sort-Object Count -Descending
+Get-AACDiagnosticSetting -ResourceType 'microsoft.keyvault/vaults' -ExpandSetting -CsvPath .\KeyVaultSettings.csv
+```
+
+Each resource with logs gets a status, and a reason when its logs don't all
+arrive:
+
+| Status | Meaning |
+|---|---|
+| Exported | Every log category reaches a Log Analytics workspace - by name, or through a category group (`allLogs`, `audit`) it belongs to |
+| Partial | Some categories do; the missing ones are listed |
+| Not to workspace | Diagnostic settings exist, but none sends logs to a workspace that exists - storage or Event Hubs only, a deleted workspace, or nothing enabled |
+| No setting | No diagnostic setting at all |
+| Unknown | It couldn't be read (the error says why) |
+
+Misconfigurations, by severity: **High** - no diagnostic setting, activity log
+not exported, no workspace destination, a workspace that doesn't exist;
+**Medium** - log categories missing, a setting with nothing enabled, the same
+category sent to a workspace twice (billed twice), a workspace other than
+`-ExpectedWorkspace`; **Low** - a workspace in another region, the retired
+retention policy still set.
+
+The view shows coverage by resource type (least covered first), the
+workspaces receiving logs, the misconfigurations with the resources they
+affect, and every resource whose logs don't reach a workspace.
+`-ExpandSetting` returns one row per diagnostic setting, flattened:
+destinations, workspace (found, region), destination table (resource-specific
+or AzureDiagnostics), storage account, event hub, log categories and groups
+enabled and disabled, metrics, retention. A large estate means a call per
+resource with logs: narrow it with `-SubscriptionId`, `-ManagementGroupId`,
+`-ResourceGroupName` or `-ResourceType`.
+
+## Log Analytics workspace assessment
+
+`Invoke-AACLogAnalyticsWorkspaceAssessment` assesses one workspace - by its
+workspace ID (GUID), resource ID or name - without changing anything:
+
+```powershell
+Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId 00000000-0000-0000-0000-000000000000
+Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId 'law-contoso-prod' -Days 7 -HtmlPath .\Workspace.html -CsvPath .\Tables.csv
+(Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId 'law-contoso-prod' -Section Tables -NoDisplay).Tables | Where-Object Billing -EQ 'Billable'
+(Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId 'law-contoso-prod' -NoDisplay).Recommendations | Where-Object Severity -EQ 'High'
+```
+
+| Section | What it shows | Read from |
+|---|---|---|
+| Tables | Billable and not billable tables: billable and free GB over `-Days`, share, daily average, last record, plan (Analytics, Basic, Auxiliary), interactive and total retention, Azure or custom | `Usage` (KQL) and the workspace's tables (Resource Manager) |
+| Settings | Every setting: pricing tier and daily cap, retention, access control mode, local authentication, network access, private link, workspace transformation DCR, solutions, data exports, linked services and storage, diagnostic settings, saved searches - and anything else the workspace has, under Other | Resource Manager, Resource Graph |
+| Recommendations | Azure Advisor's, and the assessment's own (below), by severity with what to do and a link | Everything above |
+| Overview | Tier, billable and free data, the daily average and busiest day, tables, agents, rules, operation errors | All of the below |
+| Usage | Billable GB per day, per solution, and - for the last 24 hours - per Azure resource and per computer | `Usage`, `find` (KQL) |
+| Health | `_LogOperation`: errors, warnings and information, grouped; heartbeat ingestion latency | KQL |
+| Agents | Each computer's last heartbeat, agent type (Azure Monitor Agent, the retired MMA, SCOM), state | `Heartbeat` (KQL) |
+| Query Audit | Queries per user and app, the slowest, the failed | `LAQueryLogs` (KQL) |
+| Data Collection Rules | The DCRs sending to the workspace: data sources, streams, output tables, transformations, associations | Resource Graph |
+| Change Log | Changes to the workspace and its tables, from the activity log | Resource Manager |
+
+The assessment's own recommendations: a legacy pricing tier; a commitment tier
+when billable ingestion averages 100 GB a day or more, or one above what is
+ingested; the daily cap stopping collection, ingestion close to it, or no cap;
+ingestion spikes; interactive retention beyond the free 31 days (90 with
+Microsoft Sentinel); large tables that could use the Basic or Auxiliary plan;
+the legacy ContainerLog table; AzureDiagnostics as a large share; custom tables
+with no data; computers on the retired Log Analytics agent (MMA); agents that
+stopped sending heartbeats; operation errors; data collection rules with no
+associations; shared keys (local authentication) enabled; open network access;
+workspace-only access control; query auditing off; no diagnostic settings.
+
+The KQL runs in the workspace, up to 5 queries at a time (the query API's limit
+per user), each on its own - one that can't run doesn't stop the rest. A
+workspace with no `LAQueryLogs` (query auditing off) or no `Heartbeat` (no
+agents) says so instead. It needs Reader (or Log Analytics Reader) on the
+workspace and Reader on its resource group for the activity log. `-Section`
+reads only what you ask for; `-CsvPath` writes the tables, `-HtmlPath` every
+section, each searchable and downloadable as CSV.
+
 ## Troubleshooting
 
 **When a command fails.** At the console, the progress line of the step that
@@ -1250,11 +1472,15 @@ everything on this side for real:
 | `Show-AACResourceMap` | Resource Graph, with a made-up hub-and-spoke estate | Boxes, placement, connections, network paths, NSGs and route tables, the page |
 | `Get-AACAssignedPolicy` | Resource Graph and the parallel ARM reads, with a made-up tenant (management groups, an initiative, a missing definition) | Default, assigned and effective values, resource types from rules (parameters resolved, negated and alias-only rules, initiatives), inherited assignments for a subscription or management group, name filters, the view and the exports |
 | `Get-AACStorageAccountContainerSize` | Resource Graph, the container listing and the blob service (`Send-AACHttpRequest`, with List Blobs XML pages) | The page parser (tiers, snapshots, versions, deleted blobs, Data Lake directories, encoded names, the largest blobs), paging, Entra ID and account SAS, `-AuthMode Auto`, Azure Storage's errors and what to do, filters, the view and the exports |
+| `Get-AACTerraformPlan` | Nothing: it reads a made-up Contoso plan file | Actions and reasons, attribute paths, blocks paired by name, JSON-encoded strings, forced replacements, sensitive values kept out of every output, drift, filters, UTF-16 files, the files it refuses, the view and the exports |
+| `Deploy-AACStorageAccount` | An in-memory fake of Azure: Resource Manager reads and writes, checkNameAvailability, checkPolicyRestrictions, the policy assignments, PSRule and blob uploads all go to one store, which answers as Azure does (false values left out, its own fields added, bodies taken as JSON) | Idempotency (the second run writes nothing), PATCH of only what changed, merged service updates, immutable properties and redundancy, the name, policy Deny and Modify, a failing PSRule rule blocking with its fix, `-UseSuggestedFix` - and, against the real PSRule for Azure rules, that every automatic fix makes its rule pass, drift and `-Prune` under a lock, role assignments found again or adopted, blob MD5, one-item lists sent as lists, a failure part-way and the re-run, AVM parameters files and unsupported settings, `-WhatIf` |
+| `Get-AACDiagnosticSetting` | Resource Graph and the parallel ARM reads, with a made-up Contoso estate (storage services, activity logs, a deleted workspace) | Which types have logs, every status and its reason, category groups, every misconfiguration, `-ExpectedWorkspace`, the flattened settings, the filters, how many calls are made, the view and the CSV, HTML and PDF reports |
 | `Get-AACEntraGroupMembership` | Microsoft Graph (`Send-AACHttpRequest`), with made-up groups | Name filters and OData quoting, paging, nested groups and loops, a group that can't be read, the Connect-AAC Graph token, the view and the exports |
 | `Show-AACCost` | Cost Management (`Invoke-AACCostBatch`, through a shim) | Month and service totals, failed subscriptions, the charts, PDF and HTML; also the query's paging |
 | `Invoke-AACPSRule` | The engine (`Invoke-AACPSRuleEngine`) | Output modes, `-FailedOnly`, settings passed on, CSV and HTML; what is read for the rules asked for; `-Rule` checks; the view listing every resource |
 | PSRule for Azure data (`Get-AACRuleData`) | Azure Resource Manager (`Invoke-AACArmRequest`, `Invoke-AACArmParallel`) | The Export-AzRuleData shape, child settings, 403/404 handling, masked shared keys, type filters in the query, `-NoExpand` |
 | PSRule runner | Nothing | Real PSRule for Azure in a child `pwsh`: the AAC.* rules (naming with its defaults, tags), `-Type` binding for custom rules, wildcard include/exclude, a rule error not stopping the run |
+| `Invoke-AACLogAnalyticsWorkspaceAssessment` | Resource Manager, Resource Graph and the KQL batch, with a made-up Contoso workspace; the HTTP batch for the query helper | Table sizes and billing, settings (anything new under Other), every recommendation rule and what it leaves out, agents' states, DCRs and associations, the change log, missing LAQueryLogs and Heartbeat, `-Section`, `-Days`, the view and the exports |
 | `Invoke-AACApplicationInsightQuery` | Resource Graph and the query API (`Invoke-AACArmRequest`) | The KQL built from the parameters (with escaping), both table schemas flattened, `-Query`, errors, the view and the exports |
 
 The console views are checked by swapping the Spectre console for one that

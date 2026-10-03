@@ -1,0 +1,84 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.5",
+  "timestamp": "2026-10-01T09:20:00Z",
+  "applyable": true,
+  "complete": true,
+  "errored": false,
+  "planned_values": { "root_module": {} },
+  "resource_changes": [
+    {
+      "address": "azurerm_kubernetes_cluster.main",
+      "mode": "managed", "type": "azurerm_kubernetes_cluster", "name": "main",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["delete", "create"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-aks/providers/Microsoft.ContainerService/managedClusters/aks-contoso", "name": "aks-contoso", "location": "uksouth", "resource_group_name": "rg-contoso-aks", "dns_prefix": "contoso",
+          "default_node_pool": [ { "name": "system", "vm_size": "Standard_D4s_v5", "node_count": 3, "zones": ["1", "2", "3"] } ], "network_profile": [ { "network_plugin": "kubenet" } ] },
+        "after": { "name": "aks-contoso", "location": "uksouth", "resource_group_name": "rg-contoso-aks", "dns_prefix": "contoso",
+          "default_node_pool": [ { "name": "system", "vm_size": "Standard_D4s_v5", "node_count": 3, "zones": ["1", "2", "3"] } ], "network_profile": [ { "network_plugin": "azure" } ] },
+        "after_unknown": { "id": true, "kube_config": true, "default_node_pool": [ { "zones": [false, false, false] } ], "network_profile": [ {} ] },
+        "before_sensitive": { "kube_config": true, "default_node_pool": [ { "zones": [false, false, false] } ], "network_profile": [ {} ] },
+        "after_sensitive": { "kube_config": true, "default_node_pool": [ { "zones": [false, false, false] } ], "network_profile": [ {} ] },
+        "replace_paths": [ ["network_profile", 0, "network_plugin"] ]
+      },
+      "action_reason": "replace_because_cannot_update"
+    },
+    {
+      "address": "azurerm_public_ip.gateway",
+      "mode": "managed", "type": "azurerm_public_ip", "name": "gateway",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["create", "delete"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-net/providers/Microsoft.Network/publicIPAddresses/pip-gw", "name": "pip-gw", "location": "uksouth", "resource_group_name": "rg-contoso-net", "sku": "Basic", "allocation_method": "Dynamic", "ip_address": "198.51.100.7" },
+        "after": { "name": "pip-gw", "location": "uksouth", "resource_group_name": "rg-contoso-net", "sku": "Standard", "allocation_method": "Static" },
+        "after_unknown": { "id": true, "ip_address": true },
+        "before_sensitive": {}, "after_sensitive": {},
+        "replace_paths": [ ["sku"] ]
+      },
+      "action_reason": "replace_because_cannot_update"
+    },
+    {
+      "address": "azurerm_linux_virtual_machine.jump",
+      "mode": "managed", "type": "azurerm_linux_virtual_machine", "name": "jump",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["delete", "create"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-mgmt/providers/Microsoft.Compute/virtualMachines/vm-jump", "name": "vm-jump", "location": "uksouth", "resource_group_name": "rg-contoso-mgmt", "size": "Standard_B2s" },
+        "after": { "name": "vm-jump", "location": "uksouth", "resource_group_name": "rg-contoso-mgmt", "size": "Standard_B2s" },
+        "after_unknown": { "id": true },
+        "before_sensitive": {}, "after_sensitive": {}
+      },
+      "action_reason": "replace_because_tainted"
+    },
+    {
+      "address": "azurerm_key_vault_secret.api_key",
+      "mode": "managed", "type": "azurerm_key_vault_secret", "name": "api_key",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["delete", "create"],
+        "before": { "id": "https://kv-contoso.vault.azure.net/secrets/api-key/0123456789abcdef", "name": "api-key", "value": "Old-Api-Key-123" },
+        "after": { "name": "api-key", "value": "New-Api-Key-456" },
+        "after_unknown": { "id": true, "version": true },
+        "before_sensitive": { "value": true }, "after_sensitive": { "value": true }
+      },
+      "action_reason": "replace_by_request"
+    },
+    {
+      "address": "azurerm_container_group.worker",
+      "mode": "managed", "type": "azurerm_container_group", "name": "worker",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["delete", "create"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-app/providers/Microsoft.ContainerInstance/containerGroups/aci-worker", "name": "aci-worker", "location": "uksouth", "resource_group_name": "rg-contoso-app" },
+        "after": { "name": "aci-worker", "location": "uksouth", "resource_group_name": "rg-contoso-app" },
+        "after_unknown": { "id": true },
+        "before_sensitive": {}, "after_sensitive": {}
+      },
+      "action_reason": "replace_by_triggers"
+    }
+  ],
+  "output_changes": {},
+  "prior_state": {},
+  "configuration": {}
+}

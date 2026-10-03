@@ -1,0 +1,24 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.5",
+  "timestamp": "2026-10-01T11:10:00Z",
+  "applyable": true,
+  "complete": true,
+  "errored": false,
+  "planned_values": { "root_module": {} },
+  "resource_changes": [
+    {
+      "address": "azurerm_log_analytics_workspace.shared",
+      "mode": "managed", "type": "azurerm_log_analytics_workspace", "name": "shared",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["forget"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-ops/providers/Microsoft.OperationalInsights/workspaces/law-contoso-shared", "name": "law-contoso-shared", "location": "uksouth", "resource_group_name": "rg-contoso-ops" },
+        "after": null, "after_unknown": {}, "before_sensitive": {}, "after_sensitive": false
+      }
+    }
+  ],
+  "output_changes": {},
+  "prior_state": {},
+  "configuration": {}
+}

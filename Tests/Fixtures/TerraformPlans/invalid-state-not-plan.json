@@ -1,0 +1,11 @@
+{
+  "format_version": "1.0",
+  "terraform_version": "1.9.5",
+  "values": {
+    "root_module": {
+      "resources": [
+        { "address": "azurerm_resource_group.lz", "mode": "managed", "type": "azurerm_resource_group", "name": "lz", "provider_name": "registry.terraform.io/hashicorp/azurerm", "schema_version": 0, "values": { "name": "rg-contoso-lz", "location": "uksouth" } }
+      ]
+    }
+  }
+}

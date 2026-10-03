@@ -18,19 +18,28 @@ function Invoke-AACHttp {
             query APIs' nested innererror detail - as its message
             (Get-AACErrorMessage)
 
-        Returns @{ Status; Content (the response text) }. -Resource picks the
-        token's audience (Get-AACAccessToken -Resource).
+        Returns @{ Status; Content (the response text); Headers (the
+        response's headers, content headers included, case-insensitive) }.
+        -Resource picks the token's audience (Get-AACAccessToken -Resource).
+        A failure's exception also carries Data['Code'] (Azure's error code,
+        e.g. RequestDisallowedByPolicy) and Data['Content'] (the body).
     #>
     [CmdletBinding()]
     [OutputType([hashtable])]
     param(
-        [ValidateSet('Get', 'Post', 'Put', 'Delete')]
+        [ValidateSet('Get', 'Post', 'Put', 'Patch', 'Delete', 'Head')]
         [string] $Method = 'Get',
 
         [Parameter(Mandatory)]
         [string] $Uri,
 
         [string] $Body,
+
+        [byte[]] $BodyBytes,
+
+        [string] $ContentType = 'application/octet-stream',
+
+        [System.Collections.IDictionary] $Header,
 
         [string] $Resource = 'https://management.azure.com',
 
@@ -41,6 +50,8 @@ function Invoke-AACHttp {
     for ($attempt = 1; ; $attempt++) {
         $send = @{ Method = $Method; Uri = $Uri; Token = (Get-AACAccessToken -Resource $Resource) }
         if ($PSBoundParameters.ContainsKey('Body')) { $send.Body = $Body }
+        if ($PSBoundParameters.ContainsKey('BodyBytes')) { $send.BodyBytes = $BodyBytes; $send.ContentType = $ContentType }
+        if ($Header) { $send.Header = $Header }
         $response = $null
         $status = 0
         $content = ''
@@ -55,7 +66,9 @@ function Invoke-AACHttp {
         }
         try {
             if ($status -ge 200 -and $status -lt 300) {
-                return @{ Status = $status; Content = $content }
+                $headers = [System.Collections.Generic.Dictionary[string, string]]::new([StringComparer]::OrdinalIgnoreCase)
+                foreach ($pair in @($response.Headers) + @($response.Content.Headers)) { $headers[$pair.Key] = ($pair.Value -join ',') }
+                return @{ Status = $status; Content = $content; Headers = $headers }
             }
             if ($attempt -lt $MaxAttempts -and ($status -eq 0 -or $status -eq 429 -or $status -ge 500)) {
                 $wait = Get-AACRetryDelay -Response $response -Status $status -Attempt $attempt
@@ -66,6 +79,8 @@ function Invoke-AACHttp {
             $message = Get-AACErrorMessage -Content $content -Fallback $(if ($failure) { $failure } else { "Response status code does not indicate success: $status ($($response.ReasonPhrase))." })
             $exception = [System.Exception]::new($message)
             $exception.Data['StatusCode'] = $status
+            $exception.Data['Content'] = $content
+            $exception.Data['Code'] = $(try { [string](ConvertFrom-Json -InputObject $content -AsHashtable -ErrorAction Stop)['error']['code'] } catch { '' })
             throw $exception
         }
         finally {

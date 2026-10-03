@@ -32,9 +32,11 @@
 
     FunctionsToExport    = @(
         'Connect-AAC'
+        'Deploy-AACStorageAccount'
         'Disconnect-AAC'
         'Get-AACAdvisorRecommendation'
         'Get-AACAssignedPolicy'
+        'Get-AACDiagnosticSetting'
         'Get-AACEntraGroupMembership'
         'Get-AACFirewallRule'
         'Get-AACInventory'
@@ -43,7 +45,9 @@
         'Get-AACSecurityPosture'
         'Get-AACSkuAvailability'
         'Get-AACStorageAccountContainerSize'
+        'Get-AACTerraformPlan'
         'Invoke-AACApplicationInsightQuery'
+        'Invoke-AACLogAnalyticsWorkspaceAssessment'
         'Invoke-AACPSRule'
         'Show-AACCost'
         'Show-AACResource'

@@ -70,36 +70,39 @@ function Invoke-AACProgress {
         Write-AACMarkup '[grey42]Tip: this console is not UTF-8, so symbols are drawn in plain ASCII. For the full display, run [/][grey62][[Console]]::OutputEncoding = [[Text.Encoding]]::UTF8[/][grey42] (or add it to your $PROFILE) and import the module again.[/]'
     }
 
-    $resultHolder = [ref]$null
-    $errorHolder = [ref]$null
+    # Every local from here on is prefixed 'aac': the caller's script block
+    # runs inside this function's scope, so a plain $action or $description
+    # here would hide the caller's own -Action or $description from it.
+    $aacResultHolder = [ref]$null
+    $aacErrorHolder = [ref]$null
 
-    $action = [Action[Spectre.Console.ProgressContext]] {
-        param($context)
-        $script:AACProgressContext = $context
+    $aacAction = [Action[Spectre.Console.ProgressContext]] {
+        param($aacContext)
+        $script:AACProgressContext = $aacContext
         $script:AACProgressTasks = @{}
         try {
-            $resultHolder.Value = & $ScriptBlock
+            $aacResultHolder.Value = & $ScriptBlock
         }
         catch {
-            $errorHolder.Value = $_
+            $aacErrorHolder.Value = $_
             # The steps still running are the ones that failed: they stay
             # unfinished, in red, and the error remembers the step for the
             # panel Show-AACError draws.
-            $failed = @($script:AACProgressTasks.Values | Where-Object { -not $_.IsFinished } | Sort-Object -Property Id)
-            if ($failed.Count -and -not $_.Exception.Data.Contains('AACStep')) {
-                $_.Exception.Data['AACStep'] = [Spectre.Console.Markup]::Remove($failed[-1].Description)
+            $aacFailed = @($script:AACProgressTasks.Values | Where-Object { -not $_.IsFinished } | Sort-Object -Property Id)
+            if ($aacFailed.Count -and -not $_.Exception.Data.Contains('AACStep')) {
+                $_.Exception.Data['AACStep'] = [Spectre.Console.Markup]::Remove($aacFailed[-1].Description)
             }
-            foreach ($task in $failed) {
-                $task.IsIndeterminate = $false
-                $task.Description = "[red1]$($task.Description) - failed[/]"
+            foreach ($aacTask in $aacFailed) {
+                $aacTask.IsIndeterminate = $false
+                $aacTask.Description = "[red1]$($aacTask.Description) - failed[/]"
             }
         }
         finally {
-            foreach ($task in $script:AACProgressTasks.Values) {
-                if (-not $task.IsFinished -and -not $errorHolder.Value) {
-                    $task.IsIndeterminate = $false
-                    $task.Value = $task.MaxValue
-                    $task.StopTask()
+            foreach ($aacTask in $script:AACProgressTasks.Values) {
+                if (-not $aacTask.IsFinished -and -not $aacErrorHolder.Value) {
+                    $aacTask.IsIndeterminate = $false
+                    $aacTask.Value = $aacTask.MaxValue
+                    $aacTask.StopTask()
                 }
             }
             $script:AACProgressContext = $null
@@ -107,36 +110,36 @@ function Invoke-AACProgress {
         }
     }
 
-    $spinner = [Spectre.Console.SpinnerColumn]::new([Spectre.Console.Spinner+Known]::Dots)
-    $spinner.Style = [Spectre.Console.Style]::Parse('deepskyblue3_1')
-    $spinner.CompletedText = (Get-AACGlyph).Tick
-    $spinner.CompletedStyle = [Spectre.Console.Style]::Parse('green3')
+    $aacSpinner = [Spectre.Console.SpinnerColumn]::new([Spectre.Console.Spinner+Known]::Dots)
+    $aacSpinner.Style = [Spectre.Console.Style]::Parse('deepskyblue3_1')
+    $aacSpinner.CompletedText = (Get-AACGlyph).Tick
+    $aacSpinner.CompletedStyle = [Spectre.Console.Style]::Parse('green3')
 
-    $description = [Spectre.Console.TaskDescriptionColumn]::new()
-    $description.Alignment = [Spectre.Console.Justify]::Left
+    $aacDescription = [Spectre.Console.TaskDescriptionColumn]::new()
+    $aacDescription.Alignment = [Spectre.Console.Justify]::Left
 
-    $bar = [Spectre.Console.ProgressBarColumn]::new()
-    $bar.Width = 36
-    $bar.CompletedStyle = [Spectre.Console.Style]::Parse('deepskyblue3_1')
-    $bar.FinishedStyle = [Spectre.Console.Style]::Parse('green3')
-    $bar.RemainingStyle = [Spectre.Console.Style]::Parse('grey23')
-    $bar.IndeterminateStyle = [Spectre.Console.Style]::Parse('deepskyblue3_1')
+    $aacBar = [Spectre.Console.ProgressBarColumn]::new()
+    $aacBar.Width = 36
+    $aacBar.CompletedStyle = [Spectre.Console.Style]::Parse('deepskyblue3_1')
+    $aacBar.FinishedStyle = [Spectre.Console.Style]::Parse('green3')
+    $aacBar.RemainingStyle = [Spectre.Console.Style]::Parse('grey23')
+    $aacBar.IndeterminateStyle = [Spectre.Console.Style]::Parse('deepskyblue3_1')
 
-    $percentage = [Spectre.Console.PercentageColumn]::new()
-    $percentage.Style = [Spectre.Console.Style]::Parse('grey70')
-    $percentage.CompletedStyle = [Spectre.Console.Style]::Parse('green3')
+    $aacPercentage = [Spectre.Console.PercentageColumn]::new()
+    $aacPercentage.Style = [Spectre.Console.Style]::Parse('grey70')
+    $aacPercentage.CompletedStyle = [Spectre.Console.Style]::Parse('green3')
 
-    $elapsed = [Spectre.Console.ElapsedTimeColumn]::new()
-    $elapsed.Style = [Spectre.Console.Style]::Parse('grey50')
+    $aacElapsed = [Spectre.Console.ElapsedTimeColumn]::new()
+    $aacElapsed.Style = [Spectre.Console.Style]::Parse('grey50')
 
-    $progress = [Spectre.Console.AnsiConsole]::Progress()
-    $progress.AutoClear = $false
-    $progress.HideCompleted = $false
-    [Spectre.Console.ProgressExtensions]::Columns($progress, [Spectre.Console.ProgressColumn[]]@($spinner, $description, $bar, $percentage, $elapsed)) | Out-Null
-    $progress.Start($action)
+    $aacProgress = [Spectre.Console.AnsiConsole]::Progress()
+    $aacProgress.AutoClear = $false
+    $aacProgress.HideCompleted = $false
+    [Spectre.Console.ProgressExtensions]::Columns($aacProgress, [Spectre.Console.ProgressColumn[]]@($aacSpinner, $aacDescription, $aacBar, $aacPercentage, $aacElapsed)) | Out-Null
+    $aacProgress.Start($aacAction)
 
-    if ($errorHolder.Value) {
-        throw $errorHolder.Value
+    if ($aacErrorHolder.Value) {
+        throw $aacErrorHolder.Value
     }
-    $resultHolder.Value
+    $aacResultHolder.Value
 }

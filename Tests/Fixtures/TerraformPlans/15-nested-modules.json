@@ -1,0 +1,50 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.5",
+  "timestamp": "2026-10-01T11:20:00Z",
+  "applyable": true,
+  "complete": true,
+  "errored": false,
+  "planned_values": { "root_module": {} },
+  "resource_changes": [
+    {
+      "address": "module.spokes[\"app\"].module.vnet.azurerm_virtual_network.this",
+      "module_address": "module.spokes[\"app\"].module.vnet",
+      "mode": "managed", "type": "azurerm_virtual_network", "name": "this",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": { "name": "vnet-contoso-app", "location": "uksouth", "resource_group_name": "rg-contoso-app", "address_space": ["10.10.0.0/16"] },
+        "after_unknown": { "id": true, "address_space": [false] }, "before_sensitive": false, "after_sensitive": { "address_space": [false] }
+      }
+    },
+    {
+      "address": "module.spokes[\"data\"].module.vnet.azurerm_virtual_network.this",
+      "module_address": "module.spokes[\"data\"].module.vnet",
+      "mode": "managed", "type": "azurerm_virtual_network", "name": "this",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["update"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-data/providers/Microsoft.Network/virtualNetworks/vnet-contoso-data", "name": "vnet-contoso-data", "location": "uksouth", "resource_group_name": "rg-contoso-data", "address_space": ["10.20.0.0/16"], "tags": { "spoke": "data" } },
+        "after": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-data/providers/Microsoft.Network/virtualNetworks/vnet-contoso-data", "name": "vnet-contoso-data", "location": "uksouth", "resource_group_name": "rg-contoso-data", "address_space": ["10.20.0.0/16"], "tags": { "spoke": "data", "tier": "restricted" } },
+        "after_unknown": { "address_space": [false], "tags": {} }, "before_sensitive": { "address_space": [false], "tags": {} }, "after_sensitive": { "address_space": [false], "tags": {} }
+      }
+    },
+    {
+      "address": "module.spokes[\"data\"].azurerm_virtual_network_peering.to_hub[0]",
+      "module_address": "module.spokes[\"data\"]",
+      "mode": "managed", "type": "azurerm_virtual_network_peering", "name": "to_hub", "index": 0,
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": { "name": "peer-data-to-hub", "resource_group_name": "rg-contoso-data", "virtual_network_name": "vnet-contoso-data", "allow_forwarded_traffic": true },
+        "after_unknown": { "id": true, "remote_virtual_network_id": true }, "before_sensitive": false, "after_sensitive": {}
+      }
+    }
+  ],
+  "output_changes": {},
+  "prior_state": {},
+  "configuration": {}
+}

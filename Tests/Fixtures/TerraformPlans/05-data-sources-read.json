@@ -1,0 +1,64 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.5",
+  "timestamp": "2026-10-01T09:40:00Z",
+  "applyable": true,
+  "complete": true,
+  "errored": false,
+  "planned_values": { "root_module": {} },
+  "resource_changes": [
+    {
+      "address": "data.azurerm_subnet.app",
+      "mode": "data", "type": "azurerm_subnet", "name": "app",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["read"],
+        "before": null,
+        "after": { "name": "snet-app", "resource_group_name": "rg-contoso-lz", "timeouts": null },
+        "after_unknown": { "id": true, "address_prefixes": true, "virtual_network_name": true },
+        "before_sensitive": false, "after_sensitive": {}
+      },
+      "action_reason": "read_because_config_unknown"
+    },
+    {
+      "address": "data.azurerm_key_vault_secret.db",
+      "mode": "data", "type": "azurerm_key_vault_secret", "name": "db",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["read"],
+        "before": null,
+        "after": { "name": "db-password", "key_vault_id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-sec/providers/Microsoft.KeyVault/vaults/kv-contoso" },
+        "after_unknown": { "id": true, "value": true, "version": true },
+        "before_sensitive": false, "after_sensitive": { "value": true }
+      },
+      "action_reason": "read_because_dependency_pending"
+    },
+    {
+      "address": "data.http.health",
+      "mode": "data", "type": "http", "name": "health",
+      "provider_name": "registry.terraform.io/hashicorp/http",
+      "change": {
+        "actions": ["read"],
+        "before": null,
+        "after": { "url": "https://app-contoso-api.azurewebsites.net/health" },
+        "after_unknown": { "id": true, "status_code": true, "response_body": true },
+        "before_sensitive": false, "after_sensitive": {}
+      },
+      "action_reason": "read_because_check_nested"
+    },
+    {
+      "address": "data.azurerm_client_config.current",
+      "mode": "data", "type": "azurerm_client_config", "name": "current",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["no-op"],
+        "before": { "client_id": "x", "tenant_id": "y" },
+        "after": { "client_id": "x", "tenant_id": "y" },
+        "after_unknown": {}, "before_sensitive": {}, "after_sensitive": {}
+      }
+    }
+  ],
+  "output_changes": {},
+  "prior_state": {},
+  "configuration": {}
+}
