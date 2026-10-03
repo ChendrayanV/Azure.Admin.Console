@@ -1,0 +1,56 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.5",
+  "timestamp": "2026-10-01T09:10:00Z",
+  "applyable": true,
+  "complete": true,
+  "errored": false,
+  "planned_values": { "root_module": {} },
+  "resource_changes": [
+    {
+      "address": "azurerm_virtual_network.hub",
+      "mode": "managed", "type": "azurerm_virtual_network", "name": "hub",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["update"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-lz/providers/Microsoft.Network/virtualNetworks/vnet-contoso-hub", "name": "vnet-contoso-hub", "location": "uksouth", "resource_group_name": "rg-contoso-lz", "address_space": ["10.0.0.0/16"], "dns_servers": [], "tags": { "env": "prod" } },
+        "after": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-lz/providers/Microsoft.Network/virtualNetworks/vnet-contoso-hub", "name": "vnet-contoso-hub", "location": "uksouth", "resource_group_name": "rg-contoso-lz", "address_space": ["10.0.0.0/16", "10.1.0.0/16"], "dns_servers": ["10.0.0.4", "10.0.0.5"], "tags": { "env": "prod", "cost-centre": "CC-100" } },
+        "after_unknown": { "address_space": [false, false], "dns_servers": [false, false], "tags": {} },
+        "before_sensitive": { "address_space": [false], "dns_servers": [], "tags": {} },
+        "after_sensitive": { "address_space": [false, false], "dns_servers": [false, false], "tags": {} }
+      }
+    },
+    {
+      "address": "azurerm_linux_web_app.api",
+      "mode": "managed", "type": "azurerm_linux_web_app", "name": "api",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["update"],
+        "before": {
+          "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-app/providers/Microsoft.Web/sites/app-contoso-api",
+          "name": "app-contoso-api", "location": "uksouth", "resource_group_name": "rg-contoso-app",
+          "https_only": false,
+          "app_settings": { "WEBSITE_RUN_FROM_PACKAGE": "1", "FEATURE_FLAGS": "beta", "DB_PASSWORD": "Old-Db-Secret-1" },
+          "site_config": [ { "always_on": false, "minimum_tls_version": "1.2", "ftps_state": "AllAllowed", "ip_restriction": [], "application_stack": [ { "dotnet_version": "6.0" } ] } ]
+        },
+        "after": {
+          "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-app/providers/Microsoft.Web/sites/app-contoso-api",
+          "name": "app-contoso-api", "location": "uksouth", "resource_group_name": "rg-contoso-app",
+          "https_only": true,
+          "app_settings": { "WEBSITE_RUN_FROM_PACKAGE": "1", "DB_PASSWORD": "New-Db-Secret-2", "APPLICATIONINSIGHTS_CONNECTION_STRING": "InstrumentationKey=11111111-2222-3333-4444-555555555555" },
+          "site_config": [ { "always_on": true, "minimum_tls_version": "1.2", "ftps_state": "Disabled",
+            "ip_restriction": [ { "name": "allow-frontdoor", "priority": 100, "action": "Allow", "service_tag": "AzureFrontDoor.Backend" } ],
+            "application_stack": [ { "dotnet_version": "8.0" } ] } ]
+        },
+        "after_unknown": { "app_settings": {}, "site_config": [ { "ip_restriction": [ {} ], "application_stack": [ {} ] } ] },
+        "before_sensitive": { "app_settings": { "DB_PASSWORD": true }, "site_config": [ { "ip_restriction": [], "application_stack": [ {} ] } ] },
+        "after_sensitive": { "app_settings": { "DB_PASSWORD": true }, "site_config": [ { "ip_restriction": [ {} ], "application_stack": [ {} ] } ] }
+      }
+    }
+  ],
+  "output_changes": {
+    "app_hostname": { "actions": ["no-op"], "before": "app-contoso-api.azurewebsites.net", "after": "app-contoso-api.azurewebsites.net", "after_unknown": false, "before_sensitive": false, "after_sensitive": false }
+  },
+  "prior_state": {},
+  "configuration": {}
+}

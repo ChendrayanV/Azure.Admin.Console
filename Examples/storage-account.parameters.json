@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "name": { "value": "stcontosologs" },
+    "skuName": { "value": "Standard_LRS" },
+    "allowSharedKeyAccess": { "value": false },
+    "networkAcls": { "value": { "defaultAction": "Deny", "bypass": "AzureServices", "ipRules": [ "203.0.113.10" ] } },
+    "blobServices": {
+      "value": {
+        "deleteRetentionPolicyEnabled": true,
+        "deleteRetentionPolicyDays": 7,
+        "containers": [ { "name": "insights-logs" }, { "name": "archive", "publicAccess": "None" } ]
+      }
+    },
+    "tags": { "value": { "env": "prod" } },
+    "enableTelemetry": { "value": true }
+  }
+}

@@ -88,6 +88,21 @@ Update-TypeData -TypeName 'AAC.ApplicationInsightsException' -DefaultDisplayProp
 # Invoke-AACPSRule's ~18 properties.
 Update-TypeData -TypeName 'AAC.PSRuleResult' -DefaultDisplayPropertySet 'Outcome', 'RuleName', 'ResourceName', 'Reason' -Force
 # Show-AACCost -PassThru: one property per month on top of these.
+# Get-AACTerraformPlan's ~20 properties per resource change.
+Update-TypeData -TypeName 'AAC.TerraformChange' -DefaultDisplayPropertySet 'Action', 'Address', 'ResourceName', 'ChangedAttributes' -Force
+# Invoke-AACLogAnalyticsWorkspaceAssessment: one object per workspace, its sections as properties.
+Update-TypeData -TypeName 'AAC.LogAnalyticsWorkspaceAssessment' -DefaultDisplayPropertySet 'Name', 'PricingTier', 'RetentionDays', 'BillableGB', 'AverageDailyGB', 'Recommendations' -Force
+Update-TypeData -TypeName 'AAC.LogAnalyticsTable' -DefaultDisplayPropertySet 'Table', 'Billing', 'BillableGB', 'NonBillableGB', 'SharePercent', 'Plan', 'RetentionDays' -Force
+Update-TypeData -TypeName 'AAC.LogAnalyticsRecommendation' -DefaultDisplayPropertySet 'Severity', 'Category', 'Recommendation', 'Action' -Force
+# Get-AACDiagnosticSetting: coverage per resource, one row per setting, findings.
+Update-TypeData -TypeName 'AAC.DiagnosticCoverage' -DefaultDisplayPropertySet 'Status', 'Resource', 'ResourceType', 'Workspaces', 'MissingCategories' -Force
+Update-TypeData -TypeName 'AAC.DiagnosticSettingDetail' -DefaultDisplayPropertySet 'Resource', 'Setting', 'Destinations', 'Workspace', 'LogsEnabled' -Force
+Update-TypeData -TypeName 'AAC.DiagnosticFinding' -DefaultDisplayPropertySet 'Severity', 'Finding', 'Resource', 'Detail' -Force
+# Deploy-AACStorageAccount: the deployment, its changes, gates and apply results.
+Update-TypeData -TypeName 'AAC.StorageDeployment' -DefaultDisplayPropertySet 'Name', 'Status', 'Writes', 'ResourceGroupName', 'Location' -Force
+Update-TypeData -TypeName 'AAC.StorageChange' -DefaultDisplayPropertySet 'Order', 'Action', 'Resource', 'Reason' -Force
+Update-TypeData -TypeName 'AAC.StorageGate' -DefaultDisplayPropertySet 'Outcome', 'Gate', 'Resource', 'Item', 'Detail' -Force
+Update-TypeData -TypeName 'AAC.StorageApplyResult' -DefaultDisplayPropertySet 'Status', 'Resource', 'Action', 'Seconds', 'Detail' -Force
 Update-TypeData -TypeName 'AAC.SubscriptionCost' -DefaultDisplayPropertySet 'SubscriptionName', 'Currency', 'MonthToDate', 'Total', 'TopServices', 'Status' -Force
 
 $publicFunctionNames = Get-ChildItem -LiteralPath (Join-Path -Path $moduleRoot -ChildPath 'Public') -Filter '*.ps1' -File -ErrorAction SilentlyContinue |

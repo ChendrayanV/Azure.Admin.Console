@@ -1,0 +1,4 @@
+{
+  "name": "contoso-pipeline",
+  "resources": [ { "type": "Microsoft.Storage/storageAccounts", "name": "stcontoso" } ]
+}

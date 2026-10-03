@@ -1,0 +1,59 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.5",
+  "timestamp": "2026-10-01T10:10:00Z",
+  "applyable": true,
+  "complete": true,
+  "errored": false,
+  "variables": { "admin_password": { "value": "Var-Secret-0" } },
+  "planned_values": { "root_module": {} },
+  "resource_changes": [
+    {
+      "address": "azurerm_mssql_server.main",
+      "mode": "managed", "type": "azurerm_mssql_server", "name": "main",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["update"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-data/providers/Microsoft.Sql/servers/sql-contoso", "name": "sql-contoso", "resource_group_name": "rg-contoso-data", "administrator_login": "sqladmin", "administrator_login_password": "Sql-Secret-1", "version": "12.0" },
+        "after": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-data/providers/Microsoft.Sql/servers/sql-contoso", "name": "sql-contoso", "resource_group_name": "rg-contoso-data", "administrator_login": "sqladmin", "administrator_login_password": "Sql-Secret-2", "version": "12.0" },
+        "after_unknown": {},
+        "before_sensitive": { "administrator_login_password": true },
+        "after_sensitive": { "administrator_login_password": true }
+      }
+    },
+    {
+      "address": "azurerm_container_app.api",
+      "mode": "managed", "type": "azurerm_container_app", "name": "api",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["update"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-app/providers/Microsoft.App/containerApps/ca-api", "name": "ca-api", "resource_group_name": "rg-contoso-app",
+          "secret": [ { "name": "db-conn", "value": "Server=sql;Password=Conn-Secret-3" }, { "name": "api-key", "value": "Api-Secret-4" } ] },
+        "after": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-app/providers/Microsoft.App/containerApps/ca-api", "name": "ca-api", "resource_group_name": "rg-contoso-app",
+          "secret": [ { "name": "db-conn", "value": "Server=sql;Password=Conn-Secret-5" }, { "name": "api-key", "value": "Api-Secret-4" } ] },
+        "after_unknown": { "secret": [ {}, {} ] },
+        "before_sensitive": { "secret": true },
+        "after_sensitive": { "secret": true }
+      }
+    },
+    {
+      "address": "azurerm_key_vault_secret.tokens",
+      "mode": "managed", "type": "azurerm_key_vault_secret", "name": "tokens",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": { "name": "tokens", "value": "Token-Secret-6", "content_type": "text/plain", "tags": { "rotation": "90d" } },
+        "after_unknown": { "id": true, "version": true, "tags": {} },
+        "before_sensitive": false,
+        "after_sensitive": { "value": true, "tags": {} }
+      }
+    }
+  ],
+  "output_changes": {
+    "sql_connection": { "actions": ["update"], "before": { "server": "sql-contoso", "password": "Sql-Secret-1" }, "after": { "server": "sql-contoso", "password": "Sql-Secret-2" }, "after_unknown": false, "before_sensitive": { "password": true }, "after_sensitive": { "password": true } },
+    "all_secrets": { "actions": ["update"], "before": ["Api-Secret-4", "Conn-Secret-3"], "after": ["Api-Secret-4", "Conn-Secret-5"], "after_unknown": false, "before_sensitive": true, "after_sensitive": true }
+  },
+  "prior_state": {},
+  "configuration": {}
+}

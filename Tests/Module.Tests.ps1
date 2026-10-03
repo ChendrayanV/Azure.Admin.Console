@@ -35,9 +35,11 @@ Describe 'Azure Admin Console - Module scaffold' {
     It 'exports exactly the public functions, and nothing parked or private' {
         $expectedFunctions = @(
             'Connect-AAC'
+            'Deploy-AACStorageAccount'
             'Disconnect-AAC'
             'Get-AACAdvisorRecommendation'
             'Get-AACAssignedPolicy'
+            'Get-AACDiagnosticSetting'
             'Get-AACEntraGroupMembership'
             'Get-AACFirewallRule'
             'Get-AACInventory'
@@ -46,7 +48,9 @@ Describe 'Azure Admin Console - Module scaffold' {
             'Get-AACSecurityPosture'
             'Get-AACSkuAvailability'
             'Get-AACStorageAccountContainerSize'
+            'Get-AACTerraformPlan'
             'Invoke-AACApplicationInsightQuery'
+            'Invoke-AACLogAnalyticsWorkspaceAssessment'
             'Invoke-AACPSRule'
             'Show-AACCost'
             'Show-AACResource'
@@ -79,6 +83,36 @@ Describe 'Azure Admin Console - Module scaffold' {
         # the syntax diagram as the "synopsis" instead of throwing - so a
         # not-null check alone isn't enough to catch that failure mode.
         $synopsis | Should -Not -Match ([regex]::Escape("$Name ")) -Because 'a real synopsis should not just be the syntax diagram'
+    }
+
+    It 'has no variable that is a parameter under another case ($current and -Current are one variable)' {
+        $found = foreach ($file in Get-ChildItem -Path (Join-Path $script:aacModulePath 'Private'), (Join-Path $script:aacModulePath 'Public') -Filter '*.ps1') {
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$null, [ref]$null)
+            foreach ($function in $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)) {
+                if (-not $function.Body.ParamBlock) { continue }
+                $parameters = @($function.Body.ParamBlock.Parameters | ForEach-Object { $_.Name.VariablePath.UserPath })
+                $assigned = @($function.Body.FindAll({ $args[0] -is [System.Management.Automation.Language.AssignmentStatementAst] -and $args[0].Left -is [System.Management.Automation.Language.VariableExpressionAst] }, $true) | ForEach-Object { $_.Left.VariablePath.UserPath } | Select-Object -Unique)
+                foreach ($parameter in $parameters) { foreach ($name in $assigned) { if ($name -ieq $parameter -and $name -cne $parameter) { "$($file.Name): $($function.Name) assigns `$$name, which is its parameter `$$parameter" } } }
+            }
+        }
+        @($found) | Should -BeNullOrEmpty -Because 'PowerShell variable names ignore case: assigning it overwrites the parameter'
+    }
+
+    It 'reads no member with ForEach-Object <Name> in what runs under -WhatIf (it returns nothing there)' {
+        # Deploy-AACStorageAccount takes -WhatIf; under it, ForEach-Object -MemberName
+        # treats reading a value (a hashtable key, a regex match's Value) as an
+        # operation, and silently skips it.
+        $files = @(Get-ChildItem -Path (Join-Path $script:aacModulePath 'Public/Deploy-AACStorageAccount.ps1'), (Join-Path $script:aacModulePath 'Private') -Filter '*.ps1' |
+                Where-Object { $_.Name -match 'Deploy-AACStorageAccount|Storage(Plan|DesiredState|Configuration|RuleFix|ApplyView|PlanView)|Compare-AACResourceState|Merge-AACObject|Invoke-AACArmWrite' })
+        $files.Count | Should -BeGreaterThan 8
+        $found = foreach ($file in $files) {
+            $ast = [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$null, [ref]$null)
+            foreach ($command in $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.CommandAst] -and $args[0].GetCommandName() -in 'ForEach-Object', '%', 'foreach' }, $true)) {
+                $first = $command.CommandElements | Select-Object -Skip 1 -First 1
+                if ($first -is [System.Management.Automation.Language.StringConstantExpressionAst] -and $first.StringConstantType -eq 'BareWord') { "$($file.Name):$($command.Extent.StartLineNumber): $($command.Extent.Text)" }
+            }
+        }
+        @($found) | Should -BeNullOrEmpty -Because 'use ForEach-Object { $_.Name }'
     }
 
     It 'loaded the vendored Spectre.Console.dll directly' {

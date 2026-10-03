@@ -1,0 +1,68 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.5",
+  "timestamp": "2026-10-01T10:20:00Z",
+  "applyable": true,
+  "complete": true,
+  "errored": false,
+  "planned_values": { "root_module": {} },
+  "resource_changes": [
+    {
+      "address": "azurerm_policy_definition.allowed_locations",
+      "mode": "managed", "type": "azurerm_policy_definition", "name": "allowed_locations",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["update"],
+        "before": { "id": "/providers/Microsoft.Management/managementGroups/contoso/providers/Microsoft.Authorization/policyDefinitions/allowed-locations", "name": "allowed-locations", "display_name": "Allowed locations",
+          "policy_rule": "{\"if\":{\"not\":{\"field\":\"location\",\"in\":\"[parameters('listOfAllowedLocations')]\"}},\"then\":{\"effect\":\"audit\"}}",
+          "parameters": "{\"listOfAllowedLocations\":{\"type\":\"Array\",\"defaultValue\":[\"uksouth\",\"ukwest\"]}}" },
+        "after": { "id": "/providers/Microsoft.Management/managementGroups/contoso/providers/Microsoft.Authorization/policyDefinitions/allowed-locations", "name": "allowed-locations", "display_name": "Allowed locations",
+          "policy_rule": "{\n  \"if\": {\n    \"not\": { \"field\": \"location\", \"in\": \"[parameters('listOfAllowedLocations')]\" }\n  },\n  \"then\": { \"effect\": \"deny\" }\n}",
+          "parameters": "{\"listOfAllowedLocations\":{\"type\":\"Array\",\"defaultValue\":[\"uksouth\",\"ukwest\",\"northeurope\"]}}" },
+        "after_unknown": {}, "before_sensitive": {}, "after_sensitive": {}
+      }
+    },
+    {
+      "address": "azurerm_policy_definition.require_tag",
+      "mode": "managed", "type": "azurerm_policy_definition", "name": "require_tag",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["update"],
+        "before": { "id": "/providers/Microsoft.Management/managementGroups/contoso/providers/Microsoft.Authorization/policyDefinitions/require-tag", "name": "require-tag", "description": "Old description",
+          "policy_rule": "{\"if\":{\"field\":\"tags['env']\",\"exists\":\"false\"},\"then\":{\"effect\":\"deny\"}}" },
+        "after": { "id": "/providers/Microsoft.Management/managementGroups/contoso/providers/Microsoft.Authorization/policyDefinitions/require-tag", "name": "require-tag", "description": "Every resource needs an env tag",
+          "policy_rule": "{ \"if\": { \"field\": \"tags['env']\", \"exists\": \"false\" }, \"then\": { \"effect\": \"deny\" } }" },
+        "after_unknown": {}, "before_sensitive": {}, "after_sensitive": {}
+      }
+    },
+    {
+      "address": "azapi_resource.diag_setting",
+      "mode": "managed", "type": "azapi_resource", "name": "diag_setting",
+      "provider_name": "registry.terraform.io/azure/azapi",
+      "change": {
+        "actions": ["update"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-ops/providers/Microsoft.Insights/diagnosticSettings/diag", "name": "diag", "type": "Microsoft.Insights/diagnosticSettings@2021-05-01-preview",
+          "body": { "properties": { "logs": [ { "category": "AuditEvent", "enabled": true } ], "metrics": [ { "category": "AllMetrics", "enabled": false } ] } } },
+        "after": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-ops/providers/Microsoft.Insights/diagnosticSettings/diag", "name": "diag", "type": "Microsoft.Insights/diagnosticSettings@2021-05-01-preview",
+          "body": { "properties": { "logs": [ { "category": "AuditEvent", "enabled": true } ], "metrics": [ { "category": "AllMetrics", "enabled": true } ] } } },
+        "after_unknown": { "body": { "properties": { "logs": [ {} ], "metrics": [ {} ] } } }, "before_sensitive": {}, "after_sensitive": {}
+      }
+    },
+    {
+      "address": "azurerm_resource_group_template_deployment.legacy",
+      "mode": "managed", "type": "azurerm_resource_group_template_deployment", "name": "legacy",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["update"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-app/providers/Microsoft.Resources/deployments/legacy", "name": "legacy", "resource_group_name": "rg-contoso-app", "deployment_mode": "Incremental",
+          "parameters_content": "{\"skuName\":{\"value\":\"S1\"},\"instances\":{\"value\":2}}" },
+        "after": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-app/providers/Microsoft.Resources/deployments/legacy", "name": "legacy", "resource_group_name": "rg-contoso-app", "deployment_mode": "Incremental",
+          "parameters_content": "{\"skuName\":{\"value\":\"P1v3\"},\"instances\":{\"value\":3}}" },
+        "after_unknown": { "output_content": true }, "before_sensitive": {}, "after_sensitive": {}
+      }
+    }
+  ],
+  "output_changes": {},
+  "prior_state": {},
+  "configuration": {}
+}

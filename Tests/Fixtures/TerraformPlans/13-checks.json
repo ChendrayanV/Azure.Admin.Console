@@ -1,0 +1,44 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.5",
+  "timestamp": "2026-10-01T11:00:00Z",
+  "applyable": true,
+  "complete": true,
+  "errored": false,
+  "planned_values": { "root_module": {} },
+  "resource_changes": [
+    {
+      "address": "azurerm_storage_account.public",
+      "mode": "managed", "type": "azurerm_storage_account", "name": "public",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["update"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-web/providers/Microsoft.Storage/storageAccounts/stcontosoweb", "name": "stcontosoweb", "resource_group_name": "rg-contoso-web", "location": "uksouth", "public_network_access_enabled": false },
+        "after": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-web/providers/Microsoft.Storage/storageAccounts/stcontosoweb", "name": "stcontosoweb", "resource_group_name": "rg-contoso-web", "location": "uksouth", "public_network_access_enabled": true },
+        "after_unknown": {}, "before_sensitive": {}, "after_sensitive": {}
+      }
+    }
+  ],
+  "output_changes": {},
+  "checks": [
+    {
+      "address": { "kind": "resource", "mode": "managed", "type": "azurerm_storage_account", "name": "public", "to_display": "azurerm_storage_account.public" },
+      "status": "fail",
+      "instances": [
+        { "address": { "to_display": "azurerm_storage_account.public" }, "status": "fail", "problems": [ { "message": "Storage accounts must not allow public network access." } ] }
+      ]
+    },
+    {
+      "address": { "kind": "check", "name": "api_health", "to_display": "check.api_health" },
+      "status": "unknown",
+      "instances": [ { "address": { "to_display": "check.api_health" }, "status": "unknown" } ]
+    },
+    {
+      "address": { "kind": "output_value", "name": "endpoint", "to_display": "output.endpoint" },
+      "status": "pass",
+      "instances": [ { "address": { "to_display": "output.endpoint" }, "status": "pass" } ]
+    }
+  ],
+  "prior_state": {},
+  "configuration": {}
+}

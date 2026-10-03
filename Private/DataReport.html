@@ -136,9 +136,17 @@ button.hbar:hover { background: var(--panel-2); }
 .pill.info { background: var(--info-soft); color: var(--info); }
 .tree .tpath { color: var(--faint); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 section.tbl { margin: 18px 0 8px; }
-.tbl-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin-bottom: 8px; }
+.tbl-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin: 0 -10px 8px; padding: 8px 10px; border-radius: 10px; cursor: pointer; user-select: none; }
+.tbl-head:hover { background: var(--accent-soft); }
+.tbl-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .tbl-head h2 { font-size: 18px; margin: 0; font-weight: 650; }
 .tbl-head .note { color: var(--muted); font-size: 13px; }
+.tbl-head .tcount { color: var(--faint); font-size: 13px; font-variant-numeric: tabular-nums; }
+.tbl-head .tchev { display: inline-block; width: 14px; color: var(--muted); transition: transform .15s ease; align-self: center; }
+section.tbl.collapsed .tbl-head { margin-bottom: 0; }
+section.tbl.collapsed .tbl-head .tchev { transform: rotate(-90deg); }
+section.tbl.collapsed .tbl-body { display: none; }
+.tbl-bulk { display: flex; justify-content: flex-end; gap: 8px; margin: 22px 0 -6px; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter: blur(8px); position: sticky; top: 0; z-index: 4; padding: 8px 0; }
 .search { flex: 1 1 240px; position: relative; min-width: 0; }
 .search input { width: 100%; padding: 8px 12px 8px 32px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); outline: none; }
@@ -198,6 +206,9 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
   .top { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .scroller { overflow: visible; box-shadow: none; }
   th { position: static; }
+  /* On paper every table is shown, open or not. */
+  section.tbl.collapsed .tbl-body { display: block !important; }
+  .tbl-head .tchev, .tbl-bulk { display: none !important; }
 }
 </style>
 </head>
@@ -272,10 +283,21 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
 
   // --- Tables (built first, so tiles and charts can filter them) -------------------------
   var tables = {};
+  if ((D.tables || []).length) {
+    // Expand all / Collapse all, above the tables.
+    var bulk = el('div', 'tbl-bulk');
+    [['Expand all tables', true], ['Collapse all tables', false]].forEach(function (b) {
+      var btn = el('button', 'tool-btn', b[0]); btn.type = 'button';
+      btn.addEventListener('click', function () { Object.keys(tables).forEach(function (id) { tables[id].setOpen(b[1]); }); });
+      bulk.appendChild(btn);
+    });
+    $('tables').appendChild(bulk);
+  }
   (D.tables || []).forEach(function (t) { tables[t.id] = makeTable(t); });
 
   function focusTable(id, filters) {
     var t = tables[id]; if (!t) return;
+    t.setOpen(true);
     t.setFilters(filters || {});
     t.section.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -364,9 +386,28 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
     var state = { q: '', facets: {}, sort: T.sort ? { key: T.sort.key, desc: !!T.sort.desc } : null, group: T.group || '', shown: pageSize, closed: {} };
     // Filters the table opens with (e.g. only failures); Reset clears them.
     for (var fk in (T.filters || {})) state.facets[fk] = String(T.filters[fk]);
-    var section = el('section', 'tbl'); section.id = 'table-' + T.id;
-    var head = el('div', 'tbl-head'); head.appendChild(el('h2', null, T.title)); if (T.note) head.appendChild(el('span', 'note', T.note)); section.appendChild(head);
-    var bar = el('div', 'toolbar'); section.appendChild(bar);
+    // Collapsed by default: the header (chevron, title, row count) opens and
+    // closes the table; a tile, chart or tree click on it opens it.
+    var section = el('section', 'tbl collapsed'); section.id = 'table-' + T.id;
+    var head = el('div', 'tbl-head');
+    head.setAttribute('role', 'button'); head.tabIndex = 0;
+    head.setAttribute('aria-expanded', 'false'); head.setAttribute('aria-controls', 'body-' + T.id);
+    head.title = 'Show or hide this table';
+    head.appendChild(el('span', 'tchev', '▾'));
+    head.appendChild(el('h2', null, T.title));
+    head.appendChild(el('span', 'tcount', rows.length.toLocaleString() + ' ' + (T.noun || 'rows')));
+    if (T.note) head.appendChild(el('span', 'note', T.note));
+    section.appendChild(head);
+    var body = el('div', 'tbl-body'); body.id = 'body-' + T.id; section.appendChild(body);
+    function setOpen(open) {
+      section.classList.toggle('collapsed', !open);
+      head.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    head.addEventListener('click', function () { setOpen(section.classList.contains('collapsed')); });
+    head.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(section.classList.contains('collapsed')); }
+    });
+    var bar = el('div', 'toolbar'); body.appendChild(bar);
     var search = el('label', 'search');
     search.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
     var input = el('input'); input.type = 'search'; input.placeholder = 'Search ' + T.title.toLowerCase() + '...'; input.setAttribute('aria-label', 'Search ' + T.title);
@@ -399,8 +440,8 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
     dl.addEventListener('click', function () { download(filtered()); });
     bar.appendChild(dl);
 
-    var status = el('div', 'status'); section.appendChild(status);
-    var scroller = el('div', 'scroller'); section.appendChild(scroller);
+    var status = el('div', 'status'); body.appendChild(status);
+    var scroller = el('div', 'scroller'); body.appendChild(scroller);
     var table = el('table'); scroller.appendChild(table);
     var thead = el('thead'), tbody = el('tbody'); table.appendChild(thead); table.appendChild(tbody);
     // The columns shown: all but hidden ones, and not the one grouped by
@@ -569,7 +610,7 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
     }
     function setFilters(f) { state.facets = {}; state.q = ''; for (var k in f) state.facets[k] = String(f[k]); state.shown = pageSize; render(); }
     render();
-    return { section: section, setFilters: setFilters };
+    return { section: section, setFilters: setFilters, setOpen: setOpen };
   }
 
   // --- A hierarchy (tenant > management groups > subscriptions > ...) --------------------------

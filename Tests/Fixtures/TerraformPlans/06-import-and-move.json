@@ -1,0 +1,64 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.5",
+  "timestamp": "2026-10-01T09:50:00Z",
+  "applyable": true,
+  "complete": true,
+  "errored": false,
+  "planned_values": { "root_module": {} },
+  "resource_changes": [
+    {
+      "address": "azurerm_resource_group.legacy",
+      "mode": "managed", "type": "azurerm_resource_group", "name": "legacy",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["no-op"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-legacy", "name": "rg-contoso-legacy", "location": "northeurope", "tags": {} },
+        "after": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-legacy", "name": "rg-contoso-legacy", "location": "northeurope", "tags": {} },
+        "after_unknown": {}, "before_sensitive": { "tags": {} }, "after_sensitive": { "tags": {} },
+        "importing": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-legacy" }
+      }
+    },
+    {
+      "address": "azurerm_storage_account.legacy",
+      "mode": "managed", "type": "azurerm_storage_account", "name": "legacy",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["update"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-legacy/providers/Microsoft.Storage/storageAccounts/stcontosolegacy", "name": "stcontosolegacy", "location": "northeurope", "resource_group_name": "rg-contoso-legacy", "min_tls_version": "TLS1_0", "tags": {} },
+        "after": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-legacy/providers/Microsoft.Storage/storageAccounts/stcontosolegacy", "name": "stcontosolegacy", "location": "northeurope", "resource_group_name": "rg-contoso-legacy", "min_tls_version": "TLS1_2", "tags": { "imported": "2026-10" } },
+        "after_unknown": { "tags": {} }, "before_sensitive": { "tags": {} }, "after_sensitive": { "tags": {} },
+        "importing": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-legacy/providers/Microsoft.Storage/storageAccounts/stcontosolegacy" },
+        "generated_config": "resource \"azurerm_storage_account\" \"legacy\" {\n  name = \"stcontosolegacy\"\n}\n"
+      }
+    },
+    {
+      "address": "module.network.azurerm_virtual_network.hub",
+      "previous_address": "azurerm_virtual_network.hub",
+      "module_address": "module.network",
+      "mode": "managed", "type": "azurerm_virtual_network", "name": "hub",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["no-op"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-lz/providers/Microsoft.Network/virtualNetworks/vnet-contoso-hub", "name": "vnet-contoso-hub", "address_space": ["10.0.0.0/16"] },
+        "after": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-lz/providers/Microsoft.Network/virtualNetworks/vnet-contoso-hub", "name": "vnet-contoso-hub", "address_space": ["10.0.0.0/16"] },
+        "after_unknown": {}, "before_sensitive": {}, "after_sensitive": {}
+      }
+    },
+    {
+      "address": "azurerm_subnet.app[\"app\"]",
+      "previous_address": "azurerm_subnet.app[0]",
+      "mode": "managed", "type": "azurerm_subnet", "name": "app", "index": "app",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["update"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-lz/providers/Microsoft.Network/virtualNetworks/vnet-contoso-hub/subnets/snet-app", "name": "snet-app", "service_endpoints": [] },
+        "after": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-lz/providers/Microsoft.Network/virtualNetworks/vnet-contoso-hub/subnets/snet-app", "name": "snet-app", "service_endpoints": ["Microsoft.Storage", "Microsoft.KeyVault"] },
+        "after_unknown": { "service_endpoints": [false, false] }, "before_sensitive": { "service_endpoints": [] }, "after_sensitive": { "service_endpoints": [false, false] }
+      }
+    }
+  ],
+  "output_changes": {},
+  "prior_state": {},
+  "configuration": {}
+}

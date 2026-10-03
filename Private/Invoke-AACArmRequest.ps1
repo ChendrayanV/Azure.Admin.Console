@@ -23,7 +23,7 @@ function Invoke-AACArmRequest {
     #>
     [CmdletBinding()]
     param(
-        [ValidateSet('Get', 'Post')]
+        [ValidateSet('Get', 'Post', 'Put', 'Patch', 'Delete')]
         [string] $Method = 'Get',
 
         [Parameter(Mandatory)]

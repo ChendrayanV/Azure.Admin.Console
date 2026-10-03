@@ -1,0 +1,70 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.5",
+  "timestamp": "2026-10-01T09:00:00Z",
+  "applyable": true,
+  "complete": true,
+  "errored": false,
+  "variables": { "location": { "value": "uksouth" } },
+  "planned_values": { "root_module": {} },
+  "resource_changes": [
+    {
+      "address": "azurerm_resource_group.lz",
+      "mode": "managed", "type": "azurerm_resource_group", "name": "lz",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": { "name": "rg-contoso-lz", "location": "uksouth", "managed_by": null, "tags": { "env": "prod", "owner": "platform" }, "timeouts": null },
+        "after_unknown": { "id": true, "tags": {} },
+        "before_sensitive": false,
+        "after_sensitive": { "tags": {} }
+      }
+    },
+    {
+      "address": "azurerm_virtual_network.hub",
+      "mode": "managed", "type": "azurerm_virtual_network", "name": "hub",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "vnet-contoso-hub", "location": "uksouth", "resource_group_name": "rg-contoso-lz",
+          "address_space": ["10.0.0.0/16"], "dns_servers": [],
+          "subnet": [
+            { "name": "snet-app", "address_prefixes": ["10.0.1.0/24"], "security_group": "" },
+            { "name": "snet-data", "address_prefixes": ["10.0.2.0/24"], "security_group": "" }
+          ],
+          "tags": null
+        },
+        "after_unknown": { "id": true, "guid": true, "address_space": [false], "dns_servers": [], "subnet": [ { "id": true, "address_prefixes": [false] }, { "id": true, "address_prefixes": [false] } ] },
+        "before_sensitive": false,
+        "after_sensitive": { "address_space": [false], "dns_servers": [], "subnet": [ { "address_prefixes": [false] }, { "address_prefixes": [false] } ] }
+      }
+    },
+    {
+      "address": "azurerm_storage_account.diag",
+      "mode": "managed", "type": "azurerm_storage_account", "name": "diag",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "stcontosodiag", "location": "uksouth", "resource_group_name": "rg-contoso-lz",
+          "account_tier": "Standard", "account_replication_type": "ZRS", "min_tls_version": "TLS1_2",
+          "https_traffic_only_enabled": true, "public_network_access_enabled": false,
+          "blob_properties": [ { "versioning_enabled": true, "delete_retention_policy": [ { "days": 14 } ] } ]
+        },
+        "after_unknown": { "id": true, "primary_access_key": true, "primary_blob_endpoint": true, "primary_connection_string": true, "blob_properties": [ { "delete_retention_policy": [ {} ] } ] },
+        "before_sensitive": false,
+        "after_sensitive": { "primary_access_key": true, "primary_connection_string": true, "blob_properties": [ { "delete_retention_policy": [ {} ] } ] }
+      }
+    }
+  ],
+  "output_changes": {
+    "resource_group_id": { "actions": ["create"], "before": null, "after": null, "after_unknown": true, "before_sensitive": false, "after_sensitive": false },
+    "storage_connection_string": { "actions": ["create"], "before": null, "after": null, "after_unknown": true, "before_sensitive": false, "after_sensitive": true }
+  },
+  "prior_state": { "format_version": "1.0", "terraform_version": "1.9.5", "values": { "root_module": {} } },
+  "configuration": { "root_module": {} }
+}

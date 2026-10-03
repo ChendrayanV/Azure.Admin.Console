@@ -1,0 +1,84 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.5",
+  "timestamp": "2026-10-01T09:30:00Z",
+  "applyable": true,
+  "complete": true,
+  "errored": false,
+  "planned_values": { "root_module": {} },
+  "resource_changes": [
+    {
+      "address": "azurerm_application_insights.legacy",
+      "mode": "managed", "type": "azurerm_application_insights", "name": "legacy",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["delete"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-ops/providers/Microsoft.Insights/components/appi-legacy", "name": "appi-legacy", "location": "uksouth", "resource_group_name": "rg-contoso-ops", "application_type": "web", "instrumentation_key": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" },
+        "after": null, "after_unknown": {},
+        "before_sensitive": { "instrumentation_key": true }, "after_sensitive": false
+      },
+      "action_reason": "delete_because_no_resource_config"
+    },
+    {
+      "address": "module.old_spoke.azurerm_virtual_network.spoke",
+      "module_address": "module.old_spoke",
+      "mode": "managed", "type": "azurerm_virtual_network", "name": "spoke",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["delete"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-spoke/providers/Microsoft.Network/virtualNetworks/vnet-spoke-old", "name": "vnet-spoke-old", "location": "uksouth", "resource_group_name": "rg-contoso-spoke", "address_space": ["10.9.0.0/16"] },
+        "after": null, "after_unknown": {}, "before_sensitive": { "address_space": [false] }, "after_sensitive": false
+      },
+      "action_reason": "delete_because_no_module"
+    },
+    {
+      "address": "azurerm_network_interface.nic",
+      "mode": "managed", "type": "azurerm_network_interface", "name": "nic",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["delete"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-app/providers/Microsoft.Network/networkInterfaces/nic-app", "name": "nic-app", "location": "uksouth", "resource_group_name": "rg-contoso-app" },
+        "after": null, "after_unknown": {}, "before_sensitive": {}, "after_sensitive": false
+      },
+      "action_reason": "delete_because_wrong_repetition"
+    },
+    {
+      "address": "azurerm_managed_disk.data[2]",
+      "mode": "managed", "type": "azurerm_managed_disk", "name": "data", "index": 2,
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["delete"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-app/providers/Microsoft.Compute/disks/disk-data-2", "name": "disk-data-2", "location": "uksouth", "resource_group_name": "rg-contoso-app", "disk_size_gb": 512, "storage_account_type": "Premium_LRS" },
+        "after": null, "after_unknown": {}, "before_sensitive": {}, "after_sensitive": false
+      },
+      "action_reason": "delete_because_count_index"
+    },
+    {
+      "address": "azurerm_resource_group.region[\"westeurope\"]",
+      "mode": "managed", "type": "azurerm_resource_group", "name": "region", "index": "westeurope",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["delete"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-weu", "name": "rg-contoso-weu", "location": "westeurope", "tags": {} },
+        "after": null, "after_unknown": {}, "before_sensitive": { "tags": {} }, "after_sensitive": false
+      },
+      "action_reason": "delete_because_each_key"
+    },
+    {
+      "address": "azurerm_dns_a_record.www",
+      "mode": "managed", "type": "azurerm_dns_a_record", "name": "www",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["delete"],
+        "before": { "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-dns/providers/Microsoft.Network/dnsZones/contoso.com/A/www", "name": "www", "zone_name": "contoso.com", "ttl": 300, "records": ["203.0.113.10"] },
+        "after": null, "after_unknown": {}, "before_sensitive": { "records": [false] }, "after_sensitive": false
+      },
+      "action_reason": "delete_because_no_move_target"
+    }
+  ],
+  "output_changes": {
+    "app_insights_key": { "actions": ["delete"], "before": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "after": null, "after_unknown": false, "before_sensitive": true, "after_sensitive": false }
+  },
+  "prior_state": {},
+  "configuration": {}
+}

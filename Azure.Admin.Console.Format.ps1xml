@@ -351,5 +351,55 @@
       </TableControl>
     </View>
 
+    <View>
+      <Name>AAC.TerraformChange</Name>
+      <ViewSelectedBy><TypeName>AAC.TerraformChange</TypeName></ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader><Label>Action</Label><Width>7</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Address</Label><Width>44</Width></TableColumnHeader>
+          <TableColumnHeader><Label>ResourceName</Label><Width>28</Width></TableColumnHeader>
+          <TableColumnHeader><Label>ChangedAttributes</Label></TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <Wrap />
+            <TableColumnItems>
+              <TableColumnItem><PropertyName>Action</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Address</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>ResourceName</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>ChangedAttributes</PropertyName></TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+
+    <View>
+      <Name>AAC.TerraformAttributeChange</Name>
+      <ViewSelectedBy><TypeName>AAC.TerraformAttributeChange</TypeName></ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader><Label>Address</Label><Width>36</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Attribute</Label><Width>32</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Change</Label><Width>8</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Before</Label><Width>30</Width></TableColumnHeader>
+          <TableColumnHeader><Label>After</Label></TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <Wrap />
+            <TableColumnItems>
+              <TableColumnItem><PropertyName>Address</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Attribute</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Change</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Before</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>After</PropertyName></TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+
   </ViewDefinitions>
 </Configuration>

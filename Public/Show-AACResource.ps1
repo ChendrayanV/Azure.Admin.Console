@@ -250,8 +250,8 @@ function Show-AACResource {
                 if ($rest.Count -gt 0) {
                     $bars += @{ Label = "$($rest.Count) other $noun$(if ($rest.Count -ne 1) { 's' })"; Value = ($rest | Measure-Object -Property Count -Sum).Sum; Color = 'grey50' }
                 }
-                $title = "Resources by $noun$(if ($counts.Count -gt $Top) { " (top $Top of $($counts.Count))" })"
-                Show-AACBarChart -Item $bars -Title $title
+                $chartTitle = "Resources by $noun$(if ($counts.Count -gt $Top) { " (top $Top of $($counts.Count))" })"
+                Show-AACBarChart -Item $bars -Title $chartTitle
                 [Spectre.Console.AnsiConsole]::WriteLine()
                 Write-AACMarkup '[grey42]-By Type|Location|ResourceGroup|Subscription picks what is counted; -PassThru returns the counts.[/]'
             }
