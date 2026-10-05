@@ -6,19 +6,21 @@
 #   Deploy-AACStorageAccount -SubscriptionId <subscription> -ResourceGroupName rg-contoso-data -ConfigurationPath .\Examples\storage-account.psd1 -WhatIf
 #
 @{
-    name                      = 'stcontosodata'
-    skuName                   = 'Standard_ZRS'
-    allowSharedKeyAccess      = $false
-    tags                      = @{ env = 'prod'; owner = 'data-platform' }
+    name                  = 'stcontosodata'
+    skuName               = 'Standard_ZRS'
+    allowSharedKeyAccess  = $false
+    allowBlobPublicAccess = $true
 
-    networkAcls               = @{
-        defaultAction       = 'Deny'
-        bypass              = 'AzureServices'
-        ipRules             = @('203.0.113.10')
-        virtualNetworkRules = @('/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-net/providers/Microsoft.Network/virtualNetworks/vnet-contoso/subnets/snet-data')
-    }
+    tags                  = @{ env = 'prod'; owner = 'data-platform' }
 
-    blobServices              = @{
+    # networkAcls               = @{
+    #     defaultAction       = 'Deny'
+    #     bypass              = 'AzureServices'
+    #     ipRules             = @('203.0.113.10')
+    #     virtualNetworkRules = @('/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-net/providers/Microsoft.Network/virtualNetworks/vnet-contoso/subnets/snet-data')
+    # }
+
+    blobServices          = @{
         deleteRetentionPolicyEnabled          = $true
         deleteRetentionPolicyDays             = 14
         containerDeleteRetentionPolicyEnabled = $true
@@ -33,11 +35,11 @@
         )
         diagnosticSettings                    = @(@{ workspaceResourceId = '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-monitor/providers/Microsoft.OperationalInsights/workspaces/law-contoso' })
     }
-    fileServices              = @{ shares = @(@{ name = 'exports'; shareQuota = 100 }) }
-    queueServices             = @{ queues = @('ingest-jobs') }
-    tableServices             = @{ tables = @('runs') }
+    fileServices          = @{ shares = @(@{ name = 'exports'; shareQuota = 100 }) }
+    queueServices         = @{ queues = @('ingest-jobs') }
+    tableServices         = @{ tables = @('runs') }
 
-    managementPolicyRules     = @(
+    managementPolicyRules = @(
         @{
             name = 'cool-after-30-days'; enabled = $true; type = 'Lifecycle'
             definition = @{
@@ -48,10 +50,10 @@
     )
 
     # Account-level diagnostic settings carry metrics only; logs are on the services.
-    diagnosticSettings        = @(@{ workspaceResourceId = '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-monitor/providers/Microsoft.OperationalInsights/workspaces/law-contoso' })
-    roleAssignments           = @(@{ roleDefinitionIdOrName = 'Storage Blob Data Contributor'; principalId = '00000000-0000-0000-0000-000000000000'; principalType = 'ServicePrincipal' })
-    lock                      = @{ kind = 'CanNotDelete' }
+    diagnosticSettings    = @(@{ workspaceResourceId = '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-contoso-monitor/providers/Microsoft.OperationalInsights/workspaces/law-contoso' })
+    roleAssignments       = @(@{ roleDefinitionIdOrName = 'Storage Blob Data Contributor'; principalId = '00000000-0000-0000-0000-000000000000'; principalType = 'ServicePrincipal' })
+    lock                  = @{ kind = 'CanNotDelete' }
 
     # Not AVM's: files to upload (only when new or changed).
-    blobs                     = @(@{ container = 'raw'; path = '.\README.md'; name = 'docs/README.md'; contentType = 'text/markdown' })
+    blobs                 = @(@{ container = 'raw'; path = '.\README.md'; name = 'docs/README.md'; contentType = 'text/markdown' })
 }

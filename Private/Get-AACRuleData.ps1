@@ -56,10 +56,15 @@ function Get-AACRuleData {
         [string[]] $ResourceType = @(),
 
         # Don't read the child settings (step 2).
-        [switch] $NoExpand
+        [switch] $NoExpand,
+        # Only these resources (by ID, any case): the others aren't
+        # expanded either (Invoke-AACAksAssessment's chosen clusters).
+        [string[]] $ResourceId = @()
     )
 
     $warnings = [System.Collections.Generic.List[string]]::new()
+    $onlyIds = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($id in $ResourceId) { if ($id) { [void]$onlyIds.Add($id) } }
 
     # --- Resource Graph ---------------------------------------------------------
     $graph = {
@@ -96,6 +101,9 @@ $typeFilter| project id, name, type, kind, location, resourceGroup, subscription
 | order by type asc, name asc
 "@)) {
         if (-not (& $wanted $row['type'])) {
+            continue
+        }
+        if ($onlyIds.Count -and -not $onlyIds.Contains([string]$row['id'])) {
             continue
         }
         # Export-AzRuleData's field names: resourceGroupName, not resourceGroup.

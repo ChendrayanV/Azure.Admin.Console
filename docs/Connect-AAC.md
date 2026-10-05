@@ -12,15 +12,47 @@ title: Connect-AAC
 
 ## SYNOPSIS
 
-Signs in to Azure interactively using the OAuth 2.0 Authorization Code flow with PKCE and a loopback redirect - no Az or Microsoft.Graph module, and no app registration required by default.
+Signs in to Azure - in the browser (OAuth 2.0 Authorization Code flow with PKCE and a loopback redirect), with a device code, as a service principal (client secret or certificate) or with a managed identity - no Az or Microsoft.Graph module, and no app registration required by default.
 
 ## SYNTAX
 
-### __AllParameterSets
+### Browser (Default)
 
 ```
-Connect-AAC [[-TenantId] <string>] [[-ClientId] <string>] [[-Scope] <string[]>]
- [[-TimeoutSeconds] <int>] [-PassThru]
+Connect-AAC [-TenantId <string>] [-ClientId <string>] [-Scope <string[]>] [-TimeoutSeconds <int>]
+ [-PassThru]
+```
+
+### CertificateStore
+
+```
+Connect-AAC -TenantId <string> -ClientId <string> -CertificateThumbprint <string> [-PassThru]
+```
+
+### CertificateFile
+
+```
+Connect-AAC -TenantId <string> -ClientId <string> -CertificatePath <string>
+ [-CertificatePassword <securestring>] [-PassThru]
+```
+
+### ClientSecret
+
+```
+Connect-AAC -TenantId <string> -ClientId <string> -ClientSecret <securestring> [-PassThru]
+```
+
+### DeviceCode
+
+```
+Connect-AAC -DeviceCode [-TenantId <string>] [-ClientId <string>] [-Scope <string[]>]
+ [-TimeoutSeconds <int>] [-PassThru]
+```
+
+### Identity
+
+```
+Connect-AAC -Identity [-ClientId <string>] [-PassThru]
 ```
 
 ## ALIASES
@@ -29,6 +61,15 @@ This command has no aliases.
 
 ## DESCRIPTION
 
+Without a sign-in option, the browser (below). -DeviceCode shows a
+code to enter at https://microsoft.com/devicelogin on any device.
+-ClientSecret, -CertificatePath and -CertificateThumbprint sign in
+as a service principal (-ClientId, -TenantId), and -Identity with
+the managed identity of where this runs (Azure Automation, a VM, App
+Service): no user, no refresh token - a new token is asked for when
+one runs out.
+
+The browser sign-in:
 Opens your default browser to Microsoft's sign-in page, receives the
 redirect on a one-shot local HTTP listener (http://localhost:\<port\>/),
 and exchanges the resulting authorization code for tokens directly
@@ -67,7 +108,106 @@ Connect-AAC -TenantId 'contoso.onmicrosoft.com' -ClientId '11111111-1111-1111-11
 
 Signs in to a specific tenant using your own App Registration.
 
+### Example 3
+
+```powershell
+Connect-AAC -DeviceCode
+```
+
+Signs in with a code entered at https://microsoft.com/devicelogin.
+
+### Example 4
+
+```powershell
+Connect-AAC -TenantId 'contoso.onmicrosoft.com' -ClientId '11111111-1111-1111-1111-111111111111' -ClientSecret (Read-Host -AsSecureString 'Secret')
+```
+
+Signs in as a service principal with its client secret.
+
+### Example 5
+
+```powershell
+Connect-AAC -TenantId 'contoso.onmicrosoft.com' -ClientId '11111111-1111-1111-1111-111111111111' -CertificatePath .\sp-reader.pfx -CertificatePassword $password
+```
+
+Signs in as a service principal with a certificate.
+
+### Example 6
+
+```powershell
+Connect-AAC -Identity
+```
+
+In an Azure Automation runbook: signs in with the account's system-assigned managed identity.
+
 ## PARAMETERS
+
+### -CertificatePassword
+
+The .pfx file's password.
+
+```yaml
+Type: System.Security.SecureString
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: CertificateFile
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -CertificatePath
+
+Sign in as a service principal (-ClientId, -TenantId) with a
+certificate: a .pfx file with the private key (-CertificatePassword
+if it has one). The token request is signed with the key; the key
+isn't sent anywhere.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: CertificateFile
+  Position: Named
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -CertificateThumbprint
+
+Sign in as a service principal with a certificate from the current
+user's (or the machine's) certificate store, by its thumbprint.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: CertificateStore
+  Position: Named
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
 ### -ClientId
 
@@ -81,13 +221,114 @@ Application Insights API (Data.Read).
 
 ```yaml
 Type: System.String
-DefaultValue: "'04b07795-8ddb-461a-bbee-02f9e1bf7b46'"
+DefaultValue: None
 SupportsWildcards: false
 Aliases: []
 ParameterSets:
-- Name: (All)
-  Position: 1
+- Name: Identity
+  Position: Named
   IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+- Name: CertificateStore
+  Position: Named
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+- Name: CertificateFile
+  Position: Named
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+- Name: ClientSecret
+  Position: Named
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+- Name: DeviceCode
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+- Name: Browser
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ClientSecret
+
+Sign in as a service principal (-ClientId, -TenantId) with its client
+secret - for pipelines and schedules. No user, no browser; the
+service principal needs Reader on what is read.
+
+```yaml
+Type: System.Security.SecureString
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: ClientSecret
+  Position: Named
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -DeviceCode
+
+Sign in with a code instead of a browser on this machine: the code
+is shown with the address to enter it at
+(https://microsoft.com/devicelogin), on any device. For SSH,
+containers and Cloud Shell.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: DeviceCode
+  Position: Named
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Identity
+
+Sign in with the managed identity of where this runs - an Azure
+Automation account (as a runbook), a VM, App Service or Functions.
+-ClientId picks a user-assigned identity; without it, the
+system-assigned one.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: Identity
+  Position: Named
+  IsRequired: true
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
   ValueFromRemainingArguments: false
@@ -130,8 +371,14 @@ DefaultValue: "@('https://management.azure.com/.default', 'offline_access', 'ope
 SupportsWildcards: false
 Aliases: []
 ParameterSets:
-- Name: (All)
-  Position: 2
+- Name: DeviceCode
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+- Name: Browser
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -150,12 +397,36 @@ Entra ID tenant), 'common' (also allows personal Microsoft accounts) or
 
 ```yaml
 Type: System.String
-DefaultValue: "'organizations'"
+DefaultValue: None
 SupportsWildcards: false
 Aliases: []
 ParameterSets:
-- Name: (All)
-  Position: 0
+- Name: CertificateStore
+  Position: Named
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+- Name: CertificateFile
+  Position: Named
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+- Name: ClientSecret
+  Position: Named
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+- Name: DeviceCode
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+- Name: Browser
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -176,8 +447,14 @@ DefaultValue: 180
 SupportsWildcards: false
 Aliases: []
 ParameterSets:
-- Name: (All)
-  Position: 3
+- Name: DeviceCode
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+- Name: Browser
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false

@@ -265,6 +265,7 @@
       '.bg{fill:' + t.page + ';}',
       '.cluster rect.box{stroke-width:1.6;}',
       '.cluster.subscription rect.box{fill:' + t.subscription[0] + ';stroke:' + t.subscription[1] + ';}',
+      '.cluster.managementgroup rect.box{fill:' + t.vnet[0] + ';stroke:' + t.subscription[1] + ';stroke-width:2;}',
       '.cluster.resourcegroup rect.box{fill:' + t.resourcegroup[0] + ';stroke:' + t.resourcegroup[1] + ';stroke-dasharray:7 4;}',
       '.cluster.vnet rect.box{fill:' + t.vnet[0] + ';stroke:' + t.vnet[1] + ';}',
       '.cluster.subnet rect.box{fill:' + t.subnet[0] + ';stroke:' + t.subnet[1] + ';stroke-dasharray:5 3;}',
@@ -373,7 +374,7 @@
       el('rect', { class: 'box', x: b.x, y: b.y, width: b.width, height: b.height, rx: c.kind === 'subscription' ? 14 : 10 }, g);
       el('image', { href: icon(c.icon), x: b.x + 12, y: b.y + 11, width: 26, height: 26 }, g);
       const name = el('text', { class: 'name', x: b.x + 46, y: b.y + 22 }, g);
-      name.textContent = clip(c.kind === 'subscription' ? 'Subscription: ' + c.name : c.kind === 'resourcegroup' ? 'Resource group: ' + c.name : c.name, b.width - 60, 7.4);
+      name.textContent = clip(c.kind === 'subscription' ? 'Subscription: ' + c.name : c.kind === 'resourcegroup' ? 'Resource group: ' + c.name : c.kind === 'managementgroup' ? 'Management group: ' + c.name : c.name, b.width - 60, 7.4);
       const line = [].concat(c.detail || [], state.mode === 'cards' ? (c.badges || []) : []).join('  ·  ');
       if (line) {
         const detail = el('text', { class: 'detail', x: b.x + 46, y: b.y + 38 }, g);
@@ -576,7 +577,7 @@
       add('Resource ID', '<code>' + esc(n.id) + '</code>');
     } else {
       heading = c.name;
-      type = { subscription: 'Subscription', resourcegroup: 'Resource group', vnet: 'Virtual network', subnet: 'Subnet' }[c.kind];
+      type = { managementgroup: 'Management group', subscription: 'Subscription', resourcegroup: 'Resource group', vnet: 'Virtual network', subnet: 'Subnet' }[c.kind];
       iconKey = c.icon;
       if (c.kind === 'subnet') {
         add('Address prefix', esc(c.prefix));

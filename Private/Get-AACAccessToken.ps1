@@ -52,6 +52,21 @@ function Get-AACAccessToken {
         }
     }
 
+    # A service principal or managed identity (Connect-AAC -ClientSecret,
+    # -Certificate*, -Identity) has no refresh token: ask again with it.
+    $credential = Get-AACPropertyValue -InputObject $session -Name 'Credential'
+    if ($credential) {
+        $fresh = Get-AACAppToken -Flow $credential.Flow -TenantId $credential.TenantId -ClientId $credential.ClientId -ClientSecret $credential['ClientSecret'] -Certificate $credential['Certificate'] -Resource $Resource
+        if ($isArm) {
+            $session.AccessToken = $fresh.AccessToken
+            $session.ExpiresOn = $fresh.ExpiresOn
+        }
+        else {
+            $tokens[$Resource] = @{ AccessToken = $fresh.AccessToken; ExpiresOn = $fresh.ExpiresOn }
+        }
+        return $fresh.AccessToken
+    }
+
     if (-not $session.RefreshToken) {
         throw 'The Azure sign-in has expired and no refresh token is available. Run Connect-AAC again.'
     }
