@@ -240,21 +240,21 @@ function ConvertTo-AACWorkspaceAssessment {
         })
 
     # --- Change log (activity log) -------------------------------------------------------------------------------
-    $changes = @(foreach ($event in & $armItems 'activityLog') {
-            $resource = [string](& $get $event 'resourceId')
+    $changes = @(foreach ($activity in & $armItems 'activityLog') {
+            $resource = [string](& $get $activity 'resourceId')
             if (-not $resource.ToLowerInvariant().StartsWith($workspaceKey)) { continue }
-            $status = [string](& $get $event 'status', 'value')
+            $status = [string](& $get $activity 'status', 'value')
             if ($status -in 'Started', 'Accepted') { continue }
             $relative = $resource.Substring([Math]::Min($workspaceId.Length, $resource.Length)).TrimStart('/')
             & $object 'AAC.LogAnalyticsChange' ([ordered]@{
-                    Time      = & $date (& $get $event 'eventTimestamp')
-                    Operation = $(if (& $get $event 'operationName', 'localizedValue') { [string](& $get $event 'operationName', 'localizedValue') } else { [string](& $get $event 'operationName', 'value') })
+                    Time      = & $date (& $get $activity 'eventTimestamp')
+                    Operation = $(if (& $get $activity 'operationName', 'localizedValue') { [string](& $get $activity 'operationName', 'localizedValue') } else { [string](& $get $activity 'operationName', 'value') })
                     Status    = $status
-                    Caller    = [string](& $get $event 'caller')
+                    Caller    = [string](& $get $activity 'caller')
                     Resource  = $(if ($relative) { $relative } else { '(workspace)' })
-                    Level     = [string](& $get $event 'level')
-                    Detail    = [string](& $get $event 'subStatus', 'localizedValue')
-                    Action    = [string](& $get $event 'operationName', 'value')
+                    Level     = [string](& $get $activity 'level')
+                    Detail    = [string](& $get $activity 'subStatus', 'localizedValue')
+                    Action    = [string](& $get $activity 'operationName', 'value')
                 })
         })
     $changes = @($changes | Sort-Object -Property Time -Descending)
