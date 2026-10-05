@@ -7,13 +7,10 @@
 Azure admin reports and checks from PowerShell, over plain REST. No Az or
 Microsoft.Graph modules, and no app registration.
 
-<!-- <video width="320" height="240" controls>
-  <source src="https://youtu.be/odHW8du6dUk" type="video/mp4">
-  Your browser does not support the video tag.
-</video> -->
-
 <p align="center">
-  <video src="https://www.youtube.com/watch?v=odHW8du6dUk" width="500px"></video>
+  <a href="https://www.youtube.com/watch?v=odHW8du6dUk">
+    <img src="https://img.youtube.com/vi/odHW8du6dUk/maxresdefault.jpg" alt="Azure.Admin.Console video walkthrough" width="500">
+  </a>
 </p>
 
 - **Azure Advisor report.** Every Advisor recommendation (Cost, Security,
