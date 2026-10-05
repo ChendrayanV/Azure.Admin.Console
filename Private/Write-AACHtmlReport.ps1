@@ -24,7 +24,10 @@ function Write-AACHtmlReport {
           -Table    @{ Id; Title; Note; Noun; File; Rows; Columns; Sort =
                        @{ Key; Desc }; GroupBy = @('Column', ...); Group;
                        Filters = @{ Column = 'Value' } (what it opens with);
-                       PageSize }
+                       PageSize; Section }
+                    Section: tables with one are drawn under its heading
+                    (in the order sections first appear) and listed in a
+                    Contents block above the tables - for reports with many.
                     Columns: @{ Key; Label; Type; Facet; Hidden; Tones;
                     Format; Sum; CurrencyKey; IdKey; Href; Text; Soon }.
                     Types: text (default), wide (long text, clamped), mono,

@@ -103,6 +103,39 @@ Update-TypeData -TypeName 'AAC.StorageDeployment' -DefaultDisplayPropertySet 'Na
 Update-TypeData -TypeName 'AAC.StorageChange' -DefaultDisplayPropertySet 'Order', 'Action', 'Resource', 'Reason' -Force
 Update-TypeData -TypeName 'AAC.StorageGate' -DefaultDisplayPropertySet 'Outcome', 'Gate', 'Resource', 'Item', 'Detail' -Force
 Update-TypeData -TypeName 'AAC.StorageApplyResult' -DefaultDisplayPropertySet 'Status', 'Resource', 'Action', 'Seconds', 'Detail' -Force
+# Invoke-AACAksAssessment: clusters, node pools, settings, checks, findings, policy views.
+Update-TypeData -TypeName 'AAC.AksCluster' -DefaultDisplayPropertySet 'Name', 'Version', 'Support', 'Tier', 'Nodes', 'WafScore', 'High', 'Medium', 'Low', 'PolicyViolations' -Force
+Update-TypeData -TypeName 'AAC.AksNodePool' -DefaultDisplayPropertySet 'Cluster', 'Pool', 'Mode', 'VmSize', 'Nodes', 'Autoscale', 'Zones', 'Version', 'NodeImageAge' -Force
+Update-TypeData -TypeName 'AAC.AksSetting' -DefaultDisplayPropertySet 'Cluster', 'Area', 'Setting', 'Value' -Force
+Update-TypeData -TypeName 'AAC.AksCheck' -DefaultDisplayPropertySet 'Cluster', 'Pillar', 'Check', 'Status', 'Severity' -Force
+Update-TypeData -TypeName 'AAC.AksFinding' -DefaultDisplayPropertySet 'Severity', 'Pillar', 'Source', 'Cluster', 'Check' -Force
+Update-TypeData -TypeName 'AAC.AksUpgrade' -DefaultDisplayPropertySet 'Cluster', 'Component', 'Current', 'Support', 'Available' -Force
+Update-TypeData -TypeName 'AAC.AksPolicyViolation' -DefaultDisplayPropertySet 'Cluster', 'Namespace', 'Workload', 'Component', 'Policy', 'Effect' -Force
+Update-TypeData -TypeName 'AAC.AksPolicyNamespace' -DefaultDisplayPropertySet 'Namespace', 'Violations', 'Workloads', 'Policies', 'Deny' -Force
+Update-TypeData -TypeName 'AAC.AksPolicyWorkload' -DefaultDisplayPropertySet 'Cluster', 'Namespace', 'WorkloadKind', 'Workload', 'Violations', 'Policies' -Force
+Update-TypeData -TypeName 'AAC.AksPolicySummary' -DefaultDisplayPropertySet 'Policy', 'Effect', 'Violations', 'Clusters', 'Namespaces', 'Workloads' -Force
+# Invoke-AACPolicyAssessment: assignments, compliance, exemptions, definitions, findings.
+Update-TypeData -TypeName 'AAC.PolicyAssignmentReport' -DefaultDisplayPropertySet 'Assignment', 'Scope', 'Kind', 'Enforcement', 'CompliancePercent', 'Rating', 'NonCompliant', 'Exemptions' -Force
+Update-TypeData -TypeName 'AAC.PolicyAssignmentCompliance' -DefaultDisplayPropertySet 'Assignment', 'Subscription', 'CompliancePercent', 'Rating', 'NonCompliant', 'Resources' -Force
+Update-TypeData -TypeName 'AAC.PolicyAssessmentPolicy' -DefaultDisplayPropertySet 'Assignment', 'Policy', 'Effect', 'Category', 'CompliancePercent', 'NonCompliant' -Force
+Update-TypeData -TypeName 'AAC.PolicyCategory' -DefaultDisplayPropertySet 'Category', 'Policies', 'Assignments', 'CompliancePercent', 'Rating', 'NonCompliant' -Force
+Update-TypeData -TypeName 'AAC.PolicySubscription' -DefaultDisplayPropertySet 'Subscription', 'ManagementGroups', 'CompliancePercent', 'Rating', 'NonCompliant', 'Assignments', 'Exemptions' -Force
+Update-TypeData -TypeName 'AAC.PolicyManagementGroup' -DefaultDisplayPropertySet 'ManagementGroup', 'Parent', 'CompliancePercent', 'Rating', 'Assignments', 'Subscriptions' -Force
+Update-TypeData -TypeName 'AAC.PolicyInitiative' -DefaultDisplayPropertySet 'Initiative', 'PolicyType', 'Category', 'Policies', 'Assigned', 'Deprecated' -Force
+Update-TypeData -TypeName 'AAC.PolicyDefinitionReport' -DefaultDisplayPropertySet 'Definition', 'PolicyType', 'Category', 'Effect', 'Assigned', 'Deprecated' -Force
+Update-TypeData -TypeName 'AAC.PolicyExemptionReport' -DefaultDisplayPropertySet 'Exemption', 'Assignment', 'Scope', 'Category', 'ExpiresOn', 'Status' -Force
+Update-TypeData -TypeName 'AAC.PolicyRoleAssignment' -DefaultDisplayPropertySet 'Assignment', 'Identity', 'Role', 'Scope', 'Required' -Force
+Update-TypeData -TypeName 'AAC.PolicyFinding' -DefaultDisplayPropertySet 'Severity', 'Area', 'Finding', 'Item', 'Scope' -Force
+# Invoke-AACAssessment: the run's summary (its sheets are plain rows).
+Update-TypeData -TypeName 'AAC.Assessment' -DefaultDisplayPropertySet 'Subscriptions', 'Resources', 'ResourceTypes', 'AdvisorHigh', 'Retirements', 'SecurityHigh', 'ReportFolder' -Force
+# Invoke-AACVirtualNetworkAssessment: networks, subnets, peerings, free ranges, findings.
+Update-TypeData -TypeName 'AAC.VirtualNetwork' -DefaultDisplayPropertySet 'Name', 'Role', 'AddressSpace', 'UsedIps', 'AvailableIps', 'UsedPercent', 'SubnetCount', 'PeeringCount', 'High', 'Medium', 'Low' -Force
+Update-TypeData -TypeName 'AAC.VirtualNetworkSubnet' -DefaultDisplayPropertySet 'VirtualNetwork', 'Subnet', 'Prefix', 'Usable', 'Used', 'Available', 'UsedPercent', 'Nsg', 'Outbound' -Force
+Update-TypeData -TypeName 'AAC.VirtualNetworkPeering' -DefaultDisplayPropertySet 'VirtualNetwork', 'Peering', 'RemoteVirtualNetwork', 'State', 'Sync', 'UseRemoteGateways', 'AllowGatewayTransit' -Force
+Update-TypeData -TypeName 'AAC.VirtualNetworkFreeRange' -DefaultDisplayPropertySet 'VirtualNetwork', 'AddressSpace', 'Prefix', 'Size' -Force
+Update-TypeData -TypeName 'AAC.VirtualNetworkFinding' -DefaultDisplayPropertySet 'Severity', 'Category', 'Finding', 'VirtualNetwork', 'Item', 'Action' -Force
+Update-TypeData -TypeName 'AAC.VirtualNetworkPrivateEndpoint' -DefaultDisplayPropertySet 'VirtualNetwork', 'Subnet', 'PrivateEndpoint', 'Target', 'Groups', 'Status', 'ZoneLinked' -Force
+Update-TypeData -TypeName 'AAC.ApplicationSecurityGroupUse' -DefaultDisplayPropertySet 'Asg', 'Nics', 'Rules', 'VirtualNetworks', 'ResourceGroup' -Force
 Update-TypeData -TypeName 'AAC.SubscriptionCost' -DefaultDisplayPropertySet 'SubscriptionName', 'Currency', 'MonthToDate', 'Total', 'TopServices', 'Status' -Force
 
 $publicFunctionNames = Get-ChildItem -LiteralPath (Join-Path -Path $moduleRoot -ChildPath 'Public') -Filter '*.ps1' -File -ErrorAction SilentlyContinue |

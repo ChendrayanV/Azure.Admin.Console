@@ -6,3 +6,9 @@ release-notes.md
 
 # Local release script (git add, commit, push, tag) - not part of the repo
 Release.ps1
+
+# Invoke-AACAssessment output (may hold real tenant data)
+AzureAssessment-*/
+
+# Demo video - hosted on YouTube
+video/*.mp4

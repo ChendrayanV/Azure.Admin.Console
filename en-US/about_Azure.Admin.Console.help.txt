@@ -17,10 +17,9 @@ LONG DESCRIPTION
       - PDF reports laid out for people who don't use PowerShell,
       - interactive HTML reports that work offline.
 
-    Nothing in Azure is ever changed. Reader access to the subscriptions is
-    enough for every command but one: Get-AACStorageAccountContainerSize
-    reads blobs, which needs a data role (Storage Blob Data Reader) or an
-    account SAS (-AuthMode).
+    Every command reads; only Deploy-AACStorageAccount writes, and it plans,
+    checks Azure Policy and PSRule, and asks first (-WhatIf changes
+    nothing). Each command's help lists the permissions it needs.
 
 COMMANDS
     Connect-AAC
