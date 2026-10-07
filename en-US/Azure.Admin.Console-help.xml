@@ -8396,6 +8396,368 @@ Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId 00000000-0000-0000-0000-0
   </command:command>
   <command:command>
     <command:details>
+      <command:name>Invoke-AACM365Assessment</command:name>
+      <maml:description>
+        <maml:para>Microsoft 365 tenant discovery and security posture - Entra ID, Microsoft 365 and Intune - read from the Microsoft Graph REST API with one token, with zero-trust findings, as a Spectre.Console view, an object, CSV files and a tabbed, interactive HTML report.</maml:para>
+      </maml:description>
+      <command:verb>Invoke</command:verb>
+      <command:noun>AACM365Assessment</command:noun>
+    </command:details>
+    <maml:description>
+      <maml:para>Read-only, Microsoft Graph REST only: no AzureAD, MSOnline,
+AzureADPreview or Microsoft.Graph modules. Every call uses the one
+Graph token of the Connect-AAC sign-in; about 25 calls run in
+parallel, each followed through its pages.
+
+-Section picks what is read (everything by default):
+  Entra         tenant details and directory sync, licences,
+                security defaults, user and guest settings
+                (authorization policy), cross-tenant access,
+                Conditional Access policies and named locations,
+                admin roles - active and eligible (PIM) - with each
+                admin's MFA registration, every user's MFA
+                registration, authentication methods, identity
+                providers - and:
+                  MFA coverage           registered and phishing-
+                                         resistant MFA by members,
+                                         admins and guests; the MFA
+                                         policy's exclusions
+                  emergency access       break-glass accounts (excluded
+                                         from every policy, or by
+                                         name): two, cloud-only,
+                                         Global Admin, passkey
+                  dangling admins        privileged roles held by
+                                         deleted, disabled, guest,
+                                         idle, synced accounts or apps
+                  role overlap           Global Admin plus more, three
+                                         or more roles, active and
+                                         eligible at once
+                  legacy authentication  actual IMAP, POP, SMTP AUTH,
+                                         ActiveSync... sign-ins in
+                                         the last -SignInDays
+                  user consent           who can consent to apps, and
+                                         the admin consent workflow
+                  security defaults      off with no MFA, or on when
+                                         Conditional Access is
+                                         licensed
+  Applications  (with Entra) app registrations and enterprise
+                apps: secrets and certificates expired, expiring or
+                long-lived; over-privileged permissions (application
+                permissions on Microsoft Graph and delegated
+                consents, rated Critical, High, Medium); redirect
+                URIs that are dangling (their host looked up in DNS),
+                wildcard or not HTTPS
+  Microsoft365  domains, Microsoft Secure Score and its controls
+                (with the gap and how to fix each), SharePoint and
+                OneDrive sharing settings, audit logging (Purview
+                audit log search, from its Secure Score control, and
+                the Entra audit log)
+  Intune        tenant settings, enrollment restrictions,
+                compliance policies, endpoint security policies
+                (antivirus, firewall, disk encryption, EDR, attack
+                surface reduction, account protection), managed
+                devices (compliance, encryption, stale) and the
+                Entra ID devices no MDM manages
+
+PERMISSIONS. A Graph token carries the permissions consented to the
+app you sign in with. Connect-AAC's default (the Azure CLI) can read
+the directory but not Conditional Access, Intune or Secure Score.
+For everything in one token, sign in with an app that has the
+delegated (or, for a service principal, application) permissions
+-ListPermission prints - for example Microsoft Graph Command Line
+Tools, once an admin has consented:
+
+    Connect-AAC -ClientId 14d82eec-204b-4c2f-b7e8-296a70dab67e `
+        -Scope ((Invoke-AACM365Assessment -ListPermission) + 'offline_access', 'openid', 'profile')
+
+Your account also needs a directory role that can read them (Global
+Reader, Security Reader plus Intune Administrator or reader roles).
+Whatever Graph refuses is listed in the Permissions tab with the
+permission it needs; the rest of the report is still made.
+
+What you get depends on where the command runs:
+  at the prompt    tiles, the security settings, Conditional Access,
+                   the privileged role assignments, what couldn't
+                   be read and the findings, a page at a time
+  piped onward     the AAC.M365Assessment object, with every table
+                   as a property
+  -PassThru        the view and the object
+  -NoDisplay       the object only
+-CsvPath (a folder) writes a CSV per table. -HtmlPath writes a
+tabbed report - Overview, Findings, Entra ID, Microsoft 365, Intune,
+Permissions - where every table can be searched, filtered, grouped
+and downloaded, and a row opens all its details.</maml:para>
+    </maml:description>
+    <command:syntax>
+      <command:syntaxItem>
+        <maml:name>Invoke-AACM365Assessment</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Section</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>StaleDays</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">int</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Int32</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>SignInDays</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">int</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Int32</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>CsvPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>HtmlPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Title</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>PassThru</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoDisplay</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoPaging</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+      <command:syntaxItem>
+        <maml:name>Invoke-AACM365Assessment</maml:name>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>ListPermission</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Section</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>CsvPath</maml:name>
+        <maml:description>
+          <maml:para>A folder to write a CSV per table to.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>HtmlPath</maml:name>
+        <maml:description>
+          <maml:para>Write the tabbed, interactive HTML report to this file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>ListPermission</maml:name>
+        <maml:description>
+          <maml:para>Return the Microsoft Graph permissions the report needs (as scopes
+for Connect-AAC -Scope), and read nothing.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoDisplay</maml:name>
+        <maml:description>
+          <maml:para>Return the object without showing the view.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoPaging</maml:name>
+        <maml:description>
+          <maml:para>Show the whole view at once instead of a page at a time.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>PassThru</maml:name>
+        <maml:description>
+          <maml:para>Show the view and also return the object.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Section</maml:name>
+        <maml:description>
+          <maml:para>What to read: Entra, Microsoft365, Intune. All by default.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+        <dev:defaultValue>@('Entra', 'Microsoft365', 'Intune')</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>SignInDays</maml:name>
+        <maml:description>
+          <maml:para>Look for sign-ins with legacy authentication protocols in the last
+this many days (7 by default; Entra ID keeps sign-ins 30 days with
+P1 or P2).</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Int32</maml:name>
+        </dev:type>
+        <dev:defaultValue>7</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>StaleDays</maml:name>
+        <maml:description>
+          <maml:para>A device that hasn't checked in (Intune) or signed in (Entra ID) for
+more than this many days is stale. 90 by default.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Int32</maml:name>
+        </dev:type>
+        <dev:defaultValue>90</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Title</maml:name>
+        <maml:description>
+          <maml:para>The HTML report's title.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+        <dev:defaultValue>'Microsoft 365 security posture'</dev:defaultValue>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes />
+    <command:returnValues>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>AAC.M365Assessment (piped onward, or with -PassThru or -NoDisplay) System.String (with -ListPermission)</maml:name>
+        </dev:type>
+        <maml:description>
+          <maml:para />
+        </maml:description>
+      </command:returnValue>
+    </command:returnValues>
+    <maml:alertSet>
+      <maml:alert>
+        <maml:para />
+      </maml:alert>
+    </maml:alertSet>
+    <command:examples>
+      <command:example>
+        <maml:title>--------- Example 1 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Connect-AAC -ClientId 14d82eec-204b-4c2f-b7e8-296a70dab67e -Scope ((Invoke-AACM365Assessment -ListPermission) + 'offline_access', 'openid', 'profile')
+Invoke-AACM365Assessment -HtmlPath .\out\M365.html -CsvPath .\out\m365</dev:code>
+        <dev:remarks>
+          <maml:para>Signs in once with every permission the report needs, then writes the HTML report and a CSV per table.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 2 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Invoke-AACM365Assessment -Section Entra</dev:code>
+        <dev:remarks>
+          <maml:para>Only Entra ID: settings, Conditional Access, admin roles and MFA registration.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 3 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>(Invoke-AACM365Assessment -NoDisplay -Section Entra).Registration | Where-Object { $_.Admin -eq 'Yes' -and $_.MfaRegistered -eq 'No' }</dev:code>
+        <dev:remarks>
+          <maml:para>The administrators with no MFA method registered.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 4 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>(Invoke-AACM365Assessment -NoDisplay -Section Intune -StaleDays 30).ManagedDevices | Where-Object Stale -EQ 'Yes' | Export-Csv .\stale.csv</dev:code>
+        <dev:remarks>
+          <maml:para>The Intune devices that haven't checked in for 30 days.</maml:para>
+        </dev:remarks>
+      </command:example>
+    </command:examples>
+    <command:relatedLinks>
+      <maml:navigationLink>
+        <maml:linkText>Online Version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Invoke-AACM365Assessment.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>Online version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Invoke-AACM365Assessment.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>about_Azure.Admin.Console</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md</maml:uri>
+      </maml:navigationLink>
+    </command:relatedLinks>
+  </command:command>
+  <command:command>
+    <command:details>
       <command:name>Invoke-AACPolicyAssessment</command:name>
       <maml:description>
         <maml:para>Assesses Azure Policy across a tenant, management group or set of subscriptions - what is assigned, how compliant it is (overall, by subscription, assignment, policy and category), the exemptions and the managed identities' roles - and what to improve, with a Spectre.Console view, objects, and CSV, PDF and interactive HTML reports. In the spirit of AzPolicyLens (github.com/Azure/AzPolicyLens).</maml:para>

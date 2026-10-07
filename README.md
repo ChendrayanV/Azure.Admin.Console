@@ -213,6 +213,7 @@ bookmarks are how you jump to the one you want.
 | [`Get-AACAssignedPolicy`](docs/Get-AACAssignedPolicy.md)                                         | Every Azure Policy assignment and its parameters - the default, assigned and effective value of each - with the resource types the policy applies to (its rule's type conditions, parameters resolved), one row per assignment and parameter. Assignments inherited from management groups included. A console view, objects, and CSV and interactive HTML reports.                                                                                                                                                                                                                                                                               |
 | [`Invoke-AACPolicyAssessment`](docs/Invoke-AACPolicyAssessment.md)                               | Azure Policy assessed as a whole, in the spirit of AzPolicyLens: compliance (each resource counted at its worst state) overall and by subscription, management group, assignment, policy and category; exemptions and their expiry; initiatives and definitions; the managed identities' roles; what to improve (direct assignments, DoNotEnforce, remediation without an identity or role, deprecated policies, overlapping assignments, stale exemptions, unassigned custom definitions, unused groups). Platform and Application audiences. A console view, objects, and CSV, PDF and interactive HTML reports with the management group tree. |
 | [`Invoke-AACDefenderAssessment`](docs/Invoke-AACDefenderAssessment.md)                           | Microsoft Defender for Cloud assessed across subscriptions: every recommendation (unhealthy, healthy and not applicable resources, risk level), attack paths step by step, security alerts with MITRE tactics and remediation, the inventory with each resource's plan coverage, vulnerabilities (CVEs), secure score controls, Defender plans with extensions, regulatory compliance, and environment settings (contacts, notifications, integrations, connectors, just-in-time) - with findings on how Defender is set up. A console view, an object, CSV and a tabbed HTML report in the portal's order. |
+| [`Invoke-AACM365Assessment`](docs/Invoke-AACM365Assessment.md)                                   | Microsoft 365 tenant discovery and security posture from the Microsoft Graph REST API with one token: Entra ID (settings, Conditional Access, admin roles, MFA registration, authentication methods), Microsoft 365 (domains, Secure Score, SharePoint and OneDrive sharing, audit logging) and Intune (enrollment restrictions, compliance, endpoint security, stale and unmanaged devices) - with zero-trust findings. A console view, an object, CSV and a tabbed HTML report. |
 | [`Get-AACPolicyState`](docs/Get-AACPolicyState.md)                                               | Azure Policy compliance for every resource - one row per resource and policy, with initiative, assignment, effect and when it was evaluated - by management group, subscription or resource group, with compliance per assignment, policy, subscription and resource group. A console view, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                                                                   |
 | [`Get-AACNetworkSecurityGroup`](docs/Get-AACNetworkSecurityGroup.md)                             | A detailed assessment of network security groups: associations, every rule, flow logs and diagnostic settings, and findings by severity (open to the internet, shadowed rules, subnet and NIC conflicts, logging gaps). A console view, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                                                                                                                       |
 | [`Get-AACStorageAccountContainerSize`](docs/Get-AACStorageAccountContainerSize.md)               | How much is stored in every blob container of your storage accounts: blobs, bytes, access tiers (Hot, Cool, Cold, Archive), snapshots, versions and deleted blobs, the newest change and the largest blobs - read in parallel, a page of 5,000 blobs at a time. Entra ID or a short-lived account SAS. A console view with every account and container as a tree, objects, and CSV and interactive HTML reports.                                                                                                                                                                                                                                  |
@@ -708,6 +709,49 @@ Invoke-AACDefenderAssessment -Section AttackPaths, Alerts -AlertDays 7  # attack
 Every table can be searched, filtered, grouped and downloaded as CSV, and a
 row opens all its details - the fields the table leaves out too - in a panel
 on the right.
+
+## Microsoft 365 security posture
+
+`Invoke-AACM365Assessment` discovers a Microsoft 365 tenant and assesses its
+security posture with the Microsoft Graph REST API. It uses no AzureAD,
+MSOnline, AzureADPreview or Microsoft.Graph modules, and one Graph token for
+every call.
+
+A Graph token only carries the permissions consented to the app you sign in
+with. `Connect-AAC`'s default (the Azure CLI) can read the directory, but not
+Conditional Access, Intune or Secure Score. Sign in once with the read-only
+permissions the report needs, for example with Microsoft Graph Command Line
+Tools after an admin has consented:
+
+```powershell
+Connect-AAC -ClientId 14d82eec-204b-4c2f-b7e8-296a70dab67e `
+    -Scope ((Invoke-AACM365Assessment -ListPermission) + 'offline_access', 'openid', 'profile')
+
+Invoke-AACM365Assessment -HtmlPath .\M365.html -CsvPath .\m365      # every section
+Invoke-AACM365Assessment -Section Entra                               # Entra ID only
+(Invoke-AACM365Assessment -NoDisplay).Registration | Where-Object { $_.Admin -eq 'Yes' -and $_.MfaRegistered -eq 'No' }
+```
+
+Your account also needs a directory role that can read them, for example
+Global Reader. A service principal works too, with the same permissions as
+application permissions (`Connect-AAC -ClientId ... -CertificatePath ...`).
+Whatever Graph refuses is listed in the Permissions tab with the permission it
+needs; the rest of the report is still made.
+
+| Area          | What it reads                                                                                                                                                                 |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Entra ID      | Tenant and directory sync, licences, security defaults, user and guest settings, cross-tenant access, Conditional Access and named locations, admin roles (active and PIM eligible), MFA registration, authentication methods, identity providers; MFA coverage (registered and phishing-resistant), emergency access accounts, dangling admins, role overlap, legacy authentication sign-ins, user consent settings, PIM role settings, the members of excluded and role-holding groups, access reviews, password hash sync |
+| Threat protection | Risky users, risk detections (Identity Protection) and Microsoft Defender XDR incidents |
+| Microsoft 365 | Domains, Microsoft Secure Score and its controls, SharePoint and OneDrive sharing, audit logging (Purview audit log search and the Entra audit log)                            |
+| Applications  | App registrations and enterprise apps: expired, expiring and long-lived secrets and certificates; over-privileged permissions (Microsoft Graph application permissions and delegated consents, rated Critical, High, Medium); dangling redirect URIs (hosts looked up in DNS), wildcard and non-HTTPS URIs |
+| Coverage      | Every lens, assessed or not and why (permission, licence, role); and what Microsoft Graph doesn't reach (Exchange Online, Defender for Office 365, Purview, Teams, Defender for Cloud Apps, Sentinel), with what would cover it |
+| Intune        | Tenant settings, enrollment restrictions, compliance policies, endpoint security policies, managed devices (compliance, encryption, stale), Entra ID devices no MDM manages     |
+
+The findings follow zero trust. Identity: MFA for everyone and for admins,
+legacy authentication blocked, risk-based policies, privileged access.
+Data: sharing, audit logging and Secure Score. Devices: compliance,
+encryption, endpoint security and unmanaged devices. Each finding says what
+to do and links to Microsoft's guidance.
 
 ## Azure Policy compliance
 
