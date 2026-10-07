@@ -2,6 +2,68 @@
 
 All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never published to the PowerShell Gallery.
 
+## Unreleased
+
+### New
+
+- `Invoke-AACM365Assessment` reports Microsoft 365 tenant discovery and security posture from the Microsoft Graph REST API, with no AzureAD, MSOnline, AzureADPreview or Microsoft.Graph modules. Every call uses the one Graph token of the `Connect-AAC` sign-in; about 25 calls run in parallel, each followed through its pages.
+  - **Entra ID:**
+    - tenant details and directory sync
+    - licences and security defaults
+    - user and guest settings, and cross-tenant access
+    - Conditional Access policies and named locations
+    - admin roles, active and eligible (PIM), with each admin's MFA registration
+    - every user's MFA registration
+    - authentication methods and identity providers
+  - **Microsoft 365:**
+    - domains
+    - Microsoft Secure Score and its controls, with the gap and how to fix each
+    - SharePoint and OneDrive sharing
+    - audit logging: Purview audit log search, from its Secure Score control, and the Entra audit log
+  - **Intune:**
+    - tenant settings and enrollment restrictions
+    - compliance policies
+    - endpoint security policies: antivirus, firewall, disk encryption, EDR, attack surface reduction and account protection
+    - managed devices: compliance, encryption, jailbreak, stale
+    - Entra ID devices no MDM manages
+  - **Zero-trust findings, each with what to do.** For example:
+    - MFA not required of everyone or of admins
+    - legacy authentication not blocked
+    - no risk-based policy, or policies left in report-only
+    - Global Administrator count and standing privileged access
+    - admins and users without MFA registered
+    - SMS and voice on, FIDO2 off
+    - users able to register apps, invite guests or create tenants
+    - Anyone links and guest resharing
+    - audit log search off and a low Secure Score
+    - devices with no compliance policy counted as compliant
+    - non-compliant, stale, unencrypted and rooted devices
+    - missing endpoint security policies
+    - personal enrollment and active unmanaged devices
+  - **Identity and application checks:**
+    - **MFA coverage:** registered and phishing-resistant MFA for members, admins and guests, and the MFA policy's exclusions.
+    - **Emergency access accounts:** found by being excluded from every enabled Conditional Access policy, or by name. Checked for two of them, Global Administrator, cloud-only, enabled, and a passkey.
+    - **Dangling admins:** privileged roles held by deleted, disabled, guest, idle or on-premises-synced accounts, or by apps.
+    - **Role overlap:** Global Administrator plus other roles, three or more privileged roles, and roles both active and eligible.
+    - **Expiring and long-lived credentials:** secrets and certificates on app registrations and non-Microsoft enterprise apps.
+    - **Over-privileged app permissions:** application permissions on Microsoft Graph and delegated consents, rated Critical (can take over the tenant), High (tenant-wide data) or Medium. Microsoft's apps are told apart from yours and third parties', and verified publishers from unverified ones.
+    - **Dangling redirect URIs:** each host is looked up in DNS, so a deleted Azure host anyone could claim is flagged. Wildcard, non-HTTPS and localhost-on-multi-tenant URIs are flagged too.
+    - **Legacy authentication:** the actual IMAP, POP, SMTP AUTH, ActiveSync and similar sign-ins in the last `-SignInDays`, read with one query per protocol.
+    - **User consent:** who can consent to which apps, group owner consent and the admin consent workflow.
+    - **Security defaults:** flagged when left on in a tenant licensed for Conditional Access.
+    - **PIM role settings:** MFA, approval and justification on activation, maximum activation time, and permanent assignments, for every privileged role.
+    - **Groups behind exclusions and roles:** who is actually in the groups excluded from Conditional Access and the groups holding admin roles, nested members included. Large or dynamic excluded groups and guests in role-holding groups are flagged.
+    - **Access reviews:** whether admin roles and guests are reviewed.
+    - **Directory sync settings:** password hash sync and accidental deletion prevention.
+    - **Threat protection** (a new tab): risky users, Identity Protection risk detections and Microsoft Defender XDR incidents.
+    - **Inactive licensed users:** no activity in 30 days, from the Microsoft 365 usage report.
+    - **App protection (MAM):** iOS and Android policies for personal devices.
+  - **A Coverage tab** replaces the Permissions tab. It lists every lens as *Assessed*, *Partly assessed*, *Not assessed* (with Graph's reason, the permission and any licence it needs) or *Not in this run*. It also lists what Microsoft Graph doesn't reach, each with what would cover it: Exchange Online, the unified audit log switch, Defender for Office 365, Purview, Teams, Defender for Cloud Apps, Sentinel and Entra Connect servers.
+
+    Graph is read in batches, one after another, each with its own progress line: Entra ID tenant and policies; admin roles, MFA and users; sign-in and audit logs; applications; Microsoft 365; Intune; then the redirect URIs in DNS. Reads inside a batch run in parallel. The latest audit event and the latest Secure Score read one item, not every page of their history. Inside a batch, Microsoft Graph's app-role grants need its service principal first. Users are not all read: in a large tenant, every user with their last sign-in takes many minutes. Only the users the checks need are looked up: the principals of admin role assignments and the users Conditional Access excludes, by ID 15 at a time, plus break-glass-like names. If the last sign-in is refused, those lookups are read again without it.
+  - **Permissions:** `-ListPermission` prints the read-only Graph permissions to sign in with, so one consent gives one token for everything. Graph reads it refuses are listed in a Permissions tab with the permission each needs, and the rest of the report is still made.
+  - **Outputs:** a console view, an `AAC.M365Assessment` object, a CSV per table, and a tabbed HTML report (Overview, Findings, Entra ID, Microsoft 365, Intune, Permissions).
+
 ## v0.14.1
 
 Microsoft Defender for Cloud assessed end to end, Azure Policy initiatives opened up to their member policies, and HTML reports that fit the screen - on a laptop or an external monitor.

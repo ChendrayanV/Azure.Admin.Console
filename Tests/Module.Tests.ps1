@@ -54,6 +54,7 @@ Describe 'Azure Admin Console - Module scaffold' {
             'Invoke-AACAssessment'
             'Invoke-AACDefenderAssessment'
             'Invoke-AACLogAnalyticsWorkspaceAssessment'
+            'Invoke-AACM365Assessment'
             'Invoke-AACPolicyAssessment'
             'Invoke-AACPSRule'
             'Invoke-AACVirtualNetworkAssessment'

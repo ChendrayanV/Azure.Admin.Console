@@ -140,6 +140,33 @@ Update-TypeData -TypeName 'AAC.DefenderVulnerability' -DefaultDisplayPropertySet
 Update-TypeData -TypeName 'AAC.DefenderPlanReport' -DefaultDisplayPropertySet 'SubscriptionName', 'Plan', 'State', 'SubPlan', 'Resources' -Force
 Update-TypeData -TypeName 'AAC.DefenderSetting' -DefaultDisplayPropertySet 'SubscriptionName', 'Setting', 'Value', 'Status' -Force
 Update-TypeData -TypeName 'AAC.DefenderComplianceControl' -DefaultDisplayPropertySet 'Standard', 'Control', 'State', 'FailedAssessments', 'SubscriptionName' -Force
+# Invoke-AACM365Assessment: the assessment, and the rows of its tables.
+Update-TypeData -TypeName 'AAC.M365Assessment' -DefaultDisplayPropertySet 'Tenant', 'SecureScore', 'Findings', 'ConditionalAccess', 'RoleAssignments', 'ManagedDevices', 'Permissions' -Force
+Update-TypeData -TypeName 'AAC.M365Finding' -DefaultDisplayPropertySet 'Severity', 'Area', 'Finding', 'Item' -Force
+Update-TypeData -TypeName 'AAC.M365Setting' -DefaultDisplayPropertySet 'Area', 'Setting', 'Value', 'Status' -Force
+Update-TypeData -TypeName 'AAC.M365ConditionalAccessPolicy' -DefaultDisplayPropertySet 'Policy', 'State', 'Users', 'Applications', 'Grant' -Force
+Update-TypeData -TypeName 'AAC.M365RoleAssignment' -DefaultDisplayPropertySet 'Role', 'Principal', 'Assignment', 'Privileged', 'MfaRegistered' -Force
+Update-TypeData -TypeName 'AAC.M365UserRegistration' -DefaultDisplayPropertySet 'UserPrincipalName', 'Admin', 'MfaRegistered', 'DefaultMethod' -Force
+Update-TypeData -TypeName 'AAC.M365SecureScoreControl' -DefaultDisplayPropertySet 'Control', 'Status', 'Score', 'MaxScore', 'Category' -Force
+Update-TypeData -TypeName 'AAC.M365ManagedDevice' -DefaultDisplayPropertySet 'Device', 'User', 'OS', 'Compliance', 'Encrypted', 'LastSync', 'Stale' -Force
+Update-TypeData -TypeName 'AAC.M365EntraDevice' -DefaultDisplayPropertySet 'Device', 'OS', 'Join', 'Managed', 'LastSignIn', 'Stale' -Force
+Update-TypeData -TypeName 'AAC.M365Permission' -DefaultDisplayPropertySet 'Data', 'Status', 'Permission' -Force
+Update-TypeData -TypeName 'AAC.M365MfaCoverage' -DefaultDisplayPropertySet 'Scope', 'Users', 'MfaPercent', 'PhishingResistantPercent', 'NoMethod' -Force
+Update-TypeData -TypeName 'AAC.M365EmergencyAccount' -DefaultDisplayPropertySet 'UserPrincipalName', 'DetectedBy', 'GlobalAdministrator', 'CloudOnly', 'PhishingResistant' -Force
+Update-TypeData -TypeName 'AAC.M365PrivilegedAccount' -DefaultDisplayPropertySet 'Principal', 'Roles', 'Dangling', 'Issues', 'Overlap' -Force
+Update-TypeData -TypeName 'AAC.M365AppCredential' -DefaultDisplayPropertySet 'App', 'Type', 'Status', 'End', 'DaysLeft', 'ValidityDays' -Force
+Update-TypeData -TypeName 'AAC.M365AppPermission' -DefaultDisplayPropertySet 'App', 'Permission', 'Kind', 'Risk', 'Owner' -Force
+Update-TypeData -TypeName 'AAC.M365RedirectUri' -DefaultDisplayPropertySet 'App', 'Uri', 'Resolves', 'Issue', 'Severity' -Force
+Update-TypeData -TypeName 'AAC.M365LegacySignIn' -DefaultDisplayPropertySet 'Protocol', 'Successful', 'Failed', 'Users', 'Latest' -Force
+Update-TypeData -TypeName 'AAC.M365PimRoleSetting' -DefaultDisplayPropertySet 'Role', 'MfaOnActivation', 'Approval', 'MaxActivationHours', 'PermanentActive' -Force
+Update-TypeData -TypeName 'AAC.M365GroupExposure' -DefaultDisplayPropertySet 'Group', 'Why', 'Members', 'Guests', 'Dynamic' -Force
+Update-TypeData -TypeName 'AAC.M365AccessReview' -DefaultDisplayPropertySet 'Review', 'Covers', 'Status', 'Recurrence' -Force
+Update-TypeData -TypeName 'AAC.M365RiskyUser' -DefaultDisplayPropertySet 'UserPrincipalName', 'RiskLevel', 'RiskState', 'Updated' -Force
+Update-TypeData -TypeName 'AAC.M365RiskDetection' -DefaultDisplayPropertySet 'Detection', 'Detections', 'High', 'Users', 'Latest' -Force
+Update-TypeData -TypeName 'AAC.M365Incident' -DefaultDisplayPropertySet 'Incident', 'Severity', 'Status', 'AssignedTo', 'AgeDays' -Force
+Update-TypeData -TypeName 'AAC.M365InactiveUser' -DefaultDisplayPropertySet 'UserPrincipalName', 'Products', 'LastActivity' -Force
+Update-TypeData -TypeName 'AAC.M365AppProtectionPolicy' -DefaultDisplayPropertySet 'Policy', 'Platform', 'Assigned', 'PinRequired', 'SendDataTo' -Force
+Update-TypeData -TypeName 'AAC.M365Coverage' -DefaultDisplayPropertySet 'Area', 'Lens', 'Status', 'Reads', 'Reason' -Force
 # Invoke-AACAssessment: the run's summary (its sheets are plain rows).
 Update-TypeData -TypeName 'AAC.Assessment' -DefaultDisplayPropertySet 'Subscriptions', 'Resources', 'ResourceTypes', 'AdvisorHigh', 'Retirements', 'SecurityHigh', 'ReportFolder' -Force
 # Invoke-AACVirtualNetworkAssessment: networks, subnets, peerings, free ranges, findings.

@@ -138,6 +138,16 @@ COMMANDS
         regulatory compliance and environment settings - with findings on
         how Defender is set up, in a tabbed HTML report.
 
+    Invoke-AACM365Assessment
+        Microsoft 365 tenant discovery and security posture from the
+        Microsoft Graph REST API with one token: Entra ID (settings,
+        Conditional Access, admin roles, MFA registration, authentication
+        methods), Microsoft 365 (domains, Secure Score, SharePoint and
+        OneDrive sharing, audit logging) and Intune (enrollment
+        restrictions, compliance, endpoint security, stale and unmanaged
+        devices) - with zero-trust findings. -ListPermission prints the
+        Graph permissions to sign in with.
+
     Invoke-AACPolicyAssessment
         Azure Policy assessed as a whole, in the spirit of AzPolicyLens:
         compliance by subscription, management group, assignment, policy
