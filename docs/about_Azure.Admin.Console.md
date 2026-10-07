@@ -119,6 +119,61 @@ COMMANDS
         Application Insights exceptions, flattened, from a Log Analytics
         workspace or an Application Insights resource - or any KQL query.
 
+    Get-AACAssignedPolicy -ExpandPolicySet
+        Opens up the initiatives: one row per policy in force and parameter
+        - every member policy of an assigned initiative - with its effect
+        and the value each parameter ends up with (from the assignment, the
+        initiative or the policy's default).
+
+    Invoke-AACAssessment
+        An Azure environment assessed end to end, in the spirit of Azure
+        Resource Inventory: about 95 resource types with their key settings,
+        the organization, Advisor, retirements, Defender for Cloud, Azure
+        Policy, outages, quotas and cost - CSV, HTML, PDF and diagrams.
+
+    Invoke-AACDefenderAssessment
+        Microsoft Defender for Cloud across subscriptions: recommendations,
+        attack paths step by step, security alerts, inventory with plan
+        coverage, vulnerabilities, secure score controls, Defender plans,
+        regulatory compliance and environment settings - with findings on
+        how Defender is set up, in a tabbed HTML report.
+
+    Invoke-AACPolicyAssessment
+        Azure Policy assessed as a whole, in the spirit of AzPolicyLens:
+        compliance by subscription, management group, assignment, policy
+        and category; each initiative's member policies with their effect
+        and parameter values; exemptions; managed identities' roles; and
+        what to improve.
+
+    Invoke-AACAksAssessment
+        AKS clusters through every lens: settings, about 35 Well-Architected
+        checks, PSRule for Azure, Azure Policy for Kubernetes by namespace,
+        workload and policy, versions and upgrades, Advisor and Defender.
+
+    Invoke-AACVirtualNetworkAssessment
+        Virtual networks: address space and available IPs, subnets,
+        peerings, NSGs and ASGs, DNS, DDoS, flow logs, outbound access and
+        gateways - with findings and what to do.
+
+    Invoke-AACLogAnalyticsWorkspaceAssessment
+        One Log Analytics workspace: billable and free tables and their
+        size, every setting, recommendations, data collection rules and the
+        Workspace Insights views.
+
+    Get-AACDiagnosticSetting
+        Every resource's diagnostic settings, flattened, and the resources
+        whose logs don't reach a Log Analytics workspace.
+
+    Get-AACTerraformPlan
+        A Terraform plan in JSON (terraform show -json), flattened into what
+        will be created, updated, replaced or deleted - down to each
+        attribute's before and after value. Offline.
+
+    Deploy-AACStorageAccount
+        Creates or updates a storage account and what is in it,
+        idempotently, with the Azure REST APIs: plan, Azure Policy and
+        PSRule gates, then apply. The module's only command that writes.
+
     Get-Help <command> -Full shows every parameter and example.
 
 GETTING STARTED
@@ -142,6 +197,12 @@ GETTING STARTED
 
         # What is assigned to a subscription, with every parameter's value
         Get-AACAssignedPolicy -SubscriptionId '00000000-0000-0000-0000-000000000000'
+
+        # ... and every policy inside its initiatives
+        Get-AACAssignedPolicy -ExpandPolicySet -HtmlPath .\Policies.html
+
+        # Microsoft Defender for Cloud, as a tabbed HTML report
+        Invoke-AACDefenderAssessment -HtmlPath .\Defender.html
 
         # Every blob container, with its size and access tiers
         Get-AACStorageAccountContainerSize -AuthMode Auto -HtmlPath .\Storage.html
@@ -173,7 +234,12 @@ CONSOLE VIEW, OBJECTS AND REPORTS
     The HTML reports are single, self-contained files that work offline:
     clickable tiles and charts that filter the tables, search, filter
     drop-downs, sortable columns, grouping with subtotals, Azure portal
-    links and a CSV download of the rows shown.
+    links and a CSV download of the rows shown. Each table scrolls in its
+    own box (its header row and first column stay put); a row opens all
+    its fields, hidden columns too, in a details panel (Esc closes, the
+    arrow keys move). Width (Fit or Centered) and Rows (Compact or
+    Comfortable) follow the screen until you choose, and are remembered.
+    Larger reports (Invoke-AACDefenderAssessment) are split into tabs.
 
     Every command shows the same progress display: the title, then one line
     per step with a bar, a percentage and the elapsed time. Without an

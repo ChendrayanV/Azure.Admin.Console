@@ -326,6 +326,34 @@
     </View>
 
     <View>
+      <Name>AAC.AssignedPolicyMember</Name>
+      <ViewSelectedBy><TypeName>AAC.AssignedPolicyMember</TypeName></ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader><Label>Assignment</Label><Width>26</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Policy</Label><Width>40</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Effect</Label><Width>17</Width></TableColumnHeader>
+          <TableColumnHeader><Label>Parameter</Label><Width>24</Width></TableColumnHeader>
+          <TableColumnHeader><Label>From</Label><Width>18</Width></TableColumnHeader>
+          <TableColumnHeader><Label>EffectiveValue</Label></TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <Wrap />
+            <TableColumnItems>
+              <TableColumnItem><PropertyName>AssignmentDisplayName</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>PolicyDisplayName</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Effect</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>ParameterName</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>ValueSource</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>EffectiveValue</PropertyName></TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+
+    <View>
       <Name>AAC.AssignedPolicy</Name>
       <ViewSelectedBy><TypeName>AAC.AssignedPolicy</TypeName></ViewSelectedBy>
       <TableControl>

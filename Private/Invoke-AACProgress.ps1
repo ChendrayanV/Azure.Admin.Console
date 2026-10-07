@@ -75,13 +75,24 @@ function Invoke-AACProgress {
     # here would hide the caller's own -Action or $description from it.
     $aacResultHolder = [ref]$null
     $aacErrorHolder = [ref]$null
+    # Warnings written inside the live display: PowerShell drops a delegate's
+    # warning stream (so -WarningVariable and -WarningAction never saw them)
+    # and printed they would break the display. Kept, then written after it.
+    $aacWarnings = [System.Collections.Generic.List[System.Management.Automation.WarningRecord]]::new()
 
     $aacAction = [Action[Spectre.Console.ProgressContext]] {
         param($aacContext)
         $script:AACProgressContext = $aacContext
         $script:AACProgressTasks = @{}
         try {
-            $aacResultHolder.Value = & $ScriptBlock
+            # Every warning is kept here, whatever the caller's -WarningAction:
+            # Write-Warning after the display applies it (and -WarningVariable).
+            $WarningPreference = 'Continue'
+            $aacRaw = & $ScriptBlock 3>&1
+            $aacItems = @($aacRaw)
+            $aacKept = @($aacItems | Where-Object { if ($_ -is [System.Management.Automation.WarningRecord]) { $aacWarnings.Add($_); $false } else { $true } })
+            # The result as the script block returned it: one object stays one object.
+            $aacResultHolder.Value = if ($aacKept.Count -eq $aacItems.Count) { $aacRaw } elseif ($aacKept.Count -eq 1) { $aacKept[0] } elseif ($aacKept.Count) { $aacKept } else { $null }
         }
         catch {
             $aacErrorHolder.Value = $_
@@ -138,6 +149,7 @@ function Invoke-AACProgress {
     [Spectre.Console.ProgressExtensions]::Columns($aacProgress, [Spectre.Console.ProgressColumn[]]@($aacSpinner, $aacDescription, $aacBar, $aacPercentage, $aacElapsed)) | Out-Null
     $aacProgress.Start($aacAction)
 
+    foreach ($aacWarning in $aacWarnings) { Write-Warning $aacWarning.Message }
     if ($aacErrorHolder.Value) {
         throw $aacErrorHolder.Value
     }

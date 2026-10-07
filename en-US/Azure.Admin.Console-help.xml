@@ -1678,6 +1678,26 @@ resource types": every type except those allowed), or 'All'.
 For an initiative, a row shows the types of the member policies that
 use its parameter - 'All' when one of them applies to every type.
 
+-ExpandPolicySet opens up the initiatives: one row per policy in
+force and its parameter (AAC.AssignedPolicyMember) - each member
+policy of an assigned initiative, and each policy assigned on its
+own - with the value the parameter ends up with:
+  AssignmentName, AssignmentDisplayName, ScopeType, ScopeName,
+  Inherited, EnforcementMode, DefinitionType, PolicySetName,
+  PolicySetDisplayName, ReferenceId, PolicyName, PolicyDisplayName,
+  PolicyType, Category, Effect, EffectSource, Groups, ResourceType,
+  ParameterName, ParameterDisplayName, ParameterType, DefaultValue
+  (the policy's), InitiativeValue (what the initiative passes it),
+  InitiativeParameter, EffectiveValue, ValueSource, AllowedValues,
+  NotScopes, AssignmentScope, AssignmentId, PolicySetId and PolicyId
+ValueSource: Assigned (the assignment sets the initiative parameter
+the policy's parameter takes), Initiative default, Initiative (a
+value fixed in the initiative), Policy default, Expression (another
+template expression, left as written) or Not set. Effect is the
+policy's effect resolved the same way, or the assignment's effect
+override (EffectSource Override). The HTML report always has this
+table.
+
 What you get depends on where the command runs:
   at the prompt    tiles, the assignments by scope with their
                    enforcement and resource types, the resource
@@ -1744,6 +1764,13 @@ either, the console shows only the progress and the files written.</maml:para>
           </dev:type>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>ExpandPolicySet</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
           <maml:name>PassThru</maml:name>
           <maml:description />
           <dev:type>
@@ -1787,6 +1814,20 @@ work, e.g. '*ISO*'.</maml:para>
         <dev:type>
           <maml:name>System.String</maml:name>
         </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>ExpandPolicySet</maml:name>
+        <maml:description>
+          <maml:para>One row per policy in force and its parameter - every member policy
+of an assigned initiative with its effect and the effective value
+of each of its parameters - instead of one per assignment and
+parameter. The view lists each initiative's member policies, and
+-CsvPath writes these rows.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
       </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="4" aliases="none">
         <maml:name>HtmlPath</maml:name>
@@ -1865,7 +1906,7 @@ ID, the name in the portal's URL).</maml:para>
     <command:returnValues>
       <command:returnValue>
         <dev:type>
-          <maml:name>AAC.AssignedPolicy (piped onward, or with -PassThru or -NoDisplay)</maml:name>
+          <maml:name>AAC.AssignedPolicy (piped onward, or with -PassThru or -NoDisplay) AAC.AssignedPolicyMember (with -ExpandPolicySet)</maml:name>
         </dev:type>
         <maml:description>
           <maml:para />
@@ -1917,6 +1958,22 @@ Get-AACAssignedPolicy</dev:code>
         <dev:code>Get-AACAssignedPolicy -NoDisplay | Where-Object ResourceType -Like '*Microsoft.Storage/storageAccounts*' | Select-Object AssignmentDisplayName, DefinitionDisplayName -Unique</dev:code>
         <dev:remarks>
           <maml:para>The assignments with a policy for storage accounts.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 6 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Get-AACAssignedPolicy -AssignmentName '*PostgreSQL*' -ExpandPolicySet -NoDisplay | Format-Table PolicyDisplayName, Effect, ParameterName, EffectiveValue, ValueSource</dev:code>
+        <dev:remarks>
+          <maml:para>The policies inside an initiative assignment, with the effect and the value of every parameter.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 7 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Get-AACAssignedPolicy -ExpandPolicySet -CsvPath .\policySetMembers.csv</dev:code>
+        <dev:remarks>
+          <maml:para>Every policy in force - initiatives opened up - with its parameters, to CSV.</maml:para>
         </dev:remarks>
       </command:example>
     </command:examples>
@@ -7653,6 +7710,344 @@ A management group's subscriptions: the HTML report and the diagrams.</dev:code>
   </command:command>
   <command:command>
     <command:details>
+      <command:name>Invoke-AACDefenderAssessment</command:name>
+      <maml:description>
+        <maml:para>Microsoft Defender for Cloud assessed across subscriptions - recommendations, attack paths, security alerts, inventory, vulnerabilities, secure score, Defender plans, regulatory compliance and environment settings - with what to improve, as a Spectre.Console view, an object, CSV files and a tabbed, interactive HTML report.</maml:para>
+      </maml:description>
+      <command:verb>Invoke</command:verb>
+      <command:noun>AACDefenderAssessment</command:noun>
+    </command:details>
+    <maml:description>
+      <maml:para>Read-only (Reader or Security Reader is enough), no Az modules: Azure
+Resource Graph (securityresources) for what it holds, and the
+Defender for Cloud REST API for the settings it doesn't (security
+contacts, integrations, connectors, just-in-time policies, alert
+suppression rules) - one call per subscription and setting, in
+parallel.
+
+-Section picks what is read (everything by default):
+  Recommendations  every recommendation assessed - unhealthy, healthy
+                   and not applicable resources, severity, risk level
+                   and attack paths (Defender CSPM), secure score
+                   control, description and remediation steps - and
+                   every unhealthy resource
+  AttackPaths      attack paths (Defender CSPM): each step from the
+                   entry point to the target, risk factors, MITRE
+                   tactics and techniques, story and remediation
+  Alerts           security alerts generated in the last -AlertDays,
+                   every status, with MITRE tactics and techniques,
+                   compromised entity and remediation steps; alert
+                   suppression rules
+  Inventory        every resource Defender assesses: the plan that
+                   covers it (on or off), recommendations by
+                   severity, vulnerabilities, active alerts and
+                   attack paths
+  Vulnerabilities  vulnerability assessment findings (machines, SQL,
+                   container images): CVEs, patchable, remediation
+  Posture          secure score per subscription and its controls
+                   with the potential increase, Defender plans with
+                   their sub-plan and extensions, multicloud and
+                   DevOps connectors, just-in-time policies
+  Compliance       regulatory compliance standards, their controls
+                   and the failed assessments
+  Settings         security contacts and e-mail notifications,
+                   Defender for Endpoint and Defender for Cloud Apps
+                   integration
+
+Findings, each with its severity and what to do: a plan off for
+resources the subscription has; Defender CSPM or Resource Manager
+off; Servers on Plan 1; no security contact, alert e-mails off or
+only for High alerts, owners not notified; Defender for Endpoint
+integration off; a secure score under -ScoreWarningPercent (70);
+Critical and High attack paths; High alerts still active, Medium
+alerts open over a week; suppression rules with no expiry;
+just-in-time ports open to any source.
+
+What you get depends on where the command runs:
+  at the prompt    tiles, the subscriptions, the top
+                   recommendations, attack paths, active alerts, the
+                   plans that are off and the findings, a page at a
+                   time
+  piped onward     the AAC.DefenderAssessment object, with every
+                   table as a property
+  -PassThru        the view and the object
+  -NoDisplay       the object only
+-CsvPath (a folder) writes a CSV per table. -HtmlPath writes a tabbed
+report in the portal's order - Overview, Findings, Recommendations,
+Attack path analysis, Security alerts, Inventory, Vulnerabilities,
+Security posture, Regulatory compliance, Environment settings -
+where every table is searchable, filterable, groupable and
+downloadable, and a row opens all its details (descriptions,
+remediation steps, the attack path step by step).</maml:para>
+    </maml:description>
+    <command:syntax>
+      <command:syntaxItem>
+        <maml:name>Invoke-AACDefenderAssessment</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="none">
+          <maml:name>SubscriptionId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="1" aliases="none">
+          <maml:name>Section</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="2" aliases="none">
+          <maml:name>AlertDays</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">int</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Int32</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="3" aliases="none">
+          <maml:name>ScoreWarningPercent</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">int</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Int32</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="4" aliases="none">
+          <maml:name>CsvPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="5" aliases="none">
+          <maml:name>HtmlPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="6" aliases="none">
+          <maml:name>Title</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>PassThru</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoDisplay</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoPaging</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="2" aliases="none">
+        <maml:name>AlertDays</maml:name>
+        <maml:description>
+          <maml:para>Security alerts generated in the last this many days (30 by
+default).</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Int32</maml:name>
+        </dev:type>
+        <dev:defaultValue>30</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="4" aliases="none">
+        <maml:name>CsvPath</maml:name>
+        <maml:description>
+          <maml:para>A folder to write a CSV per table to.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="5" aliases="none">
+        <maml:name>HtmlPath</maml:name>
+        <maml:description>
+          <maml:para>Write the tabbed, interactive HTML report to this file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoDisplay</maml:name>
+        <maml:description>
+          <maml:para>Return the object without showing the view.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoPaging</maml:name>
+        <maml:description>
+          <maml:para>Show the whole view at once instead of a page at a time.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>PassThru</maml:name>
+        <maml:description>
+          <maml:para>Show the view and also return the object.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="3" aliases="none">
+        <maml:name>ScoreWarningPercent</maml:name>
+        <maml:description>
+          <maml:para>A subscription's secure score under this percentage (70 by default)
+is a finding - High under half of it.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Int32</maml:name>
+        </dev:type>
+        <dev:defaultValue>70</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="1" aliases="none">
+        <maml:name>Section</maml:name>
+        <maml:description>
+          <maml:para>What to read: Recommendations, AttackPaths, Alerts, Inventory,
+Vulnerabilities, Posture, Compliance, Settings. All by default.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+        <dev:defaultValue>@('Recommendations', 'AttackPaths', 'Alerts', 'Inventory', 'Vulnerabilities', 'Posture', 'Compliance', 'Settings')</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="none">
+        <maml:name>SubscriptionId</maml:name>
+        <maml:description>
+          <maml:para>Only these subscriptions. Defaults to every subscription the account
+can see.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="6" aliases="none">
+        <maml:name>Title</maml:name>
+        <maml:description>
+          <maml:para>The HTML report's title.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+        <dev:defaultValue>'Microsoft Defender for Cloud assessment'</dev:defaultValue>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes />
+    <command:returnValues>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>AAC.DefenderAssessment (piped onward, or with -PassThru or -NoDisplay)</maml:name>
+        </dev:type>
+        <maml:description>
+          <maml:para />
+        </maml:description>
+      </command:returnValue>
+    </command:returnValues>
+    <maml:alertSet>
+      <maml:alert>
+        <maml:para />
+      </maml:alert>
+    </maml:alertSet>
+    <command:examples>
+      <command:example>
+        <maml:title>--------- Example 1 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Connect-AAC
+Invoke-AACDefenderAssessment -HtmlPath .\out\Defender.html</dev:code>
+        <dev:remarks>
+          <maml:para>Defender for Cloud across every subscription you can see, as a tabbed HTML report.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 2 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Invoke-AACDefenderAssessment -SubscriptionId '00000000-0000-0000-0000-000000000000' -CsvPath .\out\defender</dev:code>
+        <dev:remarks>
+          <maml:para>One subscription, a CSV per table.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 3 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Invoke-AACDefenderAssessment -Section AttackPaths, Alerts -AlertDays 7</dev:code>
+        <dev:remarks>
+          <maml:para>Only the attack paths and the last week's alerts.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 4 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>(Invoke-AACDefenderAssessment -NoDisplay).Recommendations | Where-Object { $_.Severity -eq 'High' -and $_.UnhealthyResources } | Select-Object Recommendation, UnhealthyResources, Control</dev:code>
+        <dev:remarks>
+          <maml:para>The High recommendations and how many resources each is on.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 5 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>(Invoke-AACDefenderAssessment -NoDisplay -Section Inventory).Inventory | Where-Object PlanState -EQ 'Off'</dev:code>
+        <dev:remarks>
+          <maml:para>The resources no Defender plan protects.</maml:para>
+        </dev:remarks>
+      </command:example>
+    </command:examples>
+    <command:relatedLinks>
+      <maml:navigationLink>
+        <maml:linkText>Online Version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Invoke-AACDefenderAssessment.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>Online version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Invoke-AACDefenderAssessment.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>about_Azure.Admin.Console</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md</maml:uri>
+      </maml:navigationLink>
+    </command:relatedLinks>
+  </command:command>
+  <command:command>
+    <command:details>
       <command:name>Invoke-AACLogAnalyticsWorkspaceAssessment</command:name>
       <maml:description>
         <maml:para>Assesses a Log Analytics workspace: billable and free tables and their size, every workspace setting, recommendations, data collection rules and the Workspace Insights views (Overview, Usage, Health, Agents, Query Audit, Data Collection Rules, Change Log) - with a Spectre.Console view, an object, and CSV and interactive HTML reports.</maml:para>
@@ -8023,6 +8418,14 @@ subscription, by management group, by assignment (and subscription),
 by policy and by category. Under -ComplianceWarningPercent (80) is
 Warning, under half of it Poor.
 
+Every assigned initiative is opened up (InitiativePolicies, and the
+initiative-policies CSV and HTML table): each member policy with its
+effect - an effect override on the assignment included - the value
+each of its parameters ends up with (from the assignment, else the
+initiative or the policy's default, as noted) and its compliance.
+For one row per policy and parameter, see Get-AACAssignedPolicy
+-ExpandPolicySet.
+
 The findings (each with its severity, what was found and what to do):
   Assignments  definitions assigned directly (not in an initiative),
                DoNotEnforce, a definition that can't be found,
@@ -8052,7 +8455,8 @@ What you get depends on where the command runs:
                    exemptions that need attention and the High and
                    Medium findings, a page at a time
   piped onward     the AAC.PolicyAssignmentReport objects, each with
-                   its Compliance, PolicyStates and Findings
+                   its Compliance, PolicyStates,
+                   InitiativePolicies and Findings
   -PassThru        the view and the objects
   -NoDisplay       the objects only
 -CsvPath (a folder) writes a CSV per table. -HtmlPath writes an
@@ -8496,6 +8900,14 @@ A landing zone's policy, with every report.</dev:code>
         <dev:code>Invoke-AACPolicyAssessment -NoDisplay | Where-Object { $_.Rating -ne 'Good' } | Select-Object Assignment, Scope, CompliancePercent, NonCompliant</dev:code>
         <dev:remarks>
           <maml:para>The assignments under the compliance threshold.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 5 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>(Invoke-AACPolicyAssessment -NoDisplay | Where-Object Assignment -Like '*PostgreSQL*').InitiativePolicies | Format-Table Policy, Effect, Parameters, CompliancePercent</dev:code>
+        <dev:remarks>
+          <maml:para>The policies inside an initiative assignment: effect, parameter values and compliance.</maml:para>
         </dev:remarks>
       </command:example>
     </command:examples>

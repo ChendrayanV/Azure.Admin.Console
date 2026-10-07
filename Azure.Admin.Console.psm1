@@ -118,7 +118,8 @@ Update-TypeData -TypeName 'AAC.AksPolicySummary' -DefaultDisplayPropertySet 'Pol
 Update-TypeData -TypeName 'AAC.PolicyAssignmentReport' -DefaultDisplayPropertySet 'Assignment', 'Scope', 'Kind', 'Enforcement', 'CompliancePercent', 'Rating', 'NonCompliant', 'Exemptions' -Force
 Update-TypeData -TypeName 'AAC.PolicyAssignmentCompliance' -DefaultDisplayPropertySet 'Assignment', 'Subscription', 'CompliancePercent', 'Rating', 'NonCompliant', 'Resources' -Force
 Update-TypeData -TypeName 'AAC.PolicyAssessmentPolicy' -DefaultDisplayPropertySet 'Assignment', 'Policy', 'Effect', 'Category', 'CompliancePercent', 'NonCompliant' -Force
-Update-TypeData -TypeName 'AAC.PolicyCategory' -DefaultDisplayPropertySet 'Category', 'Policies', 'Assignments', 'CompliancePercent', 'Rating', 'NonCompliant' -Force
+Update-TypeData -TypeName 'AAC.PolicyInitiativeMember' -DefaultDisplayPropertySet 'Assignment', 'Policy', 'Effect', 'Parameters', 'CompliancePercent', 'NonCompliant' -Force
+Update-TypeData -TypeName 'AAC.PolicyCategory'-DefaultDisplayPropertySet 'Category', 'Policies', 'Assignments', 'CompliancePercent', 'Rating', 'NonCompliant' -Force
 Update-TypeData -TypeName 'AAC.PolicySubscription' -DefaultDisplayPropertySet 'Subscription', 'ManagementGroups', 'CompliancePercent', 'Rating', 'NonCompliant', 'Assignments', 'Exemptions' -Force
 Update-TypeData -TypeName 'AAC.PolicyManagementGroup' -DefaultDisplayPropertySet 'ManagementGroup', 'Parent', 'CompliancePercent', 'Rating', 'Assignments', 'Subscriptions' -Force
 Update-TypeData -TypeName 'AAC.PolicyInitiative' -DefaultDisplayPropertySet 'Initiative', 'PolicyType', 'Category', 'Policies', 'Assigned', 'Deprecated' -Force
@@ -126,6 +127,19 @@ Update-TypeData -TypeName 'AAC.PolicyDefinitionReport' -DefaultDisplayPropertySe
 Update-TypeData -TypeName 'AAC.PolicyExemptionReport' -DefaultDisplayPropertySet 'Exemption', 'Assignment', 'Scope', 'Category', 'ExpiresOn', 'Status' -Force
 Update-TypeData -TypeName 'AAC.PolicyRoleAssignment' -DefaultDisplayPropertySet 'Assignment', 'Identity', 'Role', 'Scope', 'Required' -Force
 Update-TypeData -TypeName 'AAC.PolicyFinding' -DefaultDisplayPropertySet 'Severity', 'Area', 'Finding', 'Item', 'Scope' -Force
+# Invoke-AACDefenderAssessment: the assessment, and the rows of each of its tables.
+Update-TypeData -TypeName 'AAC.DefenderAssessment' -DefaultDisplayPropertySet 'SecureScore', 'Subscriptions', 'Findings', 'Recommendations', 'AttackPaths', 'Alerts', 'Inventory' -Force
+Update-TypeData -TypeName 'AAC.DefenderFinding' -DefaultDisplayPropertySet 'Severity', 'Area', 'Finding', 'Item', 'SubscriptionName' -Force
+Update-TypeData -TypeName 'AAC.DefenderSubscription' -DefaultDisplayPropertySet 'Subscription', 'SecureScore', 'PlansOn', 'UnhealthyResources', 'AttackPaths', 'ActiveAlerts', 'Findings' -Force
+Update-TypeData -TypeName 'AAC.DefenderRecommendation' -DefaultDisplayPropertySet 'Recommendation', 'Severity', 'RiskLevel', 'Status', 'UnhealthyResources', 'HealthyResources', 'Control' -Force
+Update-TypeData -TypeName 'AAC.DefenderUnhealthyResource' -DefaultDisplayPropertySet 'Resource', 'Recommendation', 'Severity', 'RiskLevel', 'SubscriptionName' -Force
+Update-TypeData -TypeName 'AAC.DefenderAttackPath' -DefaultDisplayPropertySet 'AttackPath', 'RiskLevel', 'EntryPoint', 'Target', 'Steps' -Force
+Update-TypeData -TypeName 'AAC.DefenderAlert' -DefaultDisplayPropertySet 'Alert', 'Severity', 'Status', 'Resource', 'Tactics', 'TimeGenerated' -Force
+Update-TypeData -TypeName 'AAC.DefenderResource' -DefaultDisplayPropertySet 'Resource', 'Type', 'Plan', 'PlanState', 'Unhealthy', 'High', 'Vulnerabilities', 'Alerts', 'AttackPaths' -Force
+Update-TypeData -TypeName 'AAC.DefenderVulnerability' -DefaultDisplayPropertySet 'Vulnerability', 'Severity', 'CVEs', 'Resource', 'Patchable' -Force
+Update-TypeData -TypeName 'AAC.DefenderPlanReport' -DefaultDisplayPropertySet 'SubscriptionName', 'Plan', 'State', 'SubPlan', 'Resources' -Force
+Update-TypeData -TypeName 'AAC.DefenderSetting' -DefaultDisplayPropertySet 'SubscriptionName', 'Setting', 'Value', 'Status' -Force
+Update-TypeData -TypeName 'AAC.DefenderComplianceControl' -DefaultDisplayPropertySet 'Standard', 'Control', 'State', 'FailedAssessments', 'SubscriptionName' -Force
 # Invoke-AACAssessment: the run's summary (its sheets are plain rows).
 Update-TypeData -TypeName 'AAC.Assessment' -DefaultDisplayPropertySet 'Subscriptions', 'Resources', 'ResourceTypes', 'AdvisorHigh', 'Retirements', 'SecurityHigh', 'ReportFolder' -Force
 # Invoke-AACVirtualNetworkAssessment: networks, subnets, peerings, free ranges, findings.

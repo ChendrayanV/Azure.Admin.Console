@@ -60,6 +60,14 @@ subscription, by management group, by assignment (and subscription),
 by policy and by category. Under -ComplianceWarningPercent (80) is
 Warning, under half of it Poor.
 
+Every assigned initiative is opened up (InitiativePolicies, and the
+initiative-policies CSV and HTML table): each member policy with its
+effect - an effect override on the assignment included - the value
+each of its parameters ends up with (from the assignment, else the
+initiative or the policy's default, as noted) and its compliance.
+For one row per policy and parameter, see Get-AACAssignedPolicy
+-ExpandPolicySet.
+
 The findings (each with its severity, what was found and what to do):
 
 ```text
@@ -94,7 +102,8 @@ What you get depends on where the command runs:
                    exemptions that need attention and the High and
                    Medium findings, a page at a time
   piped onward     the AAC.PolicyAssignmentReport objects, each with
-                   its Compliance, PolicyStates and Findings
+                   its Compliance, PolicyStates,
+                   InitiativePolicies and Findings
   -PassThru        the view and the objects
   -NoDisplay       the objects only
 ```
@@ -136,6 +145,14 @@ Invoke-AACPolicyAssessment -NoDisplay | Where-Object { $_.Rating -ne 'Good' } | 
 ```
 
 The assignments under the compliance threshold.
+
+### Example 5
+
+```powershell
+(Invoke-AACPolicyAssessment -NoDisplay | Where-Object Assignment -Like '*PostgreSQL*').InitiativePolicies | Format-Table Policy, Effect, Parameters, CompliancePercent
+```
+
+The policies inside an initiative assignment: effect, parameter values and compliance.
 
 ## PARAMETERS
 

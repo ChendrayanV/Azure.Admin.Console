@@ -2,6 +2,59 @@
 
 All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never published to the PowerShell Gallery.
 
+## v0.14.1
+
+Microsoft Defender for Cloud assessed end to end, Azure Policy initiatives opened up to their member policies, and HTML reports that fit the screen - on a laptop or an external monitor.
+
+### New
+
+- `Invoke-AACDefenderAssessment` assesses Microsoft Defender for Cloud across subscriptions. It is read-only: Reader or Security Reader is enough, and it needs no Az modules. It reads Azure Resource Graph (`securityresources`), plus the Defender for Cloud REST API for the settings Resource Graph doesn't hold. Those are one call per subscription and setting, in parallel.
+  - **Sections** (`-Section`):
+    - Recommendations: every recommendation with its unhealthy, healthy and not applicable resources, the risk level, risk factors and attack paths (Defender CSPM), its control, description and remediation steps, and every unhealthy resource.
+    - Attack paths: each path from entry point to target, step by step, with its risk factors, MITRE tactics and techniques, attack story and remediation.
+    - Security alerts: alerts of the last `-AlertDays` (default 30), in every status, with MITRE tactics and techniques, compromised entity and remediation steps, plus the suppression rules.
+    - Inventory: every resource Defender assesses, with the plan that covers it (on or off), its recommendations by severity, vulnerabilities, alerts and attack paths.
+    - Vulnerabilities: sub-assessments, with CVEs and whether a patch exists.
+    - Posture: secure score per subscription, the controls with their potential increase, plans with their sub-plan and extensions, multicloud and DevOps connectors, and just-in-time policies.
+    - Regulatory compliance: standards, controls and the failed assessments.
+    - Environment settings: security contacts, alert and attack path e-mails, and the Defender for Endpoint and Defender for Cloud Apps integrations.
+  - **Findings, each with what to do:**
+    - a plan off for resources the subscription has
+    - Defender CSPM or Resource Manager off
+    - Servers on Plan 1
+    - no security contact, alert e-mails off or only for High alerts, owners not notified
+    - the Defender for Endpoint integration off
+    - a secure score under `-ScoreWarningPercent`
+    - Critical and High attack paths
+    - High alerts still active, and Medium alerts open for over a week
+    - suppression rules with no expiry
+    - just-in-time ports open to any source
+  - **Outputs:** a console view, an `AAC.DefenderAssessment` object with every table, a CSV per table, and a tabbed HTML report in the portal's order.
+- **HTML reports can have tabs.** A report that asks for them (`Write-AACHtmlReport -Tab`) gets an Overview tab, with the tiles, charts and tree, then a tab per section, each with a count badge.
+  - The open tab is kept in the URL (`#tab=`).
+  - A tile or chart that filters a table opens that table's tab.
+  - Printing still shows every tab.
+  - Other reports keep their layout.
+  - A new `path` column type shows a chain of steps (`a → b → c`) as chips joined by arrows, and as a numbered list in the row details.
+
+### Changed
+
+- **HTML report tables fit the screen, on a laptop or an external monitor.** Every command's HTML report shares one page (`Private\DataReport.html`), so all of them have these changes.
+  - **Each table scrolls in its own box,** sized to the window. Its header row and its horizontal scrollbar stay on screen, and its first column stays put when the table scrolls sideways. Before, the scrollbar was at the bottom of up to 200 rows, and the headers scrolled away with the rows.
+  - **Width:** *Fit* (the whole window) or *Centered*.
+  - **Rows:** *Compact* (one line per cell) or *Comfortable* (up to two).
+  - **Sensible defaults:** until the viewer picks, a wide screen (1600px and over) gets Fit and a short one (900px and under) gets Compact. Each choice is remembered in the browser for every report.
+  - **Readable text columns:** plain text columns are no longer squeezed to a word per line.
+  - **Row details:** clicking a row opens all its fields in a panel on the right, in full, including the columns hidden from the table. Each field has a Copy button, and resources link to the portal. ↑ and ↓ move through the rows, and Esc closes the panel.
+  - **Printing is unchanged:** every table at full width, with the full text.
+
+- **Initiatives opened up: their member policies and the values their parameters end up with.** An initiative's parameters alone don't say what each of its policies does: a member policy's parameter can take an initiative parameter (which the assignment may set), a value fixed in the initiative, or the policy's own default. `Get-AACAssignedPolicy -ExpandPolicySet` returns one row per policy in force and parameter (`AAC.AssignedPolicyMember`). That covers every member policy of an assigned initiative, and every policy assigned on its own. Each row has the policy's effect, its default, what the initiative passes it (`InitiativeValue`, `InitiativeParameter`), the effective value and where it comes from (`ValueSource`: Assigned, Initiative default, Initiative, Policy default, Expression, Not set). The effect is resolved the same way, and an effect override on the assignment counts (`EffectSource` Override). The view then lists each initiative's policies under its assignment, `-CsvPath` writes these rows, and the HTML report always has the table (*Policies in force*). `Invoke-AACPolicyAssessment` opens up every assigned initiative too: each member policy with its effect, its parameter values and its compliance, including policies with no compliance data. They come back as the `InitiativePolicies` of each returned assignment, an `initiative-policies` CSV and an HTML table (*Policies in the initiatives*). Both commands resolve the values with one helper (`Resolve-AACPolicySetMember`).
+
+### Fixed
+
+- **Warnings were lost at an interactive terminal.** There, a command's work runs inside the live progress display, and PowerShell drops the warnings written inside it. So `-WarningVariable` and `-WarningAction` never saw messages such as "No group named 'grp-typo' was found", and the warnings that were printed broke the display. They are now kept and written once the display ends.
+- **The view was paged even when it wasn't drawn to the terminal.** `Invoke-AACPagedOutput` paged whenever the PowerShell console was interactive, even when Spectre.Console was drawing somewhere else (a capture, as the tests use). That output went to the terminal instead of where it was being drawn. It now pages only when Spectre draws to the terminal.
+
 ## v0.14.0
 
 Assessments: Azure Policy as a whole, AKS clusters through every lens, virtual networks, Log Analytics workspaces and the whole environment in the spirit of Azure Resource Inventory - plus diagnostic settings, Terraform plans, a storage account deployment, and sign-in without a browser (device code, service principals, managed identity).

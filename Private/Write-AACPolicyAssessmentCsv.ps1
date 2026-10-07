@@ -6,7 +6,8 @@ function Write-AACPolicyAssessmentCsv {
     .DESCRIPTION
         assignments, assignment-compliance (per assignment and
         subscription), policies (compliance per assignment and policy),
-        categories, subscriptions, management-groups, initiatives,
+        initiative-policies (each assigned initiative's member policies,
+        their effect, parameter values and compliance), categories, subscriptions, management-groups, initiatives,
         definitions, exemptions, role-assignments and findings. Empty tables
         are left out.
     #>
@@ -26,12 +27,13 @@ function Write-AACPolicyAssessmentCsv {
         if (-not @($Rows).Count) { return }
         $target = Join-Path -Path $Path -ChildPath "$File.csv"
         # The nested lists (an assignment's compliance...) have files of their own.
-        $Rows | Select-Object -Property * -ExcludeProperty Compliance, PolicyStates, Findings | Export-Csv -LiteralPath $target -NoTypeInformation -Encoding utf8
+        $Rows | Select-Object -Property * -ExcludeProperty Compliance, PolicyStates, InitiativePolicies, Findings | Export-Csv -LiteralPath $target -NoTypeInformation -Encoding utf8
         Get-Item -LiteralPath $target
     }
     & $write 'assignments' $Assessment.Assignments
     & $write 'assignment-compliance' $Assessment.AssignmentCompliance
     & $write 'policies' $Assessment.Policies
+    & $write 'initiative-policies' $Assessment.InitiativePolicies
     & $write 'categories' $Assessment.Categories
     & $write 'subscriptions' $Assessment.Subscriptions
     & $write 'management-groups' $Assessment.ManagementGroups

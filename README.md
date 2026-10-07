@@ -212,6 +212,7 @@ bookmarks are how you jump to the one you want.
 | [`Get-AACSkuAvailability`](docs/Get-AACSkuAvailability.md)                                       | Which VM sizes you can use for virtual machines or AKS node pools in a region and its availability zones - the subscription's restrictions, vCPU quota and AKS's rules - and why a size can't be used; an AKS cluster's node pools. Read-only REST, nothing deployed. A console view, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                                                                         |
 | [`Get-AACAssignedPolicy`](docs/Get-AACAssignedPolicy.md)                                         | Every Azure Policy assignment and its parameters - the default, assigned and effective value of each - with the resource types the policy applies to (its rule's type conditions, parameters resolved), one row per assignment and parameter. Assignments inherited from management groups included. A console view, objects, and CSV and interactive HTML reports.                                                                                                                                                                                                                                                                               |
 | [`Invoke-AACPolicyAssessment`](docs/Invoke-AACPolicyAssessment.md)                               | Azure Policy assessed as a whole, in the spirit of AzPolicyLens: compliance (each resource counted at its worst state) overall and by subscription, management group, assignment, policy and category; exemptions and their expiry; initiatives and definitions; the managed identities' roles; what to improve (direct assignments, DoNotEnforce, remediation without an identity or role, deprecated policies, overlapping assignments, stale exemptions, unassigned custom definitions, unused groups). Platform and Application audiences. A console view, objects, and CSV, PDF and interactive HTML reports with the management group tree. |
+| [`Invoke-AACDefenderAssessment`](docs/Invoke-AACDefenderAssessment.md)                           | Microsoft Defender for Cloud assessed across subscriptions: every recommendation (unhealthy, healthy and not applicable resources, risk level), attack paths step by step, security alerts with MITRE tactics and remediation, the inventory with each resource's plan coverage, vulnerabilities (CVEs), secure score controls, Defender plans with extensions, regulatory compliance, and environment settings (contacts, notifications, integrations, connectors, just-in-time) - with findings on how Defender is set up. A console view, an object, CSV and a tabbed HTML report in the portal's order. |
 | [`Get-AACPolicyState`](docs/Get-AACPolicyState.md)                                               | Azure Policy compliance for every resource - one row per resource and policy, with initiative, assignment, effect and when it was evaluated - by management group, subscription or resource group, with compliance per assignment, policy, subscription and resource group. A console view, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                                                                   |
 | [`Get-AACNetworkSecurityGroup`](docs/Get-AACNetworkSecurityGroup.md)                             | A detailed assessment of network security groups: associations, every rule, flow logs and diagnostic settings, and findings by severity (open to the internet, shadowed rules, subnet and NIC conflicts, logging gaps). A console view, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                                                                                                                       |
 | [`Get-AACStorageAccountContainerSize`](docs/Get-AACStorageAccountContainerSize.md)               | How much is stored in every blob container of your storage accounts: blobs, bytes, access tiers (Hot, Cool, Cold, Archive), snapshots, versions and deleted blobs, the newest change and the largest blobs - read in parallel, a page of 5,000 blobs at a time. Entra ID or a short-lived account SAS. A console view with every account and container as a tree, objects, and CSV and interactive HTML reports.                                                                                                                                                                                                                                  |
@@ -675,6 +676,38 @@ For every policy state in detail - compliant ones too - use
 `Get-AACInventory` and `Get-AACSecurityPosture` share their Defender queries
 and objects: the inventory puts each node's score and findings in the tree,
 and this command is the posture itself.
+
+## Microsoft Defender for Cloud assessment
+
+`Invoke-AACDefenderAssessment` goes further than the posture: everything
+Defender for Cloud knows, across subscriptions, in one tabbed report. It reads
+Azure Resource Graph (`securityresources`) and, for the settings Resource Graph
+doesn't hold, the Defender for Cloud REST API - one call per subscription and
+setting, in parallel. Reader or Security Reader is enough.
+
+```powershell
+Invoke-AACDefenderAssessment -HtmlPath .\Defender.html                 # every section, every subscription
+Invoke-AACDefenderAssessment -SubscriptionId $id -CsvPath .\defender    # one subscription, a CSV per table
+Invoke-AACDefenderAssessment -Section AttackPaths, Alerts -AlertDays 7  # attack paths and the last week's alerts
+(Invoke-AACDefenderAssessment -NoDisplay).Inventory | Where-Object PlanState -EQ 'Off'   # resources no plan protects
+```
+
+| Tab                   | What it shows                                                                                                                              |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Overview              | Secure score, recommendations, attack paths, alerts, vulnerabilities, plans and compliance as tiles and charts - each opens its tab, filtered |
+| Findings              | How Defender is set up: plans off for resources you have, Defender CSPM off, no security contact, alert e-mails off, MDE integration off, Critical attack paths, High alerts still open, suppression rules with no expiry, just-in-time ports open to any source |
+| Recommendations       | Every recommendation with its unhealthy, healthy and not applicable resources, risk level and attack paths (Defender CSPM), control, description and remediation steps; every unhealthy resource |
+| Attack path analysis  | Each path from entry point to target, step by step, with risk factors, MITRE tactics and techniques, the attack story and remediation      |
+| Security alerts       | Alerts of the last `-AlertDays`, every status, with MITRE tactics and techniques, compromised entity and remediation steps; suppression rules |
+| Inventory             | Every resource Defender assesses: the plan that protects it (on or off), recommendations by severity, vulnerabilities, alerts, attack paths |
+| Vulnerabilities       | Vulnerability assessment findings on machines, SQL and container images: CVEs, patchable, remediation                                      |
+| Security posture      | Secure score per subscription, controls with the potential increase, Defender plans with sub-plan and extensions, multicloud connectors   |
+| Regulatory compliance | Standards, failed controls and the failed assessments with the recommendation to fix                                                       |
+| Environment settings  | Security contacts and e-mail notifications, Defender for Endpoint and Defender for Cloud Apps integration, just-in-time VM access         |
+
+Every table can be searched, filtered, grouped and downloaded as CSV, and a
+row opens all its details - the fields the table leaves out too - in a panel
+on the right.
 
 ## Azure Policy compliance
 
@@ -1757,8 +1790,8 @@ It then checks the staged copy: the manifest is valid, the exports match
 2. Commit, then push a tag that matches the version:
 
    ```powershell
-   git tag -a v0.14.0 -m "Azure.Admin.Console v0.14.0"
-   git push origin v0.14.0
+   git tag -a v0.14.1 -m "Azure.Admin.Console v0.14.1"
+   git push origin v0.14.1
    ```
 
 Only a version tag publishes. Pushes and pull requests run CI only.
