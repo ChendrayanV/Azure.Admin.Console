@@ -22,7 +22,11 @@ Describe 'Azure Admin Console - the live progress display' {
             $settings.Out = [Spectre.Console.AnsiConsoleOutput]::new([System.IO.StringWriter]::new())
             $settings.Ansi = [Spectre.Console.AnsiSupport]::No
             $settings.Interactive = [Spectre.Console.InteractionSupport]::Yes
-            try { [Spectre.Console.AnsiConsole]::Console = [Spectre.Console.AnsiConsole]::Create($settings); & $Body }
+            # Spectre's enrichers turn interactivity off on CI servers (GitHub Actions...): not here.
+            $settings.Enrichment.UseDefaultEnrichers = $false
+            $console = [Spectre.Console.AnsiConsole]::Create($settings)
+            $console.Profile.Capabilities.Interactive = $true
+            try { [Spectre.Console.AnsiConsole]::Console = $console; & $Body }
             finally { [Spectre.Console.AnsiConsole]::Console = $real }
         }
     }
