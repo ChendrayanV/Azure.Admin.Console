@@ -35,9 +35,16 @@ function ConvertTo-AACAssignedPolicy {
         initiative's), or of every member for a row with no parameter -
         'All' when one of them names no type.
 
-        Returns @{ Rows (AAC.AssignedPolicy); Assignments
-        (AAC.PolicyAssignmentSummary); Missing (definition IDs not found);
-        Stats }.
+        Members: one row per policy the assignment puts in force and its
+        parameter (AAC.AssignedPolicyMember) - an initiative's member
+        policies, or the one policy assigned - with the value each parameter
+        ends up with through the initiative and the assignment
+        (Resolve-AACPolicySetMember), the effect and the policy's resource
+        types.
+
+        Returns @{ Rows (AAC.AssignedPolicy); Members
+        (AAC.AssignedPolicyMember); Assignments (AAC.PolicyAssignmentSummary);
+        Missing (definition IDs not found); Stats }.
     #>
     [CmdletBinding()]
     [OutputType([hashtable])]
@@ -76,18 +83,7 @@ function ConvertTo-AACAssignedPolicy {
         foreach ($k in $Map.Keys) { if ($k -eq $Name) { return $true } }
         $false
     }
-    $format = $null
-    $format = {
-        param($Value)
-        if ($null -eq $Value) { return '' }
-        if ($Value -is [string]) { return $Value }
-        if ($Value -is [bool]) { return $Value.ToString().ToLowerInvariant() }
-        if ($Value -is [System.Collections.IDictionary]) { return (ConvertTo-Json -InputObject $Value -Compress -Depth 20) }
-        if ($Value -is [System.Collections.IList]) {
-            return (@(foreach ($item in $Value) { if ($item -is [System.Collections.IDictionary] -or $item -is [System.Collections.IList]) { ConvertTo-Json -InputObject $item -Compress -Depth 20 } else { & $format $item } }) -join ', ')
-        }
-        [string]::Format([cultureinfo]::InvariantCulture, '{0}', $Value)
-    }
+    $format = { param($Value) Format-AACPolicyValue -Value $Value }
 
     # --- Where each scope sits: root management group first -------------------------------------
     $pathOf = {
@@ -149,6 +145,7 @@ function ConvertTo-AACAssignedPolicy {
     $specific = { param($Types) if ($Types.Include.Count) { $Types.Include } else { $Types.Aliased } }
 
     $rows = [System.Collections.Generic.List[object]]::new()
+    $memberRows = [System.Collections.Generic.List[object]]::new()
     $summaries = [System.Collections.Generic.List[object]]::new()
     $missing = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     $typeCounts = @{}
@@ -179,6 +176,17 @@ function ConvertTo-AACAssignedPolicy {
         $parameters = if ($policy) { $policy.Parameters } else { $null }
         $effective = & $effectiveOf $parameters $assigned
 
+        # The policies the assignment puts in force, each parameter's value
+        # resolved: an initiative's members, or the one policy assigned.
+        $resolved = @(if ($policy -and $kind -eq 'PolicySet') {
+                Resolve-AACPolicySetMember -Member @($policy.Members) -SetParameter $policy.Parameters -Assigned $assigned -Override @(& $get $a 'overrides') -Definition $Definition
+            }
+            elseif ($kind -eq 'Policy') {
+                $refs = @{}
+                if ($assigned -is [System.Collections.IDictionary]) { foreach ($k in $assigned.Keys) { $refs[$k] = @{ value = "[parameters('$k')]" } } }
+                Resolve-AACPolicySetMember -Member @(@{ policyDefinitionId = $definitionId; parameters = $refs }) -Assigned $assigned -Override @(& $get $a 'overrides') -Definition $Definition
+            })
+
         # Resource types: per parameter for an initiative (its members that use it).
         $rowTypes = @{}
         $allTypes = [System.Collections.Generic.SortedSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
@@ -186,29 +194,12 @@ function ConvertTo-AACAssignedPolicy {
         if ($policy -and $kind -eq 'PolicySet') {
             $byParameter = @{}
             $unrestricted = [System.Collections.Generic.List[string]]::new()
-            foreach ($member in @($policy.Members)) {
-                if ($member -isnot [System.Collections.IDictionary]) { continue }
+            foreach ($member in $resolved) {
                 $memberCount++
-                $memberDefinition = $Definition[([string](& $get $member 'policyDefinitionId')).ToLowerInvariant()]
-                $memberValues = @{}
-                $memberRefs = & $get $member 'parameters'
-                $uses = [System.Collections.Generic.List[string]]::new()
-                if ($memberDefinition -and $memberDefinition.Parameters -is [System.Collections.IDictionary]) {
-                    foreach ($pn in $memberDefinition.Parameters.Keys) {
-                        if (& $has $memberRefs $pn) {
-                            $v = & $get (& $get $memberRefs $pn) 'value'
-                            if ($v -is [string] -and $v -match "^\[parameters\('([^']+)'\)\]$") {
-                                $setName = $Matches[1]
-                                $uses.Add($setName)
-                                $memberValues[$pn] = & $get $effective $setName
-                            }
-                            else { $memberValues[$pn] = $v }
-                        }
-                        elseif (& $has $memberDefinition.Parameters[$pn] 'defaultValue') { $memberValues[$pn] = & $get $memberDefinition.Parameters[$pn] 'defaultValue' }
-                    }
-                }
-                if (-not $memberDefinition) { continue }
-                $found = Get-AACPolicyResourceType -Rule $memberDefinition.Rule -Parameter $memberValues
+                if (-not $member.Definition) { continue }
+                $uses = @($member.Parameters | Where-Object SetParameter | ForEach-Object SetParameter)
+                $found = Get-AACPolicyResourceType -Rule $member.Definition.Rule -Parameter $member.Values
+                $member.ResourceType = $found.Text
                 $types = @(& $specific $found)
                 # A member that names no type ('All', 'All except ...') applies
                 # to every type: whatever uses its parameter does too.
@@ -290,6 +281,65 @@ function ConvertTo-AACAssignedPolicy {
             $rows.Add([pscustomobject]$row)
         }
 
+        # One row per policy in force and its parameter (-ExpandPolicySet).
+        foreach ($member in $resolved) {
+            $memberDefinition = $member.Definition
+            $inSet = $kind -eq 'PolicySet'
+            $memberBase = [ordered]@{
+                PSTypeName            = 'AAC.AssignedPolicyMember'
+                AssignmentName        = $name
+                AssignmentDisplayName = $displayName
+                ScopeType             = $info.Type
+                ScopeName             = $info.Name
+                Inherited             = $inherited
+                EnforcementMode       = $base.EnforcementMode
+                DefinitionType        = $kind
+                PolicySetName         = $(if ($inSet) { $base.DefinitionName } else { '' })
+                PolicySetDisplayName  = $(if ($inSet) { $base.DefinitionDisplayName } else { '' })
+                ReferenceId           = $member.ReferenceId
+                PolicyName            = $(if ($memberDefinition) { $memberDefinition.Name } else { ($member.DefinitionId -split '/')[-1] })
+                PolicyDisplayName     = $(if ($memberDefinition) { $memberDefinition.DisplayName } else { '(definition not found)' })
+                PolicyType            = $(if ($memberDefinition) { $memberDefinition.PolicyType } else { '' })
+                Category              = $(if ($memberDefinition) { $memberDefinition.Category } else { '' })
+                Effect                = $member.Effect
+                EffectSource          = $(if ($member.Effect) { $member.EffectSource } else { '' })
+                Groups                = @($member.Groups) -join ', '
+                ResourceType          = $(if ($inSet) { [string]$member.ResourceType } else { $assignmentTypes })
+                ParameterName         = ''
+                ParameterDisplayName  = ''
+                ParameterType         = ''
+                DefaultValue          = ''
+                InitiativeValue       = ''
+                InitiativeParameter   = ''
+                EffectiveValue        = ''
+                ValueSource           = ''
+                AllowedValues         = ''
+                NotScopes             = $base.NotScopes
+                AssignmentScope       = $scope
+                AssignmentId          = $base.AssignmentId
+                PolicySetId           = $(if ($inSet) { $definitionId } else { '' })
+                PolicyId              = $member.DefinitionId
+            }
+            if (-not @($member.Parameters).Count) { $memberRows.Add([pscustomobject]$memberBase) }
+            foreach ($p in $member.Parameters) {
+                $row = [ordered]@{}
+                foreach ($key in $memberBase.Keys) { $row[$key] = $memberBase[$key] }
+                $row.ParameterName = $p.Name
+                $row.ParameterDisplayName = $p.DisplayName
+                $row.ParameterType = $p.Type
+                $row.DefaultValue = & $format $p.DefaultValue
+                # A single policy's values come from the assignment, not an initiative.
+                if ($inSet) {
+                    $row.InitiativeValue = & $format $p.SetValue
+                    $row.InitiativeParameter = $p.SetParameter
+                }
+                $row.EffectiveValue = & $format $p.Value
+                $row.ValueSource = $p.Source
+                $row.AllowedValues = & $format $p.AllowedValues
+                $memberRows.Add([pscustomobject]$row)
+            }
+        }
+
         $summaries.Add([pscustomobject][ordered]@{
                 PSTypeName            = 'AAC.PolicyAssignmentSummary'
                 AssignmentName        = $name
@@ -318,8 +368,11 @@ function ConvertTo-AACAssignedPolicy {
     $sortedRows = @($rows | Sort-Object -Property @{ Expression = { $scopeOrder[$_.ScopeType] } }, ScopeName, AssignmentDisplayName, AssignmentName, ParameterName)
     $sortedSummaries = @($summaries | Sort-Object -Property @{ Expression = { $scopeOrder[$_.ScopeType] } }, ScopeName, AssignmentDisplayName)
     $parameterRows = @($sortedRows | Where-Object ParameterName)
+    $sortedMembers = @($memberRows | Sort-Object -Property @{ Expression = { $scopeOrder[$_.ScopeType] } }, ScopeName, AssignmentDisplayName, AssignmentName, PolicyDisplayName, ReferenceId, ParameterName)
+    $setMembers = @($sortedMembers | Where-Object DefinitionType -EQ 'PolicySet')
     @{
         Rows        = $sortedRows
+        Members     = $sortedMembers
         Assignments = $sortedSummaries
         Missing     = @($missing)
         Stats       = @{
@@ -327,6 +380,9 @@ function ConvertTo-AACAssignedPolicy {
             Initiatives   = @($sortedSummaries | Where-Object DefinitionType -EQ 'PolicySet').Count
             Policies      = @($sortedSummaries | Where-Object DefinitionType -EQ 'Policy').Count
             Rows          = $sortedRows.Count
+            # The policies inside the assigned initiatives (per assignment), and their parameters.
+            MemberPolicies   = @($setMembers | ForEach-Object { "$($_.AssignmentId)|$($_.ReferenceId)|$($_.PolicyId)" } | Select-Object -Unique).Count
+            MemberParameters = @($setMembers | Where-Object ParameterName).Count
             Parameters    = $parameterRows.Count
             Assigned      = @($parameterRows | Where-Object ValueSource -EQ 'Assigned').Count
             Default       = @($parameterRows | Where-Object ValueSource -EQ 'Default').Count

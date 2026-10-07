@@ -38,7 +38,7 @@ Describe 'Azure Admin Console - collapsible tables in the HTML reports' {
     }
 
     It 'opens a table when a tile, chart or tree link filters it, and offers expand and collapse all' {
-        $script:template | Should -Match "function focusTable\(id, filters\) \{\s+var t = tables\[id\]; if \(!t\) return;\s+t\.setOpen\(true\);"
+        $script:template | Should -Match "function focusTable\(id, filters\) \{\s+var t = tables\[id\]; if \(!t\) return;\s+if \(showTabOf\) showTabOf\(t\.section\);\s+t\.setOpen\(true\);"
         $script:template | Should -Match 'Expand all tables'
         $script:template | Should -Match 'Collapse all tables'
     }
@@ -47,6 +47,60 @@ Describe 'Azure Admin Console - collapsible tables in the HTML reports' {
         $print = [regex]::Match($script:template, '@media print \{(.+?)\n\}', 'Singleline').Groups[1].Value
         $print | Should -Match 'section\.tbl\.collapsed \.tbl-body \{ display: block !important; \}'
         $print | Should -Match '\.tbl-bulk'
+    }
+
+    It 'scrolls each table in its own box - the header row and first column stay put' {
+        $script:template | Should -Match '\.scroller \{ overflow: auto; max-height: var\(--table-max\);'
+        $script:template | Should -Match 'th \{ position: sticky; top: 0;'
+        $script:template | Should -Match 'th\.pin, td\.pin \{ position: sticky; left: 0;'
+        $script:template | Should -Match "i === 0 \? ' pin' : ''"
+    }
+
+    It 'fits the window on wide screens and compacts rows on short ones, unless the viewer chose (remembered)' {
+        $script:template | Should -Match '@media \(min-width: 1600px\) \{ :root:not\(\[data-width\]\) \{ --page-max: none;'
+        $script:template | Should -Match '@media \(max-height: 900px\) \{ :root:not\(\[data-density\]\) \{ --cell-y: 3px;'
+        $script:template | Should -Match '\.wrap \{ max-width: var\(--page-max\);'
+        $script:template | Should -Match "key: 'aac-width'"
+        $script:template | Should -Match "key: 'aac-density'"
+        $script:template | Should -Match 'id="width"'
+        $script:template | Should -Match 'id="density"'
+    }
+
+    It 'opens a row''s every field - hidden columns too - in a details panel, Esc to close, arrows to move' {
+        $script:template | Should -Match 'role="dialog" aria-modal="true"'
+        $script:template | Should -Match "openDrawer\(T\.title, cols, shownRows\.slice\(\), index, mark\)"
+        $script:template | Should -Match "if \(c\.hidden\) dt\.appendChild\(el\('span', 'hid', 'not in the table'\)\)"
+        $script:template | Should -Match "e\.key === 'Escape'"
+        $script:template | Should -Match "e\.key === 'ArrowDown' \|\| e\.key === 'ArrowUp'"
+        $script:template | Should -Match "if \(e\.target\.closest\('a, button'\)\) return;"
+    }
+
+    It 'prints at full width: no scroll boxes, pinned columns, clamps or panel' {
+        $print = [regex]::Match($script:template, '@media print \{(.+?)\n\}', 'Singleline').Groups[1].Value
+        $print | Should -Match '\.scroller \{ overflow: visible; max-height: none;'
+        $print | Should -Match '\.drawer, \.drawer-bg'
+        $print | Should -Match 'td\.wide \.clamp \{ display: block;'
+        $print | Should -Match 'td\.txt \{ white-space: normal;'
+    }
+
+    It 'turns sections into tabs when a report asks: Overview first, the tab in the URL, a filtered table opening its tab' {
+        $script:template | Should -Match "if \(D\.tabs && sectionOrder\.length\)"
+        $script:template | Should -Match "var names = \['Overview'\]"
+        $script:template | Should -Match "history\.replaceState\(null, '', '#tab=' \+ encodeURIComponent\(name\)\)"
+        $script:template | Should -Match "e\.key === 'ArrowRight'"
+        $script:template | Should -Match '@media screen \{ \.tab-off \{ display: none !important; \} \}' -Because 'printed, every tab is'
+        $tabbed = Join-Path $TestDrive 'tabbed.html'
+        $null = InModuleScope 'Azure.Admin.Console' -Parameters @{ Path = $tabbed } {
+            param($Path)
+            Write-AACHtmlReport -Path $Path -Title 'Tabs' -Tab @(@{ Name = 'Second'; Badge = '3'; Tone = 'bad' }) -Table @(
+                @{ Id = 'a'; Title = 'A'; Section = 'First'; Rows = @(@{ A = 'x' }); Columns = @(@{ Key = 'A'; Label = 'A' }) }
+                @{ Id = 'b'; Title = 'B'; Section = 'Second'; Rows = @(@{ A = 'p → q' }); Columns = @(@{ Key = 'A'; Label = 'A'; Type = 'path' }) }
+            )
+        }
+        $tabs = [regex]::Match((Get-Content -LiteralPath $tabbed -Raw), '"tabs":\[\{[^\]]+\]').Value
+        $tabs | Should -Match '"name":"Second"'
+        $tabs | Should -Match '"badge":"3"'
+        $tabs | Should -Match '"tone":"bad"'
     }
 
     It 'is the page every command writes' {

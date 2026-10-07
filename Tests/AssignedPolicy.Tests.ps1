@@ -205,6 +205,61 @@ Describe 'Azure Admin Console - Get-AACAssignedPolicy' {
         $result.Assignments[0].ResourceType | Should -Be 'All'
     }
 
+    It 'opens up the initiatives with -ExpandPolicySet: each member policy, its effect and every parameter''s value' {
+        $rows = @(Get-AACAssignedPolicy -ExpandPolicySet -NoDisplay)
+        $rows[0].PSObject.TypeNames[0] | Should -Be 'AAC.AssignedPolicyMember'
+        $baseline = @($rows | Where-Object AssignmentName -EQ 'baseline')
+        @($baseline.PolicyDisplayName | Select-Object -Unique | Sort-Object) | Should -Be @('Storage accounts use TLS 1.2', 'VM OS check')
+        $tls = $baseline | Where-Object ParameterName -EQ 'minimumTlsVersion'
+        "$($tls.EffectiveValue) $($tls.ValueSource) $($tls.InitiativeParameter) $($tls.InitiativeValue) $($tls.DefaultValue)" | Should -Be "TLS1_1 Assigned tlsVersion [parameters('tlsVersion')] TLS1_2"
+        $tls.PolicySetDisplayName | Should -Be 'Contoso security baseline'
+        $tls.ResourceType | Should -Be 'Microsoft.Storage/storageAccounts'
+        $effect = $baseline | Where-Object { $_.PolicyName -eq 'storage-tls' -and $_.ParameterName -eq 'effect' }
+        "$($effect.EffectiveValue) $($effect.ValueSource) $($effect.Effect) $($effect.EffectSource)" | Should -Be 'Deny Initiative Deny Initiative' -Because 'the initiative fixes the effect'
+        $vm = @($baseline | Where-Object PolicyName -EQ 'vm-os')
+        $vm.Count | Should -Be 1 -Because 'a member with no parameters is one row'
+        "$($vm[0].Effect) $($vm[0].EffectSource) $($vm[0].ResourceType)" | Should -Be 'audit Policy Microsoft.Compute/virtualMachines'
+
+        $single = @($rows | Where-Object AssignmentName -EQ 'tls')
+        ($single | Where-Object ParameterName -EQ 'effect').ValueSource | Should -Be 'Policy default'
+        $single[0].Effect | Should -Be 'Audit'
+        $single[0].PolicySetName | Should -Be '' -Because 'a policy assigned on its own is in no initiative'
+        ($rows | Where-Object AssignmentName -EQ 'locations').ValueSource | Should -Be 'Assigned'
+        ($rows | Where-Object AssignmentName -EQ 'gone').PolicyDisplayName | Should -Be '(definition not found)'
+    }
+
+    It 'resolves a member''s parameters through the initiative, and the assignment''s effect overrides' {
+        $members = InModuleScope 'Azure.Admin.Console' {
+            $policy = '/providers/Microsoft.Authorization/policyDefinitions/p'
+            $definitions = @{ $policy = @{ parameters = @{ effect = @{ type = 'String'; defaultValue = 'Audit' }; sku = @{ type = 'String' }; tier = @{ type = 'String'; defaultValue = 'Basic' }; zone = @{ type = 'String' } }; rule = @{ then = @{ effect = "[parameters('effect')]" } } } }
+            $member = @(
+                @{ policyDefinitionId = $policy; policyDefinitionReferenceId = 'one'; parameters = @{ sku = @{ value = "[parameters('skuName')]" }; zone = @{ value = "[concat('a', 'b')]" } } }
+                @{ policyDefinitionId = $policy; policyDefinitionReferenceId = 'two'; parameters = @{ effect = @{ value = "[parameters('effect')]" }; sku = @{ value = 'Standard' } } }
+            )
+            $override = @(@{ kind = 'policyEffect'; value = 'Disabled'; selectors = @(@{ kind = 'policyDefinitionReferenceId'; in = @('two') }) })
+            Resolve-AACPolicySetMember -Member $member -SetParameter @{ skuName = @{ defaultValue = 'Premium' }; effect = @{ defaultValue = 'Deny' } } -Assigned @{} -Override $override -Definition $definitions
+        }
+        $one = $members | Where-Object ReferenceId -EQ 'one'
+        $source = { param($M, $Name) $p = $M.Parameters | Where-Object Name -EQ $Name; "$($p.Value)|$($p.Source)" }
+        & $source $one 'sku' | Should -Be 'Premium|Initiative default'
+        & $source $one 'zone' | Should -Be "[concat('a', 'b')]|Expression"
+        & $source $one 'tier' | Should -Be 'Basic|Policy default'
+        "$($one.Effect) $($one.EffectSource)" | Should -Be 'Audit Policy default'
+        $two = $members | Where-Object ReferenceId -EQ 'two'
+        & $source $two 'sku' | Should -Be 'Standard|Initiative'
+        & $source $two 'tier' | Should -Be 'Basic|Policy default'
+        "$($two.Effect) $($two.EffectSource)" | Should -Be 'Disabled Override' -Because 'the override selects reference two'
+    }
+
+    It 'lists each initiative''s member policies in the view with -ExpandPolicySet' {
+        $text = (& $script:capture { Get-AACAssignedPolicy -NoPaging }).Text
+        $text | Should -Match '2 member policies \(-ExpandPolicySet lists them\)'
+        $text = (& $script:capture { Get-AACAssignedPolicy -ExpandPolicySet -NoPaging }).Text
+        $text | Should -Match 'Storage accounts use TLS 1.2 Deny'
+        $text | Should -Match 'minimumTlsVersion\s+TLS1_1 assigned'
+        $text | Should -Match 'VM OS check audit'
+    }
+
     It 'lists an assignment whose definition is gone, and says so' {
         $text = (& $script:capture { Get-AACAssignedPolicy -AssignmentName 'gone' -NoPaging }).Text
         $text | Should -Match "couldn't be read"
@@ -253,5 +308,12 @@ Describe 'Azure Admin Console - Get-AACAssignedPolicy' {
         $rows[0].PSObject.Properties.Name | Should -Contain 'ResourceType'
         $rows[0].PSObject.Properties.Name | Should -Contain 'EffectiveValue'
         Get-Content -LiteralPath $html -Raw | Should -Match 'Contoso security baseline'
+        Get-Content -LiteralPath $html -Raw | Should -Match 'Policies in force'
+
+        $members = Join-Path $TestDrive 'members.csv'
+        $null = & $script:capture { Get-AACAssignedPolicy -ExpandPolicySet -CsvPath $members }
+        $rows = @(Import-Csv -LiteralPath $members)
+        $rows.Count | Should -Be 7 -Because 'locations 1, baseline 3 (storage-tls 2, vm-os 1), tls 2, gone 1'
+        $rows[0].PSObject.Properties.Name | Should -Contain 'InitiativeValue'
     }
 }

@@ -33,7 +33,9 @@ function Invoke-AACPagedOutput {
         [scriptblock] $ReadKey = { [Console]::ReadKey($true) }
     )
 
-    $isInteractive = -not [Console]::IsInputRedirected -and -not [Console]::IsOutputRedirected
+    # A terminal at both ends - and Spectre still drawing to it (a console
+    # swapped for a buffer, as tests and other captures do, isn't paged).
+    $isInteractive = -not [Console]::IsInputRedirected -and -not [Console]::IsOutputRedirected -and [Spectre.Console.AnsiConsole]::Console.Profile.Out.IsTerminal
     if ($NoPaging -or (-not $isInteractive -and $PageSize -le 0)) {
         & $ScriptBlock
         return

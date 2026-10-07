@@ -104,6 +104,16 @@ Describe 'Azure Admin Console - Azure Policy assessment' {
         ($script:a.Categories | Where-Object Category -EQ 'Tags').Rating | Should -Be 'Warning'
     }
 
+    It 'opens up each assigned initiative: its member policies, their effect, parameters and compliance' {
+        $members = @($script:a.InitiativePolicies | Where-Object { $_.AssignmentId -like '*/a-mcsb' })
+        $members.Count | Should -Be 2
+        $members[0].PSObject.TypeNames[0] | Should -Be 'AAC.PolicyInitiativeMember'
+        $https = $members | Where-Object ReferenceId -EQ 'storageHttps'
+        "$($https.Policy) | $($https.Initiative) | $($https.Effect) | $($https.EffectSource) | $($https.Groups)" | Should -Be 'Secure transfer to storage accounts should be enabled | Microsoft cloud security benchmark | Audit | Policy default | NS-1'
+        "$($https.NonCompliant) $($https.Resources)" | Should -Be '12 110' -Because 'its compliance across the subscriptions in scope'
+        @($script:a.InitiativePolicies | Where-Object { $_.AssignmentId -like '*/a-locations' }).Count | Should -Be 0 -Because 'a policy assigned on its own is no initiative'
+    }
+
     It 'flags the assignment findings' {
         & $script:findingsOf 'Allowed locations' | Should -Be @('Deny without a non-compliance message', 'Policy definition assigned directly')
         & $script:findingsOf 'Allowed locations (platform)' | Should -Be @('Policy definition assigned directly') -Because 'it has a message'

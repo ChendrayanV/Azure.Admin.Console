@@ -32,13 +32,21 @@ function Write-AACHtmlReport {
                     Format; Sum; CurrencyKey; IdKey; Href; Text; Soon }.
                     Types: text (default), wide (long text, clamped), mono,
                     number, money, score (0-100 as a percentage: 70+
-                    green, 40-69 amber, under 40 red), date (Soon: red within 90 days, orange
+                    green, 40-69 amber, under 40 red), path ('a → b → c': steps
+                    as chips joined by arrows), date (Soon: red within 90 days, orange
                     within 180), datetime (date and time, local), badge (Tones = @{ Value = 'bad' }), link
                     (https only), resource (the name with Azure portal and
                     copy-ID buttons from the IdKey column, ResourceId by
                     default). Facet columns get a filter drop-down; Sum
                     columns are totalled for the rows shown and per group.
           -Notice   @{ Tone; Text } lines under the tiles.
+          -Tab      @(@{ Name; Badge; Tone; Note }) turns the sections into
+                    tabs: Overview (tiles, notices, charts, tree) first, then
+                    one per section in this order (sections not listed after
+                    them), each with its Badge (a count, coloured by Tone)
+                    and Note above its tables. The tab shown is in the URL
+                    (#tab=Name); a tile or chart that filters a table opens
+                    its tab. Printed, every tab is.
           -Tree     @{ Title; OpenTo = 's'; Root = node } a collapsible,
                     searchable hierarchy above the tables. Node: @{ l = 't'|
                     'm'|'s'|'g'|'r'|'d' (tenant, management group,
@@ -79,7 +87,9 @@ function Write-AACHtmlReport {
 
         [object[]] $Notice = @(),
 
-        [System.Collections.IDictionary] $Tree
+        [System.Collections.IDictionary] $Tree,
+
+        [object[]] $Tab = @()
     )
 
     $fullPath = $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
@@ -146,6 +156,7 @@ function Write-AACHtmlReport {
             })
         tables        = @($tables)
     }
+    if ($Tab.Count) { $model['tabs'] = @(foreach ($item in $Tab) { & $camel $item }) }
     if ($Tree) {
         $model['tree'] = [ordered]@{ title = $Tree.Title; openTo = $(if ($Tree.Contains('OpenTo')) { $Tree.OpenTo } else { 's' }); root = $Tree.Root }
     }

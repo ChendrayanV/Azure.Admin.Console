@@ -46,6 +46,26 @@ function Get-AACAssignedPolicy {
         For an initiative, a row shows the types of the member policies that
         use its parameter - 'All' when one of them applies to every type.
 
+        -ExpandPolicySet opens up the initiatives: one row per policy in
+        force and its parameter (AAC.AssignedPolicyMember) - each member
+        policy of an assigned initiative, and each policy assigned on its
+        own - with the value the parameter ends up with:
+          AssignmentName, AssignmentDisplayName, ScopeType, ScopeName,
+          Inherited, EnforcementMode, DefinitionType, PolicySetName,
+          PolicySetDisplayName, ReferenceId, PolicyName, PolicyDisplayName,
+          PolicyType, Category, Effect, EffectSource, Groups, ResourceType,
+          ParameterName, ParameterDisplayName, ParameterType, DefaultValue
+          (the policy's), InitiativeValue (what the initiative passes it),
+          InitiativeParameter, EffectiveValue, ValueSource, AllowedValues,
+          NotScopes, AssignmentScope, AssignmentId, PolicySetId and PolicyId
+        ValueSource: Assigned (the assignment sets the initiative parameter
+        the policy's parameter takes), Initiative default, Initiative (a
+        value fixed in the initiative), Policy default, Expression (another
+        template expression, left as written) or Not set. Effect is the
+        policy's effect resolved the same way, or the assignment's effect
+        override (EffectSource Override). The HTML report always has this
+        table.
+
         What you get depends on where the command runs:
           at the prompt    tiles, the assignments by scope with their
                            enforcement and resource types, the resource
@@ -73,6 +93,12 @@ function Get-AACAssignedPolicy {
         Write an interactive HTML report to this file.
     .PARAMETER Title
         The HTML report's title.
+    .PARAMETER ExpandPolicySet
+        One row per policy in force and its parameter - every member policy
+        of an assigned initiative with its effect and the effective value
+        of each of its parameters - instead of one per assignment and
+        parameter. The view lists each initiative's member policies, and
+        -CsvPath writes these rows.
     .PARAMETER PassThru
         Show the view and also return the rows.
     .PARAMETER NoDisplay
@@ -95,11 +121,18 @@ function Get-AACAssignedPolicy {
     .EXAMPLE
         Get-AACAssignedPolicy -NoDisplay | Where-Object ResourceType -Like '*Microsoft.Storage/storageAccounts*' | Select-Object AssignmentDisplayName, DefinitionDisplayName -Unique
         The assignments with a policy for storage accounts.
+    .EXAMPLE
+        Get-AACAssignedPolicy -AssignmentName '*PostgreSQL*' -ExpandPolicySet -NoDisplay | Format-Table PolicyDisplayName, Effect, ParameterName, EffectiveValue, ValueSource
+        The policies inside an initiative assignment, with the effect and the value of every parameter.
+    .EXAMPLE
+        Get-AACAssignedPolicy -ExpandPolicySet -CsvPath .\policySetMembers.csv
+        Every policy in force - initiatives opened up - with its parameters, to CSV.
     .OUTPUTS
         AAC.AssignedPolicy (piped onward, or with -PassThru or -NoDisplay)
+        AAC.AssignedPolicyMember (with -ExpandPolicySet)
     #>
     [CmdletBinding()]
-    [OutputType('AAC.AssignedPolicy')]
+    [OutputType('AAC.AssignedPolicy', 'AAC.AssignedPolicyMember')]
     param(
         [ValidateNotNullOrEmpty()]
         [string[]] $ManagementGroupId,
@@ -117,6 +150,8 @@ function Get-AACAssignedPolicy {
         [string] $HtmlPath,
 
         [string] $Title = 'Assigned Azure Policy',
+
+        [switch] $ExpandPolicySet,
 
         [switch] $PassThru,
 
@@ -149,7 +184,7 @@ function Get-AACAssignedPolicy {
         # Tenant-wide, so a subscription's assignments inherited from its
         # management groups are there to filter (ConvertTo-AACAssignedPolicy).
         $queries = [ordered]@{
-            assignments      = @{ Tenant = $true; Query = "policyresources | where type =~ 'microsoft.authorization/policyassignments' | project id, name, displayName = tostring(properties.displayName), scope = tostring(properties.scope), definitionId = tostring(properties.policyDefinitionId), parameters = properties.parameters, enforcement = tostring(properties.enforcementMode), notScopes = properties.notScopes, description = tostring(properties.description)" }
+            assignments      = @{ Tenant = $true; Query = "policyresources | where type =~ 'microsoft.authorization/policyassignments' | project id, name, displayName = tostring(properties.displayName), scope = tostring(properties.scope), definitionId = tostring(properties.policyDefinitionId), parameters = properties.parameters, enforcement = tostring(properties.enforcementMode), notScopes = properties.notScopes, overrides = properties.overrides, description = tostring(properties.description)" }
             subscriptions    = @{ Tenant = $true; Query = "resourcecontainers | where type =~ 'microsoft.resources/subscriptions' | project id, subscriptionId, name, chain = properties.managementGroupAncestorsChain" }
             managementGroups = @{ Tenant = $true; Query = "resourcecontainers | where type =~ 'microsoft.management/managementgroups' | project id, name, displayName = tostring(properties.displayName), chain = properties.details.managementGroupAncestorsChain" }
         }
@@ -248,7 +283,8 @@ function Get-AACAssignedPolicy {
         if ($AssignmentName) { $scope['Assignments'] = $AssignmentName -join ', ' }
         $inventory.Notice = $notices.ToArray()
 
-        $null = Invoke-AACExport -CsvPath $csvFullPath -CsvObject @($inventory.Rows) -Noun 'assigned parameter' -HtmlPath $htmlFullPath -WriteHtml {
+        $csvRows = if ($ExpandPolicySet) { @($inventory.Members) } else { @($inventory.Rows) }
+        $null = Invoke-AACExport -CsvPath $csvFullPath -CsvObject $csvRows -Noun $(if ($ExpandPolicySet) { 'policy parameter' } else { 'assigned parameter' }) -HtmlPath $htmlFullPath -WriteHtml {
             Write-AACAssignedPolicyHtml -Inventory $inventory -Path $htmlFullPath -Title $Title -Detail $scope
         }
         @{ Inventory = $inventory; Scope = $scope }
@@ -256,13 +292,13 @@ function Get-AACAssignedPolicy {
 
     if ($showView) {
         Invoke-AACPagedOutput -NoPaging:$NoPaging -ScriptBlock {
-            Show-AACAssignedPolicyView -Inventory $state.Inventory -Scope $state.Scope
+            Show-AACAssignedPolicyView -Inventory $state.Inventory -Scope $state.Scope -ExpandPolicySet:$ExpandPolicySet
         }
     }
     elseif ($interactive) {
         foreach ($notice in @($state.Inventory.Notice)) { Write-AACMarkup "[grey58]$([Spectre.Console.Markup]::Escape($notice))[/]" }
     }
     if ($returnObjects) {
-        $state.Inventory.Rows
+        if ($ExpandPolicySet) { $state.Inventory.Members } else { $state.Inventory.Rows }
     }
 }

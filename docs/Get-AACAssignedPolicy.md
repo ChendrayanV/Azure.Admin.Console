@@ -21,7 +21,7 @@ Every Azure Policy assignment with its parameters - the default, assigned and ef
 ```
 Get-AACAssignedPolicy [[-ManagementGroupId] <string[]>] [[-SubscriptionId] <string[]>]
  [[-AssignmentName] <string[]>] [[-CsvPath] <string>] [[-HtmlPath] <string>] [[-Title] <string>]
- [-PassThru] [-NoDisplay] [-NoPaging]
+ [-ExpandPolicySet] [-PassThru] [-NoDisplay] [-NoPaging]
 ```
 
 ## ALIASES
@@ -72,6 +72,30 @@ it denies), else the types of the property aliases it reads, else
 resource types": every type except those allowed), or 'All'.
 For an initiative, a row shows the types of the member policies that
 use its parameter - 'All' when one of them applies to every type.
+
+-ExpandPolicySet opens up the initiatives: one row per policy in
+force and its parameter (AAC.AssignedPolicyMember) - each member
+policy of an assigned initiative, and each policy assigned on its
+own - with the value the parameter ends up with:
+
+```text
+  AssignmentName, AssignmentDisplayName, ScopeType, ScopeName,
+  Inherited, EnforcementMode, DefinitionType, PolicySetName,
+  PolicySetDisplayName, ReferenceId, PolicyName, PolicyDisplayName,
+  PolicyType, Category, Effect, EffectSource, Groups, ResourceType,
+  ParameterName, ParameterDisplayName, ParameterType, DefaultValue
+  (the policy's), InitiativeValue (what the initiative passes it),
+  InitiativeParameter, EffectiveValue, ValueSource, AllowedValues,
+  NotScopes, AssignmentScope, AssignmentId, PolicySetId and PolicyId
+```
+
+ValueSource: Assigned (the assignment sets the initiative parameter
+the policy's parameter takes), Initiative default, Initiative (a
+value fixed in the initiative), Policy default, Expression (another
+template expression, left as written) or Not set. Effect is the
+policy's effect resolved the same way, or the assignment's effect
+override (EffectSource Override). The HTML report always has this
+table.
 
 What you get depends on where the command runs:
 
@@ -134,6 +158,22 @@ Get-AACAssignedPolicy -NoDisplay | Where-Object ResourceType -Like '*Microsoft.S
 
 The assignments with a policy for storage accounts.
 
+### Example 6
+
+```powershell
+Get-AACAssignedPolicy -AssignmentName '*PostgreSQL*' -ExpandPolicySet -NoDisplay | Format-Table PolicyDisplayName, Effect, ParameterName, EffectiveValue, ValueSource
+```
+
+The policies inside an initiative assignment, with the effect and the value of every parameter.
+
+### Example 7
+
+```powershell
+Get-AACAssignedPolicy -ExpandPolicySet -CsvPath .\policySetMembers.csv
+```
+
+Every policy in force - initiatives opened up - with its parameters, to CSV.
+
 ## PARAMETERS
 
 ### -AssignmentName
@@ -171,6 +211,31 @@ Aliases:
 ParameterSets:
 - Name: (All)
   Position: 3
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ExpandPolicySet
+
+One row per policy in force and its parameter - every member policy
+of an assigned initiative with its effect and the effective value
+of each of its parameters - instead of one per assignment and
+parameter. The view lists each initiative's member policies, and
+-CsvPath writes these rows.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -339,7 +404,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## OUTPUTS
 
-### AAC.AssignedPolicy (piped onward, or with -PassThru or -NoDisplay)
+### AAC.AssignedPolicy (piped onward, or with -PassThru or -NoDisplay) AAC.AssignedPolicyMember (with -ExpandPolicySet)
 
 ## NOTES
 

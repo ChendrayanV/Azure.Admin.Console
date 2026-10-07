@@ -23,6 +23,14 @@ function Invoke-AACPolicyAssessment {
         by policy and by category. Under -ComplianceWarningPercent (80) is
         Warning, under half of it Poor.
 
+        Every assigned initiative is opened up (InitiativePolicies, and the
+        initiative-policies CSV and HTML table): each member policy with its
+        effect - an effect override on the assignment included - the value
+        each of its parameters ends up with (from the assignment, else the
+        initiative or the policy's default, as noted) and its compliance.
+        For one row per policy and parameter, see Get-AACAssignedPolicy
+        -ExpandPolicySet.
+
         The findings (each with its severity, what was found and what to do):
           Assignments  definitions assigned directly (not in an initiative),
                        DoNotEnforce, a definition that can't be found,
@@ -52,7 +60,8 @@ function Invoke-AACPolicyAssessment {
                            exemptions that need attention and the High and
                            Medium findings, a page at a time
           piped onward     the AAC.PolicyAssignmentReport objects, each with
-                           its Compliance, PolicyStates and Findings
+                           its Compliance, PolicyStates,
+                           InitiativePolicies and Findings
           -PassThru        the view and the objects
           -NoDisplay       the objects only
         -CsvPath (a folder) writes a CSV per table. -HtmlPath writes an
@@ -101,6 +110,9 @@ function Invoke-AACPolicyAssessment {
     .EXAMPLE
         Invoke-AACPolicyAssessment -NoDisplay | Where-Object { $_.Rating -ne 'Good' } | Select-Object Assignment, Scope, CompliancePercent, NonCompliant
         The assignments under the compliance threshold.
+    .EXAMPLE
+        (Invoke-AACPolicyAssessment -NoDisplay | Where-Object Assignment -Like '*PostgreSQL*').InitiativePolicies | Format-Table Policy, Effect, Parameters, CompliancePercent
+        The policies inside an initiative assignment: effect, parameter values and compliance.
     .OUTPUTS
         AAC.PolicyAssignmentReport (piped onward, or with -PassThru or -NoDisplay)
     #>
@@ -299,6 +311,7 @@ function Invoke-AACPolicyAssessment {
             $item | Add-Member -NotePropertyMembers ([ordered]@{
                     Compliance = @($assessment.AssignmentCompliance | Where-Object AssignmentId -EQ $id)
                     PolicyStates = @($assessment.Policies | Where-Object AssignmentId -EQ $id)
+                    InitiativePolicies = @($assessment.InitiativePolicies | Where-Object AssignmentId -EQ $id)
                     Findings   = @($assessment.Findings | Where-Object ResourceId -EQ $id)
                 }) -Force
             $item

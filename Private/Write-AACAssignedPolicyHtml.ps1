@@ -25,10 +25,16 @@ function Write-AACAssignedPolicyHtml {
     $enforcementTones = @{ Default = 'good'; DoNotEnforce = 'warn' }
     $kindTones = @{ Policy = 'info'; PolicySet = 'violet' }
     $scopeTones = @{ 'Management group' = 'violet'; Subscription = 'info'; 'Resource group' = 'good'; Resource = 'warn'; Other = 'neutral' }
+    $memberSourceTones = @{ Assigned = 'good'; Initiative = 'violet'; 'Initiative default' = 'neutral'; 'Policy default' = 'neutral'; Expression = 'info'; 'Not set' = 'warn' }
+    # Effects are written in any case ('Deny', 'deny'): a tone for each one used.
+    $effectTones = [System.Collections.Generic.Dictionary[string, string]]::new([StringComparer]::Ordinal)
+    $toneOf = @{ deny = 'bad'; audit = 'info'; auditIfNotExists = 'info'; deployIfNotExists = 'violet'; modify = 'violet'; append = 'violet'; disabled = 'neutral' }
+    foreach ($effect in @($Inventory.Members | ForEach-Object Effect | Where-Object { $_ } | Select-Object -Unique)) { if ($toneOf.ContainsKey($effect)) { $effectTones[$effect] = $toneOf[$effect] } }
 
     $tiles = @(
         @{ Value = '{0:N0}' -f $stats.Assignments; Label = 'assignments'; Tone = 'info'; Table = 'assignments' }
         @{ Value = '{0:N0}' -f $stats.Initiatives; Label = 'initiatives'; Tone = 'violet'; Table = 'assignments'; Filters = @{ DefinitionType = 'PolicySet' } }
+        @{ Value = '{0:N0}' -f $stats.MemberPolicies; Label = 'policies in initiatives'; Tone = 'violet'; Table = 'policies' }
         @{ Value = '{0:N0}' -f $stats.Policies; Label = 'single policies'; Tone = 'info'; Table = 'assignments'; Filters = @{ DefinitionType = 'Policy' } }
         @{ Value = '{0:N0}' -f $stats.Assigned; Label = 'parameters assigned'; Tone = 'good'; Table = 'parameters'; Filters = @{ ValueSource = 'Assigned' } }
         @{ Value = '{0:N0}' -f $stats.Default; Label = 'at their default'; Tone = 'neutral'; Table = 'parameters'; Filters = @{ ValueSource = 'Default' } }
@@ -82,6 +88,29 @@ function Write-AACAssignedPolicyHtml {
                 @{ Key = 'DefinitionType'; Label = 'Definition type'; Facet = $true; Hidden = $true }
                 @{ Key = 'Category'; Label = 'Category'; Facet = $true; Hidden = $true }
                 @{ Key = 'AssignmentName'; Label = 'Assignment name'; Type = 'mono'; Hidden = $true }
+            )
+        }
+        @{
+            Id = 'policies'; Title = 'Policies in force'; Note = 'Each initiative opened up: every member policy (and every policy assigned on its own) with its effect and the value each parameter ends up with - from the assignment, the initiative or the policy''s default.'; Noun = 'policy parameters'; File = 'assigned-policy-members'
+            Rows = @($Inventory.Members); GroupBy = @('AssignmentDisplayName', 'PolicyDisplayName', 'Effect', 'ValueSource')
+            Columns = @(
+                @{ Key = 'AssignmentDisplayName'; Label = 'Assignment'; Facet = $true }
+                @{ Key = 'PolicySetDisplayName'; Label = 'Initiative'; Facet = $true }
+                @{ Key = 'PolicyDisplayName'; Label = 'Policy'; Type = 'wide'; Facet = $true }
+                @{ Key = 'Effect'; Label = 'Effect'; Type = 'badge'; Tones = $effectTones; Facet = $true }
+                @{ Key = 'ParameterName'; Label = 'Parameter'; Type = 'mono' }
+                @{ Key = 'ValueSource'; Label = 'Value from'; Type = 'badge'; Tones = $memberSourceTones; Facet = $true }
+                @{ Key = 'EffectiveValue'; Label = 'Effective value'; Type = 'wide' }
+                @{ Key = 'InitiativeValue'; Label = 'In the initiative'; Type = 'wide' }
+                @{ Key = 'DefaultValue'; Label = 'Policy default'; Type = 'wide'; Hidden = $true }
+                @{ Key = 'AllowedValues'; Label = 'Allowed values'; Type = 'wide'; Hidden = $true }
+                @{ Key = 'ResourceType'; Label = 'Resource types'; Type = 'wide' }
+                @{ Key = 'ScopeName'; Label = 'Assigned at'; Facet = $true; Hidden = $true }
+                @{ Key = 'PolicyType'; Label = 'Built-in or custom'; Facet = $true; Hidden = $true }
+                @{ Key = 'Category'; Label = 'Category'; Facet = $true; Hidden = $true }
+                @{ Key = 'Groups'; Label = 'Groups'; Type = 'wide'; Hidden = $true }
+                @{ Key = 'ReferenceId'; Label = 'Reference ID'; Type = 'mono'; Hidden = $true }
+                @{ Key = 'PolicyId'; Label = 'Policy ID'; Type = 'mono'; Hidden = $true }
             )
         }
     )

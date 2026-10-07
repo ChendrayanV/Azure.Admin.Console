@@ -24,8 +24,15 @@ function ConvertTo-AACPolicyAssessment {
         compliance = (compliant + exempt) / all. A rate below
         -ComplianceWarningPercent is Warning, below half of it Poor.
 
+        Every assigned initiative is opened up (InitiativePolicies): each
+        member policy with its effect and the effective value of its
+        parameters - through the initiative's parameters and the
+        assignment's (Resolve-AACPolicySetMember) - and its compliance,
+        policies with no compliance data included.
+
         Returns a hashtable: Assignments, AssignmentCompliance (per
         assignment and subscription), Policies (per assignment and policy),
+        InitiativePolicies (per initiative assignment and member policy),
         Categories, Subscriptions, ManagementGroups, Initiatives,
         Definitions, Exemptions, Roles, Findings, Tree (for the HTML
         report), Stats.
@@ -204,6 +211,7 @@ function ConvertTo-AACPolicyAssessment {
 
     $assignmentRows = [System.Collections.Generic.List[object]]::new()
     $roleRows = [System.Collections.Generic.List[object]]::new()
+    $memberEntries = [System.Collections.Generic.List[object]]::new()
     foreach ($entry in $inScope) {
         $row = $entry.Row
         $id = [string](& $at $row 'id'); $key = & $lower $id
@@ -213,6 +221,9 @@ function ConvertTo-AACPolicyAssessment {
         [void]$assignedDefinitions.Add((& $lower $definitionId))
         $members = @(if ($set) { & $list (& $at $target 'members') })
         foreach ($member in $members) { [void]$assignedDefinitions.Add((& $lower (& $at $member 'policyDefinitionId'))) }
+        if ($set -and $members.Count) {
+            $memberEntries.Add(@{ Row = $row; Where = $entry.Where; Set = $target; Resolved = @(Resolve-AACPolicySetMember -Member $members -SetParameter (& $at $target 'parameters') -Assigned (& $at $row 'parameters') -Override @(& $list (& $at $row 'overrides')) -Definition $Definition) })
+        }
         $memberCount[(& $lower $definitionId)] = 1 + $(if ($memberCount.Contains((& $lower $definitionId))) { $memberCount[(& $lower $definitionId)] } else { 0 })
         $parameters = & $at $row 'parameters'
         $counts = if ($compliance.Contains($key)) { $compliance[$key] } else { @{ NonCompliant = 0L; Compliant = 0L; Conflict = 0L; Exempt = 0L } }
@@ -340,6 +351,30 @@ function ConvertTo-AACPolicyAssessment {
             $pct = & $percent $c $e ($n + $c + $e + $x)
             & $object 'AAC.PolicyCategory' ([ordered]@{ Category = $group.Name; Policies = @($group.Group | ForEach-Object DefinitionId | Sort-Object -Unique).Count; Assignments = @($group.Group | ForEach-Object AssignmentId | Sort-Object -Unique).Count; NonCompliant = $n; Compliant = $c; Conflict = $x; Exempt = $e; CompliancePercent = $pct; Rating = & $rate $pct })
         }) | Sort-Object -Property @{ Expression = { if ($null -eq $_.CompliancePercent) { 101 } else { $_.CompliancePercent } } }, Category
+
+    # --- The policies inside the assigned initiatives: effect, parameter values, compliance ---------------------------------
+    $memberRows = @(foreach ($item in $memberEntries) {
+            $row = $item.Row
+            $assignmentKey = & $lower (& $at $row 'id')
+            $display = [string]$(if (& $at $row 'displayName') { & $at $row 'displayName' } else { & $at $row 'name' })
+            foreach ($member in $item.Resolved) {
+                $groupKey = "$assignmentKey|$($member.ReferenceId)|$(& $lower $member.DefinitionId)"
+                $counts = if ($policyGroups.Contains($groupKey)) { $policyGroups[$groupKey] } else { @{ NonCompliant = 0L; Compliant = 0L; Conflict = 0L; Exempt = 0L } }
+                $total = $counts.NonCompliant + $counts.Compliant + $counts.Conflict + $counts.Exempt
+                $pct = & $percent $counts.Compliant $counts.Exempt $total
+                $values = @($member.Parameters | Where-Object Name -NE 'effect' | ForEach-Object { "$($_.Name) = $(Format-AACPolicyValue -Value $_.Value)$(if ($_.Source -ne 'Assigned') { " ($($_.Source.ToLowerInvariant()))" })" })
+                & $object 'AAC.PolicyInitiativeMember' ([ordered]@{
+                        Assignment = $display; Scope = $item.Where.Name; Initiative = [string](& $at $item.Set 'displayName'); ReferenceId = $member.ReferenceId
+                        Policy = & $nameOf $member.DefinitionId; PolicyType = [string](& $at $member.Definition 'policyType'); Category = [string](& $at $member.Definition 'metadata.category')
+                        Effect = $member.Effect; EffectSource = $(if ($member.Effect) { $member.EffectSource } else { '' }); Groups = @($member.Groups) -join ', '
+                        Parameters = $values -join '; '; ParametersAssigned = @($member.Parameters | Where-Object Source -EQ 'Assigned').Count
+                        NonCompliant = $counts.NonCompliant; Compliant = $counts.Compliant; Conflict = $counts.Conflict; Exempt = $counts.Exempt; Resources = $total
+                        CompliancePercent = $pct; Rating = & $rate $pct
+                        Deprecated = $(if ($member.Definition -and (& $deprecated $member.Definition)) { 'Yes' } else { 'No' })
+                        AssignmentId = [string](& $at $row 'id'); InitiativeId = [string](& $at $item.Set 'id'); DefinitionId = $member.DefinitionId
+                    })
+            }
+        }) | Sort-Object -Property Assignment, @{ Expression = 'NonCompliant'; Descending = $true }, Policy
 
     # --- Exemptions -----------------------------------------------------------------------------------------------------
     $allAssignmentIds = [System.Collections.Generic.HashSet[string]]::new()
@@ -487,6 +522,7 @@ function ConvertTo-AACPolicyAssessment {
         Assignments          = @($assignmentRows | Sort-Object -Property @{ Expression = { if ($null -eq $_.CompliancePercent) { 101 } else { $_.CompliancePercent } } }, Assignment)
         AssignmentCompliance = @($assignmentCompliance)
         Policies             = @($policyRows)
+        InitiativePolicies   = @($memberRows)
         Categories           = @($categoryRows)
         Subscriptions        = @($subscriptionRows)
         ManagementGroups     = @($groupRows)

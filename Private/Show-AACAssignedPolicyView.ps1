@@ -13,6 +13,9 @@ function Show-AACAssignedPolicyView {
         parameters with no value in orange. An assignment with more than
         -ShowDefault parameters lists the assigned ones and counts the rest,
         which keep their defaults (-NoDisplay or -HtmlPath has every one).
+        With -ExpandPolicySet, an initiative's node lists its member
+        policies, each with its effect and its other parameters' effective
+        values.
         Output goes straight to the Spectre console; wrap the call in
         Invoke-AACPagedOutput to page it.
     #>
@@ -24,7 +27,12 @@ function Show-AACAssignedPolicyView {
         [System.Collections.IDictionary] $Scope,
 
         # Up to this many parameters, defaults are listed too.
-        [int] $ShowDefault = 12
+        [int] $ShowDefault = 12,
+
+        # List each initiative's member policies, up to -ShowMember of them.
+        [switch] $ExpandPolicySet,
+
+        [int] $ShowMember = 40
     )
 
     $escape = { param($Text) [Spectre.Console.Markup]::Escape([string]$Text) }
@@ -109,6 +117,12 @@ function Show-AACAssignedPolicyView {
         if (-not $byAssignment.ContainsKey($row.AssignmentId)) { $byAssignment[$row.AssignmentId] = [System.Collections.Generic.List[object]]::new() }
         $byAssignment[$row.AssignmentId].Add($row)
     }
+    $byMember = @{}
+    foreach ($row in @($Inventory.Members)) {
+        if ($row.DefinitionType -ne 'PolicySet') { continue }
+        if (-not $byMember.ContainsKey($row.AssignmentId)) { $byMember[$row.AssignmentId] = [System.Collections.Generic.List[object]]::new() }
+        $byMember[$row.AssignmentId].Add($row)
+    }
     $tree = [Spectre.Console.Tree]::new([Spectre.Console.Markup]::new("[bold deepskyblue1]$($glyph.Bullet) Parameters[/] [grey58]$($glyph.Dot) [/][springgreen2]assigned[/][grey58], [/][grey62]default[/][grey58], [/][orange1]not set[/]"))
     $tree.Style = [Spectre.Console.Style]::Parse('grey42')
     if (-not $unicode) { $tree.Guide = [Spectre.Console.TreeGuide]::Ascii }
@@ -128,10 +142,35 @@ function Show-AACAssignedPolicyView {
         if ($hidden -gt 0) {
             $node.Nodes.Add([Spectre.Console.TreeNode]::new([Spectre.Console.Markup]::new("[grey50]$($glyph.Chevron) $hidden more at their default value[/]"))) | Out-Null
         }
+        if ($a.DefinitionType -ne 'PolicySet' -or -not $a.Members) { continue }
+        if (-not $ExpandPolicySet) {
+            $node.Nodes.Add([Spectre.Console.TreeNode]::new([Spectre.Console.Markup]::new("[grey50]$($glyph.Chevron) $($a.Members) member policies (-ExpandPolicySet lists them)[/]"))) | Out-Null
+            continue
+        }
+        # The initiative's policies: effect, and the parameters other than the effect.
+        $policies = [Spectre.Console.TreeNode]::new([Spectre.Console.Markup]::new("[mediumpurple2]Policies[/] [grey50]$($a.Members)[/]"))
+        $node.Nodes.Add($policies) | Out-Null
+        $members = @(@(if ($byMember.ContainsKey($a.AssignmentId)) { $byMember[$a.AssignmentId] }) | Group-Object ReferenceId, PolicyId)
+        foreach ($group in $members | Select-Object -First $ShowMember) {
+            $first = $group.Group[0]
+            $effect = if ($first.Effect) { " [$(if ($first.Effect -eq 'deny') { 'orange1' } elseif ($first.Effect -eq 'disabled') { 'grey50' } else { 'deepskyblue1' })]$(& $escape $first.Effect)[/]" } else { '' }
+            $policy = [Spectre.Console.TreeNode]::new([Spectre.Console.Markup]::new("[white]$(& $escape (& $shorten $first.PolicyDisplayName 90))[/]$effect"))
+            $policies.Nodes.Add($policy) | Out-Null
+            $parameterRows = @($group.Group | Where-Object { $_.ParameterName -and $_.ParameterName -ne 'effect' })
+            $width = [Math]::Min(40, [Math]::Max(10, (@($parameterRows | ForEach-Object { $_.ParameterName.Length }) + 0 | Measure-Object -Maximum).Maximum))
+            foreach ($row in $parameterRows) {
+                $color = switch ($row.ValueSource) { 'Assigned' { 'springgreen2' } { $_ -in 'Initiative', 'Initiative default', 'Policy default', 'Expression' } { 'grey62' } default { 'orange1' } }
+                $value = if ($row.ValueSource -eq 'Not set') { '(not set)' } elseif ($row.EffectiveValue -eq '') { '(empty)' } else { & $shorten $row.EffectiveValue 120 }
+                $policy.Nodes.Add([Spectre.Console.TreeNode]::new([Spectre.Console.Markup]::new("[white]$(& $escape $row.ParameterName.PadRight($width))[/] [$color]$(& $escape $value)[/] [grey42]$(& $escape $row.ValueSource.ToLowerInvariant())[/]"))) | Out-Null
+            }
+        }
+        if ($members.Count -gt $ShowMember) {
+            $policies.Nodes.Add([Spectre.Console.TreeNode]::new([Spectre.Console.Markup]::new("[grey50]$($glyph.Chevron) $($members.Count - $ShowMember) more (-NoDisplay or -HtmlPath has every one)[/]"))) | Out-Null
+        }
     }
     [Spectre.Console.AnsiConsole]::Write($tree)
     [Spectre.Console.AnsiConsole]::WriteLine()
 
     foreach ($notice in @($Inventory.Notice)) { Write-AACMarkup "[orange1]$(& $escape $notice)[/]" }
-    Write-AACMarkup "[grey42]Add -PassThru (or pipe the command) for one row per assignment and parameter; -CsvPath and -HtmlPath write every one.[/]"
+    Write-AACMarkup "[grey42]Add -PassThru (or pipe the command) for one row per assignment and parameter$(if ($ExpandPolicySet) { ' (here: per policy in force and parameter)' }); -CsvPath and -HtmlPath write every one.[/]"
 }
