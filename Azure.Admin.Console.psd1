@@ -1,6 +1,6 @@
 @{
     RootModule           = 'Azure.Admin.Console.psm1'
-    ModuleVersion        = '0.14.1'
+    ModuleVersion        = '0.14.2'
     GUID                 = '9923da59-cf92-4a4a-b855-f59a088a3f09'
     Author               = 'Chendrayan Venkatesan'
     CompanyName          = 'Freelancer'
@@ -34,14 +34,23 @@
         'Connect-AAC'
         'Deploy-AACStorageAccount'
         'Disconnect-AAC'
+        'Get-AACAccessReview'
         'Get-AACAdvisorRecommendation'
         'Get-AACAssignedPolicy'
+        'Get-AACAttackPath'
+        'Get-AACChangeHistory'
+        'Get-AACComplianceGap'
+        'Get-AACConfigurationDrift'
+        'Get-AACCostAnomaly'
+        'Get-AACDependencyGraph'
         'Get-AACDiagnosticSetting'
         'Get-AACEntraGroupMembership'
+        'Get-AACFailoverReadiness'
         'Get-AACFirewallRule'
         'Get-AACInventory'
         'Get-AACNetworkSecurityGroup'
         'Get-AACPolicyState'
+        'Get-AACResourceUtilization'
         'Get-AACSecurityPosture'
         'Get-AACSkuAvailability'
         'Get-AACStorageAccountContainerSize'
@@ -50,12 +59,15 @@
         'Invoke-AACApplicationInsightQuery'
         'Invoke-AACAssessment'
         'Invoke-AACDefenderAssessment'
+        'Invoke-AACHealthCheck'
         'Invoke-AACLogAnalyticsWorkspaceAssessment'
         'Invoke-AACM365Assessment'
         'Invoke-AACPolicyAssessment'
         'Invoke-AACPSRule'
         'Invoke-AACVirtualNetworkAssessment'
         'Show-AACCost'
+        'Show-AACDashboard'
+        'Show-AACJson'
         'Show-AACResource'
         'Show-AACResourceMap'
     )
@@ -65,10 +77,10 @@
 
     PrivateData          = @{
         PSData = @{
-            Tags         = @('Azure', 'AzureAdvisor', 'AzureFirewall', 'CostManagement', 'Inventory', 'FirewallPolicy', 'ResourceGraph', 'Governance', 'EntraID', 'MicrosoftGraph', 'Groups', 'DefenderForCloud', 'Storage', 'BlobStorage', 'AzurePolicy', 'SecureScore', 'Report', 'PDF', 'CSV', 'ApplicationInsights', 'LogAnalytics', 'KQL', 'PSRule', 'WellArchitected', 'HTML', 'Compliance', 'SpectreConsole', 'REST', 'PKCE', 'PSEdition_Core', 'Windows', 'Linux', 'MacOS')
+            Tags         = @('Azure', 'AzureAdvisor', 'AzureFirewall', 'CostManagement', 'Inventory', 'FirewallPolicy', 'ResourceGraph', 'Governance', 'EntraID', 'MicrosoftGraph', 'Groups', 'DefenderForCloud', 'Storage', 'BlobStorage', 'AzurePolicy', 'SecureScore', 'Report', 'PDF', 'CSV', 'ApplicationInsights', 'LogAnalytics', 'KQL', 'PSRule', 'WellArchitected', 'HTML', 'Compliance', 'SpectreConsole', 'Dashboard', 'ResourceHealth', 'JSON', 'REST', 'PKCE', 'PSEdition_Core', 'Windows', 'Linux', 'MacOS')
             ProjectUri   = 'https://github.com/ChendrayanV/Azure.Admin.Console'
             LicenseUri   = 'https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/LICENSE'
-            ReleaseNotes = 'v0.14.1 - NEW Invoke-AACDefenderAssessment: Microsoft Defender for Cloud across subscriptions - every recommendation (unhealthy, healthy and not applicable resources, risk level), attack paths step by step, security alerts with MITRE tactics and remediation, inventory with each resource''s plan coverage, vulnerabilities (CVEs), secure score controls, Defender plans with extensions, regulatory compliance and environment settings (contacts, notifications, integrations, connectors, just-in-time) - with findings on how Defender is set up; console, object, CSV and a tabbed HTML report. Get-AACAssignedPolicy -ExpandPolicySet and Invoke-AACPolicyAssessment open up initiatives: each member policy with its effect (overrides included) and the value every parameter ends up with. HTML reports: each table scrolls in its own box (sticky header row and first column), Fit/Centered width and Compact/Comfortable rows that follow the screen, a details panel with every field of a row, and tabs for large reports. Full history: CHANGELOG.md.'
+            ReleaseNotes = 'v0.14.2 - NEW Show-AACDashboard: the estate on one screen - Resource Health, active Azure incidents, Advisor and what changed today. NEW Invoke-AACAssessment governance sheets. NEW ten commands for cost, security, operations, compliance and resilience: Get-AACCostAnomaly, Get-AACAttackPath, Get-AACAccessReview (with what to do per assignment; PIM only for people), Get-AACChangeHistory, Invoke-AACHealthCheck, Get-AACComplianceGap, Get-AACFailoverReadiness, Get-AACDependencyGraph, Get-AACResourceUtilization, Get-AACConfigurationDrift. NEW Show-AACJson. A shared status vocabulary and callouts across the console; progress lines fit narrow consoles. Get-AACEntraGroupMembership -CsvPath writes the one-row-per-group CSV (-CsvLayout Member for the previous one). Fixes to Invoke-AACM365Assessment. Full history: CHANGELOG.md.'
         }
     }
 }

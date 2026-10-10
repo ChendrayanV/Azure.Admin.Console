@@ -62,7 +62,7 @@ function Show-AACNsgView {
     [Spectre.Console.AnsiConsole]::WriteLine()
 
     if (-not $groups.Count) {
-        Show-AACPanel -Content '[bold]No network security groups[/] [grey58]were found in this scope.[/]' -BorderColor 'grey50' -AllowMarkup
+        Show-AACCallout Info -Message '[bold]No network security groups[/] [grey58]were found in this scope.[/]'
         return
     }
     Show-AACTileRow -Tile @(

@@ -115,5 +115,5 @@ function Show-AACAssessmentView {
         else { foreach ($item in $group.Group) { $content.Add("[grey58]$($group.Name.PadRight(8))[/] [link]$(& $escape $item.FullName)[/]") } }
     }
     if ($Timing -and $Timing.Count) { $content.Add("[grey58]Took[/]     $((@($Timing.Keys | ForEach-Object { "$_ $('{0:mm\:ss}' -f $Timing[$_])" })) -join ' · ')") }
-    if ($content.Count) { Show-AACPanel -Content ($content -join "`n") -Header 'Reports' -BorderColor 'green3' -AllowMarkup }
+    if ($content.Count) { Show-AACCallout Success -Message ($content -join "`n") -Title 'Reports' }
 }

@@ -38,7 +38,10 @@ function Invoke-AACAssessment {
                           (unless -SkipVMDetail); -SkipApi skips them all
           5. Cost         each resource's cost, this month and last
                           (-IncludeCost, Cost Management)
-          6. Reports      CSV, HTML, PDF and diagrams (-Output), then an
+          6. Governance   the policy assignments in force and every policy
+                          they apply (unless -SkipPolicy); PSRule for Azure's
+                          rules on the resources (-PSRule)
+          7. Reports      CSV, HTML, PDF and diagrams (-Output), then an
                           upload to a blob container (-StorageAccount)
 
         Every inventory sheet adds, after its own columns: Retirement (an
@@ -48,13 +51,33 @@ function Invoke-AACAssessment {
         Resource types, All resources; then Advisor recommendations,
         Advisor score, Retirements, Security recommendations, Secure score,
         Policy compliance, Outages, Quotas, Support tickets and Reservation
-        recommendations.
+        recommendations. Then the governance sheets:
+          Policy compliance  Compliance by initiative, by resource group and
+                             by standard (the controls of CIS, NIST, ISO
+                             27001, the Microsoft cloud security benchmark
+                             ... initiatives), and each non-compliant
+                             resource with why and how to fix it
+          Policy inventory   Policy assignments, and every policy in force
+                             with its effect, resource types, controls and
+                             status (Failed, Passed, Manual review, Exempt,
+                             Not evaluated, Disabled)
+          PSRule results     PSRule rules (checked, passed, failed, with
+                             their documentation) and the failed resources
+                             (-PSRule)
+          Recommendations    Resource recommendations: Advisor, Defender,
+                             retirements, unattached and empty resources,
+                             policy non-compliance and PSRule in one list,
+                             each with a severity, category and what to do
 
         The reports, in -ReportDir (a folder named after -ReportName and
         the time):
-          HTML      one page: tiles, charts, the tenant tree, and every sheet
-                    as a table under its category, listed in the contents -
-                    searchable, filterable, groupable, each downloadable as CSV
+          HTML      a tabbed workbook: an Executive summary (tiles, charts -
+                    a click filters the table behind them - and the tenant
+                    tree), then Policy compliance, Policy inventory, PSRule
+                    results, Resource recommendations, Resources, Inventory,
+                    Advisor, Security, Health and Cost; every table
+                    searchable, filterable, groupable, with each row's
+                    details a click away, and downloadable as CSV
           CSV       a file per sheet
           PDF       the summary, then each category with its sheets' key
                     columns (bookmarked)
@@ -102,7 +125,16 @@ function Invoke-AACAssessment {
     .PARAMETER SkipAdvisor
         Don't read Advisor recommendations (retirements are still read).
     .PARAMETER SkipPolicy
-        Don't read Azure Policy compliance.
+        Don't read Azure Policy compliance, or the policy inventory.
+    .PARAMETER PSRule
+        Run PSRule for Azure's rules on the resources in scope too: the
+        PSRule results tab, and its failures among the recommendations.
+        Needs PSRule.Rules.Azure (Install-PSResource PSRule.Rules.Azure
+        -Scope CurrentUser); it reads each resource's child settings, so it
+        takes a while on a large estate.
+    .PARAMETER PSRuleBaseline
+        The PSRule for Azure baseline (Azure.Default by default), e.g.
+        Azure.Pillar.Security or Azure.GA_2024_12.
     .PARAMETER IncludeCost
         Read each resource's actual cost, this month and last (Cost
         Management Reader).
@@ -192,6 +224,10 @@ function Invoke-AACAssessment {
 
         [switch] $SkipPolicy,
 
+        [switch] $PSRule,
+
+        [string] $PSRuleBaseline,
+
         [switch] $IncludeCost,
 
         [switch] $QuotaUsage,
@@ -271,6 +307,8 @@ function Invoke-AACAssessment {
         SecurityCenter    = [bool]$SecurityCenter
         SkipAdvisor       = [bool]$SkipAdvisor
         SkipPolicy        = [bool]$SkipPolicy
+        PSRule            = [bool]$PSRule
+        PSRuleBaseline    = $PSRuleBaseline
         IncludeCost       = [bool]$IncludeCost
         QuotaUsage        = [bool]$QuotaUsage
         SkipApi           = [bool]$SkipApi
@@ -331,7 +369,7 @@ function Invoke-AACAssessment {
         # --- 2. Estate: every resource, the containers, Advisor, Defender, Policy ----------------------------------------
         $filter = Get-AACAssessmentQuery -Filter -ResourceGroupName $request.ResourceGroupName -TagKey $request.TagKey -TagValue $request.TagValue
         $estate = Get-AACAssessmentExtraQuery -Stage Estate -Filter $filter -ResourceGroupName $request.ResourceGroupName -SkipAdvisor:$request.SkipAdvisor -SecurityCenter:$request.SecurityCenter -SkipPolicy:$request.SkipPolicy
-        $labels = @{ types = 'resource types'; resources = 'resources'; groups = 'resource groups'; advisor = $(if ($request.SkipAdvisor) { 'retirements' } else { 'Advisor recommendations' }); security = 'Defender for Cloud recommendations'; secureScores = 'secure scores'; policy = 'Azure Policy compliance'; supportTickets = 'support tickets' }
+        $labels = @{ types = 'resource types'; resources = 'resources'; groups = 'resource groups'; advisor = $(if ($request.SkipAdvisor) { 'retirements' } else { 'Advisor recommendations' }); security = 'Defender for Cloud recommendations'; secureScores = 'secure scores'; policy = 'Azure Policy compliance'; policyByGroup = 'policy compliance by resource group'; policyResources = 'non-compliant resources'; supportTickets = 'support tickets' }
         Update-AACProgress -Id 'estate' -Total $estate.Count -Description 'Reading every resource, resource group, Advisor, Defender and Policy'
         $read = Invoke-AACGraphBatch -Query $estate -SubscriptionId $graphScope -AllowFailure @($estate.Keys | Where-Object { $_ -notin 'types', 'resources' }) -OnProgress {
             param($Name, $Done, $Total)
@@ -441,6 +479,48 @@ function Invoke-AACAssessment {
         $assessment.Notices = $notices.ToArray()
         Update-AACProgress -Id 'assess' -Complete -Description ('Assessed: {0:N0} sheet(s), {1:N0} retirement(s){2}' -f @($assessment.Sheets | Where-Object { @($_.Rows).Count }).Count, $assessment.Stats.Retirements, $(if ($null -ne $assessment.Stats.Advisor) { ", $($assessment.Stats.AdvisorHigh) High-impact Advisor recommendation(s)" }))
         & $lap 'Assess'
+
+        # --- 6b. Governance: the policy inventory, PSRule for Azure, one list of recommendations ------------------------------
+        $inScopeIds = @($subscriptions | ForEach-Object { ([string]$_['subscriptionId']).ToLowerInvariant() })
+        $assignedPolicy = $null
+        $policyRead = -not $request.SkipPolicy -and -not $estateRead.Errors.Contains('policy')
+        if (-not $request.SkipPolicy) {
+            try {
+                $policyData = Read-AACAssignedPolicyData
+                $assignedPolicy = ConvertTo-AACAssignedPolicy -Assignment $policyData.Assignments -Definition $policyData.Definitions -SubscriptionName $policyData.SubscriptionNames -ManagementGroupName $policyData.GroupNames `
+                    -SubscriptionChain $policyData.SubscriptionChain -GroupChain $policyData.GroupChain -SubscriptionId $inScopeIds
+            }
+            catch { $notices.Add("The policy assignments couldn't be read: $($_.Exception.Message)") }
+        }
+        $psruleResults = @()
+        $psruleRead = $false
+        if ($request.PSRule) {
+            if (-not (Get-Module -Name 'PSRule.Rules.Azure' -ListAvailable)) {
+                $notices.Add('PSRule for Azure is not installed, so its rules were not run: Install-PSResource PSRule.Rules.Azure -Scope CurrentUser')
+            }
+            else {
+                try {
+                    $engine = @{ SubscriptionId = $inScopeIds }
+                    if ($request.PSRuleBaseline) { $engine.Baseline = $request.PSRuleBaseline }
+                    $psruleResults = @((Invoke-AACPSRuleEngine @engine).Results)
+                    if ($request.ResourceGroupName.Count) { $psruleResults = @($psruleResults | Where-Object { $request.ResourceGroupName -contains [string]$_.ResourceGroup }) }
+                    $psruleRead = $true
+                }
+                catch { $notices.Add("PSRule for Azure couldn't run: $($_.Exception.Message)") }
+            }
+        }
+        Update-AACProgress -Id 'governance' -Description 'Building the policy, PSRule and recommendation sheets' -Indeterminate
+        $nameOf = @{}
+        foreach ($sub in $subscriptions) { $nameOf[([string]$sub['subscriptionId']).ToLowerInvariant()] = [string]$sub['name'] }
+        $governance = ConvertTo-AACAssessmentGovernance -Sheet $assessment.Sheets -Policy @(& $rowsOf $estateRead 'policy') -PolicyByGroup @(& $rowsOf $estateRead 'policyByGroup') `
+            -PolicyResource @(& $rowsOf $estateRead 'policyResources') -AssignedPolicy $assignedPolicy -PSRuleResult $psruleResults -SubscriptionName $nameOf -PolicyRead:$policyRead -PSRuleRead:$psruleRead
+        $assessment.Sheets = @($assessment.Sheets) + @($governance.Sheets)
+        foreach ($key in $governance.Stats.Keys) { $assessment.Stats[$key] = $governance.Stats[$key] }
+        foreach ($line in @($governance.Notices)) { $notices.Add($line) }
+        $assessment.Notices = $notices.ToArray()
+        $g = $governance.Stats
+        Update-AACProgress -Id 'governance' -Complete -Description ('Governance: {0:N0} policy assignment(s), {1:N0} failed polic(ies), {2:N0} non-compliant resource(s){3}; {4:N0} recommendation(s), {5:N0} critical or high' -f $g.PolicyAssignments, $g.PoliciesFailed, $g.NonCompliantResources, $(if ($psruleRead) { "; PSRule: $($g.PSRuleFailed) failure(s)" }), $g.Recommendations, $g.RecommendationsUrgent)
+        & $lap 'Governance'
 
         # --- 7. The reports --------------------------------------------------------------------------------------------
         $scope = [ordered]@{

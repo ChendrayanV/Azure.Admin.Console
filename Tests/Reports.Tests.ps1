@@ -83,9 +83,10 @@ Describe 'Azure Admin Console - collapsible tables in the HTML reports' {
         $print | Should -Match 'td\.txt \{ white-space: normal;'
     }
 
-    It 'turns sections into tabs when a report asks: Overview first, the tab in the URL, a filtered table opening its tab' {
+    It 'turns sections into tabs when a report asks: Overview (or the name given) first, the tab in the URL, a filtered table opening its tab' {
         $script:template | Should -Match "if \(D\.tabs && sectionOrder\.length\)"
-        $script:template | Should -Match "var names = \['Overview'\]"
+        $script:template | Should -Match "var OV = D\.overviewTab \|\| 'Overview';"
+        $script:template | Should -Match "var names = \[OV\]"
         $script:template | Should -Match "history\.replaceState\(null, '', '#tab=' \+ encodeURIComponent\(name\)\)"
         $script:template | Should -Match "e\.key === 'ArrowRight'"
         $script:template | Should -Match '@media screen \{ \.tab-off \{ display: none !important; \} \}' -Because 'printed, every tab is'
@@ -101,6 +102,9 @@ Describe 'Azure Admin Console - collapsible tables in the HTML reports' {
         $tabs | Should -Match '"name":"Second"'
         $tabs | Should -Match '"badge":"3"'
         $tabs | Should -Match '"tone":"bad"'
+        Get-Content -LiteralPath $tabbed -Raw | Should -Not -Match '"overviewTab"' -Because 'Overview, unless named'
+        $null = InModuleScope 'Azure.Admin.Console' -Parameters @{ Path = $tabbed } { param($Path) Write-AACHtmlReport -Path $Path -Title 'Tabs' -Tab @(@{ Name = 'First' }) -OverviewTab 'Executive summary' -Table @(@{ Id = 'a'; Title = 'A'; Section = 'First'; Rows = @(@{ A = 'x' }); Columns = @(@{ Key = 'A'; Label = 'A' }) }) }
+        Get-Content -LiteralPath $tabbed -Raw | Should -Match '"overviewTab":"Executive summary"'
     }
 
     It 'is the page every command writes' {

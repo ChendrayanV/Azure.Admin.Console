@@ -234,7 +234,7 @@ function Connect-AAC {
     }
 
     $summary = "[grey58]Account:[/]  $($script:AACSession.Account)`n[grey58]Tenant:[/]   $($script:AACSession.TenantId)`n[grey58]Expires:[/]  $($script:AACSession.ExpiresOn.ToString('u'))"
-    Show-AACPanel -Content $summary -Header 'Connected' -BorderColor 'green1' -AllowMarkup
+    Show-AACCallout Success -Message $summary -Title 'Connected'
 
     if ($PassThru) {
         return $script:AACSession

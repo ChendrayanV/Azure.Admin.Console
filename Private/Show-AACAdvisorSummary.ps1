@@ -67,7 +67,7 @@ function Show-AACAdvisorSummary {
     [Spectre.Console.AnsiConsole]::WriteLine()
 
     if ($count -eq 0) {
-        Show-AACPanel -Content '[bold green]No Azure Advisor recommendations[/] [grey58]for this scope - nothing to act on.[/]' -BorderColor 'green' -AllowMarkup
+        Show-AACCallout Success -Message '[bold green]No Azure Advisor recommendations[/] [grey58]for this scope - nothing to act on.[/]'
     }
     else {
         $resources = @($Recommendation | ForEach-Object { if ($_.ResourceId) { $_.ResourceId.ToLowerInvariant() } else { $_.ResourceName } } | Select-Object -Unique).Count

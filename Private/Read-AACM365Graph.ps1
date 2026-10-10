@@ -132,7 +132,13 @@ function Read-AACM365Graph {
                     $mine["$name|ids$i"] = "id in ($((@($ids[$i..([Math]::Min($i + 14, $ids.Count - 1))] | ForEach-Object { & $quote $_ })) -join ','))"
                 }
                 if ($name -eq 'Users') { $mine["$name|names"] = (@(foreach ($field in 'displayName', 'userPrincipalName') { foreach ($prefix in 'break', 'emergency', 'bg-', 'bga') { "startswith($field,$(& $quote $prefix))" } }) -join ' or ') }
-                if (-not $mine.Count) { $data[$name] = @(); continue }
+                if (-not $mine.Count) {
+                    # Nothing to look up: none, or because what names them couldn't be read.
+                    $sources = @('RoleAssignments', 'RoleEligibility', 'ConditionalAccess' | Where-Object { $names -contains $_ })
+                    if ($sources.Count -and -not @($sources | Where-Object { $data.Contains($_) }).Count) { $errors[$name] = "Not read: it needs $($sources -join ' or '), which couldn't be read." }
+                    else { $data[$name] = @() }
+                    continue
+                }
                 foreach ($key in $mine.Keys) { $lookups[$key] = $mine[$key]; $second[$key] = ($q.Uri -f [System.Uri]::EscapeDataString($mine[$key])); $m365Labels[$key] = ([string]$q.Data).ToLowerInvariant(); $split.Add($key) }
                 continue
             }
@@ -159,6 +165,7 @@ function Read-AACM365Graph {
             }
             $groupParts = @($split | Where-Object { $_ -like 'Groups|*' })
             if ($groupParts.Count -and -not @($groupParts | Where-Object { $data.Contains($_) }).Count) { $errors['GroupMembers'] = 'Not read: it needs the groups, which couldn''t be read.' }
+            elseif ($errors.Contains('Groups')) { $errors['GroupMembers'] = 'Not read: it needs the groups, which couldn''t be read.' }
             elseif (-not $groupIds.Count) { $data['GroupMembers'] = @() }
         }
         if ($third.Count) {

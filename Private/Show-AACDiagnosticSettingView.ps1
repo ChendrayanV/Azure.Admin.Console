@@ -113,7 +113,7 @@ function Show-AACDiagnosticSettingView {
         if ($missing.Count -gt $MaxRow) { Write-AACMarkup "[grey50]... and $($missing.Count - $MaxRow) more: -PassThru, -CsvPath, -HtmlPath or -PdfPath lists them all.[/]"; [Spectre.Console.AnsiConsole]::WriteLine() }
     }
     elseif ($stats.WithLogs -and -not $stats.Unknown) {
-        Show-AACPanel -Content '[bold green3]Every resource''s logs reach Log Analytics.[/]' -BorderColor 'green3' -AllowMarkup
+        Show-AACCallout Success -Message '[bold green3]Every resource''s logs reach Log Analytics.[/]'
         [Spectre.Console.AnsiConsole]::WriteLine()
     }
     Write-AACMarkup '[grey42]Add -PassThru (or pipe the command) for one row per resource, -ExpandSetting for one per diagnostic setting; -CsvPath, -PdfPath or -HtmlPath for a report.[/]'

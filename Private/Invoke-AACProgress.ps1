@@ -129,8 +129,14 @@ function Invoke-AACProgress {
     $aacDescription = [Spectre.Console.TaskDescriptionColumn]::new()
     $aacDescription.Alignment = [Spectre.Console.Justify]::Left
 
+    # A narrow console gets a shorter bar, and descriptions are cut to the
+    # width left (Update-AACProgress) - otherwise Spectre squeezes the
+    # percentage and time columns until they wrap, one character a line.
+    $aacConsoleWidth = [Spectre.Console.AnsiConsole]::Profile.Width
     $aacBar = [Spectre.Console.ProgressBarColumn]::new()
-    $aacBar.Width = 36
+    $aacBar.Width = if ($aacConsoleWidth -lt 120) { 20 } else { 36 }
+    # Spinner 1, percentage 4, time 8, and a space between the five columns.
+    $script:AACProgressDescriptionWidth = [Math]::Max(20, $aacConsoleWidth - $aacBar.Width - 18)
     $aacBar.CompletedStyle = [Spectre.Console.Style]::Parse('deepskyblue3_1')
     $aacBar.FinishedStyle = [Spectre.Console.Style]::Parse('green3')
     $aacBar.RemainingStyle = [Spectre.Console.Style]::Parse('grey23')

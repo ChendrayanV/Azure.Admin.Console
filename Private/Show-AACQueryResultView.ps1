@@ -42,7 +42,7 @@ function Show-AACQueryResultView {
     [Spectre.Console.AnsiConsole]::WriteLine()
 
     if ($Row.Count -eq 0) {
-        Show-AACPanel -Content '[bold]The query returned no rows.[/]' -BorderColor 'grey50' -AllowMarkup
+        Show-AACCallout Info -Message '[bold]The query returned no rows.[/]'
         return
     }
     $columns = @($Row[0].PSObject.Properties.Name)

@@ -39,7 +39,14 @@ function Get-AACEntraGroupMembership {
           piped onward     the rows, with no view
           -PassThru        the view and the rows
           -NoDisplay       the rows only
-        -CsvPath writes the rows. -HtmlPath writes an interactive report:
+        -CsvPath writes the CSV - by default in Export-EntraGroupMemberShip.ps1's
+        layout: one row per group with GroupName, GroupSource (Cloud or
+        Windows Server AD), GroupType ('Security', 'Microsoft 365 / Dynamic',
+        'Mail-Enabled Security / Role-Assignable' ...), Members (the direct
+        members, groups marked ' (Group)', or '(No members)') and
+        NestedGroupMembers (each nested group's own members, 'Group: a, b;
+        Other: c'). -CsvLayout Member writes the rows above instead, one per
+        group and member. -HtmlPath writes an interactive report:
         tiles and charts that filter the tables, a table of groups and one of
         every membership - searchable, filterable by group, member type,
         guest or member, direct or nested, and downloadable as CSV. -PdfPath
@@ -52,7 +59,12 @@ function Get-AACEntraGroupMembership {
     .PARAMETER GroupNameStartsWith
         Report on every group whose display name starts with this.
     .PARAMETER CsvPath
-        Write every row to this CSV file. Alias: OutputPath.
+        Write the CSV to this file (see -CsvLayout). Alias: OutputPath.
+    .PARAMETER CsvLayout
+        Group (the default): one row per group, as Export-EntraGroupMemberShip.ps1
+        writes it - a group whose members can't be read is left out, with a
+        warning. Member: one row per group and member (the rows the command
+        returns), nested members at every depth.
     .PARAMETER PdfPath
         Write a PDF report to this file.
     .PARAMETER HtmlPath
@@ -70,7 +82,10 @@ function Get-AACEntraGroupMembership {
         Two groups, with everyone in them, direct or nested.
     .EXAMPLE
         Get-AACEntraGroupMembership -GroupNameStartsWith 'grp-azure-' -HtmlPath .\out\Groups.html -CsvPath .\out\Groups.csv
-        Every group whose name starts with 'grp-azure-', as an interactive HTML report and a CSV file.
+        Every group whose name starts with 'grp-azure-', as an interactive HTML report and a CSV file - one row per group, as Export-EntraGroupMemberShip.ps1 writes it.
+    .EXAMPLE
+        Get-AACEntraGroupMembership -GroupNameStartsWith 'grp-' -CsvPath .\out\Members.csv -CsvLayout Member
+        One CSV row per group and member instead, nested members at every depth, with the path they came through.
     .EXAMPLE
         Get-AACEntraGroupMembership -GroupNameStartsWith 'grp-' -NoDisplay | Where-Object { $_.UserType -eq 'Guest' }
         The guests in those groups, and through which group.
@@ -93,6 +108,9 @@ function Get-AACEntraGroupMembership {
 
         [Alias('OutputPath')]
         [string] $CsvPath,
+
+        [ValidateSet('Group', 'Member')]
+        [string] $CsvLayout = 'Group',
 
         [string] $PdfPath,
 
@@ -149,7 +167,11 @@ function Get-AACEntraGroupMembership {
             if ($GroupNameStartsWith) { "starting with '$GroupNameStartsWith'" }
         ) -join '; '
         if (-not $scope['Groups']) { $scope['Groups'] = 'every group in the tenant' }
-        $null = Invoke-AACExport -CsvPath $csvFullPath -CsvObject @($membership.Rows) -Noun 'membership row' -PdfPath $pdfFullPath -WritePdf {
+        $csvRows = if ($CsvLayout -eq 'Member') { @($membership.Rows) } else { @($membership.Summary) }
+        if ($csvFullPath -and $CsvLayout -eq 'Group') {
+            foreach ($g in @($membership.Unread)) { Write-Warning "The members of group '$($g.GroupName)' couldn't be read, so it's left out of the CSV: $($g.Error)" }
+        }
+        $null = Invoke-AACExport -CsvPath $csvFullPath -CsvObject $csvRows -Noun $(if ($CsvLayout -eq 'Member') { 'membership row' } else { 'group' }) -PdfPath $pdfFullPath -WritePdf {
             Write-AACGroupMembershipPdf -Membership $membership -Path $pdfFullPath -Title $Title -Detail $scope
         } -HtmlPath $htmlFullPath -WriteHtml {
             Write-AACGroupMembershipHtml -Membership $membership -Path $htmlFullPath -Title $Title -Detail $scope

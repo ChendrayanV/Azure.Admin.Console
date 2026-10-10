@@ -973,11 +973,12 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
 
   // --- Tabs: Overview (tiles, charts, notices, tree), then one per section --------------------
   if (D.tabs && sectionOrder.length) (function () {
+    var OV = D.overviewTab || 'Overview';   // the first tab's name
     document.body.classList.add('tabbed');
     $('toc').hidden = true;
     var overview = [$('tiles'), $('notices'), $('charts'), $('tree')];
-    overview.forEach(function (e) { e.dataset.tab = 'Overview'; });
-    var names = ['Overview'].concat(D.tabs.map(function (t) { return t.name; }).filter(function (n) { return sections[n]; }));
+    overview.forEach(function (e) { e.dataset.tab = OV; });
+    var names = [OV].concat(D.tabs.map(function (t) { return t.name; }).filter(function (n) { return sections[n]; }));
     sectionOrder.forEach(function (n) { if (names.indexOf(n) < 0) names.push(n); });
     var bar = $('tabbar'); bar.hidden = false;
     var buttons = {}, visited = {};
@@ -989,23 +990,23 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
       bar.appendChild(b); buttons[name] = b;
     });
     function show(name, remember) {
-      if (!buttons[name]) name = 'Overview';
+      if (!buttons[name]) name = OV;
       names.forEach(function (n) {
         var on = n === name;
         buttons[n].setAttribute('aria-selected', on ? 'true' : 'false'); buttons[n].tabIndex = on ? 0 : -1;
-        (n === 'Overview' ? overview : [sections[n]]).forEach(function (e) { e.classList.toggle('tab-off', !on); });
+        (n === OV ? overview : [sections[n]]).forEach(function (e) { e.classList.toggle('tab-off', !on); });
       });
       // A tab's first table opens the first time the tab is shown.
-      if (!visited[name] && name !== 'Overview') {
+      if (!visited[name] && name !== OV) {
         visited[name] = true;
         var first = Object.keys(tables).filter(function (id) { return sections[name].contains(tables[id].section); })[0];
         if (first) tables[first].setOpen(true);
       }
-      $('tables').querySelector('.tbl-bulk').classList.toggle('tab-off', name === 'Overview');
+      $('tables').querySelector('.tbl-bulk').classList.toggle('tab-off', name === OV);
       if (remember) { try { history.replaceState(null, '', '#tab=' + encodeURIComponent(name)); } catch (e) { /* file: */ } }
     }
     // A tile, chart or tree link that filters a table opens its tab first.
-    showTabOf = function (section) { names.forEach(function (n) { if (n !== 'Overview' && sections[n].contains(section)) show(n, true); }); };
+    showTabOf = function (section) { names.forEach(function (n) { if (n !== OV && sections[n].contains(section)) show(n, true); }); };
     bar.addEventListener('keydown', function (e) {
       var i = names.indexOf(names.filter(function (n) { return buttons[n] === document.activeElement; })[0]);
       if (i < 0) return;
@@ -1018,7 +1019,7 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
     function measure() { document.body.style.setProperty('--tabbar-h', bar.offsetHeight + 'px'); }
     window.addEventListener('resize', measure); measure();
     var m = /^#tab=(.+)$/.exec(location.hash);
-    show(m ? decodeURIComponent(m[1]) : 'Overview', false);
+    show(m ? decodeURIComponent(m[1]) : OV, false);
   })();
 
   window.addEventListener('beforeprint', function () { document.querySelectorAll('.clamp').forEach(function (c) { c.classList.add('open'); }); });

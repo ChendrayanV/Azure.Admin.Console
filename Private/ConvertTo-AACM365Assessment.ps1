@@ -1033,14 +1033,14 @@ function ConvertTo-AACM365Assessment {
     }
     # What Microsoft Graph doesn't reach: said, with what would.
     foreach ($gap in @(
-            @('Exchange Online', 'Mail forwarding to external addresses, SMTP AUTH, mailbox auditing, anti-phishing and anti-spam policies, DKIM and DMARC', 'The Exchange Online admin API or ExchangeOnlineManagement PowerShell, with the Exchange Administrator (or View-Only Organization Management) role')
-            @('Microsoft 365', 'Whether unified audit logging is actually on', 'Graph has no switch for it: taken from the Secure Score control here. Exchange Online: Get-AdminAuditLogConfig | Select UnifiedAuditLogIngestionEnabled')
-            @('Microsoft Defender for Office 365', 'Safe Links, Safe Attachments and preset security policies', 'Exchange Online PowerShell (Get-SafeLinksPolicy, Get-SafeAttachmentPolicy) or the Microsoft Defender portal')
-            @('Microsoft Purview', 'Data loss prevention, sensitivity labels, retention and insider risk', 'Security & Compliance PowerShell (Connect-IPPSSession) or the Microsoft Purview portal')
-            @('Microsoft Teams', 'External access, guest access and meeting policies', 'MicrosoftTeams PowerShell (Get-CsTenantFederationConfiguration, Get-CsTeamsMeetingPolicy)')
-            @('Microsoft Defender for Cloud Apps', 'Session and app governance policies, discovered apps', 'The Defender for Cloud Apps API, with its own token')
-            @('Microsoft Sentinel', 'Data connectors, analytics rules, automation and incidents', 'Azure Resource Manager (Microsoft.SecurityInsights) with the Microsoft Sentinel Reader role: not Microsoft Graph. Invoke-AACLogAnalyticsWorkspaceAssessment covers the workspace')
-            @('Entra Connect servers', 'Sync server health and version', 'Microsoft Entra Connect Health, on the servers themselves')
+            , @('Exchange Online', 'Mail forwarding to external addresses, SMTP AUTH, mailbox auditing, anti-phishing and anti-spam policies, DKIM and DMARC', 'The Exchange Online admin API or ExchangeOnlineManagement PowerShell, with the Exchange Administrator (or View-Only Organization Management) role')
+            , @('Microsoft 365', 'Whether unified audit logging is actually on', 'Graph has no switch for it: taken from the Secure Score control here. Exchange Online: Get-AdminAuditLogConfig | Select UnifiedAuditLogIngestionEnabled')
+            , @('Microsoft Defender for Office 365', 'Safe Links, Safe Attachments and preset security policies', 'Exchange Online PowerShell (Get-SafeLinksPolicy, Get-SafeAttachmentPolicy) or the Microsoft Defender portal')
+            , @('Microsoft Purview', 'Data loss prevention, sensitivity labels, retention and insider risk', 'Security & Compliance PowerShell (Connect-IPPSSession) or the Microsoft Purview portal')
+            , @('Microsoft Teams', 'External access, guest access and meeting policies', 'MicrosoftTeams PowerShell (Get-CsTenantFederationConfiguration, Get-CsTeamsMeetingPolicy)')
+            , @('Microsoft Defender for Cloud Apps', 'Session and app governance policies, discovered apps', 'The Defender for Cloud Apps API, with its own token')
+            , @('Microsoft Sentinel', 'Data connectors, analytics rules, automation and incidents', 'Azure Resource Manager (Microsoft.SecurityInsights) with the Microsoft Sentinel Reader role: not Microsoft Graph. Invoke-AACLogAnalyticsWorkspaceAssessment covers the workspace')
+            , @('Entra Connect servers', 'Sync server health and version', 'Microsoft Entra Connect Health, on the servers themselves')
         )) {
         $coverage.Add((& $object 'AAC.M365Coverage' ([ordered]@{ Area = $gap[0]; Lens = $gap[1]; Status = 'Not covered'; Reads = ''; Reason = 'Not in Microsoft Graph.'; ToCover = $gap[2]; Source = 'Outside Microsoft Graph' })))
     }

@@ -19,6 +19,12 @@ function Get-AACGlyph {
           Chevron   ›         >
           Tick      ✓         +
           Cross     ✗         x
+          Warn      ⚠         !
+          Spin      ↻         ~
+          Info      ℹ         i
+
+        The status states (Get-AACStatus) are drawn with Tick, Warn, Cross,
+        Spin and Info.
 
         Returns a hashtable, e.g. $glyph = Get-AACGlyph; "$($glyph.Dot)".
     #>
@@ -27,9 +33,9 @@ function Get-AACGlyph {
     param()
 
     if ([Spectre.Console.AnsiConsole]::Profile.Capabilities.Unicode) {
-        @{ Bullet = [string][char]0x25CF; Dot = [string][char]0x00B7; Arrow = [string][char]0x2192; Chevron = [string][char]0x203A; Tick = [string][char]0x2713; Cross = [string][char]0x2717 }
+        @{ Bullet = [string][char]0x25CF; Dot = [string][char]0x00B7; Arrow = [string][char]0x2192; Chevron = [string][char]0x203A; Tick = [string][char]0x2713; Cross = [string][char]0x2717; Warn = [string][char]0x26A0; Spin = [string][char]0x21BB; Info = [string][char]0x2139 }
     }
     else {
-        @{ Bullet = '*'; Dot = '-'; Arrow = '->'; Chevron = '>'; Tick = '+'; Cross = 'x' }
+        @{ Bullet = '*'; Dot = '-'; Arrow = '->'; Chevron = '>'; Tick = '+'; Cross = 'x'; Warn = '!'; Spin = '~'; Info = 'i' }
     }
 }

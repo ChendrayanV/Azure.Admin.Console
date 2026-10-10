@@ -93,7 +93,7 @@ function Show-AACPSRuleView {
 
     $problems = @($failed + $errors)
     if ($problems.Count -eq 0) {
-        Show-AACPanel -Content $(if ($Result.Count) { '[bold green3]Every rule passed.[/]' } else { '[bold]No rule applied[/] [grey58]to the resources in scope.[/]' }) -BorderColor $(if ($Result.Count) { 'green3' } else { 'grey50' }) -AllowMarkup
+        Show-AACCallout $(if ($Result.Count) { 'Success' } else { 'Info' }) $(if ($Result.Count) { '[bold green3]Every rule passed.[/]' } else { '[bold]No rule applied[/] [grey58]to the resources in scope.[/]' })
         return
     }
 

@@ -20,8 +20,8 @@ Who is in your Entra ID groups - direct members and everyone in the groups neste
 
 ```
 Get-AACEntraGroupMembership [[-GroupName] <string[]>] [[-GroupNameStartsWith] <string>]
- [[-CsvPath] <string>] [[-PdfPath] <string>] [[-HtmlPath] <string>] [[-Title] <string>] [-PassThru]
- [-NoDisplay] [-NoPaging]
+ [[-CsvPath] <string>] [[-CsvLayout] <string>] [[-PdfPath] <string>] [[-HtmlPath] <string>]
+ [[-Title] <string>] [-PassThru] [-NoDisplay] [-NoPaging]
 ```
 
 ## ALIASES
@@ -70,7 +70,14 @@ What you get depends on where the command runs:
   -NoDisplay       the rows only
 ```
 
--CsvPath writes the rows. -HtmlPath writes an interactive report:
+-CsvPath writes the CSV - by default in Export-EntraGroupMemberShip.ps1's
+layout: one row per group with GroupName, GroupSource (Cloud or
+Windows Server AD), GroupType ('Security', 'Microsoft 365 / Dynamic',
+'Mail-Enabled Security / Role-Assignable' ...), Members (the direct
+members, groups marked ' (Group)', or '(No members)') and
+NestedGroupMembers (each nested group's own members, 'Group: a, b;
+Other: c'). -CsvLayout Member writes the rows above instead, one per
+group and member. -HtmlPath writes an interactive report:
 tiles and charts that filter the tables, a table of groups and one of
 every membership - searchable, filterable by group, member type,
 guest or member, direct or nested, and downloadable as CSV. -PdfPath
@@ -94,9 +101,17 @@ Two groups, with everyone in them, direct or nested.
 Get-AACEntraGroupMembership -GroupNameStartsWith 'grp-azure-' -HtmlPath .\out\Groups.html -CsvPath .\out\Groups.csv
 ```
 
-Every group whose name starts with 'grp-azure-', as an interactive HTML report and a CSV file.
+Every group whose name starts with 'grp-azure-', as an interactive HTML report and a CSV file - one row per group, as Export-EntraGroupMemberShip.ps1 writes it.
 
 ### Example 3
+
+```powershell
+Get-AACEntraGroupMembership -GroupNameStartsWith 'grp-' -CsvPath .\out\Members.csv -CsvLayout Member
+```
+
+One CSV row per group and member instead, nested members at every depth, with the path they came through.
+
+### Example 4
 
 ```powershell
 Get-AACEntraGroupMembership -GroupNameStartsWith 'grp-' -NoDisplay | Where-Object { $_.UserType -eq 'Guest' }
@@ -104,7 +119,7 @@ Get-AACEntraGroupMembership -GroupNameStartsWith 'grp-' -NoDisplay | Where-Objec
 
 The guests in those groups, and through which group.
 
-### Example 4
+### Example 5
 
 ```powershell
 Connect-AAC
@@ -115,9 +130,33 @@ Every group in the tenant you signed in to, as a PDF report.
 
 ## PARAMETERS
 
+### -CsvLayout
+
+Group (the default): one row per group, as Export-EntraGroupMemberShip.ps1
+writes it - a group whose members can't be read is left out, with a
+warning. Member: one row per group and member (the rows the command
+returns), nested members at every depth.
+
+```yaml
+Type: System.String
+DefaultValue: "'Group'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 3
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -CsvPath
 
-Write every row to this CSV file. Alias: OutputPath.
+Write the CSV to this file (see -CsvLayout). Alias: OutputPath.
 
 ```yaml
 Type: System.String
@@ -192,7 +231,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 4
+  Position: 5
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -276,7 +315,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 3
+  Position: 4
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -297,7 +336,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 5
+  Position: 6
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false

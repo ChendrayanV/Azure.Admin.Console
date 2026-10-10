@@ -55,15 +55,25 @@ function Update-AACProgress {
         return
     }
 
+    # Cut to the width the display has for it (Invoke-AACProgress), so the other columns keep theirs.
+    $fit = {
+        param([string] $Text)
+        $width = $script:AACProgressDescriptionWidth
+        if ($width -and $Text.Length -gt $width) {
+            $more = if ([Spectre.Console.AnsiConsole]::Profile.Capabilities.Unicode) { [string][char]0x2026 } else { '...' }
+            $Text = $Text.Substring(0, $width - $more.Length).TrimEnd() + $more
+        }
+        [Spectre.Console.Markup]::Escape($Text)
+    }
     $task = $script:AACProgressTasks[$Id]
     if (-not $task) {
         $text = if ($Description) { $Description } else { $Id }
-        $task = $context.AddTask([Spectre.Console.Markup]::Escape($text), $true, 1)
+        $task = $context.AddTask((& $fit $text), $true, 1)
         $task.IsIndeterminate = $true
         $script:AACProgressTasks[$Id] = $task
     }
     elseif ($Description) {
-        $task.Description = [Spectre.Console.Markup]::Escape($Description)
+        $task.Description = & $fit $Description
     }
 
     if ($PSBoundParameters.ContainsKey('Total')) {

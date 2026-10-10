@@ -21,11 +21,11 @@ Assesses an Azure environment end to end - an inventory of every resource type w
 ```
 Invoke-AACAssessment [[-TenantId] <string>] [[-ManagementGroupId] <string[]>]
  [[-SubscriptionId] <string[]>] [[-ResourceGroupName] <string[]>] [[-TagKey] <string>]
- [[-TagValue] <string>] [[-Category] <string[]>] [[-Output] <string[]>] [[-ReportName] <string>]
- [[-ReportDir] <string>] [[-StorageAccount] <string>] [[-StorageContainer] <string>]
- [[-Title] <string>] [-IncludeTag] [-SecurityCenter] [-SkipAdvisor] [-SkipPolicy] [-IncludeCost]
- [-QuotaUsage] [-SkipApi] [-SkipVMDetail] [-SkipDiagram] [-DiagramFullEnvironment] [-Automation]
- [-PassThru] [-NoDisplay] [-NoPaging]
+ [[-TagValue] <string>] [[-Category] <string[]>] [[-PSRuleBaseline] <string>] [[-Output] <string[]>]
+ [[-ReportName] <string>] [[-ReportDir] <string>] [[-StorageAccount] <string>]
+ [[-StorageContainer] <string>] [[-Title] <string>] [-IncludeTag] [-SecurityCenter] [-SkipAdvisor]
+ [-SkipPolicy] [-PSRule] [-IncludeCost] [-QuotaUsage] [-SkipApi] [-SkipVMDetail] [-SkipDiagram]
+ [-DiagramFullEnvironment] [-Automation] [-PassThru] [-NoDisplay] [-NoPaging]
 ```
 
 ## ALIASES
@@ -66,7 +66,10 @@ What it reads, in phases - each a line of the progress display:
                   (unless -SkipVMDetail); -SkipApi skips them all
   5. Cost         each resource's cost, this month and last
                   (-IncludeCost, Cost Management)
-  6. Reports      CSV, HTML, PDF and diagrams (-Output), then an
+  6. Governance   the policy assignments in force and every policy
+                  they apply (unless -SkipPolicy); PSRule for Azure's
+                  rules on the resources (-PSRule)
+  7. Reports      CSV, HTML, PDF and diagrams (-Output), then an
                   upload to a blob container (-StorageAccount)
 ```
 
@@ -77,15 +80,38 @@ recommendations), its cost with -IncludeCost, and its tags with
 Resource types, All resources; then Advisor recommendations,
 Advisor score, Retirements, Security recommendations, Secure score,
 Policy compliance, Outages, Quotas, Support tickets and Reservation
-recommendations.
+recommendations. Then the governance sheets:
+
+```text
+  Policy compliance  Compliance by initiative, by resource group and
+                     by standard (the controls of CIS, NIST, ISO
+                     27001, the Microsoft cloud security benchmark
+                     ... initiatives), and each non-compliant
+                     resource with why and how to fix it
+  Policy inventory   Policy assignments, and every policy in force
+                     with its effect, resource types, controls and
+                     status (Failed, Passed, Manual review, Exempt,
+                     Not evaluated, Disabled)
+  PSRule results     PSRule rules (checked, passed, failed, with
+                     their documentation) and the failed resources
+                     (-PSRule)
+  Recommendations    Resource recommendations: Advisor, Defender,
+                     retirements, unattached and empty resources,
+                     policy non-compliance and PSRule in one list,
+                     each with a severity, category and what to do
+```
 
 The reports, in -ReportDir (a folder named after -ReportName and
 the time):
 
 ```text
-  HTML      one page: tiles, charts, the tenant tree, and every sheet
-            as a table under its category, listed in the contents -
-            searchable, filterable, groupable, each downloadable as CSV
+  HTML      a tabbed workbook: an Executive summary (tiles, charts -
+            a click filters the table behind them - and the tenant
+            tree), then Policy compliance, Policy inventory, PSRule
+            results, Resource recommendations, Resources, Inventory,
+            Advisor, Security, Health and Cost; every table
+            searchable, filterable, groupable, with each row's
+            details a click away, and downloadable as CSV
   CSV       a file per sheet
   PDF       the summary, then each category with its sheets' key
             columns (bookmarked)
@@ -344,7 +370,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 7
+  Position: 8
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -366,6 +392,53 @@ Aliases: []
 ParameterSets:
 - Name: (All)
   Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PSRule
+
+Run PSRule for Azure's rules on the resources in scope too: the
+PSRule results tab, and its failures among the recommendations.
+Needs PSRule.Rules.Azure (Install-PSResource PSRule.Rules.Azure
+-Scope CurrentUser); it reads each resource's child settings, so it
+takes a while on a large estate.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PSRuleBaseline
+
+The PSRule for Azure baseline (Azure.Default by default), e.g.
+Azure.Pillar.Security or Azure.GA_2024_12.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 7
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -409,7 +482,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 9
+  Position: 10
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -430,7 +503,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 8
+  Position: 9
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -549,7 +622,7 @@ HelpMessage: ''
 
 ### -SkipPolicy
 
-Don't read Azure Policy compliance.
+Don't read Azure Policy compliance, or the policy inventory.
 
 ```yaml
 Type: System.Management.Automation.SwitchParameter
@@ -600,7 +673,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 10
+  Position: 11
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -621,7 +694,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 11
+  Position: 12
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -728,7 +801,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 12
+  Position: 13
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false

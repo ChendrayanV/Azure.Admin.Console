@@ -123,7 +123,7 @@ function Show-AACPolicyStateView {
         [Spectre.Console.AnsiConsole]::WriteLine()
     }
     else {
-        Show-AACPanel -Content '[bold green3]Every evaluated resource complies[/] [grey58]with every policy in this scope.[/]' -BorderColor 'green3' -AllowMarkup
+        Show-AACCallout Success -Message '[bold green3]Every evaluated resource complies[/] [grey58]with every policy in this scope.[/]'
         [Spectre.Console.AnsiConsole]::WriteLine()
     }
     Write-AACMarkup '[grey42]Compliance: (compliant + exempt + unknown + protected resources) / every resource evaluated, as the Azure portal counts it. Add -PassThru (or pipe the command) for every state; -CsvPath, -PdfPath or -HtmlPath for a report.[/]'

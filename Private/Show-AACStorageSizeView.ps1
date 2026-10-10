@@ -65,7 +65,7 @@ function Show-AACStorageSizeView {
     [Spectre.Console.AnsiConsole]::WriteLine()
 
     if (-not @($Report.Accounts).Count) {
-        Show-AACPanel -Content '[bold]No storage accounts[/] [grey58]were found in this scope.[/]' -BorderColor 'grey50' -AllowMarkup
+        Show-AACCallout Info -Message '[bold]No storage accounts[/] [grey58]were found in this scope.[/]'
         return
     }
 
@@ -222,7 +222,7 @@ function Show-AACStorageSizeView {
             $reason = ($sample.Error -replace '^[^:]*:\s*', '')
             $lines.Add("  [grey70]$(& $escape $reason)[/]")
         }
-        Show-AACPanel -Content ($lines -join "`n") -Header ' Not read in full ' -BorderColor 'red1' -AllowMarkup
+        Show-AACCallout Warning -Message ($lines -join "`n") -Title 'Not read in full'
         [Spectre.Console.AnsiConsole]::WriteLine()
     }
 

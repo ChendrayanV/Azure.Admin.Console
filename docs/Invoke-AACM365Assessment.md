@@ -73,6 +73,20 @@ parallel, each followed through its pages.
                   security defaults      off with no MFA, or on when
                                          Conditional Access is
                                          licensed
+                  PIM role settings      MFA, approval, justification
+                                         and maximum duration on
+                                         activation; permanent
+                                         assignments
+                  groups                 who is in the groups excluded
+                                         from Conditional Access and
+                                         the groups holding roles
+                  access reviews         of admin roles and guests
+                  directory sync         password hash sync,
+                                         accidental deletion
+                                         prevention
+  Threat protection (with Entra and Microsoft365) risky users and
+                risk detections (Identity Protection), Microsoft
+                Defender XDR incidents
   Applications  (with Entra) app registrations and enterprise
                 apps: secrets and certificates expired, expiring or
                 long-lived; over-privileged permissions (application
@@ -89,8 +103,10 @@ parallel, each followed through its pages.
                 compliance policies, endpoint security policies
                 (antivirus, firewall, disk encryption, EDR, attack
                 surface reduction, account protection), managed
-                devices (compliance, encryption, stale) and the
-                Entra ID devices no MDM manages
+                devices (compliance, encryption, stale), the
+                Entra ID devices no MDM manages, and app protection
+                (MAM) for personal iOS and Android devices
+  Microsoft365  (also) licensed users with no activity in 30 days
 ```
 
 PERMISSIONS. A Graph token carries the permissions consented to the
@@ -108,8 +124,13 @@ Tools, once an admin has consented:
 
 Your account also needs a directory role that can read them (Global
 Reader, Security Reader plus Intune Administrator or reader roles).
-Whatever Graph refuses is listed in the Permissions tab with the
-permission it needs; the rest of the report is still made.
+COVERAGE. The Coverage tab lists every lens - Assessed, Partly
+assessed, Not assessed (with Graph's reason, the permission and any
+licence it needs) or Not in this run - and what Microsoft Graph
+doesn't reach at all (Exchange Online, Defender for Office 365,
+Purview, Teams, Defender for Cloud Apps, Sentinel...), each with
+what would cover it. The rest of the report is made whatever is
+refused.
 
 What you get depends on where the command runs:
 
@@ -124,8 +145,9 @@ What you get depends on where the command runs:
 ```
 
 -CsvPath (a folder) writes a CSV per table. -HtmlPath writes a
-tabbed report - Overview, Findings, Entra ID, Microsoft 365, Intune,
-Permissions - where every table can be searched, filtered, grouped
+tabbed report - Overview, Findings, Entra ID, Microsoft 365,
+Applications, Threat protection, Intune, Coverage - where every
+table can be searched, filtered, grouped
 and downloaded, and a row opens all its details.
 
 ## EXAMPLES

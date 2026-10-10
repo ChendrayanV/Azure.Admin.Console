@@ -21,11 +21,11 @@ function Disconnect-AAC {
     trap { if ($_.Exception -is [System.Management.Automation.PipelineStoppedException]) { return }; $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
 
     if (-not $script:AACSession) {
-        Write-AACMarkup '[grey58]Not connected - nothing to do.[/]'
+        Write-AACStatusLine Info 'Not connected - nothing to do.'
         return
     }
 
     $account = $script:AACSession.Account
     $script:AACSession = $null
-    Write-AACMarkup "[green1]Disconnected $account.[/]"
+    Write-AACStatusLine Success "Disconnected $account."
 }

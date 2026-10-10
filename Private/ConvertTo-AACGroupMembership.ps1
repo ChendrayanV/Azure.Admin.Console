@@ -23,7 +23,17 @@ function ConvertTo-AACGroupMembership {
         members, nested groups, and the unique users in it - all, guests and
         disabled accounts - counted through every nested group.
 
-        Returns @{ Rows; Groups; Stats }.
+        Summary (AAC.EntraGroupMembershipSummary), one per group, in
+        Export-EntraGroupMemberShip.ps1's CSV layout and labels: GroupName,
+        GroupSource (Cloud, Windows Server AD), GroupType ('Security',
+        'Microsoft 365 / Dynamic', 'Mail-Enabled Security / Role-Assignable'
+        ...), Members (the direct members, a group's name followed by
+        ' (Group)'; '(No members)' when there are none) and NestedGroupMembers
+        (each nested group's own direct members: 'Group: a, b; Other: c').
+        A group whose members couldn't be read has no summary row; Unread
+        lists them (@{ GroupName; Error }).
+
+        Returns @{ Rows; Groups; Summary; Unread; Stats }.
     #>
     [CmdletBinding()]
     [OutputType([hashtable])]
@@ -68,8 +78,41 @@ function ConvertTo-AACGroupMembership {
     }
     $memberType = { param($M) $odata = & $text $M '@odata.type'; if ($kindOf.Contains($odata)) { $kindOf[$odata] } elseif ($odata) { $odata -replace '^#microsoft\.graph\.', '' } else { 'Unknown' } }
 
+    # Export-EntraGroupMemberShip.ps1's labels, for the summary rows.
+    $summaryType = {
+        param($G)
+        $types = @(& $value $G 'groupTypes')
+        @(
+            if ($types -contains 'Unified') { 'Microsoft 365' }
+            elseif ((& $value $G 'securityEnabled') -eq $true -and (& $value $G 'mailEnabled') -eq $true) { 'Mail-Enabled Security' }
+            elseif ((& $value $G 'securityEnabled') -eq $true) { 'Security' }
+            elseif ((& $value $G 'mailEnabled') -eq $true) { 'Distribution' }
+            else { 'Unknown' }
+            if ($types -contains 'DynamicMembership') { 'Dynamic' }
+            if ((& $value $G 'isAssignableToRole') -eq $true) { 'Role-Assignable' }
+        ) -join ' / '
+    }
+    $summaryName = {
+        param($M)
+        $name = foreach ($key in 'displayName', 'userPrincipalName', 'id') { $v = & $text $M $key; if ($v) { $v; break } }
+        if ((& $memberType $M) -eq 'Group') { "$name (Group)" } else { [string]$name }
+    }
+    $nestedSummary = @{}   # a group nested in several is summarised once
+    $summaryOf = {
+        param($M)
+        $id = & $text $M 'id'
+        if (-not $nestedSummary.Contains($id)) {
+            $own = @(if ($Member.Contains($id) -and -not $MemberError.Contains($id)) { $Member[$id] | Where-Object { $null -ne $_ } })
+            $name = foreach ($key in 'displayName', 'userPrincipalName', 'id') { $v = & $text $M $key; if ($v) { $v; break } }
+            $nestedSummary[$id] = "$($name): $(if ($own.Count) { @($own | ForEach-Object { & $summaryName $_ }) -join ', ' } else { '(No members)' })"
+        }
+        $nestedSummary[$id]
+    }
+
     $rows = [System.Collections.Generic.List[object]]::new()
     $groups = [System.Collections.Generic.List[object]]::new()
+    $summary = [System.Collections.Generic.List[object]]::new()
+    $unread = [System.Collections.Generic.List[object]]::new()
     foreach ($g in @($Group | Sort-Object -Property { & $text $_ 'displayName' })) {
         $gid = & $text $g 'id'
         $gName = & $text $g 'displayName'
@@ -125,6 +168,19 @@ function ConvertTo-AACGroupMembership {
         $direct = @(if ($Member.Contains($gid)) { $Member[$gid] | Where-Object { $null -ne $_ } }).Count
         if ($rows.Count -eq $before) { & $row $null $(if ($MemberError.Contains($gid)) { 'Not read' } else { 'Empty' }) '' 0 }
 
+        if ($MemberError.Contains($gid)) { $unread.Add(@{ GroupName = $gName; Error = [string]$MemberError[$gid] }) }
+        else {
+            $directMembers = @(if ($Member.Contains($gid)) { $Member[$gid] | Where-Object { $null -ne $_ } })
+            $summary.Add([pscustomobject][ordered]@{
+                    PSTypeName         = 'AAC.EntraGroupMembershipSummary'
+                    GroupName          = $gName
+                    GroupSource        = $(if ((& $value $g 'onPremisesSyncEnabled') -eq $true) { 'Windows Server AD' } else { 'Cloud' })
+                    GroupType          = & $summaryType $g
+                    Members            = $(if ($directMembers.Count) { @($directMembers | ForEach-Object { & $summaryName $_ }) -join ', ' } else { '(No members)' })
+                    NestedGroupMembers = @($directMembers | Where-Object { (& $memberType $_) -eq 'Group' } | ForEach-Object { & $summaryOf $_ }) -join '; '
+                })
+        }
+
         $userList = @($users.Values)
         $groups.Add([pscustomobject][ordered]@{
                 PSTypeName     = 'AAC.EntraGroup'
@@ -149,6 +205,8 @@ function ConvertTo-AACGroupMembership {
     @{
         Rows   = $all
         Groups = $groups.ToArray()
+        Summary = $summary.ToArray()
+        Unread  = $unread.ToArray()
         Stats  = @{
             Groups       = $groups.Count
             Rows         = $all.Count

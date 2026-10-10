@@ -65,7 +65,7 @@ function Show-AACWorkspaceAssessmentView {
         @{ Value = "$($stats.High) / $($stats.Medium) / $($stats.Low)"; Caption = 'recommendations H / M / L'; Color = $(if ($stats.High) { 'red1' } elseif ($stats.Medium) { 'orange1' } else { 'green3' }) }
     )
     [Spectre.Console.AnsiConsole]::WriteLine()
-    foreach ($notice in @($Assessment.Notices)) { Write-AACMarkup "[deepskyblue1]i[/] [grey70]$(& $escape $notice)[/]" }
+    foreach ($notice in @($Assessment.Notices)) { Write-AACStatusLine Info $notice }
     foreach ($key in @($Assessment.Errors.Keys)) { Write-AACMarkup "[orange1]![/] [grey70]$(& $escape ($key -replace '^\w+:', '')) couldn't be read: $(& $escape $Assessment.Errors[$key])[/]" }
     if (@($Assessment.Notices).Count -or $Assessment.Errors.Count) { [Spectre.Console.AnsiConsole]::WriteLine() }
 
@@ -85,7 +85,7 @@ function Show-AACWorkspaceAssessmentView {
             & $write $table
         }
         else {
-            Show-AACPanel -Content '[bold green3]No recommendations[/] [grey58]for this workspace.[/]' -BorderColor 'green3' -AllowMarkup
+            Show-AACCallout Success -Message '[bold green3]No recommendations[/] [grey58]for this workspace.[/]'
             [Spectre.Console.AnsiConsole]::WriteLine()
         }
     }

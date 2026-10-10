@@ -33,14 +33,14 @@ function Show-AACStorageApplyView {
     if ($Deployment.Status -eq 'Failed') { return }
     $left = @($Deployment.Verification)
     if (-not $left.Count) {
-        Show-AACPanel -Content "[bold green3]$($glyph.Tick) Verified.[/] [grey70]Read again, $(& $escape $Deployment.Name) matches the configuration: running this again changes nothing.[/]" -BorderColor 'green3' -AllowMarkup
+        Show-AACCallout Success -Title 'Verified' -Message "[bold green3]Verified.[/] [grey70]Read again, $(& $escape $Deployment.Name) matches the configuration: running this again changes nothing.[/]" -BorderColor 'green3' -AllowMarkup
     }
     else {
         $lines = @(foreach ($item in $left) {
                 "[bold]$(& $escape $item.Resource)[/] [grey58]($(& $escape $item.Action))[/]"
                 foreach ($difference in @($item.Differences)) { "  [orange1]~[/] $(& $escape $difference.Property): [white]$(& $escape $difference.Current)[/] [grey58]$($glyph.Arrow)[/] configured [white]$(& $escape $difference.Desired)[/]" }
             })
-        Show-AACPanel -Content "[bold orange1]Applied, but $($left.Count) resource(s) differ from the configuration when read again.[/] [grey70]Azure changed them by itself - a Modify or Append policy, or a setting the service adjusts. Running again would try to change them back.[/]`n$($lines -join "`n")" -BorderColor 'orange1' -AllowMarkup
+        Show-AACCallout Warning -Message "[bold orange1]Applied, but $($left.Count) resource(s) differ from the configuration when read again.[/] [grey70]Azure changed them by itself - a Modify or Append policy, or a setting the service adjusts. Running again would try to change them back.[/]`n$($lines -join "`n")"
     }
     [Spectre.Console.AnsiConsole]::WriteLine()
 }

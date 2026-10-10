@@ -239,7 +239,7 @@ Describe 'Azure Admin Console - the Microsoft 365 assessment' {
 
     It 'shows in one place what was assessed, what wasn''t and why, and what Graph doesn''t reach' {
         $c = $script:a.Coverage
-        @($c | Where-Object Status -EQ 'Assessed').Count | Should -Be 33 -Because 'every lens was read'
+        @($c | Where-Object Status -EQ 'Assessed').Count | Should -Be 34 -Because 'every lens was read'
         @($c | Where-Object Status -EQ 'Not covered').Lens | Should -Contain 'Whether unified audit logging is actually on'
         ($c | Where-Object Area -EQ 'Exchange Online').ToCover | Should -Match 'Exchange Online admin API'
         $partial = & $script:assess (@{} + $script:f.Data | ForEach-Object { $d = $_.Clone(); $d.Remove('PimPolicies'); $d.Remove('Groups'); $d }) @{ PimPolicies = 'The tenant needs an AAD Premium 2 license.'; Groups = 'Insufficient privileges to complete the operation.' }
@@ -287,7 +287,7 @@ Describe 'Azure Admin Console - the Microsoft 365 assessment' {
         $p = $script:a.ConditionalAccess
         @($p.State) | Should -Be @('On', 'On', 'Report-only')
         $mfa = $p | Where-Object Policy -EQ 'Require MFA for all users'
-        "$($mfa.Users) | $($mfa.Excluded) | $($mfa.Applications) | $($mfa.Grant) | $($mfa.RequiresMfa)" | Should -Be 'All users | 1 | All cloud apps | Mfa | Yes'
+        "$($mfa.Users) | $($mfa.Excluded) | $($mfa.Applications) | $($mfa.Grant) | $($mfa.RequiresMfa)" | Should -Be 'All users | 2 | All cloud apps | Mfa | Yes' -Because 'a break-glass account and the travel group are excluded'
         ($p | Where-Object Policy -Like 'Admins*').Grant | Should -Be 'Strength: Phishing-resistant MFA'
         ($p | Where-Object Policy -Like 'Block*').ClientApps | Should -Be 'Exchange Active Sync, Other'
         $p[0].PSObject.Properties.Name | Should -Not -Contain '_On' -Because 'the analysis flags are dropped'
@@ -558,7 +558,7 @@ Describe 'Azure Admin Console - Invoke-AACM365Assessment through the real Graph 
         @($result.ConditionalAccess).Count | Should -Be 3
         $result.SecureScore | Should -Be 40
         @($result.Permissions | Where-Object Status -EQ 'Read').Count | Should -Be 46
-        @($result.Coverage | Where-Object Status -EQ 'Assessed').Count | Should -Be 33
+        @($result.Coverage | Where-Object Status -EQ 'Assessed').Count | Should -Be 34
         @($result.LegacyAuthentication).Count | Should -Be 3 -Because 'one query per legacy protocol, merged'
         @($result.AppPermissions | Where-Object Risk -EQ 'Critical').App | Should -Be 'Automation runbook' -Because 'the second round read the Graph grants'
         Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Send-AACHttpRequest -Times 57 -Exactly -Because 'per batch: 12; 5, then users by ID and name and groups by ID, then 2 groups'' members; 10 protocols and the audit log; 3; 4 and the Graph grants; 5; 11 - every one through the real reader and HTTP batch'

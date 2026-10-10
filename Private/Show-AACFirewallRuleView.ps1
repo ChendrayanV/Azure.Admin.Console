@@ -79,7 +79,7 @@ function Show-AACFirewallRuleView {
     [Spectre.Console.AnsiConsole]::WriteLine()
 
     if ($Rule.Count -eq 0) {
-        Show-AACPanel -Content '[bold]No Firewall Policy rules[/] [grey58]were found for this account and these filters.[/]' -BorderColor 'grey50' -AllowMarkup
+        Show-AACCallout Info -Message '[bold]No Firewall Policy rules[/] [grey58]were found for this account and these filters.[/]'
         return
     }
 

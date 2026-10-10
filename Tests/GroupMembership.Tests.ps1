@@ -137,6 +137,40 @@ Describe 'Azure Admin Console - Get-AACEntraGroupMembership' {
         $null = & $script:capture { Get-AACEntraGroupMembership -GroupName 'grp-finance' -HtmlPath $html }
         $model = [regex]::Match((Get-Content -LiteralPath $html -Raw), '<script id="aac-data" type="application/json">(.*?)</script>', 'Singleline').Groups[1].Value | ConvertFrom-Json
         ($model.tables | Where-Object id -EQ 'groups').rows[0].Error | Should -BeLike '*Insufficient privileges*'
+        # The CSV: grp-finance stays, its nested group's members shown as none; a group of its own that can't be read is left out, and said.
+        $csv = Join-Path $TestDrive 'denied.csv'
+        $warned = (& $script:capture { $null = Get-AACEntraGroupMembership -GroupName 'grp-finance', 'grp-finance-emea' -CsvPath $csv -WarningVariable seen -WarningAction SilentlyContinue; $seen }).Output
+        @(Import-Csv -LiteralPath $csv | ForEach-Object { "$($_.GroupName)|$($_.NestedGroupMembers)" }) | Should -Be @('grp-finance|grp-finance-emea: (No members)')
+        @($warned | ForEach-Object { "$_" }) | Should -Be @("The members of group 'grp-finance-emea' couldn't be read, so it's left out of the CSV: Insufficient privileges to complete the operation.")
+    }
+
+    It 'summarises each group as Export-EntraGroupMemberShip.ps1 does: its labels, direct members, and nested groups'' own members' {
+        $m = & $script:build @('g-fin', 'g-all', 'g-loopa', 'g-empty', 'g-emea')
+        @($m.Summary | ForEach-Object { "$($_.GroupName) | $($_.GroupSource) | $($_.GroupType) | $($_.Members) | $($_.NestedGroupMembers)" }) | Should -Be @(
+            'grp-all-staff | Cloud | Microsoft 365 / Dynamic | Ada Lovelace, Linus Torvalds | '
+            'grp-empty | Cloud | Security | (No members) | '
+            'grp-finance | Cloud | Security | Ada Lovelace, Gus Guest, grp-finance-emea (Group) | grp-finance-emea: Grace Hopper, Ada Lovelace, app-payroll'
+            'grp-finance-emea | Windows Server AD | Security | Grace Hopper, Ada Lovelace, app-payroll | '
+            'grp-loop-a | Cloud | Security | grp-loop-b (Group) | grp-loop-b: Linus Torvalds, grp-loop-a (Group)'
+        )
+        @($m.Summary[0].PSObject.Properties.Name) | Should -Be @('GroupName', 'GroupSource', 'GroupType', 'Members', 'NestedGroupMembers')
+        $m.Summary[0].PSObject.TypeNames | Should -Contain 'AAC.EntraGroupMembershipSummary'
+    }
+
+    It 'names a member by its UPN or ID when it has no display name, and leaves out a group whose members couldn''t be read' {
+        $data = $script:contosoGroups
+        $members = @{}
+        foreach ($key in $data.Members.Keys) { $members[$key] = $data.Members[$key] }
+        $members['g-all'] = @(@{ '@odata.type' = '#microsoft.graph.user'; id = 'u-x'; displayName = $null; userPrincipalName = 'x@contoso.example' }, @{ '@odata.type' = '#microsoft.graph.device'; id = 'd-1' })
+        $role = $data.Groups['g-loopa'].Clone(); $role.isAssignableToRole = $true; $role.mailEnabled = $true
+        $m = InModuleScope 'Azure.Admin.Console' -Parameters @{ G = @($data.Groups['g-all'], $data.Groups['g-fin'], $data.Groups['g-emea'], $role); M = $members } {
+            param($G, $M)
+            ConvertTo-AACGroupMembership -Group $G -Member $M -MemberError @{ 'g-emea' = 'Insufficient privileges.' }
+        }
+        ($m.Summary | Where-Object GroupName -EQ 'grp-all-staff').Members | Should -Be 'x@contoso.example, d-1'
+        ($m.Summary | Where-Object GroupName -EQ 'grp-finance').NestedGroupMembers | Should -Be 'grp-finance-emea: (No members)'
+        ($m.Summary | Where-Object GroupName -EQ 'grp-loop-a').GroupType | Should -Be 'Mail-Enabled Security / Role-Assignable'
+        @($m.Summary.GroupName) | Should -Not -Contain 'grp-finance-emea'
     }
 
     It 'draws the groups and each group''s member tree at the console, in characters any console can show' {
@@ -151,13 +185,18 @@ Describe 'Azure Admin Console - Get-AACEntraGroupMembership' {
         }
     }
 
-    It 'writes the rows to CSV (-OutputPath too), and an HTML report with a groups and a memberships table' {
+    It 'writes the CSV a row per group as Export-EntraGroupMemberShip.ps1 does (-OutputPath too), or per member, and an HTML report with a groups and a memberships table' {
         $csv = Join-Path $TestDrive 'groups.csv'
         $html = Join-Path $TestDrive 'groups.html'
         $null = & $script:capture { Get-AACEntraGroupMembership -GroupName 'grp-finance', 'grp-empty' -OutputPath $csv -HtmlPath $html }
+        $groupRows = @(Import-Csv -LiteralPath $csv)
+        (Get-Content -LiteralPath $csv -TotalCount 1) | Should -Be '"GroupName","GroupSource","GroupType","Members","NestedGroupMembers"'
+        @($groupRows | ForEach-Object { "$($_.GroupName)|$($_.Members)" }) | Should -Be @('grp-empty|(No members)', 'grp-finance|Ada Lovelace, Gus Guest, grp-finance-emea (Group)')
+        $null = & $script:capture { Get-AACEntraGroupMembership -GroupName 'grp-finance', 'grp-empty' -CsvPath $csv -CsvLayout Member }
         $rows = @(Import-Csv -LiteralPath $csv)
         $rows.Count | Should -Be 7
         $rows[0].PSObject.Properties.Name | Should -Contain 'Via'
+        $null = & $script:capture { Get-AACEntraGroupMembership -GroupName 'grp-finance', 'grp-empty' -OutputPath $csv -HtmlPath $html }
         $model = [regex]::Match((Get-Content -LiteralPath $html -Raw), '<script id="aac-data" type="application/json">(.*?)</script>', 'Singleline').Groups[1].Value | ConvertFrom-Json
         @($model.tables.id) | Should -Be @('groups', 'members')
         @(($model.tables | Where-Object id -EQ 'members').rows).Count | Should -Be 7
