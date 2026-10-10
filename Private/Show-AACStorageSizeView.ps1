@@ -91,7 +91,7 @@ function Show-AACStorageSizeView {
             if ($bytes -le 0) { continue }
             $slices[$tierLabel[$name]] = $bytes
             $colors[$tierLabel[$name]] = $tierColor[$name]
-            "[$($tierColor[$name])]$($glyph.Bullet)[/] $($tierLabel[$name]) [bold]$(& $size $bytes)[/] [grey58]$('{0:P0}' -f ($bytes / $stats.Bytes))[/]"
+            "[$($tierColor[$name])]$($glyph.Bullet)[/] $($tierLabel[$name]) [bold]$(& $size $bytes)[/] [grey58]$('{0:N0}%' -f ($bytes / $stats.Bytes * 100))[/]"
         }
         Show-AACBreakdownChart -Data $slices -Color $colors -Title 'Size by access tier' -Width 100 -HideTags
         Write-AACMarkup ($legend -join '   ')
@@ -160,7 +160,7 @@ function Show-AACStorageSizeView {
                     $main = & $dominant $row
                     $flags = @(
                         if ($row.BlobCount -eq 0) { '[grey50]empty[/]' }
-                        else { "[grey58]$(& $blobCount $row.BlobCount) $($glyph.Dot) [/][$($tierColor[$main.Tier])]$($tierLabel[$main.Tier]) $('{0:P0}' -f $main.Share)[/]" }
+                        else { "[grey58]$(& $blobCount $row.BlobCount) $($glyph.Dot) [/][$($tierColor[$main.Tier])]$($tierLabel[$main.Tier]) $('{0:N0}%' -f ($main.Share * 100))[/]" }
                         if ($row.LastModified) { "[grey50]$($glyph.Dot) changed $(& $escape (& $when $row.LastModified))[/]" }
                         if ($row.PublicAccess -and $row.PublicAccess -ne 'None') { "[orange1]$($glyph.Dot) public ($(& $escape $row.PublicAccess))[/]" }
                         if ($row.Status -eq 'Partial') { "[orange1]$($glyph.Dot) partial: $(& $escape (($row.Error -split ':')[0]))[/]" }

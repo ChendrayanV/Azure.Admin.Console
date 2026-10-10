@@ -151,7 +151,7 @@ function ConvertTo-AACCostAnomaly {
             default { "Open Cost analysis for $($Series.Subscription) on $span, filtered to this $DimensionLabel and grouped by resource, and check the changes made then (Get-AACChangeHistory): a scale-out, a new SKU, a runaway job or logs ingestion. Set a budget alert on it." }
         }
         $anomalies.Add((New-AACFinding -TypeName 'AAC.CostAnomaly' -Severity $severity -Category $Kind -Finding $text -Resource $Series.Name -ResourceType $DimensionLabel -Subscription $Series.Subscription `
-                    -Detail ("Robust z-score {0:N1}; {1:P0} of the subscription's average month" -f $Score, $share) -Impact ('{0}{1:N2} {2} ({3})' -f $(if ($impact -ge 0) { '+' } else { '' }), $impact, $Series.Currency, $(if ($Expected) { '{0:+0%;-0%}' -f ($impact / $Expected) } else { 'new' })) `
+                    -Detail ("Robust z-score {0:N1}; {1:N0}% of the subscription's average month" -f $Score, ($share * 100)) -Impact ('{0}{1:N2} {2} ({3})' -f $(if ($impact -ge 0) { '+' } else { '' }), $impact, $Series.Currency, $(if ($Expected) { '{0:+0%;-0%}' -f ($impact / $Expected) } else { 'new' })) `
                     -Remediation $remedy -Effort 'Low' -Link 'https://portal.azure.com/#view/Microsoft_Azure_CostManagement/Menu/~/costanalysis' -Property ([ordered]@{
                         Kind = $Kind; Dimension = $DimensionLabel; Name = $Series.Name; Start = $From; End = $To; Days = [int]($To - $From).TotalDays + 1
                         Actual = & $round $Actual; Expected = & $round $Expected; CostImpact = & $round $impact; ImpactPercent = $(if ($Expected) { & $round ($impact / $Expected * 100) } else { $null })
@@ -251,7 +251,7 @@ function ConvertTo-AACCostAnomaly {
         if ($complete -and $lastMonth -gt 0 -and $forecast -ge 1.2 * $lastMonth -and ($forecast - $lastMonth) -ge $MinimumImpact) {
             $s = @{ SubscriptionId = $id; Subscription = $bySubscription[$id].Name; Name = $bySubscription[$id].Name; Currency = $bySubscription[$id].Currency }
             $share = ($forecast - $lastMonth) / $monthlyOf[$id]
-            $anomalies.Add((New-AACFinding -TypeName 'AAC.CostAnomaly' -Severity $(if ($share -ge 0.5) { 'High' } else { 'Medium' }) -Category 'Forecast' -Finding ("{0}: on track for {1:N2} {2} this month - {3:P0} more than last month ({4:N2})" -f $s.Name, $forecast, $s.Currency, (($forecast - $lastMonth) / $lastMonth), $lastMonth) `
+            $anomalies.Add((New-AACFinding -TypeName 'AAC.CostAnomaly' -Severity $(if ($share -ge 0.5) { 'High' } else { 'Medium' }) -Category 'Forecast' -Finding ("{0}: on track for {1:N2} {2} this month - {3:N0}% more than last month ({4:N2})" -f $s.Name, $forecast, $s.Currency, (($forecast - $lastMonth) / $lastMonth * 100), $lastMonth) `
                         -Resource $s.Name -ResourceType 'subscription' -Subscription $s.Subscription -Detail ('{0:N2} so far; the last 7 days'' median day for each of the {1} day(s) left' -f $mtd, ($daysInMonth - $lastDay.Day)) `
                         -Impact ('+{0:N2} {1} by month end' -f ($forecast - $lastMonth), $s.Currency) -Remediation 'Find the services behind the rise (the anomalies above, or Cost analysis grouped by service), and set a budget with a forecast alert on the subscription.' -Effort 'Low' `
                         -Link 'https://learn.microsoft.com/azure/cost-management-billing/costs/tutorial-acm-create-budgets' -Property ([ordered]@{

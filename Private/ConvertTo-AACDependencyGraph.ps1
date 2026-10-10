@@ -210,7 +210,7 @@ function ConvertTo-AACDependencyGraph {
         if (-not $target) { continue }
         $to = if ($hostTo.Contains($target)) { $hostTo[$target] } else { $match = @($hostTo.Keys | Where-Object { $target.EndsWith($_) -or $_.EndsWith($target) } | Select-Object -First 1); if ($match.Count) { $hostTo[$match[0]] } else { & $nodeFor '' $target } }
         $calls = [long](& $get $t 'Calls'); $failed = [long](& $get $t 'Failed')
-        & $link $from $to 'calls' ('{0:N0} call(s), {1:P0} failed ({2})' -f $calls, $(if ($calls) { $failed / $calls } else { 0 }), (& $get $t 'DependencyType'))
+        & $link $from $to 'calls' ('{0:N0} call(s), {1:N0}% failed ({2})' -f $calls, $(if ($calls) { $failed / $calls * 100 } else { 0 }), (& $get $t 'DependencyType'))
     }
 
     # --- Analysis -------------------------------------------------------------------------------------------------
