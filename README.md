@@ -8,7 +8,7 @@ Azure admin reports and checks from PowerShell, over plain REST. No Az or
 Microsoft.Graph modules, and no app registration.
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=odHW8du6dUk">
+  <a href="https://youtu.be/bI-_g2D0urk">
     <img src="https://img.youtube.com/vi/odHW8du6dUk/maxresdefault.jpg" alt="Azure.Admin.Console video walkthrough" width="500">
   </a>
 </p>
