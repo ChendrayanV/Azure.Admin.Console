@@ -69,7 +69,7 @@ function Show-AACVirtualNetworkView {
     [Spectre.Console.AnsiConsole]::WriteLine()
 
     if (-not $vnets.Count) {
-        Show-AACPanel -Content '[bold]No virtual networks[/] [grey58]were found in this scope.[/]' -BorderColor 'grey50' -AllowMarkup
+        Show-AACCallout Info -Message '[bold]No virtual networks[/] [grey58]were found in this scope.[/]'
         return
     }
     Show-AACTileRow -Tile @(

@@ -47,6 +47,7 @@ function Write-AACHtmlReport {
                     and Note above its tables. The tab shown is in the URL
                     (#tab=Name); a tile or chart that filters a table opens
                     its tab. Printed, every tab is.
+          -OverviewTab  the first tab's name ('Overview' unless given).
           -Tree     @{ Title; OpenTo = 's'; Root = node } a collapsible,
                     searchable hierarchy above the tables. Node: @{ l = 't'|
                     'm'|'s'|'g'|'r'|'d' (tenant, management group,
@@ -89,7 +90,9 @@ function Write-AACHtmlReport {
 
         [System.Collections.IDictionary] $Tree,
 
-        [object[]] $Tab = @()
+        [object[]] $Tab = @(),
+
+        [string] $OverviewTab
     )
 
     $fullPath = $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
@@ -157,6 +160,7 @@ function Write-AACHtmlReport {
         tables        = @($tables)
     }
     if ($Tab.Count) { $model['tabs'] = @(foreach ($item in $Tab) { & $camel $item }) }
+    if ($OverviewTab) { $model['overviewTab'] = $OverviewTab }
     if ($Tree) {
         $model['tree'] = [ordered]@{ title = $Tree.Title; openTo = $(if ($Tree.Contains('OpenTo')) { $Tree.OpenTo } else { 's' }); root = $Tree.Root }
     }

@@ -179,6 +179,24 @@ Update-TypeData -TypeName 'AAC.VirtualNetworkPrivateEndpoint' -DefaultDisplayPro
 Update-TypeData -TypeName 'AAC.ApplicationSecurityGroupUse' -DefaultDisplayPropertySet 'Asg', 'Nics', 'Rules', 'VirtualNetworks', 'ResourceGroup' -Force
 Update-TypeData -TypeName 'AAC.SubscriptionCost' -DefaultDisplayPropertySet 'SubscriptionName', 'Currency', 'MonthToDate', 'Total', 'TopServices', 'Status' -Force
 
+# Show-AACDashboard: the status and headline first.
+Update-TypeData -TypeName 'AAC.Dashboard' -DefaultDisplayPropertySet 'Status', 'Headline', 'Resources', 'Regions', 'AdvisorHigh', 'Health' -Force
+Update-TypeData -TypeName 'AAC.DashboardChange' -DefaultDisplayPropertySet 'Time', 'Change', 'Resource', 'ResourceGroup', 'ChangedBy' -Force
+Update-TypeData -TypeName 'AAC.DashboardServiceEvent' -DefaultDisplayPropertySet 'Type', 'Title', 'TrackingId', 'Started', 'Subscription' -Force
+Update-TypeData -TypeName 'AAC.DashboardUnhealthyResource' -DefaultDisplayPropertySet 'Resource', 'State', 'Summary', 'ResourceGroup' -Force
+
+# The expert commands (issue 10): what matters first at the prompt.
+Update-TypeData -TypeName 'AAC.CostAnomaly' -DefaultDisplayPropertySet 'Severity', 'Kind', 'Name', 'Subscription', 'Start', 'CostImpact', 'Currency' -Force
+Update-TypeData -TypeName 'AAC.AttackPath' -DefaultDisplayPropertySet 'Severity', 'Category', 'Resource', 'BlastRadius', 'Path' -Force
+Update-TypeData -TypeName 'AAC.AccessAssignment' -DefaultDisplayPropertySet 'Severity', 'Principal', 'PrincipalType', 'Role', 'Scope', 'Assignment', 'Recommendation' -Force
+Update-TypeData -TypeName 'AAC.ChangeRecord' -DefaultDisplayPropertySet 'Time', 'Severity', 'Category', 'Resource', 'Caller', 'Status', 'Detail' -Force
+Update-TypeData -TypeName 'AAC.HealthCheck' -DefaultDisplayPropertySet 'Status', 'Tier', 'Category', 'Check', 'Detail' -Force
+Update-TypeData -TypeName 'AAC.ComplianceGap' -DefaultDisplayPropertySet 'Severity', 'Phase', 'Framework', 'ControlId', 'FailingResources', 'Effort' -Force
+Update-TypeData -TypeName 'AAC.FailoverReadiness' -DefaultDisplayPropertySet 'Severity', 'Resource', 'Protection', 'Confidence', 'Rpo', 'Finding' -Force
+Update-TypeData -TypeName 'AAC.DependencyNode' -DefaultDisplayPropertySet 'Resource', 'Type', 'BlastRadius', 'Dependents', 'Redundant', 'SinglePointOfFailure' -Force
+Update-TypeData -TypeName 'AAC.ResourceUtilization' -DefaultDisplayPropertySet 'Category', 'Resource', 'Kind', 'CpuP95', 'MemoryP95', 'Trend', 'SuggestedSize', 'EstimatedSaving' -Force
+Update-TypeData -TypeName 'AAC.ConfigurationDrift' -DefaultDisplayPropertySet 'Severity', 'Resource', 'Category', 'Property', 'Detail', 'Origin', 'Strategy' -Force
+
 $publicFunctionNames = Get-ChildItem -LiteralPath (Join-Path -Path $moduleRoot -ChildPath 'Public') -Filter '*.ps1' -File -ErrorAction SilentlyContinue |
     Select-Object -ExpandProperty BaseName
 

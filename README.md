@@ -169,6 +169,21 @@ Every command works the same way:
 - **Progress:** every command shows the same progress display: the title,
   then one line per step with a bar, a percentage and the elapsed time, each
   finishing with what it did.
+- **Status:** every command shows a state the same way, as a symbol, a
+  colour and a word, so nothing depends on colour alone:
+
+  | State       | Symbol | Colour | Used for                                        |
+  | ----------- | ------ | ------ | ----------------------------------------------- |
+  | Success     | ✓ (+)  | green  | done, verified, healthy, nothing to fix         |
+  | Warning     | ⚠ (!)  | orange | partly read, degraded, needs attention          |
+  | Failed      | ✗ (x)  | red    | failed, blocked, unavailable                    |
+  | In progress | ↻ (~)  | blue   | running, ready to apply                         |
+  | Info        | ℹ (i)  | grey   | nothing found, notes                            |
+
+  Outcomes that matter (verified, blocked, no changes, nothing found, what
+  couldn't be read) are callouts: a rounded panel in the state's colour,
+  headed by its symbol. Notices are status lines. The symbols in brackets
+  are what a console that isn't UTF-8 (code page 437 or 850) shows instead.
 
 **Nothing is cut off.** Console views wrap long text - reasons,
 recommendations, messages - rather than truncating it, and list every
@@ -222,6 +237,18 @@ bookmarks are how you jump to the one you want.
 | [`Get-AACEntraGroupMembership`](docs/Get-AACEntraGroupMembership.md)                             | Entra ID groups and everyone in them - direct and through nested groups - one row per group and member, with type, source, guests and disabled accounts. A console view with each group's members as a tree, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                                                                                                                                                  |
 | [`Show-AACResourceMap`](docs/Show-AACResourceMap.md)                                             | A map of one or more resource groups, opened in your browser: the resources with their Azure icons, in subscription, resource group, VNet and subnet boxes, with their connections, dependencies and network paths. Saves as PNG or JPEG.                                                                                                                                                                                                                                                                                                                                                                                                         |
 | [`Show-AACCost`](docs/Show-AACCost.md)                                                           | Subscription costs: month to date by subscription and by service, and a monthly trend, as charts and a table.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| [`Show-AACDashboard`](docs/Show-AACDashboard.md)                                                 | A one-screen dashboard: one status at the top (healthy, needs attention, action needed), the session, subscriptions, resources by region, Resource Health, active Azure Service Health events, Advisor and the latest resource changes - from one Resource Graph batch. `-Select` picks the subscriptions from a list.                                                                                                                                                                                                                                                                                                                           |
+| [`Show-AACJson`](docs/Show-AACJson.md)                                                           | JSON - or any object, as JSON - indented and syntax-coloured in a panel: ARM templates, REST responses, resources, this module's objects.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| [`Get-AACCostAnomaly`](docs/Get-AACCostAnomaly.md)                                               | Spend anomalies before the invoice: spikes, drops, new spend, level shifts and steady rises by service, resource group, region or meter (robust median/MAD statistics), the resources behind each, a month-end forecast and a subscription benchmark.                                                                                                                                                                                                                                                                                                                                                                                             |
+| [`Get-AACAttackPath`](docs/Get-AACAttackPath.md)                                                 | Attack paths from the Internet, through managed identities, to what an attacker could control or read - with blast radius, risk and the fix; plus Defender for Clouds own paths.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| [`Get-AACAccessReview`](docs/Get-AACAccessReview.md)                                             | A least-privilege access review of Azure RBAC (permanent, PIM-activated, eligible), classic admins, Entra ID roles and Graph application permissions - unused, standing, guest, orphaned and over-broad access, with an attestation CSV.                                                                                                                                                                                                                                                                                                                                                                                                          |
+| [`Get-AACChangeHistory`](docs/Get-AACChangeHistory.md)                                           | Who changed what, when and from where - properties before and after, how to undo it, and the alerts and health events that followed - a timeline for incidents and change control.                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| [`Invoke-AACHealthCheck`](docs/Invoke-AACHealthCheck.md)                                         | Endpoints (synthetic requests, latency, TLS expiry), databases, Service Bus queues, Resource Health, Service Health and alerts - by tier, with an SLA report and a live -Watch board.                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| [`Get-AACComplianceGap`](docs/Get-AACComplianceGap.md)                                           | Compliance gaps per framework (CIS, PCI-DSS, HIPAA, SOC 2, GDPR, ISO 27001, NIST, MCSB) from Defender and Azure Policy, prioritised by risk and effort as a roadmap, with progress against a baseline.                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| [`Get-AACFailoverReadiness`](docs/Get-AACFailoverReadiness.md)                                   | Disaster recovery readiness: backups (fresh, succeeding, restore-tested), Site Recovery (health, RPO, test failover), vault settings and recovery plan runbooks, with a confidence score.                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| [`Get-AACDependencyGraph`](docs/Get-AACDependencyGraph.md)                                       | Which resources depend on which (network, pools, Front Door, plans, private endpoints, identities, Application Insights calls): blast radius, single points of failure, cycles and critical services; Graphviz export.                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| [`Get-AACResourceUtilization`](docs/Get-AACResourceUtilization.md)                               | Idle, under-used, hot and right-sized resources from their actual CPU, memory and activity, with trends, VM right-sizing priced from Azure retail prices, and an unused-cost chargeback.                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| [`Get-AACConfigurationDrift`](docs/Get-AACConfigurationDrift.md)                                 | Configuration drift against a saved baseline, desired-state rules (or a built-in security baseline) or Terraform - who changed it, the strategy to fix it, and the trend over time.                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | [`Invoke-AACPSRule`](docs/Invoke-AACPSRule.md)                                                   | PSRule for Azure, the module's own naming and tag rules and your custom rules on the live estate: include or exclude rules by name or wildcard, with a baseline or settings. Runs of only the module's rules read just names, types and tags.                                                                                                                                                                                                                                                                                                                                                                                                     |
 | [`Invoke-AACVirtualNetworkAssessment`](docs/Invoke-AACVirtualNetworkAssessment.md)               | Virtual networks assessed: address space with total, used and available IPs and the free CIDR ranges; every subnet (capacity, NSG, routes, NAT gateway, outbound path, endpoints, delegations); peerings; NSGs and ASGs; DNS, DDoS, encryption, flow logs, gateways, firewalls and Bastion - with findings by severity. A console view, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                       |
 | [`Invoke-AACLogAnalyticsWorkspaceAssessment`](docs/Invoke-AACLogAnalyticsWorkspaceAssessment.md) | A Log Analytics workspace assessed: billable and not billable tables with their size, plan and retention; every workspace setting; recommendations (Azure Advisor's and its own: cost, reliability, security); data collection rules; and the Workspace Insights views - Overview, Usage, Health, Agents, Query Audit, Data Collection Rules, Change Log. Read-only. A console view, an object, and CSV and interactive HTML reports.                                                                                                                                                                                                             |
@@ -404,6 +431,110 @@ row per rule, with the base policy and attached firewalls on every row. The
 PDF groups rules by policy, rule collection group and collection, with the
 same colours.
 
+## Dashboard
+
+`Show-AACDashboard` puts the state of your estate on one screen, from one
+Azure Resource Graph batch:
+
+```powershell
+Show-AACDashboard                                # every subscription you can see
+Show-AACDashboard -Select -Hours 72              # tick the subscriptions in a list; changes of the last 3 days
+(Show-AACDashboard -NoDisplay).Status            # Success, Warning or Failed - for a script or a pipeline
+```
+
+```text
+── Azure Admin Console :: Dashboard ─────────────────────────────────────────
+admin@contoso.com · tenant ... · Scope: all subscriptions · 9 Oct 2026 10:42
+
+✗ Action needed  1 resource(s) unavailable; 1 active Azure service issue(s)
+
+╭─ Session ─────────────────────────────╮ ╭─ Resource Health ──────────────╮
+│ Account   admin@contoso.com           │ │ ✓ Available    1,204           │
+│ Tenant    ...                         │ │ ✗ Unavailable  1               │
+│ Token     ✓ valid until 11:37         │ │ ⚠ Degraded     2               │
+╰───────────────────────────────────────╯ ╰────────────────────────────────╯
+```
+
+Then the subscriptions and their state, resources by region, the active
+Azure Service Health events (service issues, planned maintenance,
+advisories, once each however many subscriptions they touch), the unhealthy
+resources, Advisor recommendations by category and impact, and the latest
+resource changes: what was created, updated or deleted, where and by whom.
+
+The status at the top is **Action needed** when resources are unavailable or
+a service issue is active; **Needs attention** when resources are degraded,
+Advisor has High-impact recommendations, maintenance or an advisory is
+active, or something couldn't be read; and **Healthy** otherwise. Anything
+the account can't read is listed at the end, and the rest is still shown.
+`-Select` asks at the console (arrow keys, space, Enter); in a script, use
+`-SubscriptionId`.
+
+`Show-AACJson` shows JSON, or any object as JSON, indented and coloured
+(names, strings, numbers, booleans and null each in their own colour):
+
+```powershell
+Get-Content .\azuredeploy.json -Raw | Show-AACJson -Title 'ARM template'
+Invoke-RestMethod -Uri $uri -Headers $headers | Show-AACJson -Title 'Response'
+```
+
+## Cost, security, operations, compliance and resilience
+
+Ten commands for the questions platform, security, operations, FinOps and
+compliance teams ask every day. They all work the same way: scope with
+`-SubscriptionId`, `-ManagementGroupId` (and most with `-ResourceGroupName`),
+a console view, objects with `-NoDisplay`, and `-CsvPath`, `-HtmlPath` and
+`-PdfPath` reports. Every finding has a severity, what was found, its impact,
+what to do and how much effort it is. All are read-only.
+
+```powershell
+Get-AACCostAnomaly -By ServiceName -Sensitivity High            # FinOps: spend anomalies, the resources behind them
+Get-AACAttackPath -Severity Critical, High                      # security: Internet > identity > control or data
+Get-AACAccessReview -PrivilegedOnly -CsvPath .\AccessReview.csv # security and audit: least privilege, attestation
+Get-AACChangeHistory -ResourceGroupName rg-app -Hours 6         # incidents: what changed, who, what followed
+Invoke-AACHealthCheck -Discover -Count 5                        # operations: endpoints, queues, platform, SLA
+Get-AACComplianceGap -Framework PCI-DSS, ISO27001               # compliance: gaps as a roadmap
+Get-AACFailoverReadiness -RpoMinutes 15                         # BCDR: can we recover, and how sure are we
+Get-AACDependencyGraph -IncludeTelemetry -DotPath .\deps.dot    # architecture: blast radius, single points of failure
+Get-AACResourceUtilization -IncludeCost                         # FinOps: idle, under-used, right-sizing, chargeback
+Get-AACConfigurationDrift -UseDefaultRules -BaselinePath .\baseline.json   # IaC: drift, who did it, the trend
+```
+
+| Command | Reads | Needs |
+| --- | --- | --- |
+| `Get-AACCostAnomaly` | Cost Management daily cost per subscription (3 at a time), then per resource for the largest anomalies | Cost Management Reader |
+| `Get-AACAttackPath` | Resource Graph: public IPs, NICs, NSG rules, VMs, apps, AKS, data stores, identities, role assignments; Defender attack paths | Reader (Defender CSPM for its paths) |
+| `Get-AACAccessReview` | Resource Graph RBAC; per subscription PIM, classic admins and the Activity Log; Microsoft Graph principals, sign-ins, Entra roles and Graph app permissions | Reader; Graph Directory.Read.All, RoleManagement.Read.Directory, Application.Read.All, AuditLog.Read.All |
+| `Get-AACChangeHistory` | The Activity Log; Resource Graph resource changes, alerts and Resource Health | Reader |
+| `Invoke-AACHealthCheck` | HTTP and TCP probes from where it runs (no credentials sent); Resource Graph; Service Bus queues | Reader (none with `-SkipAzure`) |
+| `Get-AACComplianceGap` | Defender regulatory compliance; Azure Policy regulatory initiatives; resources nothing evaluates | Reader, Security Reader |
+| `Get-AACFailoverReadiness` | Resource Graph: VMs, vaults, backup items, restore jobs; Site Recovery items, recovery plans and their runbooks | Reader |
+| `Get-AACDependencyGraph` | Resource Graph relationships and role assignments; Application Insights dependencies (`-IncludeTelemetry`) | Reader (Log Analytics Reader for telemetry) |
+| `Get-AACResourceUtilization` | Azure Monitor metrics, hourly; VM sizes; the public Azure Retail Prices API; cost (`-IncludeCost`) | Reader / Monitoring Reader (Cost Management Reader) |
+| `Get-AACConfigurationDrift` | Resource Graph configuration and its 14-day change history; a baseline, rules or a Terraform plan JSON | Reader |
+
+`Get-AACAccessReview` gives every assignment a recommendation (Remove, Make
+eligible (PIM), Narrow the scope or role, Review usage, Use a group or Keep)
+and an **Action**: what to do, in so many words, for the kind of principal.
+People are told to make standing privileged access just-in-time in PIM.
+Service principals and managed identities with elevated access are flagged
+just as hard - a leaked secret or a compromised workload uses that access with
+no MFA - but PIM needs a person to activate a role, so they are never told to
+use it. Instead: replace Owner with Contributor at the resource groups they
+deploy to, or with Role Based Access Control Administrator under a condition
+if they must assign roles; use a managed identity or federated credential
+rather than a client secret. Write access an application hasn't used is
+"Review usage" (check its sign-in logs first), not "Remove": a monthly job or a
+disaster-recovery pipeline can be quiet for weeks. Roles with data-plane access
+(blobs, secrets, messages) are never called unused, because the Activity Log
+doesn't record that use.
+
+What they don't do, by design: change anything (no remediation, failover or
+"bulk fix" - the fixes are yours to apply, ideally through infrastructure as
+code), or claim more than Azure records - "ML" anomaly detection is robust
+statistics, attack paths show where to look rather than proof of compromise,
+failover readiness checks the runbooks a recovery plan runs without running
+them, and audit certificates aren't in Azure (see the Service Trust Portal).
+
 ## Resources and costs
 
 `Show-AACResource` counts every resource you can see with two Resource Graph
@@ -474,8 +605,9 @@ table).
 `Invoke-AACAssessment` assesses a whole Azure environment in one run - the
 module's take on [Azure Resource Inventory (ARI)](https://github.com/microsoft/ARI):
 an inventory of every resource type with the settings that matter for it, the
-organization, Advisor and retirements, Defender for Cloud, Azure Policy,
-outages, quotas and cost - as CSV files, an interactive HTML report, a PDF and
+organization, Advisor and retirements, Defender for Cloud, Azure Policy
+compliance and inventory, PSRule for Azure, one list of recommendations,
+outages, quotas and cost - as CSV files, a tabbed HTML workbook, a PDF and
 interactive diagrams. Read-only, Resource Graph and REST only: no Az modules,
 no Excel.
 
@@ -485,6 +617,8 @@ Invoke-AACAssessment                                                    # everyt
 Invoke-AACAssessment -TenantId 'contoso.onmicrosoft.com' -SecurityCenter -IncludeTag -IncludeCost
 Invoke-AACAssessment -ManagementGroupId 'mg-landingzones' -ReportDir C:\Reports -Output Html, Diagram
 Invoke-AACAssessment -SubscriptionId $sub -TagKey 'Environment' -TagValue 'Production' -Category Compute, Networking
+Invoke-AACAssessment -SubscriptionId $sub -PSRule -PSRuleBaseline 'Azure.Pillar.Security'   # PSRule for Azure too
+(Invoke-AACAssessment -Output Csv -NoDisplay).Sheets['Resource recommendations'] | Where-Object Severity -In 'Critical', 'High'
 (Invoke-AACAssessment -Output Csv -NoDisplay).Sheets['Virtual machines'] | Where-Object 'Power state' -NE 'VM running'
 ```
 
@@ -499,6 +633,7 @@ where the reports are and how long each phase took:
 | Inventory  | A sheet per resource type present - about 95 types in 14 categories (`-Category` picks some): VMs, scale sets, disks, AKS and its node pools, container apps, SQL, Cosmos DB, PostgreSQL and MySQL, Redis, storage accounts, key vaults, virtual networks, subnets, peerings, NSG rules, firewalls, gateways, private endpoints, App Services, Log Analytics, Recovery Services and backup items, Arc servers, AI services and more - each with the settings that matter for it, as Resource Graph projections (only the types present are read) |
 | Azure APIs | Per subscription: the Advisor score, reservation recommendations, the last 6 months' outages (Resource Health service issues), compute quotas (`-QuotaUsage`) and VM sizes' vCPUs and memory (unless `-SkipVMDetail`); `-SkipApi` skips them                                                                                                                                                                                                                                                                                                     |
 | Cost       | Each resource's actual cost, this month and last (`-IncludeCost`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Governance | The policy assignments in force and every policy they apply (unless `-SkipPolicy`); PSRule for Azure's rules on the resources (`-PSRule`); then the governance sheets and one list of recommendations |
 | Reports    | The reports in `-Output` (all by default), then an upload to blob storage (`-StorageAccount`, `-StorageContainer`)                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 Every inventory sheet adds, after its own columns, the resource's **Retirement**
@@ -510,11 +645,24 @@ recommendations, Advisor score, Retirements, Security recommendations, Secure
 score, Policy compliance, Outages, Quotas, Support tickets and Reservation
 recommendations.
 
+**Governance.** Every run also reads the policy assignments in force and adds:
+
+| Sheet                        | What's in it                                                                                                                                                                                         |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Compliance by initiative     | Each assignment: its policies by status, and the compliance of its resource states                                                                                                                   |
+| Compliance by resource group | Each resource group's resources: non-compliant with any policy, compliant or exempt                                                                                                                  |
+| Compliance by standard       | The controls of the initiatives that map their policies to a standard (CIS, NIST, ISO 27001, the Microsoft cloud security benchmark ...), with the policies behind each                              |
+| Non-compliant resources      | Each resource and the policy it fails: why, and how to fix it (a remediation task, a configuration change or an attestation), with a docs link                                                       |
+| Policy assignments           | Every assignment in force on the scope, inherited ones too: definition, enforcement, policies, resource types, compliance                                                                           |
+| Policies                     | Every policy in force, per assignment: effect, resource types, controls, and status (Failed, Passed, Manual review, Exempt, Not evaluated, Disabled)                                                 |
+| PSRule rules, PSRule results | With `-PSRule` (and `-PSRuleBaseline`): each PSRule for Azure rule run on the resources (checked, passed, failed, its documentation), and each failure with its reason. Needs `PSRule.Rules.Azure` |
+| Resource recommendations     | Everything to act on in one list, most severe first: Advisor, Defender, retirements, unattached and empty resources, policy non-compliance and PSRule, each with a category and what to do          |
+
 **The reports**, in `<-ReportDir>\<-ReportName>-<date>\`:
 
 | Report                     | What's in it                                                                                                                                                                                                                                                                                                                               |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `<name>.html`              | Tiles (each opening its table), charts (resources by category, location, subscription and type; Advisor; Defender), the tenant tree (management groups > subscriptions > resource groups), and every sheet as a collapsible table under its category, listed in the contents - searchable, filterable, groupable, each downloadable as CSV |
+| `<name>.html`              | A tabbed workbook. Executive summary: tiles (each opening its table), charts that filter the table behind them (policies by status, non-compliant resources by resource group, recommendations by severity and category, PSRule rules, resources by category, location, subscription and type, Advisor, Defender) and the tenant tree. Then Policy compliance, Policy inventory, PSRule results, Resource recommendations, Resources, Inventory, Advisor, Security, Health and Cost, each table with row details and a CSV download - searchable, filterable, groupable, each downloadable as CSV |
 | `csv\`                     | A CSV file per sheet                                                                                                                                                                                                                                                                                                                       |
 | `<name>.pdf`               | The summary, then each category with its sheets' key columns, bookmarked                                                                                                                                                                                                                                                                   |
 | `<name>-Network.html`      | An interactive network diagram: virtual networks and subnets, peerings, gateways and connections, firewalls, Bastion, load balancers, application gateways, private endpoints and DNS zones, with NSGs and route tables (rules and routes) on what they apply to. `-DiagramFullEnvironment` draws every resource and how they connect      |
@@ -945,7 +1093,7 @@ grp-finance  Security - Cloud - 3 direct - 3 users
 ```
 
 **One row per group and member** (`AAC.EntraGroupMember`), the same in the
-objects, CSV, HTML and PDF: the group (name, type - Microsoft 365, Security,
+objects, HTML, PDF and `-CsvLayout Member` CSV: the group (name, type - Microsoft 365, Security,
 Mail-enabled security, Distribution, dynamic, role-assignable - and whether
 it's cloud or synced from on-premises AD), the member (name, type - user,
 group, device, service principal, contact - user principal name, mail,
@@ -956,6 +1104,16 @@ group appears. A group met again on its own path (a loop) is listed but not
 followed twice. The console and reports also show each group's totals:
 direct members, nested groups, and unique users, guests and disabled
 accounts at every level.
+
+**The CSV** is one row per group by default - the same file
+[Export-EntraGroupMemberShip.ps1](https://www.powershellgallery.com/packages/Export-EntraGroupMemberShip)
+writes, with the same columns and labels: GroupName, GroupSource (Cloud or
+Windows Server AD), GroupType (`Security`, `Microsoft 365 / Dynamic`,
+`Mail-Enabled Security / Role-Assignable` ...), Members (the direct members,
+groups marked `(Group)`, or `(No members)`) and NestedGroupMembers (each
+nested group's own members: `grp-finance-emea: Grace Hopper, Ada Lovelace`).
+A group whose members can't be read is left out of it, with a warning.
+`-CsvLayout Member` writes the one-row-per-member rows instead.
 
 **Sign-in.** It uses your `Connect-AAC` sign-in - no second prompt: a
 Microsoft Graph token is taken from it silently, the way Application
@@ -1769,7 +1927,7 @@ everything on this side for real:
 | `Connect-AAC`                                                                     | The browser (`Start-Process`) and the token endpoint (`Invoke-RestMethod`)                                                                                                                                                                                                          | The PKCE code, the localhost listener receiving the redirect, state (CSRF) validation, the token exchange and the stored session; app-only sign-in: a client secret, a certificate's signed client assertion (checked with its public key), a managed identity endpoint, and a new token when one runs out                                                                                                                                                                                                                                          |
 | `Invoke-AACPolicyAssessment`                                                      | Resource Graph and Resource Manager, with a made-up Contoso tenant                                                                                                                                                                                                                  | The queries (tenant-wide discovery, worst-state compliance, by-ID chunks), compliance overall and by subscription, management group, assignment, policy and category, thresholds, every finding, identities and roles, exemption expiry, Platform and Application audiences, management group and subscription scopes, excluded scopes, the tree, the built-in definitions Resource Graph lacks read from Resource Manager, the reports and the view                                                                                                |
 | `Invoke-AACAksAssessment`                                                         | Resource Graph, the PSRule exporter and engine, Resource Manager and AKS run command, with made-up Contoso clusters                                                                                                                                                                 | Workloads inferred from pod names, system namespaces, effects and DoNotEnforce, the roll-ups and the 500-record cap, cluster policy states and assignments, version support (supported, LTS, out of support) and upgrades, every Well-Architected check on a well-run and a neglected cluster, subnet capacity, the other lenses as findings, settings, Gatekeeper through run command (Entra ID token, no Gatekeeper, failures), scope and names, PSRule options, the reports and the view                                                         |
-| `Invoke-AACAssessment`                                                            | Resource Graph, Resource Manager and Cost Management, with a made-up Contoso tenant                                                                                                                                                                                                 | The catalog (every sheet, column spec and key column) and its queries, resource group and tag filters, every sheet by label, VM sizes and subnet IPs filled in afterwards, retirements, Advisor, cost and tags on each row, the overview sheets, Advisor, Defender, Policy, outages across subscriptions, quotas, reservations, the tenant tree and organization diagram, scope and `-Category`, which Azure APIs are asked, a sheet that fails, the upload, Automation sign-in, the reports and the view                                           |
+| `Invoke-AACAssessment`                                                            | Resource Graph, Resource Manager and Cost Management, with a made-up Contoso tenant                                                                                                                                                                                                 | The catalog (every sheet, column spec and key column) and its queries, resource group and tag filters, every sheet by label, VM sizes and subnet IPs filled in afterwards, retirements, Advisor, cost and tags on each row, the overview sheets, Advisor, Defender, Policy, outages across subscriptions, quotas, reservations, the tenant tree and organization diagram, scope and `-Category`, which Azure APIs are asked, the governance sheets (policy status, controls, why a resource fails, PSRule, recommendations ranked) and `-PSRule`, a sheet that fails, the upload, Automation sign-in, the reports and the view                                           |
 | The transport (`Invoke-AACHttp`, `Invoke-AACArmParallel`, `Invoke-AACGraphBatch`) | The single HTTP send (`Send-AACHttpRequest`), or nothing (a local test server)                                                                                                                                                                                                      | Retries as Azure's retry headers ask (`Retry-After`, Cost Management's and Resource Graph's own), paging (`nextLink`, `$skipToken`), the throttle limit, Azure's error messages, failures allowed per query                                                                                                                                                                                                                                                                                                                                         |
 | `Get-AACAdvisorRecommendation`, `Get-AACFirewallRule`, `Show-AACResource`         | Resource Graph, with hand-built rows (through a shim that runs each batched query one by one)                                                                                                                                                                                       | Flattening, filters and search, output modes, CSV, PDF and HTML, and the console view                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `Get-AACInventory`                                                                | Resource Graph and Cost Management, with a made-up Contoso tenant                                                                                                                                                                                                                   | The tree and its rolled-up counts, secure scores, cost (management group scope and the per-subscription fallback, deleted resources, currencies), insights (the mix, what needs attention, subnets), the views and the exports                                                                                                                                                                                                                                                                                                                      |
@@ -1784,6 +1942,8 @@ everything on this side for real:
 | `Deploy-AACStorageAccount`                                                        | An in-memory fake of Azure: Resource Manager reads and writes, checkNameAvailability, checkPolicyRestrictions, the policy assignments, PSRule and blob uploads all go to one store, which answers as Azure does (false values left out, its own fields added, bodies taken as JSON) | Idempotency (the second run writes nothing), PATCH of only what changed, merged service updates, immutable properties and redundancy, the name, policy Deny and Modify, a failing PSRule rule blocking with its fix, `-UseSuggestedFix` - and, against the real PSRule for Azure rules, that every automatic fix makes its rule pass, drift and `-Prune` under a lock, role assignments found again or adopted, blob MD5, one-item lists sent as lists, a failure part-way and the re-run, AVM parameters files and unsupported settings, `-WhatIf` |
 | `Get-AACDiagnosticSetting`                                                        | Resource Graph and the parallel ARM reads, with a made-up Contoso estate (storage services, activity logs, a deleted workspace)                                                                                                                                                     | Which types have logs, every status and its reason, category groups, every misconfiguration, `-ExpectedWorkspace`, the flattened settings, the filters, how many calls are made, the view and the CSV, HTML and PDF reports                                                                                                                                                                                                                                                                                                                         |
 | `Get-AACEntraGroupMembership`                                                     | Microsoft Graph (`Send-AACHttpRequest`), with made-up groups                                                                                                                                                                                                                        | Name filters and OData quoting, paging, nested groups and loops, a group that can't be read, the Connect-AAC Graph token, the view and the exports                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Cost anomalies, attack paths, access review, change history, health check, compliance gaps, failover readiness, dependency graph, utilization, drift | Made-up Contoso data per command (`Tests/Fixtures/Contoso*.ps1`), with Resource Graph, Resource Manager, Cost Management, Microsoft Graph, Log Analytics, the probes and the prices faked | Each command's rules and numbers (anomalies and forecasts, NSG evaluation and blast radius, RBAC findings and attestation, change grouping and incidents, probes and SLA, control mapping and baseline progress, recovery scores and runbooks, graph analysis and cycles, metrics classification and right-sizing, snapshot diff and rules), its queries, the view in any code page and the reports |
+| `Show-AACDashboard`, `Show-AACJson`                                                | Resource Graph (`Invoke-AACGraphBatch`), with a made-up estate                                                                                                                                                                                                                      | The status (Failed, Warning, Healthy) and its headline, health counts, service events once per tracking ID, Advisor by category, changes, what couldn't be read, `-SubscriptionId` and `-Select` (and no console to ask), the view in any code page; JSON colouring and escaping, objects, JSON text, arrays and invalid JSON; the status vocabulary and callouts in Unicode and ASCII |
 | `Show-AACCost`                                                                    | Cost Management (`Invoke-AACCostBatch`, through a shim)                                                                                                                                                                                                                             | Month and service totals, failed subscriptions, the charts, PDF and HTML; also the query's paging                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `Invoke-AACPSRule`                                                                | The engine (`Invoke-AACPSRuleEngine`)                                                                                                                                                                                                                                               | Output modes, `-FailedOnly`, settings passed on, CSV and HTML; what is read for the rules asked for; `-Rule` checks; the view listing every resource                                                                                                                                                                                                                                                                                                                                                                                                |
 | PSRule for Azure data (`Get-AACRuleData`)                                         | Azure Resource Manager (`Invoke-AACArmRequest`, `Invoke-AACArmParallel`)                                                                                                                                                                                                            | The Export-AzRuleData shape, child settings, 403/404 handling, masked shared keys, type filters in the query, `-NoExpand`                                                                                                                                                                                                                                                                                                                                                                                                                           |
@@ -1834,8 +1994,8 @@ It then checks the staged copy: the manifest is valid, the exports match
 2. Commit, then push a tag that matches the version:
 
    ```powershell
-   git tag -a v0.14.1 -m "Azure.Admin.Console v0.14.1"
-   git push origin v0.14.1
+   git tag -a v0.14.2 -m "Azure.Admin.Console v0.14.2"
+   git push origin v0.14.2
    ```
 
 Only a version tag publishes. Pushes and pull requests run CI only.

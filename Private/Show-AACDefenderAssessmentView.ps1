@@ -42,7 +42,7 @@ function Show-AACDefenderAssessmentView {
     if ($Scope) { foreach ($key in $Scope.Keys) { $facts.Add("$(& $escape $key): $(& $escape $Scope[$key])") } }
     $facts.Add((Get-Date).ToString('d MMM yyyy HH:mm'))
     Write-AACMarkup "[grey58]$($facts -join " $($glyph.Dot) ")[/]"
-    foreach ($line in @($Assessment.Notices)) { Write-AACMarkup "[orange1]$(& $escape $line)[/]" }
+    foreach ($line in @($Assessment.Notices)) { Write-AACStatusLine Warning $line }
     [Spectre.Console.AnsiConsole]::WriteLine()
 
     Show-AACTileRow -Tile @(

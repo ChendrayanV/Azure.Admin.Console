@@ -74,6 +74,25 @@ function Get-AACAssessmentExtraQuery {
                     "| join kind=leftouter (policyresources | where type =~ 'microsoft.authorization/policysetdefinitions' | project setId = tolower(id), policySet = tostring(properties.displayName)) on setId"
                     "| extend id = strcat(assignmentId, '|', definitionId) | project-away assignmentId1, definitionId1, setId1"
                 ) -join ' '
+                # Each resource once - non-compliant with any policy, else compliant - per resource group.
+                $queries['policyByGroup'] = @(
+                    "policyresources | where type =~ 'microsoft.policyinsights/policystates'$stateGroups"
+                    '| extend state = tostring(properties.complianceState), resourceId = tolower(tostring(properties.resourceId)), resourceGroup = tolower(tostring(properties.resourceGroup))'
+                    "| summarize nc = countif(state =~ 'NonCompliant'), c = countif(state =~ 'Compliant'), ex = countif(state =~ 'Exempt') by resourceId, subscriptionId, resourceGroup"
+                    '| summarize resources = count(), nonCompliant = countif(nc > 0), compliant = countif(nc == 0 and c > 0), exempt = countif(nc == 0 and c == 0 and ex > 0), nonCompliantStates = sum(nc) by subscriptionId, resourceGroup'
+                    "| extend id = strcat(subscriptionId, '|', resourceGroup)"
+                ) -join ' '
+                # Each non-compliant resource and the policy it fails, with why (capped).
+                $queries['policyResources'] = @(
+                    "policyresources | where type =~ 'microsoft.policyinsights/policystates'$stateGroups | where tostring(properties.complianceState) =~ 'NonCompliant'"
+                    '| extend resourceId = tolower(tostring(properties.resourceId)), assignmentId = tolower(tostring(properties.policyAssignmentId)), definitionId = tolower(tostring(properties.policyDefinitionId)), setId = tolower(tostring(properties.policySetDefinitionId)), effect = tostring(properties.policyDefinitionAction), resourceType = tostring(properties.resourceType), resourceGroup = tostring(properties.resourceGroup), reasonCode = tostring(properties.complianceReasonCode), groups = strcat_array(properties.policyDefinitionGroupNames, '', ''), evaluated = tostring(properties.timestamp)'
+                    '| summarize evaluated = max(evaluated), effect = take_any(effect), reasonCode = take_any(reasonCode), setId = take_any(setId), groups = take_any(groups) by resourceId, assignmentId, definitionId, subscriptionId, resourceGroup, resourceType'
+                    '| take 5000'
+                    "| join kind=leftouter (policyresources | where type =~ 'microsoft.authorization/policyassignments' | project assignmentId = tolower(id), assignment = tostring(properties.displayName)) on assignmentId"
+                    "| join kind=leftouter (policyresources | where type =~ 'microsoft.authorization/policydefinitions' | project definitionId = tolower(id), policy = tostring(properties.displayName), description = tostring(properties.description)) on definitionId"
+                    "| join kind=leftouter (policyresources | where type =~ 'microsoft.authorization/policysetdefinitions' | project setId = tolower(id), policySet = tostring(properties.displayName)) on setId"
+                    "| extend id = strcat(resourceId, '|', assignmentId, '|', definitionId) | project-away assignmentId1, definitionId1, setId1"
+                ) -join ' '
             }
             $queries['supportTickets'] = "supportresources | where type =~ 'microsoft.support/supporttickets' | project id, subscriptionId, ticketId = tostring(properties.supportTicketId), ticketTitle = tostring(properties['title']), service = tostring(properties.serviceDisplayName), severity = tostring(properties.severity), status = tostring(properties.status), plan = tostring(properties.supportPlanType), created = tostring(properties.createdDate), modified = tostring(properties.modifiedDate)"
         }

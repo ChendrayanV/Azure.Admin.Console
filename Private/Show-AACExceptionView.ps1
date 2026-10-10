@@ -55,7 +55,7 @@ function Show-AACExceptionView {
     [Spectre.Console.AnsiConsole]::WriteLine()
 
     if ($Exception.Count -eq 0) {
-        Show-AACPanel -Content '[bold green3]No exceptions[/] [grey58]in this time range and with these filters.[/]' -BorderColor 'green3' -AllowMarkup
+        Show-AACCallout Success -Message '[bold green3]No exceptions[/] [grey58]in this time range and with these filters.[/]'
         return
     }
 

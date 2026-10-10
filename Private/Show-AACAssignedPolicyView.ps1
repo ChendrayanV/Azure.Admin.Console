@@ -60,7 +60,7 @@ function Show-AACAssignedPolicyView {
     [Spectre.Console.AnsiConsole]::WriteLine()
 
     if (-not $assignments.Count) {
-        Show-AACPanel -Content '[bold]No policy assignments[/] [grey58]were found in this scope.[/]' -BorderColor 'grey50' -AllowMarkup
+        Show-AACCallout Info -Message '[bold]No policy assignments[/] [grey58]were found in this scope.[/]'
         return
     }
 

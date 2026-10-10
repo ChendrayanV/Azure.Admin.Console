@@ -114,8 +114,11 @@ Describe 'Azure Admin Console - assessment catalog and queries' {
 
     It 'reads the estate, Advisor (retirements only with -SkipAdvisor), Defender, Policy and the diagram' {
         $estate = & $script:inModule { Get-AACAssessmentExtraQuery -Stage Estate -SecurityCenter }
-        @($estate.Keys) | Should -Be @('types', 'resources', 'groups', 'advisor', 'security', 'secureScores', 'policy', 'supportTickets')
+        @($estate.Keys) | Should -Be @('types', 'resources', 'groups', 'advisor', 'security', 'secureScores', 'policy', 'policyByGroup', 'policyResources', 'supportTickets')
         $estate.policy | Should -BeLike '*| summarize nonCompliant = countif(*| extend id = strcat(assignmentId, *'
+        $estate.policyByGroup | Should -BeLike '*by resourceId, subscriptionId, resourceGroup | summarize resources = count(), nonCompliant = countif(nc > 0)*| extend id = *'
+        $estate.policyResources | Should -BeLike "*complianceState) =~ 'NonCompliant'*reasonCode = tostring(properties.complianceReasonCode)*| take 5000*description = tostring(properties.description)*"
+        @((& $script:inModule { Get-AACAssessmentExtraQuery -Stage Estate -SkipPolicy }).Keys) | Should -Not -Contain 'policyResources'
         (& $script:inModule { Get-AACAssessmentExtraQuery -Stage Estate -SkipAdvisor -SkipPolicy }).advisor | Should -BeLike "*| where subCategory == 'ServiceUpgradeAndRetirement' |*"
         @((& $script:inModule { Get-AACAssessmentExtraQuery -Stage Estate -SkipPolicy }).Keys) | Should -Not -Contain 'policy'
         (& $script:inModule { Get-AACAssessmentExtraQuery -Stage Scope }).managementGroups.Tenant | Should -BeTrue
@@ -224,6 +227,105 @@ Describe 'Azure Admin Console - the assessment' {
     }
 }
 
+Describe 'Azure Admin Console - the assessment''s governance sheets' {
+    BeforeAll {
+        $sub = '22222222-2222-2222-2222-222222222222'
+        $rid = { param([string] $Type, [string] $Name) "/subscriptions/$sub/resourceGroups/rg-app/providers/$Type/$Name" }
+        $set = '/providers/microsoft.authorization/policysetdefinitions/cis'
+        $asg = '/subscriptions/22222222-2222-2222-2222-222222222222/providers/microsoft.authorization/policyassignments/cis'
+        $state = { param([string] $Definition, [string] $Effect, [int] $Bad, [int] $Good, [int] $Other = 0) @{ assignmentId = $asg; assignmentName = 'cis'; assignment = 'CIS benchmark'; assignmentScope = "/subscriptions/$sub"; definitionId = "/providers/microsoft.authorization/policydefinitions/$Definition"; policy = $Definition; setId = $set; policySet = 'CIS Microsoft Azure Foundations Benchmark'; effect = $Effect; nonCompliant = $Bad; compliant = $Good; exempt = 0; other = $Other; subscriptions = 1 } }
+        $member = { param([string] $Definition, [string] $Effect, [string] $Groups) [pscustomobject]@{ AssignmentId = $asg; AssignmentDisplayName = 'CIS benchmark'; PolicyId = "/providers/microsoft.authorization/policydefinitions/$Definition"; ReferenceId = $Definition; PolicyDisplayName = $Definition; PolicySetDisplayName = 'CIS Microsoft Azure Foundations Benchmark'; Effect = $Effect; Category = 'Storage'; PolicyType = 'BuiltIn'; ResourceType = 'Microsoft.Storage/storageAccounts'; Groups = $Groups; ScopeType = 'Subscription'; ScopeName = 'sub-app' } }
+        $script:input = @{
+            Policy           = @((& $state 'https' 'audit' 2 3), (& $state 'tls' 'audit' 0 5), (& $state 'mfa-attest' 'manual' 0 0 1))
+            AssignedPolicy   = @{
+                Assignments = @([pscustomobject]@{ AssignmentId = $asg; AssignmentDisplayName = 'CIS benchmark'; DefinitionDisplayName = 'CIS Microsoft Azure Foundations Benchmark'; DefinitionType = 'PolicySet'; EnforcementMode = 'Default'; ScopeType = 'Subscription'; ScopeName = 'sub-app'; Inherited = $false; Members = 4; Category = 'Regulatory Compliance'; PolicyType = 'BuiltIn'; ResourceType = ''; NotScopes = '' })
+                # One per parameter: https comes twice.
+                Members     = @((& $member 'https' 'Audit' 'CIS_3.1'), (& $member 'https' 'Audit' 'CIS_3.1'), (& $member 'tls' 'Audit' 'CIS_3.1, CIS_3.15'), (& $member 'mfa-attest' 'Manual' 'CIS_1.1'), (& $member 'old' 'Disabled' 'CIS_9.9'), (& $member 'unseen' 'Audit' ''))
+            }
+            PolicyResource   = @(@{ resourceId = (& $rid 'Microsoft.Storage/storageAccounts' 'stapp').ToLowerInvariant(); subscriptionId = $sub; resourceGroup = 'rg-app'; resourceType = 'Microsoft.Storage/storageAccounts'; assignmentId = $asg; assignment = 'CIS benchmark'; definitionId = '/providers/microsoft.authorization/policydefinitions/https'; policy = 'Secure transfer to storage accounts should be enabled'; description = 'Use HTTPS only.'; effect = 'deployifnotexists'; reasonCode = 'Type:NotFound'; groups = 'CIS_3.1'; policySet = 'CIS Microsoft Azure Foundations Benchmark' })
+            PolicyByGroup    = @(@{ subscriptionId = $sub; resourceGroup = ''; resources = 2; nonCompliant = 0; compliant = 2; exempt = 0; nonCompliantStates = 0 })
+            PSRuleResult     = @(
+                [pscustomobject]@{ Outcome = 'Fail'; RuleName = 'Azure.Storage.SecureTransfer'; Title = 'Use secure transfer'; Pillar = 'Security'; Severity = 'Important'; ResourceName = 'stapp'; ResourceType = 'Microsoft.Storage/storageAccounts'; ResourceGroup = 'rg-app'; SubscriptionName = 'sub-app'; Reason = @('Secure transfer is off.'); Recommendation = 'Turn it on.'; Link = 'https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.Storage.SecureTransfer/'; ResourceId = (& $rid 'Microsoft.Storage/storageAccounts' 'stapp') }
+                [pscustomobject]@{ Outcome = 'Pass'; RuleName = 'Azure.Storage.SecureTransfer'; Title = 'Use secure transfer'; Pillar = 'Security'; Severity = 'Important'; ResourceName = 'stdata'; ResourceType = 'Microsoft.Storage/storageAccounts'; ResourceGroup = 'rg-app'; SubscriptionName = 'sub-app'; Reason = @(); Recommendation = 'Turn it on.'; Link = ''; ResourceId = (& $rid 'Microsoft.Storage/storageAccounts' 'stdata') }
+                [pscustomobject]@{ Outcome = 'Fail'; RuleName = 'Azure.VM.Standalone'; Title = 'Use availability zones'; Pillar = 'Reliability'; Severity = 'Critical'; ResourceName = 'vm1'; ResourceType = 'Microsoft.Compute/virtualMachines'; ResourceGroup = 'rg-app'; SubscriptionName = 'sub-app'; Reason = 'Not zonal.'; Recommendation = 'Deploy across zones.'; Link = ''; ResourceId = (& $rid 'Microsoft.Compute/virtualMachines' 'vm1') }
+            )
+            Sheet            = @(
+                @{ Sheet = 'Advisor recommendations'; Kind = 'Advisor'; Columns = @(); Rows = @([pscustomobject]@{ Impact = 'Medium'; Category = 'HighAvailability'; Problem = 'Use zones'; Solution = 'Zone it'; Resource = 'vm1'; 'Resource type' = 'microsoft.compute/virtualmachines'; Subscription = 'sub-app'; 'Resource group' = 'rg-app'; ResourceId = (& $rid 'Microsoft.Compute/virtualMachines' 'vm1') }) }
+                @{ Sheet = 'Retirements'; Kind = 'Advisor'; Columns = @(); Rows = @(
+                        [pscustomobject]@{ 'Retirement date' = '2026-11-01'; Retiring = 'Basic public IPs'; Resource = 'pip1'; 'Resource type' = ''; Subscription = 'sub-app'; 'Resource group' = 'rg-app'; 'What to do' = 'Upgrade to Standard'; ResourceId = (& $rid 'Microsoft.Network/publicIPAddresses' 'pip1') }
+                        [pscustomobject]@{ 'Retirement date' = '2028-09-30'; Retiring = 'Old API'; Resource = 'app1'; 'Resource type' = ''; Subscription = 'sub-app'; 'Resource group' = 'rg-app'; 'What to do' = 'Move on'; ResourceId = (& $rid 'Microsoft.Web/sites' 'app1') }
+                    ) }
+                @{ Sheet = 'Public IP addresses'; Kind = 'Inventory'; Category = 'Networking'; Columns = @('Name', 'Orphaned'); Rows = @([pscustomobject]@{ Name = 'pip2'; Orphaned = 'Yes'; ResourceId = (& $rid 'Microsoft.Network/publicIPAddresses' 'pip2') }, [pscustomobject]@{ Name = 'pip1'; Orphaned = 'No'; ResourceId = '' }) }
+                @{ Sheet = 'Resource groups'; Kind = 'Overview'; Columns = @('Empty'); Rows = @([pscustomobject]@{ 'Resource group' = 'rg-old'; Empty = 'Yes'; ResourceId = "/subscriptions/$sub/resourceGroups/rg-old" }) }
+            )
+        }
+        $script:governance = InModuleScope 'Azure.Admin.Console' -Parameters @{ I = $script:input } {
+            param($I)
+            ConvertTo-AACAssessmentGovernance -Sheet $I.Sheet -Policy $I.Policy -PolicyByGroup $I.PolicyByGroup -PolicyResource $I.PolicyResource -AssignedPolicy $I.AssignedPolicy `
+                -PSRuleResult $I.PSRuleResult -SubscriptionName @{ '22222222-2222-2222-2222-222222222222' = 'sub-app' } -PolicyRead -PSRuleRead -PolicyResourceLimit 1 -Now ([datetime]'2026-10-09T00:00:00Z')
+        }
+        $script:rowsOf = { param([string] $Name) @(@($script:governance.Sheets | Where-Object Sheet -EQ $Name)[0].Rows) }
+    }
+
+    It 'adds the policy, inventory, PSRule and recommendation sheets, each under its tab''s category' {
+        @($script:governance.Sheets | ForEach-Object { "$($_.Category): $($_.Sheet)" }) | Should -Be @(
+            'Policy: Compliance by initiative', 'Policy: Compliance by resource group', 'Policy: Non-compliant resources', 'Policy inventory: Policy assignments', 'Policy inventory: Policies'
+            'Policy: Compliance by standard', 'PSRule: PSRule rules', 'PSRule: PSRule results', 'Recommendations: Resource recommendations')
+    }
+
+    It 'gives every policy in force a status: Failed, Manual review, Passed, Not evaluated or Disabled - once per assignment' {
+        @(& $script:rowsOf 'Policies' | ForEach-Object { "$($_.Policy) $($_.Status) $($_.'Non-compliant')" }) | Should -Be @('https Failed 2', 'mfa-attest Manual review 0', 'unseen Not evaluated 0', 'tls Passed 0', 'old Disabled 0')
+        $initiative = (& $script:rowsOf 'Compliance by initiative')[0]
+        "$($initiative.Kind) $($initiative.Status) $($initiative.Policies) $($initiative.'Failed policies') $($initiative.'Compliance (%)')" | Should -Be 'Initiative Failed 3 1 80'
+        (& $script:rowsOf 'Policy assignments')[0].Inherited | Should -Be 'No'
+        (& $script:rowsOf 'Compliance by resource group')[0].'Resource group' | Should -Be '(the subscription)'
+    }
+
+    It 'maps the policies to the standard''s controls' {
+        @(& $script:rowsOf 'Compliance by standard' | ForEach-Object { "$($_.Control) $($_.Status) $($_.Policies) $($_.'Failing policies')" }) | Should -Be @('CIS_3.1 Failed 2 https', 'CIS_1.1 Manual review 1 ', 'CIS_3.15 Passed 1 ', 'CIS_9.9 Disabled 1 ')
+    }
+
+    It 'says why each resource fails, and how to fix it - and when the list was cut short' {
+        $row = (& $script:rowsOf 'Non-compliant resources')[0]
+        "$($row.Resource) | $($row.Effect) | $($row.Controls)" | Should -Be 'stapp | DeployIfNotExists | CIS_3.1'
+        $row.Reason | Should -Be 'The related resource or setting the policy deploys is missing, or not configured as it requires. Reason code: Type:NotFound. The policy: Use HTTPS only.'
+        $row.Remediation | Should -BeLike 'Create a remediation task*'
+        $row.Link | Should -BeLike '*/remediate-resources'
+        $script:governance.Notices | Should -BeLike '*stops at 1 resource-and-policy pairs*'
+    }
+
+    It 'counts each PSRule rule''s checks, and lists the failures with their reasons' {
+        $rule = & $script:rowsOf 'PSRule rules' | Where-Object Name -EQ 'Azure.Storage.SecureTransfer'
+        "$($rule.Status) $($rule.Checked) $($rule.Passed) $($rule.Failed) $($rule.'Pass (%)')" | Should -Be 'Failed 2 1 1 50'
+        @(& $script:rowsOf 'PSRule results').Count | Should -Be 2
+        (& $script:rowsOf 'PSRule results' | Where-Object Resource -EQ 'stapp').Reason | Should -Be 'Secure transfer is off.'
+        "$($script:governance.Stats.PSRuleRules) $($script:governance.Stats.PSRulePassed) $($script:governance.Stats.PSRuleFailed)" | Should -Be '2 1 2'
+    }
+
+    It 'puts every recommendation in one list, most severe first, with a category and what to do' {
+        @(& $script:rowsOf 'Resource recommendations' | ForEach-Object { "$($_.Severity)|$($_.Category)|$($_.Source)|$($_.Resource)" }) | Should -Be @(
+            'Critical|Reliability|PSRule for Azure|vm1'
+            'High|Reliability|Retirements|pip1'
+            'High|Security|PSRule for Azure|stapp'
+            'Medium|Governance|Azure Policy|stapp'
+            'Medium|Reliability|Azure Advisor|vm1'
+            'Low|Cost|Inventory|pip2'
+            'Low|Operational excellence|Inventory|rg-old'
+            'Low|Reliability|Retirements|app1'
+        )
+        $pip = & $script:rowsOf 'Resource recommendations' | Where-Object Resource -EQ 'pip2'
+        "$($pip.'Resource type') $($pip.'Resource group') $($pip.Subscription)" | Should -Be 'microsoft.network/publicipaddresses rg-app sub-app'
+        $script:governance.Stats.RecommendationsUrgent | Should -Be 3
+    }
+
+    It 'leaves out what wasn''t read' {
+        $none = InModuleScope 'Azure.Admin.Console' { ConvertTo-AACAssessmentGovernance }
+        @($none.Sheets.Sheet) | Should -Be @('Resource recommendations')
+        $none.Stats.PSRuleRules | Should -BeNullOrEmpty
+        @($none.Sheets[0].Rows).Count | Should -Be 0
+    }
+}
+
 Describe 'Azure Admin Console - the organization diagram' {
     It 'nests management groups and subscriptions as boxes, with resource groups as nodes' {
         $map = & $script:inModule { param($O) ConvertTo-AACOrganizationMap @O } @{ O = @{ ManagementGroup = $script:a.Organization.ManagementGroup; Subscription = $script:a.Organization.Subscription; ResourceGroup = $script:a.Organization.ResourceGroup; ResourceCount = $script:a.Organization.ResourceCount } }
@@ -321,6 +423,7 @@ Describe 'Azure Admin Console - Invoke-AACAssessment' {
                 $rows[$key] = @(switch ($key) {
                         'subscriptions' { $script:f.Subscriptions } 'managementGroups' { $script:f.ManagementGroups } 'types' { $script:f.Types } 'resources' { $script:f.Resources }
                         'groups' { $script:f.Groups } 'advisor' { $script:f.Advisor } 'security' { $script:f.Security } 'secureScores' { $script:f.SecureScores } 'policy' { $script:f.Policy }
+                        'policyByGroup' { $script:f.PolicyByGroup } 'policyResources' { $script:f.PolicyResources }
                         'supportTickets' { $script:f.SupportTickets } 'diagram' { $script:f.Diagram }
                         default { if ($script:queryRows.Contains($key)) { $script:queryRows[$key] } }
                     })
@@ -345,6 +448,7 @@ Describe 'Azure Admin Console - Invoke-AACAssessment' {
             $answers
         }
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Read-AACInventoryCost -MockWith { $script:f.Cost }
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Read-AACAssignedPolicyData -MockWith { $script:f.PolicyData }
         InModuleScope 'Azure.Admin.Console' { $script:AACSession = [pscustomobject]@{ Account = 'admin@contoso.com'; TenantId = 'tenant-1'; AccessToken = 'x'; ExpiresOn = (Get-Date).AddHours(1); RefreshToken = 'r'; ClientId = 'c'; Scope = @('s') } }
     }
     AfterEach { InModuleScope 'Azure.Admin.Console' { $script:AACSession = $null } }
@@ -362,10 +466,46 @@ Describe 'Azure Admin Console - Invoke-AACAssessment' {
         @($result.Sheets['Outages']).Count | Should -Be 1
         $html = Get-Content -LiteralPath (Join-Path $result.ReportFolder 'Contoso.html') -Raw
         $model = [regex]::Match($html, '<script id="aac-data" type="application/json">(.*?)</script>', 'Singleline').Groups[1].Value | ConvertFrom-Json
-        @($model.tables | ForEach-Object section | Select-Object -Unique) | Should -Be @('Overview', 'Compute', 'Networking', 'Security', 'Storage', 'Advisor', 'Security', 'Policy', 'Health', 'Cost' | Select-Object -Unique)
+        @($model.tables | ForEach-Object section | Select-Object -Unique) | Should -Be @('Resources', 'Inventory', 'Security', 'Advisor', 'Policy compliance', 'Health', 'Cost', 'Policy inventory', 'Resource recommendations')
+        $model.overviewTab | Should -Be 'Executive summary'
+        @($model.tabs.name)[0..3] | Should -Be @('Policy compliance', 'Policy inventory', 'PSRule results', 'Resource recommendations')
+        ($model.tables | Where-Object id -EQ 'virtual-machines').title | Should -Be 'Compute: Virtual machines' -Because 'the inventory''s categories share a tab'
+        $donut = $model.charts | Where-Object title -EQ 'Policies by compliance status'
+        "$($donut.kind) $($donut.table) $($donut.column)" | Should -Be 'donut policies Status'
+        @($donut.items | ForEach-Object { "$($_.label) $($_.value) $($_.tone)" }) | Should -Be @('Failed 1 bad')
+        ($model.charts | Where-Object title -EQ 'Non-compliant resources by resource group').items[0].label | Should -Be 'rg-app'
+        ($model.charts | Where-Object title -EQ 'Recommendations by severity').table | Should -Be 'resource-recommendations'
+        ($model.tiles | Where-Object { $_.label -like 'failed of*' }).filters.Status | Should -Be 'Failed'
+        (($model.tables | Where-Object id -EQ 'resource-recommendations').columns | Where-Object key -EQ 'Link').type | Should -Be 'link'
+        $policy = @($result.Sheets['Policies'])[0]
+        "$($policy.Policy) | $($policy.Status) | $($policy.Effect) | $($policy.'Non-compliant')" | Should -Be 'Allowed locations | Failed | Deny | 3'
+        @($result.Sheets['Policy assignments'])[0].Inherited | Should -Be 'Yes'
+        $failing = @($result.Sheets['Non-compliant resources'])[0]
+        "$($failing.Resource) | $($failing.Effect)" | Should -Be 'vm-web-1 | Deny'
+        $failing.Reason | Should -BeLike '*doesn''t match what the policy requires*Restrict the locations*'
+        $names | Should -Contain 'Resource recommendations.csv'
         ($model.tiles | Where-Object label -EQ 'resources without tags').table | Should -Be 'all-resources'
         $model.tree.root.n | Should -Be 'Tenant Root Group'
         @($script:graphCalls | Where-Object { $_.Keys -contains 'types' })[0].SubscriptionId.Count | Should -Be 0 -Because 'with no scope, every query covers everything the account can see'
+    }
+
+    It 'runs PSRule for Azure with -PSRule, on the resource groups asked for - and says when it isn''t installed' {
+        $script:engine = $null
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Get-Module -ParameterFilter { $Name -eq 'PSRule.Rules.Azure' } -MockWith { [pscustomobject]@{ Name = 'PSRule.Rules.Azure'; Version = [version]'1.40.0' } }
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACPSRuleEngine -MockWith {
+            $script:engine = @{ Baseline = $Baseline; SubscriptionId = @($SubscriptionId) }
+            $result = { param([string] $Group, [string] $Outcome) [pscustomobject]@{ Outcome = $Outcome; RuleName = 'Azure.VM.Standalone'; Title = 'Use availability zones'; Pillar = 'Reliability'; Severity = 'Critical'; ResourceName = "vm-$Group"; ResourceType = 'Microsoft.Compute/virtualMachines'; ResourceGroup = $Group; SubscriptionName = 'sub-landingzone-app'; Reason = 'Not zonal.'; Recommendation = 'Deploy across zones.'; Link = 'https://azure.github.io/PSRule.Rules.Azure/'; ResourceId = "/subscriptions/x/resourceGroups/$Group/providers/Microsoft.Compute/virtualMachines/vm-$Group" } }
+            @{ Results = @((& $result 'rg-app' 'Fail'), (& $result 'rg-app' 'Pass'), (& $result 'rg-other' 'Fail')) }
+        }
+        $result = (& $script:capture { Invoke-AACAssessment -ReportDir $TestDrive -Output Csv -PSRule -PSRuleBaseline 'Azure.Pillar.Reliability' -ResourceGroupName 'rg-app' -NoDisplay }).Output[0]
+        $script:engine.Baseline | Should -Be 'Azure.Pillar.Reliability'
+        $script:engine.SubscriptionId.Count | Should -Be 2
+        @($result.Sheets['PSRule results'].Resource) | Should -Be @('vm-rg-app')
+        (@($result.Sheets['Resource recommendations']) | Where-Object Source -EQ 'PSRule for Azure').Severity | Should -Be 'Critical'
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Get-Module -ParameterFilter { $Name -eq 'PSRule.Rules.Azure' } -MockWith { }
+        $without = (& $script:capture { Invoke-AACAssessment -ReportDir $TestDrive -Output Csv -PSRule -NoDisplay }).Output[0]
+        $without.Notices | Should -Contain 'PSRule for Azure is not installed, so its rules were not run: Install-PSResource PSRule.Rules.Azure -Scope CurrentUser'
+        $without.Sheets.Contains('PSRule results') | Should -BeFalse
     }
 
     It 'reads a sheet only for the resource types present, and only the categories asked for' {

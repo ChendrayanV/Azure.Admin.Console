@@ -160,7 +160,7 @@ function Show-AACTerraformPlanView {
     }
 
     if (-not $resources.Count -and -not $outputs.Count -and -not $drift.Count -and -not $Plan.Filtered) {
-        Show-AACPanel -Content '[bold green3]No changes.[/] [grey58]The infrastructure matches the configuration.[/]' -BorderColor 'green3' -AllowMarkup
+        Show-AACCallout Success -Message '[bold green3]No changes.[/] [grey58]The infrastructure matches the configuration.[/]'
         [Spectre.Console.AnsiConsole]::WriteLine()
     }
     Write-AACMarkup '[grey42]Add -PassThru (or pipe the command) for one row per resource, -ExpandAttribute for one per attribute; -CsvPath or -HtmlPath for a report. Sensitive values are never shown.[/]'

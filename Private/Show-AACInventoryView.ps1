@@ -312,7 +312,7 @@ function Show-AACInventoryView {
         Write-AACMarkup "[grey42]Cost: Cost Management's actual cost, month to date (MTD) and last month, in each subscription's billing currency - never converted. 'Deleted resources' are costs of resources no longer in Azure, and charges not tied to a resource.[/]"
     }
     if ($stats.EmptyGroups) {
-        Write-AACMarkup "[orange1]![/] [grey58]$($stats.EmptyGroups) resource group(s) have no resources.[/]"
+        Write-AACStatusLine Warning "$($stats.EmptyGroups) resource group(s) have no resources."
     }
     foreach ($notice in @($Inventory.Notice | Where-Object { $_ })) {
         Write-AACMarkup "[grey58]$(& $escape $notice)[/]"

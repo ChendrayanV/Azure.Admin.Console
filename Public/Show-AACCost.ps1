@@ -331,11 +331,11 @@ function Show-AACCost {
 
         $read = @($costs | Where-Object Status -eq 'OK')
         if ($read.Count -eq 0 -and @($costs | Where-Object Status -eq 'No cost').Count) {
-            Show-AACPanel -Content "[bold]Cost Management reports no cost[/] [grey58]for $(if ($costs.Count -eq 1) { 'this subscription' } else { 'these subscriptions' }) from $($monthStarts[0].ToString('MMM yyyy')) to today. Its usage may be billed to another subscription, be covered by credits, or not be processed yet.[/]" -BorderColor 'grey50' -AllowMarkup
+            Show-AACCallout Info -Message "[bold]Cost Management reports no cost[/] [grey58]for $(if ($costs.Count -eq 1) { 'this subscription' } else { 'these subscriptions' }) from $($monthStarts[0].ToString('MMM yyyy')) to today. Its usage may be billed to another subscription, be covered by credits, or not be processed yet.[/]"
             [Spectre.Console.AnsiConsole]::WriteLine()
         }
         elseif ($read.Count -eq 0) {
-            Show-AACPanel -Content '[bold]No costs could be read[/] [grey58]for these subscriptions - see the reasons below.[/]' -BorderColor 'grey50' -AllowMarkup
+            Show-AACCallout Warning -Message '[bold]No costs could be read[/] [grey58]for these subscriptions - see the reasons below.[/]'
         }
         $currencyGroups = @($read | Group-Object -Property Currency | Sort-Object -Property Count -Descending)
         foreach ($currencyGroup in $currencyGroups) {
@@ -363,7 +363,7 @@ function Show-AACCost {
             [Spectre.Console.AnsiConsole]::WriteLine()
 
             if ($periodTotal -eq 0) {
-                Show-AACPanel -Content "[bold]Cost Management reports no cost[/] [grey58]for $(if ($group.Count -eq 1) { 'this subscription' } else { 'these subscriptions' }) from $($monthStarts[0].ToString('MMM yyyy')) to today. Its usage may be billed to another subscription, be covered by credits, or not be processed yet.[/]" -BorderColor 'grey50' -AllowMarkup
+                Show-AACCallout Info -Message "[bold]Cost Management reports no cost[/] [grey58]for $(if ($group.Count -eq 1) { 'this subscription' } else { 'these subscriptions' }) from $($monthStarts[0].ToString('MMM yyyy')) to today. Its usage may be billed to another subscription, be covered by credits, or not be processed yet.[/]"
                 [Spectre.Console.AnsiConsole]::WriteLine()
                 continue
             }

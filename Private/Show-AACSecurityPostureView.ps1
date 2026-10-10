@@ -145,7 +145,7 @@ function Show-AACSecurityPostureView {
             [Spectre.Console.AnsiConsole]::WriteLine()
         }
         else {
-            Show-AACPanel -Content '[bold green3]No unhealthy recommendations[/] [grey58]in this scope.[/]' -BorderColor 'green3' -AllowMarkup
+            Show-AACCallout Success -Message '[bold green3]No unhealthy recommendations[/] [grey58]in this scope.[/]'
             [Spectre.Console.AnsiConsole]::WriteLine()
         }
     }

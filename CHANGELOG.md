@@ -2,10 +2,24 @@
 
 All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never published to the PowerShell Gallery.
 
-## Unreleased
+## v0.14.2
+
+The estate on one screen with `Show-AACDashboard`, ten commands for the questions cost, security, operations and compliance teams ask every day, and an access review that tells people and workloads apart.
 
 ### New
 
+- **Ten commands for cost, security, operations, compliance and resilience** ([#10](https://github.com/ChendrayanV/Azure.Admin.Console/issues/10)). All are read-only, take the usual scope, and give a console view, objects, CSV, HTML and PDF. Each finding has a severity, impact, remediation and effort.
+  - `Get-AACCostAnomaly`: spend spikes, drops, new spend, level shifts and steady rises per service, resource group, region or meter, found with robust statistics (a median/MAD baseline). Includes the resources behind the largest anomalies, a month-end forecast and how each subscription compares with the others. The issue's name, `Get-AACCostAnomalies`, was made singular because the build's analyzer rule rejects plural nouns.
+  - `Get-AACAttackPath`: paths from the Internet (NSG rules evaluated in priority order, public apps, AKS API servers, open data stores) through managed identities to control or data access, with blast radius and risk. Defender for Cloud's own attack paths are added when Defender CSPM provides them.
+  - `Get-AACAccessReview`: covers Azure RBAC (permanent, PIM-activated, eligible), classic admins, Entra ID roles and Microsoft Graph application permissions. It finds standing privileged access, guests, apps that can grant access or take over the tenant, disabled, dormant and deleted principals, unused write access (Activity Log), wildcard custom roles and too many Global Administrators. The attestation CSV has Decision and Reviewer columns. Every row has an Action - what to do, for the kind of principal. Just-in-time (PIM) is recommended only for users, guests and groups. Service principals and managed identities with elevated access are flagged as the risk they are, but PIM needs a person to activate a role: they are told how to narrow it (Role Based Access Control Administrator with a condition in place of Owner, resource groups in place of the subscription) and how to protect the credential, and access they haven't used is "Review usage" - check the sign-in logs first - not "Remove". Unused write access is judged only on what the Activity Log records, so roles with data-plane access (blobs, secrets, messages) are never called unused.
+  - `Get-AACChangeHistory`: one entry per operation, with caller, client IP, correlation ID and status. It shows the before and after of each property (Resource Graph changes), how to undo it, its risk and origin (manual, automation, Azure), and the alerts and health events that followed.
+  - `Invoke-AACHealthCheck`: endpoint probes for availability, latency and TLS expiry, with no Azure credential sent. Also database TCP checks, Service Bus backlog and dead letters, Resource Health, Service Health and fired alerts. Results come by tier, with an SLA report; `-Watch` gives a live board and `-SkipAzure` runs without signing in.
+  - `Get-AACComplianceGap`: CIS, PCI-DSS, HIPAA, SOC 2, GDPR, ISO 27001, NIST and MCSB, from Defender regulatory compliance and Azure Policy initiatives. It flags failing and manual controls, frameworks not assessed and resources nothing evaluates, with priority × effort as a roadmap and New/Open/Closed against a baseline CSV.
+  - `Get-AACFailoverReadiness`: each workload's backups (fresh, succeeding, restore-tested) and Site Recovery state (health, RPO, test failover, failover allowed). Also vault settings and recovery plan runbooks (they exist and are published), with a confidence score and RPO on track or at risk.
+  - `Get-AACDependencyGraph`: dependencies from networks, pools, Front Door, plans, private endpoints, identities and Application Insights telemetry. It reports blast radius, redundancy, single points of failure, cycles and critical services, with a Graphviz DOT export.
+  - `Get-AACResourceUtilization`: rates resources idle, under-used, hot or right sized from hourly Azure Monitor metrics (CPU, memory, activity), with the trend. Under-used VMs get a size suggestion priced from the public Azure Retail Prices API; `-IncludeCost` adds an unused-cost chargeback.
+  - `Get-AACConfigurationDrift`: drift against a saved snapshot baseline, desired-state rules (a file, or a built-in security baseline) or a Terraform plan's `resource_drift`. It shows who changed each setting (Resource Graph's change history), the strategy (Fix, Revert, Re-deploy, Update the baseline, Review) and the trend across runs.
+  - Shared plumbing: one finding shape, scope resolution, and one report model that drives the console view, the HTML and a generic PDF writer.
 - `Invoke-AACM365Assessment` reports Microsoft 365 tenant discovery and security posture from the Microsoft Graph REST API, with no AzureAD, MSOnline, AzureADPreview or Microsoft.Graph modules. Every call uses the one Graph token of the `Connect-AAC` sign-in; about 25 calls run in parallel, each followed through its pages.
   - **Entra ID:**
     - tenant details and directory sync
@@ -63,6 +77,36 @@ All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never pu
     Graph is read in batches, one after another, each with its own progress line: Entra ID tenant and policies; admin roles, MFA and users; sign-in and audit logs; applications; Microsoft 365; Intune; then the redirect URIs in DNS. Reads inside a batch run in parallel. The latest audit event and the latest Secure Score read one item, not every page of their history. Inside a batch, Microsoft Graph's app-role grants need its service principal first. Users are not all read: in a large tenant, every user with their last sign-in takes many minutes. Only the users the checks need are looked up: the principals of admin role assignments and the users Conditional Access excludes, by ID 15 at a time, plus break-glass-like names. If the last sign-in is refused, those lookups are read again without it.
   - **Permissions:** `-ListPermission` prints the read-only Graph permissions to sign in with, so one consent gives one token for everything. Graph reads it refuses are listed in a Permissions tab with the permission each needs, and the rest of the report is still made.
   - **Outputs:** a console view, an `AAC.M365Assessment` object, a CSV per table, and a tabbed HTML report (Overview, Findings, Entra ID, Microsoft 365, Intune, Permissions).
+
+- **`Invoke-AACAssessment` writes a tabbed governance workbook** ([#7](https://github.com/ChendrayanV/Azure.Admin.Console/issues/7)):
+  - **Executive summary** tab: tiles, charts and the tenant tree. A click on a chart filters the table behind it. Charts: policies by compliance status (Failed, Passed, Manual review, Exempt, Not evaluated), non-compliant resources by resource group, recommendations by severity and by category, PSRule rules by status, plus the resource charts.
+  - **Policy compliance** tab:
+    - compliance by initiative
+    - compliance by resource group (each resource counted once)
+    - compliance by standard: the controls of the initiatives that group their policies (CIS, NIST, ISO 27001, the Microsoft cloud security benchmark ...)
+    - every non-compliant resource with the policy it fails, why, and how to fix it (by effect: a remediation task, a configuration change or an attestation), with a docs link
+  - **Policy inventory** tab: the policy assignments in force (inherited ones too), and every policy they apply, with its effect, the resource types it targets, the controls it maps to and its status.
+  - **PSRule results** tab (new `-PSRule` switch, `-PSRuleBaseline`): each PSRule for Azure rule run on the resources in scope, with how many it checked, passed and failed and its documentation, and every failure with its reason.
+  - **Resource recommendations** tab: one list of everything to act on, most severe first. It merges Azure Advisor, Defender for Cloud, retirements (more severe as the date nears), unattached and empty resources, policy non-compliance and PSRule failures. Each item has a category (Cost, Security, Reliability, Operational excellence, Performance, Governance) and what to do.
+  - Then the Resources, Inventory (every resource type sheet), Advisor, Security, Health and Cost tabs. Every table still has row details, filters, grouping and CSV download, and the new sheets are also written as CSV and to the PDF.
+  - The policy assignment reader is shared with `Get-AACAssignedPolicy` (new private `Read-AACAssignedPolicyData`).
+- Reports can name their first tab (`Write-AACHtmlReport -OverviewTab`).
+- **A consistent console experience** ([#11](https://github.com/ChendrayanV/Azure.Admin.Console/issues/11)):
+  - **One status vocabulary** for every command. Each state has a symbol, a colour and a word: ✓ Success (green), ⚠ Warning (orange), ✗ Failed (red), ↻ In progress (blue) and ℹ Info (grey). Consoles that aren't UTF-8 get ASCII symbols instead (`+ ! x ~ i`).
+  - **Callouts:** outcomes and notices that matter are rounded panels in their state's colour, headed by its symbol. Examples: verified, blocked, no changes, nothing found, not read in full, connected. Notices are status lines. This covers every view's outcome panels, `Connect-AAC`, `Disconnect-AAC`, and the assessments' notices.
+  - **`Show-AACDashboard`** (new): one screen with the overall status, tiles, the session, subscriptions and their state, resources by region, Resource Health, active Azure Service Health events, Advisor by category and impact, and the latest resource changes (create, update, delete, by whom). Everything comes from one Resource Graph batch. `-Select` lets you tick subscriptions in a Spectre.Console list, `-Hours` sets the change window, and `-NoDisplay` returns an `AAC.Dashboard` object whose `Status` a script can act on.
+  - **`Show-AACJson`** (new): JSON or any object, indented and syntax-coloured in a panel, and paged.
+
+### Changed
+
+- `Get-AACEntraGroupMembership -CsvPath` (`-OutputPath`) writes the same CSV as Export-EntraGroupMemberShip.ps1: one row per group with GroupName, GroupSource (Cloud or Windows Server AD), GroupType (for example `Microsoft 365 / Dynamic`), Members (direct members, groups marked `(Group)`, or `(No members)`) and NestedGroupMembers (each nested group's own members). A group whose members can't be read is left out of the CSV, with a warning. **This changes the default CSV:** to get the previous one-row-per-member CSV, add `-CsvLayout Member`. The objects, HTML and PDF are unchanged.
+- The live progress display fits consoles narrower than 120 columns: the bar is shorter and long step descriptions end in "…", instead of squeezing the percentage and time columns until they wrap.
+
+### Fixed
+
+- `Invoke-AACM365Assessment`:
+  - The Coverage tab listed what Microsoft Graph doesn't reach as single characters.
+  - When Graph refused every read, the run carried on with an empty report instead of saying what to do: the groups and group members lookups counted as read when there was nothing to look up.
 
 ## v0.14.1
 

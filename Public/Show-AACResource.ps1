@@ -231,7 +231,7 @@ function Show-AACResource {
             [Spectre.Console.AnsiConsole]::WriteLine()
 
             if ($counts.Count -eq 0) {
-                Show-AACPanel -Content '[bold]No resources[/] [grey58]were found for this account and these filters.[/]' -BorderColor 'grey50' -AllowMarkup
+                Show-AACCallout Info -Message '[bold]No resources[/] [grey58]were found for this account and these filters.[/]'
             }
             else {
                 $totals = $data.Totals | Select-Object -First 1

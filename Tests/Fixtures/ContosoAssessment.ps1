@@ -90,6 +90,22 @@ function Get-AACContosoAssessment {
         Security = @(@{ id = 's1'; subscriptionId = $app; resourceGroup = 'rg-app'; resourceId = (& $id $app 'rg-app' 'Microsoft.Storage/storageAccounts' 'stcontosoapp').ToLowerInvariant(); recommendation = 'Storage accounts should restrict network access'; severity = 'High'; categories = 'Data'; remediation = 'Set the default action to Deny.'; since = '2026-08-01T00:00:00Z' })
         SecureScores = @(@{ id = 'sc1'; subscriptionId = $app; current = 31.5; max = 45 }, @{ id = 'sc2'; subscriptionId = $hub; current = 40; max = 45 })
         Policy = @(@{ id = 'p1'; assignmentId = '/providers/microsoft.management/managementgroups/contoso/providers/microsoft.authorization/policyassignments/allowed-locations'; assignmentName = 'allowed-locations'; assignment = 'Allowed locations'; assignmentScope = '/providers/Microsoft.Management/managementGroups/contoso'; definitionId = '/providers/microsoft.authorization/policydefinitions/e56962a6'; policy = 'Allowed locations'; setId = ''; policySet = ''; effect = 'deny'; nonCompliant = 3; compliant = 7; exempt = 0; other = 0; subscriptions = 2 })
+        # Compliance per resource group, each non-compliant resource, and the assignment behind them.
+        PolicyByGroup = @(
+            @{ id = "$app|rg-app"; subscriptionId = $app; resourceGroup = 'rg-app'; resources = 6; nonCompliant = 2; compliant = 4; exempt = 0; nonCompliantStates = 3 }
+            @{ id = "$hub|rg-hub"; subscriptionId = $hub; resourceGroup = 'rg-hub'; resources = 4; nonCompliant = 0; compliant = 4; exempt = 0; nonCompliantStates = 0 }
+        )
+        PolicyResources = @(
+            @{ id = 'r1'; resourceId = (& $id $app 'rg-app' 'Microsoft.Compute/virtualMachines' 'vm-web-1').ToLowerInvariant(); subscriptionId = $app; resourceGroup = 'rg-app'; resourceType = 'Microsoft.Compute/virtualMachines'; assignmentId = '/providers/microsoft.management/managementgroups/contoso/providers/microsoft.authorization/policyassignments/allowed-locations'; assignment = 'Allowed locations'; definitionId = '/providers/microsoft.authorization/policydefinitions/e56962a6'; policy = 'Allowed locations'; description = 'Restrict the locations resources can be deployed to.'; effect = 'deny'; reasonCode = ''; groups = ''; setId = ''; policySet = ''; evaluated = '2026-10-04T08:00:00Z' }
+        )
+        PolicyData = @{
+            Assignments       = @(@{ id = '/providers/Microsoft.Management/managementGroups/contoso/providers/Microsoft.Authorization/policyAssignments/allowed-locations'; name = 'allowed-locations'; displayName = 'Allowed locations'; scope = '/providers/Microsoft.Management/managementGroups/contoso'; definitionId = '/providers/Microsoft.Authorization/policyDefinitions/e56962a6'; parameters = @{}; enforcement = 'Default'; notScopes = @(); overrides = $null; description = '' })
+            Definitions       = @{ '/providers/microsoft.authorization/policydefinitions/e56962a6' = @{ Id = '/providers/Microsoft.Authorization/policyDefinitions/e56962a6'; Name = 'e56962a6'; Kind = 'Policy'; DisplayName = 'Allowed locations'; PolicyType = 'BuiltIn'; Category = 'General'; Description = 'Restrict the locations resources can be deployed to.'; Parameters = @{}; Rule = @{ if = @{ field = 'location'; notIn = @('westeurope') }; then = @{ effect = 'deny' } }; Members = @() } }
+            SubscriptionNames = @{ $hub = 'sub-connectivity'; $app = 'sub-landingzone-app' }
+            GroupNames        = @{ contoso = 'Tenant Root Group'; 'mg-platform' = 'Platform'; 'mg-landingzones' = 'Landing zones' }
+            SubscriptionChain = @{ $hub = @('contoso', 'mg-platform'); $app = @('contoso', 'mg-landingzones') }
+            GroupChain        = @{ contoso = @('contoso'); 'mg-platform' = @('contoso', 'mg-platform'); 'mg-landingzones' = @('contoso', 'mg-landingzones') }
+        }
         SupportTickets = @(@{ id = '/subscriptions/x/providers/Microsoft.Support/supportTickets/t1'; subscriptionId = $app; ticketId = '2410040010001234'; ticketTitle = 'VM cannot start'; service = 'Virtual Machine running Windows'; severity = 'Moderate'; status = 'Open'; plan = 'Unified'; created = '2026-10-01T09:00:00Z'; modified = '2026-10-02T09:00:00Z' })
         Arm = @{
             AdvisorScore = @{ $app = @(@{ name = 'Cost'; properties = @{ lastRefreshedScore = @{ date = '2026-10-03'; score = 62; impactedResourceCount = 3; potentialScoreIncrease = 12 } } }) }

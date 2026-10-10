@@ -108,7 +108,7 @@ function Show-AACStoragePlanView {
     $manual = @($Deployment.Fixes | Where-Object Kind -EQ 'Manual')
     if ($applied.Count) {
         $snippet = & $psd1 (Set-AACStorageConfigurationFix -Configuration ([ordered]@{}) -Fix $applied)
-        Show-AACPanel -Header 'Suggested fixes applied to this run' -Content "[grey70]The plan above uses these settings (-UseSuggestedFix) and was checked again. Put them in your configuration so the next run has them:[/]`n[white]$(& $escape $snippet)[/]" -BorderColor 'springgreen3' -AllowMarkup
+        Show-AACCallout Info -Title 'Suggested fixes applied to this run' -Message "[grey70]The plan above uses these settings (-UseSuggestedFix) and was checked again. Put them in your configuration so the next run has them:[/]`n[white]$(& $escape $snippet)[/]"
         [Spectre.Console.AnsiConsole]::WriteLine()
     }
     elseif ($automatic.Count -or $manual.Count) {
@@ -119,7 +119,7 @@ function Show-AACStoragePlanView {
         }
         foreach ($fix in $manual) { $lines.Add("[orange1]$($glyph.Bullet)[/] [bold]$(& $escape $fix.Rule)[/]: [grey70]$(& $escape $fix.Advice)[/]") }
         $lines.Add('[grey50]A rule that does not apply to this account can be excluded on purpose: -ExcludeRule <rule>.[/]')
-        Show-AACPanel -Header 'How to fix the failing PSRule rules' -Content ($lines -join "`n") -BorderColor 'orange1' -AllowMarkup
+        Show-AACCallout Warning -Title 'How to fix the failing PSRule rules' -Message ($lines -join "`n")
         [Spectre.Console.AnsiConsole]::WriteLine()
     }
 
@@ -128,8 +128,8 @@ function Show-AACStoragePlanView {
     $breaks = @($gates | Where-Object Outcome -EQ 'Breaks').Count
     $byPolicy = @($gates | Where-Object Outcome -EQ 'Changes').Count
     $summary = "Blocks $(@($gates | Where-Object Outcome -EQ 'Blocks').Count) $($glyph.Dot) breaks standards $breaks $($glyph.Dot) changed by policy $byPolicy $($glyph.Dot) $($Deployment.Writes) change(s) to apply"
-    if ($blocks) { Show-AACPanel -Content "[bold red1]Blocked[/] [grey70]- nothing will be written$(if ($breaks) { ': fix the failing PSRule rules (above), or exclude one that does not apply' }).[/]`n[grey58]$(& $escape $summary)[/]" -BorderColor 'red1' -AllowMarkup }
-    elseif (-not $Deployment.Writes) { Show-AACPanel -Content "[bold green3]No changes.[/] [grey70]The account matches the configuration.[/]`n[grey58]$(& $escape $summary)[/]" -BorderColor 'green3' -AllowMarkup }
-    else { Show-AACPanel -Content "[bold]Ready to apply.[/]`n[grey58]$(& $escape $summary)[/]" -BorderColor 'springgreen3' -AllowMarkup }
+    if ($blocks) { Show-AACCallout Failed -Message "[bold red1]Blocked[/] [grey70]- nothing will be written$(if ($breaks) { ': fix the failing PSRule rules (above), or exclude one that does not apply' }).[/]`n[grey58]$(& $escape $summary)[/]" }
+    elseif (-not $Deployment.Writes) { Show-AACCallout Success -Message "[bold green3]No changes.[/] [grey70]The account matches the configuration.[/]`n[grey58]$(& $escape $summary)[/]" }
+    else { Show-AACCallout InProgress -Title 'Ready to apply' -Message "[bold]Ready to apply.[/]`n[grey58]$(& $escape $summary)[/]" }
     [Spectre.Console.AnsiConsole]::WriteLine()
 }
