@@ -107,7 +107,7 @@ function ConvertTo-AACSecurityPosture {
             $target = @(@(& $value $row 'resources') | ForEach-Object { [string](& $value $_ 'AzureResourceId'); [string](& $value $_ 'azureResourceId') } | Where-Object { $_ }) | Select-Object -First 1
             if (-not (& $onResource $target)) { continue }
             $time = [datetime]::MinValue
-            $when = if ([datetime]::TryParse((& $text $row 'time'), [cultureinfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AdjustToUniversal, [ref]$time)) { $time } else { $null }
+            $when = if ([datetime]::TryParse((& $text $row 'generated'), [cultureinfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AdjustToUniversal, [ref]$time)) { $time } else { $null }
             $resource = if ($target) { ($target -split '/')[-1] } else { & $text $row 'entity' }
             [pscustomobject][ordered]@{
                 PSTypeName       = 'AAC.SecurityAlert'

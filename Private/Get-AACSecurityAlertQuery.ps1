@@ -29,10 +29,10 @@ function Get-AACSecurityAlertQuery {
     $where = @(
         if ($Status) { "| where status in~ ($(& $list $Status))" }
         if ($Severity) { "| where severity in~ ($(& $list $Severity))" }
-        if ($Days -gt 0) { "| where time > ago($($Days)d)" }
+        if ($Days -gt 0) { "| where generated > ago($($Days)d)" }
     ) -join ' '
-    $alerts = "securityresources | where type =~ 'microsoft.security/locations/alerts' | extend p = properties | extend status = tostring(coalesce(p.Status, p.status)), severity = tostring(coalesce(p.Severity, p.severity)), time = todatetime(coalesce(p.TimeGeneratedUtc, p.timeGeneratedUtc)) $where" +
-    ' | project id, alertName = name, subscriptionId, location, status, severity, time' +
+    $alerts = "securityresources | where type =~ 'microsoft.security/locations/alerts' | extend p = properties | extend status = tostring(coalesce(p.Status, p.status)), severity = tostring(coalesce(p.Severity, p.severity)), generated = todatetime(coalesce(p.TimeGeneratedUtc, p.timeGeneratedUtc)) $where" +
+    ' | project id, alertName = name, subscriptionId, location, status, severity, generated' +
     ', name = tostring(coalesce(p.AlertDisplayName, p.alertDisplayName)), alertType = tostring(coalesce(p.AlertType, p.alertType))' +
     ', intent = tostring(coalesce(p.Intent, p.intent)), techniques = coalesce(p.Techniques, p.techniques), subTechniques = coalesce(p.SubTechniques, p.subTechniques)' +
     ', start = tostring(coalesce(p.StartTimeUtc, p.startTimeUtc)), end = tostring(coalesce(p.EndTimeUtc, p.endTimeUtc))' +

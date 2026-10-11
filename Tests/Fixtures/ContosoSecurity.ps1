@@ -46,8 +46,8 @@ function Get-AACContosoSecurity {
             & $recommendation 'a-ddos' $vnet $connectivity 'Azure DDoS Protection Standard should be enabled' 'Medium' 'Networking'
         )
         Alerts                = @(
-            @{ id = 'alert-1'; subscriptionId = $corp; status = 'Active'; name = 'Suspicious login to a VM'; severity = 'High'; intent = 'InitialAccess'; alertType = 'VM_Login'; time = '2026-09-25T10:00:00Z'; description = 'A login from an unusual location.'; link = 'https://portal.azure.com/#blade/alert-1'; entity = 'vm-web-01'; resources = @(@{ AzureResourceId = $vm1; Type = 'AzureResource' }) }
-            @{ id = 'alert-2'; subscriptionId = $connectivity; status = 'Active'; name = 'Traffic from a known malicious IP'; severity = 'Medium'; intent = 'Probing'; alertType = 'Net_MaliciousIP'; time = '2026-09-27T08:00:00Z'; description = 'Inbound traffic from a known malicious address.'; link = 'https://portal.azure.com/#blade/alert-2'; entity = 'hub-gateway'; resources = @() }
+            @{ id = 'alert-1'; subscriptionId = $corp; status = 'Active'; name = 'Suspicious login to a VM'; severity = 'High'; intent = 'InitialAccess'; alertType = 'VM_Login'; generated = '2026-09-25T10:00:00Z'; description = 'A login from an unusual location.'; link = 'https://portal.azure.com/#blade/alert-1'; entity = 'vm-web-01'; resources = @(@{ AzureResourceId = $vm1; Type = 'AzureResource' }) }
+            @{ id = 'alert-2'; subscriptionId = $connectivity; status = 'Active'; name = 'Traffic from a known malicious IP'; severity = 'Medium'; intent = 'Probing'; alertType = 'Net_MaliciousIP'; generated = '2026-09-27T08:00:00Z'; description = 'Inbound traffic from a known malicious address.'; link = 'https://portal.azure.com/#blade/alert-2'; entity = 'hub-gateway'; resources = @() }
         )
         Plans                 = @(
             @{ subscriptionId = $corp; plan = 'VirtualMachines'; tier = 'Standard'; subPlan = 'P2' }

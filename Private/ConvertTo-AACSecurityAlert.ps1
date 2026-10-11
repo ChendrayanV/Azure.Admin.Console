@@ -123,7 +123,7 @@ function ConvertTo-AACSecurityAlert {
             $extended = [ordered]@{}
             $bag = & $get $row 'extended'
             if ($bag -is [System.Collections.IDictionary]) { foreach ($k in @($bag.Keys | Sort-Object)) { $extended[[string]$k] = [string]$bag[$k] } }
-            $when = & $date (& $text $row 'time')
+            $when = & $date (& $text $row 'generated')
             $status = & $text $row 'status'
             $compromised = & $text $row 'entity'
             $item = [pscustomobject][ordered]@{

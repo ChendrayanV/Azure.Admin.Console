@@ -253,7 +253,7 @@ function ConvertTo-AACDefenderAssessment {
             if (-not (& $inScope $sub)) { continue }
             $target = @(@(& $list (& $value $row 'resources')) | ForEach-Object { [string](& $get $_ 'azureResourceId') } | Where-Object { $_ }) | Select-Object -First 1
             $where = & $parse $target
-            $when = & $date (& $text $row 'time')
+            $when = & $date (& $text $row 'generated')
             $status = & $text $row 'status'
             $active = $status -in 'Active', 'InProgress'
             if ($active -and $target) { $alertResources[$target.ToLowerInvariant()] = 1 + [int]$alertResources[$target.ToLowerInvariant()] }

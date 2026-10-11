@@ -30,7 +30,7 @@ function Get-AACContosoAlert {
         param([string] $Sub, [string] $AlertName, [string] $Name, [string] $Severity, [string] $Status, [double] $Days, [string] $Target, [hashtable] $Extra = @{})
         $row = @{
             id = "/subscriptions/$Sub/resourceGroups/rg-app/providers/Microsoft.Security/locations/westeurope/alerts/$AlertName"; alertName = $AlertName; subscriptionId = $Sub; location = 'westeurope'
-            status = $Status; severity = $Severity; time = (& $ago $Days); name = $Name; alertType = "VM_$($Name -replace '\W', '')"; intent = 'Discovery'; techniques = @(); subTechniques = @()
+            status = $Status; severity = $Severity; generated = (& $ago $Days); name = $Name; alertType = "VM_$($Name -replace '\W', '')"; intent = 'Discovery'; techniques = @(); subTechniques = @()
             start = (& $ago $Days); end = (& $ago $Days); description = "<p>$Name detected.</p>"; remediation = @('Investigate.'); link = "https://portal.azure.com/#alert/$AlertName"; entity = ($Target -split '/')[-1]
             resources = @(if ($Target) { @{ AzureResourceId = $Target; Type = 'AzureResource' } }); entities = @(); extended = @{}; product = 'Microsoft Defender for Servers'; vendor = 'Microsoft'; isIncident = 'False'
         }

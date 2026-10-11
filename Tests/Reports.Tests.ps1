@@ -107,6 +107,11 @@ Describe 'Azure Admin Console - collapsible tables in the HTML reports' {
         Get-Content -LiteralPath $tabbed -Raw | Should -Match '"overviewTab":"Executive summary"'
     }
 
+    It 'hides what is hidden, whatever its class''s display - no empty tab bar over the tiles' {
+        $script:template | Should -Match '\[hidden\]\s*\{\s*display:\s*none\s*!important;?\s*\}'
+        $script:template | Should -Match '<nav class="tabbar"[^>]*\bhidden\b' -Because 'the tab bar starts hidden, and only tabbed reports show it'
+    }
+
     It 'is the page every command writes' {
         $html = Get-Content -LiteralPath $script:page -Raw
         $html | Should -Match "el\('section', 'tbl collapsed'\)"

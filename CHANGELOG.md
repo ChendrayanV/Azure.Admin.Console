@@ -12,6 +12,12 @@ All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never pu
   - **Each alert (`AAC.SecurityAlert`, a superset of the alerts in `Get-AACSecurityPosture`):** MITRE ATT&CK tactics and techniques, the resource's type and group (or the compromised entity), `Hosts`, `Accounts` and `IpAddresses` read from the alert's entities, extended properties as a dictionary, the description and remediation steps as plain text, age, incident, product, location, and `Occurrences` (how many alerts share its type and resource).
   - **Report:** tiles; charts by severity, MITRE tactic (in kill-chain order), resource, day and alert type; the alerts; and the recurring ones (three or more of a type on one resource), to fix at the source or tune with a suppression rule. Subscriptions with no Defender plan on are pointed out, because they raise no alerts. Console view, objects, CSV, HTML and PDF.
 
+### Fixed
+
+- The security alerts couldn't be read by `Get-AACSecurityPosture` or `Invoke-AACDefenderAssessment` (Resource Graph: "Query is invalid ... ParserFailure"). The alert queries named a column `time`, a KQL type keyword; it is now `generated`.
+- HTML reports drew an empty tab bar, a band with a line, across the top of the tiles in every report without tabs: the bar's `display: flex` overrode its `hidden` attribute. Hidden elements are now always hidden.
+- The console view stopped paging in hosts that replace `Console.Out` after start-up, such as VS Code's PowerShell extension. Paging is now skipped only when the output is redirected or captured.
+
 ## v0.14.2
 
 The estate on one screen with `Show-AACDashboard`, ten commands for the questions cost, security, operations and compliance teams ask every day, and an access review that tells people and workloads apart.

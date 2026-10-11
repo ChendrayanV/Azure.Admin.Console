@@ -97,11 +97,20 @@ Describe 'Azure Admin Console - security alert query' {
     It 'filters status, severity and age in Resource Graph, and reads the plans' {
         $q = InModuleScope 'Azure.Admin.Console' { Get-AACSecurityAlertQuery -Status Active, InProgress -Severity High -Days 7 }
         @($q.Keys) | Should -Be @('alerts', 'plans')
-        $q.alerts | Should -Match ([regex]::Escape("| where status in~ ('Active', 'InProgress') | where severity in~ ('High') | where time > ago(7d)"))
+        $q.alerts | Should -Match ([regex]::Escape("| where status in~ ('Active', 'InProgress') | where severity in~ ('High') | where generated > ago(7d)"))
         $q.alerts | Should -Match 'entities = coalesce\(p\.Entities, p\.entities\)'
         $q.plans | Should -Match 'microsoft.security/pricings'
         $all = InModuleScope 'Azure.Admin.Console' { Get-AACSecurityAlertQuery }
-        $all.alerts | Should -Not -Match 'where (status|severity|time) '
+        $all.alerts | Should -Not -Match 'where (status|severity|generated) '
+    }
+
+    It 'names no column after a KQL keyword (time is a type: Resource Graph fails with ParserFailure)' {
+        $queries = InModuleScope 'Azure.Admin.Console' {
+            (Get-AACDefenderQuery -Name Alerts)['Alerts']
+            (Get-AACDefenderAssessmentQuery -Section Alerts).Graph['Alerts']
+            (Get-AACSecurityAlertQuery -Days 7)['alerts']
+        }
+        foreach ($query in $queries) { $query | Should -Not -Match '(?<![\w.''\[])(time|timespan|date|datetime)\s*(=(?!~)|>|<|,|\s*\|)' }
     }
 }
 
@@ -126,7 +135,7 @@ Describe 'Azure Admin Console - Get-AACSecurityAlert' {
         $null = Get-AACSecurityAlert -Name '2517001*' -NoDisplay
         $script:calls[-1].Query.alerts | Should -Not -Match 'where status'
         $null = Get-AACSecurityAlert -Status Dismissed -Severity Low -Days 60 -NoDisplay
-        $script:calls[-1].Query.alerts | Should -Match ([regex]::Escape("| where status in~ ('Dismissed') | where severity in~ ('Low') | where time > ago(60d)"))
+        $script:calls[-1].Query.alerts | Should -Match ([regex]::Escape("| where status in~ ('Dismissed') | where severity in~ ('Low') | where generated > ago(60d)"))
     }
 
     It 'filters by name, alert type, tactic, incident and resource group' {

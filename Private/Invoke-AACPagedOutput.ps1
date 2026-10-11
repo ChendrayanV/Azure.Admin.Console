@@ -35,7 +35,11 @@ function Invoke-AACPagedOutput {
 
     # A terminal at both ends - and Spectre still drawing to it (a console
     # swapped for a buffer, as tests and other captures do, isn't paged).
-    $isInteractive = -not [Console]::IsInputRedirected -and -not [Console]::IsOutputRedirected -and [Spectre.Console.AnsiConsole]::Console.Profile.Out.IsTerminal
+    # Not Spectre's IsTerminal: it is true only while its writer is the very
+    # object [Console]::Out is, and hosts that replace Console.Out after
+    # Spectre started (VS Code's PowerShell extension) made it false.
+    $capturing = [Spectre.Console.AnsiConsole]::Console.Profile.Out.Writer -is [System.IO.StringWriter]
+    $isInteractive = -not [Console]::IsInputRedirected -and -not [Console]::IsOutputRedirected -and -not $capturing
     if ($NoPaging -or (-not $isInteractive -and $PageSize -le 0)) {
         & $ScriptBlock
         return
