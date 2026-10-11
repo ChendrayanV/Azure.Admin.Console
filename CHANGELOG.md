@@ -2,6 +2,16 @@
 
 All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never published to the PowerShell Gallery.
 
+## Unreleased
+
+### New
+
+- `Get-AACSecurityAlert`: Microsoft Defender for Cloud's security alerts, the equivalent of `Get-AzSecurityAlert` (Az.Security). It reads every subscription, or a management group's, in one Resource Graph query instead of one subscription and location at a time. Read-only; Reader or Security Reader is enough.
+  - **Filters:** `-Status` (default Active and InProgress), `-Severity` and `-Days` are applied in the query. `-Name` (the alert's name or display name; on its own it reads every status, as `Get-AzSecurityAlert -Name` does), `-AlertType`, `-Tactic`, `-Incident`, `-ResourceGroupName` and `-ResourceId` take wildcards or match what's under a resource ID.
+  - **Pipeline:** takes `ResourceId` or `Id` by property name, so resources from `Get-AACInventory`, `Get-AzResource` or `Get-AzVM` can be piped in.
+  - **Each alert (`AAC.SecurityAlert`, a superset of the alerts in `Get-AACSecurityPosture`):** MITRE ATT&CK tactics and techniques, the resource's type and group (or the compromised entity), `Hosts`, `Accounts` and `IpAddresses` read from the alert's entities, extended properties as a dictionary, the description and remediation steps as plain text, age, incident, product, location, and `Occurrences` (how many alerts share its type and resource).
+  - **Report:** tiles; charts by severity, MITRE tactic (in kill-chain order), resource, day and alert type; the alerts; and the recurring ones (three or more of a type on one resource), to fix at the source or tune with a suppression rule. Subscriptions with no Defender plan on are pointed out, because they raise no alerts. Console view, objects, CSV, HTML and PDF.
+
 ## v0.14.2
 
 The estate on one screen with `Show-AACDashboard`, ten commands for the questions cost, security, operations and compliance teams ask every day, and an access review that tells people and workloads apart.

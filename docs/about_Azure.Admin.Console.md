@@ -85,6 +85,13 @@ COMMANDS
         scores, recommendations, alerts, Defender plans, regulatory and
         policy compliance - one list of findings.
 
+    Get-AACSecurityAlert
+        Defender for Cloud's security alerts across every subscription in
+        one query - the Get-AzSecurityAlert equivalent - with MITRE tactics,
+        the hosts, accounts and IPs involved, remediation, incidents and
+        recurring alerts. Filters by status, severity, age, name, type,
+        tactic and resource; takes resources from the pipeline.
+
     Get-AACSkuAvailability
         Which VM sizes you can use for virtual machines or AKS node pools in
         a region and its availability zones - restrictions, vCPU quota and

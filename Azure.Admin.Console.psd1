@@ -51,6 +51,7 @@
         'Get-AACNetworkSecurityGroup'
         'Get-AACPolicyState'
         'Get-AACResourceUtilization'
+        'Get-AACSecurityAlert'
         'Get-AACSecurityPosture'
         'Get-AACSkuAvailability'
         'Get-AACStorageAccountContainerSize'
