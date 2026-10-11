@@ -17,17 +17,14 @@ function Get-AACPropertyValue {
         Set-StrictMode -Version Latest when the property doesn't exist.
         $obj.PSObject.Properties[<name>] is a safe, explicit lookup that
         returns $null instead, which is what this wraps.
+
+        Deliberately not an advanced function: it is called once per value
+        read (cost rows, query pages, tokens), and [CmdletBinding()]'s
+        parameter binding made each call about three times slower.
     #>
-    [CmdletBinding()]
-    [OutputType([object])]
-    param(
-        [Parameter(Mandatory)]
-        [object] $InputObject,
+    param($InputObject, [string] $Name)
 
-        [Parameter(Mandatory)]
-        [string] $Name
-    )
-
+    if ($null -eq $InputObject) { return $null }
     $property = $InputObject.PSObject.Properties[$Name]
     if ($property) {
         return $property.Value

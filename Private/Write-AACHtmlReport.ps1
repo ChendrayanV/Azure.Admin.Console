@@ -126,10 +126,14 @@ function Write-AACHtmlReport {
         $keys = @($t['columns'] | ForEach-Object { $_['key'] })
         $idKeys = @($t['columns'] | ForEach-Object { $_['idKey'], $_['href'], $_['currencyKey'] } | Where-Object { $_ })
         $keys = @($keys + $idKeys + 'ResourceId' | Select-Object -Unique)
+        # Every cell of every row passes through here: read properties inline, a
+        # function call per cell is what made big reports slow.
         $t['rows'] = @(foreach ($row in @($item.Rows)) {
                 $plain = [ordered]@{}
+                $isMap = $row -is [System.Collections.IDictionary]
+                if (-not $isMap) { $properties = $row.PSObject.Properties }
                 foreach ($key in $keys) {
-                    $value = if ($row -is [System.Collections.IDictionary]) { $row[$key] } else { Get-AACPropertyValue -InputObject $row -Name $key }
+                    $value = if ($isMap) { $row[$key] } else { $p = $properties[$key]; if ($p) { $p.Value } }
                     if ($value -is [datetime]) { $value = $value.ToString('o', [cultureinfo]::InvariantCulture) }
                     elseif ($null -ne $value -and $value -isnot [string] -and $value -isnot [ValueType]) { $value = [string]$value }
                     $plain[$key] = $value

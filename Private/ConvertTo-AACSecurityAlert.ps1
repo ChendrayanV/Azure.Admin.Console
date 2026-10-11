@@ -32,11 +32,7 @@ function ConvertTo-AACSecurityAlert {
 
     # --- Helpers ---------------------------------------------------------------------------------------------
     # Alert properties have come back in both cases: read keys case-insensitively.
-    $get = {
-        param($Object, [string] $Key)
-        if ($Object -isnot [System.Collections.IDictionary]) { return $null }
-        foreach ($k in $Object.Keys) { if ($k -eq $Key) { return $Object[$k] } }
-    }
+    $get = ${function:Get-AACMember}
     $text = { param($Object, [string] $Key) $v = & $get $Object $Key; if ($null -eq $v) { '' } else { [string]$v } }
     $list = { param($Item) @(if ($Item -is [System.Collections.IEnumerable] -and $Item -isnot [string] -and $Item -isnot [System.Collections.IDictionary]) { $Item } elseif ($null -ne $Item) { , $Item }) | Where-Object { $null -ne $_ -and '' -ne $_ } }
     $rowsOf = { param([string] $Name) @(if ($Read.Rows -and $Read.Rows.Contains($Name)) { $Read.Rows[$Name] | Where-Object { $null -ne $_ } }) }

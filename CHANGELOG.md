@@ -2,15 +2,46 @@
 
 All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never published to the PowerShell Gallery.
 
-## Unreleased
+## v0.14.3
+
+A resource export admins can hand to anyone, Defender for Cloud alerts, eight commands for day-to-day operations and troubleshooting, faster HTML reports, and fixes to the alert queries and the HTML tiles.
 
 ### New
 
+- `Export-AACResource`: every resource in the tenant, a management group, subscriptions, resource groups or resource types, to CSV, HTML and PDF. It gives more than Resource Graph Explorer's "Download as CSV":
+  - **Where:** one Resource Graph query joins `resources` to `resourcecontainers` for the subscription name and state, the management group and its path up to the root, and the resource group's tags.
+  - **Details:** the settings people look up for about 25 types, as one line. For example a VM's size, OS, image and power state; a storage account's TLS, public access and network rules; a NIC's IP, VM and NSG; an AKS cluster's version and nodes.
+  - **Tags:** a dictionary on each object, and one `Tag: <key>` column per key in the CSV and the HTML report. Keys that differ only in case are treated as the same tag.
+  - **Other columns:** parent, identity, provisioning state, public network access, created when Azure records it. `-Flatten` adds every property as a dotted column.
+  - **Filters:** `-ResourceType`, `-ResourceGroupName`, `-Name`, `-Location`, `-Tag`, `-MissingTag` (for tag governance) and a KQL `-Filter` run in Resource Graph. Wildcards and `-Search` (text anywhere in the name, details, tags or ID) run afterwards.
+  - **Speed:** subscriptions are split across up to four parallel queries.
 - `Get-AACSecurityAlert`: Microsoft Defender for Cloud's security alerts, the equivalent of `Get-AzSecurityAlert` (Az.Security). It reads every subscription, or a management group's, in one Resource Graph query instead of one subscription and location at a time. Read-only; Reader or Security Reader is enough.
   - **Filters:** `-Status` (default Active and InProgress), `-Severity` and `-Days` are applied in the query. `-Name` (the alert's name or display name; on its own it reads every status, as `Get-AzSecurityAlert -Name` does), `-AlertType`, `-Tactic`, `-Incident`, `-ResourceGroupName` and `-ResourceId` take wildcards or match what's under a resource ID.
   - **Pipeline:** takes `ResourceId` or `Id` by property name, so resources from `Get-AACInventory`, `Get-AzResource` or `Get-AzVM` can be piped in.
   - **Each alert (`AAC.SecurityAlert`, a superset of the alerts in `Get-AACSecurityPosture`):** MITRE ATT&CK tactics and techniques, the resource's type and group (or the compromised entity), `Hosts`, `Accounts` and `IpAddresses` read from the alert's entities, extended properties as a dictionary, the description and remediation steps as plain text, age, incident, product, location, and `Occurrences` (how many alerts share its type and resource).
   - **Report:** tiles; charts by severity, MITRE tactic (in kill-chain order), resource, day and alert type; the alerts; and the recurring ones (three or more of a type on one resource), to fix at the source or tune with a suppression rule. Subscriptions with no Defender plan on are pointed out, because they raise no alerts. Console view, objects, CSV, HTML and PDF.
+
+- **Eight commands for operations and troubleshooting** ([#8](https://github.com/ChendrayanV/Azure.Admin.Console/issues/8)). Like the rest, they take the usual scope and give a console view, objects, CSV, HTML and PDF. All are read-only in Azure.
+  - `Get-AACResourceHealth`: each resource's Resource Health (Available, Unavailable, Degraded, Unknown), the reason and since when, worst and longest-down first. It adds the latest platform event in the window (a reboot, a live migration) and the Service Health events that hit the resource. `-IncludeHistory` reads Resource Health's history and works out the availability over `-Days` and how often the state changed. `-ServiceHealth` returns the outages, maintenance and advisories instead.
+  - `Get-AACUnusedResource`: unattached disks, NICs and public IPs, NSGs and route tables on nothing, NAT gateways, load balancers and Application Gateways with no backends, empty App Service plans and SQL elastic pools, VMs stopped but still billed, deallocated VMs, old snapshots, unlinked private DNS zones, unused DDoS plans, WAF policies and IP groups, expired certificates and empty resource groups. Each is rated by what keeping it costs, with Billed and Since. `-IncludeCost` adds last month's cost.
+  - `Get-AACResourceError`: failed operations from the Activity Log, one per correlation ID. Each is sorted into Authorization (the refused action and scope), Policy, Quota, Capacity, Throttling, Lock, Conflict, Validation or Not found, using the innermost error of a failed deployment, with the caller and the fix. Also grouped by error code. This answers the "failed actions and permission issues" part of the requested `Get-AACActivityLog`.
+  - `Get-AACPrivateEndpoint`: every private endpoint connection with its state, target, IPs and names. It shows the DNS zone group, whether the endpoint's network (or one peered with it) is linked to that zone, and whether the zone is the right one for the service. It finds pending, rejected and disconnected connections, endpoints to deleted resources, targets still open to public networks and privatelink zones defined more than once.
+  - `Get-AACLoadBalancerHealth`: load balancers (health probe status per backend IP and data path availability, from Azure Monitor), v2 Application Gateways (healthy and unhealthy hosts per pool) and Traffic Manager endpoints. It finds pools down, empty pools, rules without probes, single backends or instances, and the retired Basic load balancer and Application Gateway v1.
+  - `Get-AACLegacyAuthentication`:
+    - **Azure:** storage shared keys and other local or key authentication (Cosmos DB, Service Bus, Event Hubs, Event Grid, App Configuration, AI services and more), SQL and PostgreSQL passwords, the ACR admin user, Redis access keys and its non-TLS port, AKS local accounts or no Entra ID, Linux password login, App Service basic publishing credentials, TLS 1.0/1.1 and Key Vault access policies.
+    - **Entra ID:** sign-ins over legacy protocols, successful (High) or failed (password spraying); whether Conditional Access or security defaults block legacy authentication; implicit grant and public client flows; client secrets; SMS and voice.
+  - `Get-AACOrphanedIdentity`: role assignments to deleted principals, user-assigned identities attached to nothing and with no federated credential, managed identities whose resource is gone, the tenant's service principals not signed in for `-InactiveDays` (90), and app registrations with only expired credentials or no owners. Severity follows the access each still holds.
+  - `Export-AACDiagnosticBundle`: a zip for a support case or a colleague. For each resource (`-ResourceId`, piped in, or `-ResourceGroupName`) it holds the configuration, Resource Health and its history, the Activity Log, diagnostic settings, locks, Advisor, Defender for Cloud, non-compliant policy states, alerts, recent changes and role assignments. A README, `summary.json` and `summary.html` sit on top. Keys, passwords, tokens, connection strings and SAS are redacted before anything is written. `-WhatIf` is supported; an existing zip is only replaced with `-Force`.
+  - The rest of #8 maps to existing commands: `Get-AACAccessReview` (role assignments, service principal access), `Get-AACChangeHistory` (activity), `Get-AACFailoverReadiness` (backups) and `Get-AACDependencyGraph` (dependencies). The README has the mapping.
+
+### Improved
+
+- HTML reports are written about five times faster: 10,000 rows of 20 columns took 6.8 seconds and now take 1.4. Each cell used to be read through a helper function call. Every command's HTML report benefits.
+- `Get-AACPropertyValue`, called for every value in cost rows, query pages and tokens, is a plain function now; an advanced function's parameter binding made each call about three times slower. The converters share one case-insensitive reader, `Get-AACMember`, which tries the exact key first, instead of eight copies that scanned every key.
+- Module best practices (Azure PowerShell's module guidelines):
+  - The manifest's description is short again and links to the documentation, and the tags cover the newer areas.
+  - Every object type the newer commands return has a default display, so they show as a short table at the prompt.
+- The demo (`Azure.Admin.Console.Demo`) runs every command, the new ones included, from the module's test fixtures. The test data of three commands moved into `Tests\Fixtures` so the demo can share it.
 
 ### Fixed
 

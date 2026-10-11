@@ -37,6 +37,8 @@ Describe 'Azure Admin Console - Module scaffold' {
             'Connect-AAC'
             'Deploy-AACStorageAccount'
             'Disconnect-AAC'
+            'Export-AACDiagnosticBundle'
+            'Export-AACResource'
             'Get-AACAccessReview'
             'Get-AACAdvisorRecommendation'
             'Get-AACAssignedPolicy'
@@ -51,14 +53,21 @@ Describe 'Azure Admin Console - Module scaffold' {
             'Get-AACFailoverReadiness'
             'Get-AACFirewallRule'
             'Get-AACInventory'
+            'Get-AACLegacyAuthentication'
+            'Get-AACLoadBalancerHealth'
             'Get-AACNetworkSecurityGroup'
+            'Get-AACOrphanedIdentity'
             'Get-AACPolicyState'
+            'Get-AACPrivateEndpoint'
+            'Get-AACResourceError'
+            'Get-AACResourceHealth'
             'Get-AACResourceUtilization'
             'Get-AACSecurityAlert'
             'Get-AACSecurityPosture'
             'Get-AACSkuAvailability'
             'Get-AACStorageAccountContainerSize'
             'Get-AACTerraformPlan'
+            'Get-AACUnusedResource'
             'Invoke-AACAksAssessment'
             'Invoke-AACApplicationInsightQuery'
             'Invoke-AACAssessment'
@@ -111,6 +120,8 @@ Describe 'Azure Admin Console - Module scaffold' {
                 if (-not $function.Body.ParamBlock) { continue }
                 $parameters = @($function.Body.ParamBlock.Parameters | ForEach-Object { $_.Name.VariablePath.UserPath })
                 $assigned = @($function.Body.FindAll({ $args[0] -is [System.Management.Automation.Language.AssignmentStatementAst] -and $args[0].Left -is [System.Management.Automation.Language.VariableExpressionAst] }, $true) | ForEach-Object { $_.Left.VariablePath.UserPath } | Select-Object -Unique)
+                # A foreach variable is assigned too - and a typed parameter converts each item it gets ([object[]] $Row wraps every row in an array).
+                $assigned += @($function.Body.FindAll({ $args[0] -is [System.Management.Automation.Language.ForEachStatementAst] }, $true) | ForEach-Object { $_.Variable.VariablePath.UserPath } | Select-Object -Unique)
                 foreach ($parameter in $parameters) { foreach ($name in $assigned) { if ($name -ieq $parameter -and $name -cne $parameter) { "$($file.Name): $($function.Name) assigns `$$name, which is its parameter `$$parameter" } } }
             }
         }

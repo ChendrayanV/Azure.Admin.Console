@@ -1,11 +1,11 @@
 @{
     RootModule           = 'Azure.Admin.Console.psm1'
-    ModuleVersion        = '0.14.2'
+    ModuleVersion        = '0.14.3'
     GUID                 = '9923da59-cf92-4a4a-b855-f59a088a3f09'
     Author               = 'Chendrayan Venkatesan'
     CompanyName          = 'Freelancer'
     Copyright            = '(c) 2026 Chendrayan Venkatesan. Licensed under the MIT License.'
-    Description          = 'Azure admin reports and checks from PowerShell, over plain REST - no Az or Microsoft.Graph modules, no app registration. Get-AACAdvisorRecommendation: a consolidated, flattened Azure Advisor view (Cost, Security, Reliability, Operational excellence, Performance). Get-AACFirewallRule: every Azure Firewall Policy rule, searchable by source, destination, port and protocol (Allow green, Deny red). Show-AACResource and Show-AACCost: your resources and subscription costs, with a full resource inventory. Invoke-AACPSRule: PSRule for Azure (500+ Well-Architected rules), the module''s own rules and your custom rules on the live estate, with rules excluded by name or wildcard. Invoke-AACApplicationInsightQuery: Application Insights exceptions (or any KQL query) from a Log Analytics workspace or Application Insights resource, flattened. Get-AACInventory: the tenant as a tree (management groups, subscriptions, resource groups, resources) with Defender for Cloud secure scores and costs. Get-AACNetworkSecurityGroup: a detailed NSG assessment with findings by severity. Show-AACResourceMap: an interactive diagram of resource groups in the browser, saved as PNG or JPEG. Get-AACPolicyState: Azure Policy compliance for every resource, by management group, subscription or resource group. Get-AACSkuAvailability: which VM sizes you can use for VMs or AKS node pools in a region and its zones - restrictions, vCPU quota, AKS rules - and why not. Get-AACSecurityPosture: Defender for Cloud and Azure Policy - secure scores, recommendations, alerts, plans, regulatory and policy compliance. Get-AACEntraGroupMembership: Entra ID groups and everyone in them, nested groups included, one row per group and member (Microsoft Graph). Get-AACAssignedPolicy: every Azure Policy assignment with the default, assigned and effective value of each parameter and the resource types the policy applies to. Get-AACStorageAccountContainerSize: every blob container''s size, access tiers and largest blobs, read in parallel. Invoke-AACDefenderAssessment: Microsoft Defender for Cloud end to end - recommendations, attack paths, alerts, inventory, vulnerabilities, posture, compliance and settings - in a tabbed HTML report. Invoke-AACPolicyAssessment: Azure Policy assessed as a whole, initiatives opened up to their member policies. Every command: a colourful console view, objects, CSV and interactive HTML reports, and most a PDF. PDF export needs Windows and PowerShell 7.4+.'
+    Description          = 'Azure administration from PowerShell over plain REST - no Az or Microsoft.Graph modules, no app registration. Inventory and resource export, cost, Advisor, security (Defender for Cloud, alerts, attack paths, access reviews, legacy authentication), Azure Policy and compliance, operations and troubleshooting (Resource Health, failed operations, load balancers, private endpoints, unused resources, diagnostic bundles), networks, AKS, Log Analytics and Microsoft 365 - each command with a console view, objects, and CSV, HTML and PDF reports. Documentation: https://github.com/ChendrayanV/Azure.Admin.Console/tree/main/docs'
     PowerShellVersion    = '7.2'
     CompatiblePSEditions = @('Core')
 
@@ -34,6 +34,8 @@
         'Connect-AAC'
         'Deploy-AACStorageAccount'
         'Disconnect-AAC'
+        'Export-AACDiagnosticBundle'
+        'Export-AACResource'
         'Get-AACAccessReview'
         'Get-AACAdvisorRecommendation'
         'Get-AACAssignedPolicy'
@@ -48,14 +50,21 @@
         'Get-AACFailoverReadiness'
         'Get-AACFirewallRule'
         'Get-AACInventory'
+        'Get-AACLegacyAuthentication'
+        'Get-AACLoadBalancerHealth'
         'Get-AACNetworkSecurityGroup'
+        'Get-AACOrphanedIdentity'
         'Get-AACPolicyState'
+        'Get-AACPrivateEndpoint'
+        'Get-AACResourceError'
+        'Get-AACResourceHealth'
         'Get-AACResourceUtilization'
         'Get-AACSecurityAlert'
         'Get-AACSecurityPosture'
         'Get-AACSkuAvailability'
         'Get-AACStorageAccountContainerSize'
         'Get-AACTerraformPlan'
+        'Get-AACUnusedResource'
         'Invoke-AACAksAssessment'
         'Invoke-AACApplicationInsightQuery'
         'Invoke-AACAssessment'
@@ -78,10 +87,10 @@
 
     PrivateData          = @{
         PSData = @{
-            Tags         = @('Azure', 'AzureAdvisor', 'AzureFirewall', 'CostManagement', 'Inventory', 'FirewallPolicy', 'ResourceGraph', 'Governance', 'EntraID', 'MicrosoftGraph', 'Groups', 'DefenderForCloud', 'Storage', 'BlobStorage', 'AzurePolicy', 'SecureScore', 'Report', 'PDF', 'CSV', 'ApplicationInsights', 'LogAnalytics', 'KQL', 'PSRule', 'WellArchitected', 'HTML', 'Compliance', 'SpectreConsole', 'Dashboard', 'ResourceHealth', 'JSON', 'REST', 'PKCE', 'PSEdition_Core', 'Windows', 'Linux', 'MacOS')
+            Tags         = @('Azure', 'AzureAdvisor', 'AzureFirewall', 'CostManagement', 'Inventory', 'FirewallPolicy', 'ResourceGraph', 'Governance', 'EntraID', 'MicrosoftGraph', 'Groups', 'DefenderForCloud', 'Storage', 'BlobStorage', 'AzurePolicy', 'SecureScore', 'Report', 'PDF', 'CSV', 'ApplicationInsights', 'LogAnalytics', 'KQL', 'PSRule', 'WellArchitected', 'HTML', 'Compliance', 'SpectreConsole', 'Dashboard', 'ResourceHealth', 'ServiceHealth', 'PrivateEndpoint', 'PrivateLink', 'LoadBalancer', 'ApplicationGateway', 'SecurityAlerts', 'ActivityLog', 'Identity', 'Tags', 'Export', 'JSON', 'REST', 'PKCE', 'PSEdition_Core', 'Windows', 'Linux', 'MacOS')
             ProjectUri   = 'https://github.com/ChendrayanV/Azure.Admin.Console'
             LicenseUri   = 'https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/LICENSE'
-            ReleaseNotes = 'v0.14.2 - NEW Show-AACDashboard: the estate on one screen - Resource Health, active Azure incidents, Advisor and what changed today. NEW Invoke-AACAssessment governance sheets. NEW ten commands for cost, security, operations, compliance and resilience: Get-AACCostAnomaly, Get-AACAttackPath, Get-AACAccessReview (with what to do per assignment; PIM only for people), Get-AACChangeHistory, Invoke-AACHealthCheck, Get-AACComplianceGap, Get-AACFailoverReadiness, Get-AACDependencyGraph, Get-AACResourceUtilization, Get-AACConfigurationDrift. NEW Show-AACJson. A shared status vocabulary and callouts across the console; progress lines fit narrow consoles. Get-AACEntraGroupMembership -CsvPath writes the one-row-per-group CSV (-CsvLayout Member for the previous one). Fixes to Invoke-AACM365Assessment. Full history: CHANGELOG.md.'
+            ReleaseNotes = 'v0.14.3 - NEW Export-AACResource: every resource with its subscription, management group path, resource group, tags as columns and key settings per type, to CSV, HTML and PDF, filtered in Resource Graph (type, group, name, location, tag, missing tag, KQL) and read in parallel. NEW Get-AACSecurityAlert (the Get-AzSecurityAlert equivalent, across every subscription). NEW for operations and troubleshooting (issue 8): Get-AACResourceHealth, Get-AACUnusedResource, Get-AACResourceError, Get-AACPrivateEndpoint, Get-AACLoadBalancerHealth, Get-AACLegacyAuthentication, Get-AACOrphanedIdentity, Export-AACDiagnosticBundle. HTML reports about five times faster. FIXED: Defender alert queries failed to parse in Get-AACSecurityPosture and Invoke-AACDefenderAssessment; an empty tab bar was drawn over the HTML tiles; console paging was off in VS Code. Full history: CHANGELOG.md.'
         }
     }
 }

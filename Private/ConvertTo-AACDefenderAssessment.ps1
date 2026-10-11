@@ -54,16 +54,7 @@ function ConvertTo-AACDefenderAssessment {
     $value = { param($Object, [string] $Key) if ($Object -is [System.Collections.IDictionary] -and $Object.Contains($Key)) { $Object[$Key] } }
     $text = { param($Object, [string] $Key) $v = & $value $Object $Key; if ($null -eq $v) { '' } else { [string]$v } }
     # REST bodies and attack paths: their keys' case isn't fixed.
-    $get = {
-        param($Object, [string] $Path)
-        foreach ($part in $Path.Split('.')) {
-            if ($Object -isnot [System.Collections.IDictionary]) { return $null }
-            $found = $null
-            foreach ($k in $Object.Keys) { if ($k -eq $part) { $found = $Object[$k]; break } }
-            $Object = $found
-        }
-        $Object
-    }
+    $get = ${function:Get-AACMember}
     $list = { param($Item) @(if ($Item -is [System.Collections.IEnumerable] -and $Item -isnot [string] -and $Item -isnot [System.Collections.IDictionary]) { $Item } elseif ($null -ne $Item) { , $Item }) | Where-Object { $null -ne $_ -and '' -ne $_ } }
     $rowsOf = { param([string] $Name) @(if ($Rows.Contains($Name)) { $Rows[$Name] | Where-Object { $null -ne $_ } }) }
     $inScope = { param([string] $Subscription) $Subscription -and $SubscriptionName.Contains($Subscription.ToLowerInvariant()) }

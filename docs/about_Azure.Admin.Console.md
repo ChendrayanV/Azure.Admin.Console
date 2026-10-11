@@ -92,6 +92,47 @@ COMMANDS
         recurring alerts. Filters by status, severity, age, name, type,
         tactic and resource; takes resources from the pipeline.
 
+    Export-AACResource
+        Every resource - for the tenant, a management group, subscriptions,
+        resource groups or types - with its subscription and management group
+        by name, tags as columns and each type's key settings, to CSV, HTML
+        and PDF. Filters in Resource Graph; -Flatten adds every property.
+
+    Get-AACResourceHealth
+        Resource Health of every resource, why and since when, its latest
+        platform event, the Azure outages and maintenance that hit it, and
+        its availability over the last days (-IncludeHistory).
+
+    Get-AACUnusedResource
+        Unattached disks, NICs and public IPs, empty plans, pools and
+        gateways, stopped VMs still billed, old snapshots, empty resource
+        groups - billed or not, and their cost (-IncludeCost).
+
+    Get-AACResourceError
+        What failed, from the Activity Log: access denied, policy denies,
+        quota and capacity, throttling, locks, invalid deployments - with
+        who and the fix.
+
+    Get-AACPrivateEndpoint
+        Private endpoints: connection state, DNS zone groups and links,
+        orphaned endpoints, targets still public, duplicated zones.
+
+    Get-AACLoadBalancerHealth
+        Load balancers, Application Gateways and Traffic Manager: backend
+        health probes, host counts, data path, empty pools, retired SKUs.
+
+    Get-AACLegacyAuthentication
+        Keys, SAS, local accounts, passwords and old TLS in Azure; legacy-
+        protocol sign-ins, implicit grant, ROPC, secrets and SMS in Entra ID.
+
+    Get-AACOrphanedIdentity
+        Role assignments to deleted principals, unattached identities,
+        stale service principals and abandoned app registrations.
+
+    Export-AACDiagnosticBundle
+        A zip for a support case: each resource's configuration, health,
+        activity, settings, recommendations and changes, secrets redacted.
+
     Get-AACSkuAvailability
         Which VM sizes you can use for virtual machines or AKS node pools in
         a region and its availability zones - restrictions, vCPU quota and

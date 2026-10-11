@@ -197,6 +197,23 @@ Update-TypeData -TypeName 'AAC.DependencyNode' -DefaultDisplayPropertySet 'Resou
 Update-TypeData -TypeName 'AAC.ResourceUtilization' -DefaultDisplayPropertySet 'Category', 'Resource', 'Kind', 'CpuP95', 'MemoryP95', 'Trend', 'SuggestedSize', 'EstimatedSaving' -Force
 Update-TypeData -TypeName 'AAC.ConfigurationDrift' -DefaultDisplayPropertySet 'Severity', 'Resource', 'Category', 'Property', 'Detail', 'Origin', 'Strategy' -Force
 
+# Security alerts, operations and troubleshooting (issue 8), and the resource export.
+Update-TypeData -TypeName 'AAC.SecurityAlert' -DefaultDisplayPropertySet 'Severity', 'Status', 'Alert', 'Resource', 'Intent', 'AgeDays' -Force
+Update-TypeData -TypeName 'AAC.ResourceHealth' -DefaultDisplayPropertySet 'State', 'Resource', 'ResourceType', 'Summary', 'Hours', 'LastEvent' -Force
+Update-TypeData -TypeName 'AAC.ServiceHealthEvent' -DefaultDisplayPropertySet 'Status', 'EventType', 'Title', 'Regions', 'ImpactedResources', 'TrackingId' -Force
+Update-TypeData -TypeName 'AAC.UnusedResource' -DefaultDisplayPropertySet 'Severity', 'Category', 'Resource', 'Billed', 'AgeDays', 'MonthlyCost', 'ResourceGroup' -Force
+Update-TypeData -TypeName 'AAC.ResourceError' -DefaultDisplayPropertySet 'Time', 'Category', 'ErrorCode', 'Resource', 'Caller', 'Message' -Force
+Update-TypeData -TypeName 'AAC.PrivateEndpoint' -DefaultDisplayPropertySet 'Status', 'Endpoint', 'Target', 'GroupId', 'ConnectionState', 'ZoneLinked', 'Issues' -Force
+Update-TypeData -TypeName 'AAC.PrivateEndpointFinding' -DefaultDisplayPropertySet 'Severity', 'Finding', 'Resource', 'Detail' -Force
+Update-TypeData -TypeName 'AAC.LoadBalancerBackend' -DefaultDisplayPropertySet 'Health', 'Balancer', 'Pool', 'Backend', 'Address', 'Availability' -Force
+Update-TypeData -TypeName 'AAC.LoadBalancer' -DefaultDisplayPropertySet 'Health', 'Balancer', 'Kind', 'Sku', 'Backends', 'Unhealthy', 'Issues' -Force
+Update-TypeData -TypeName 'AAC.LoadBalancerFinding' -DefaultDisplayPropertySet 'Severity', 'Finding', 'Resource', 'Detail' -Force
+Update-TypeData -TypeName 'AAC.LegacyAuthentication' -DefaultDisplayPropertySet 'Severity', 'Area', 'Finding', 'Resource', 'ResourceGroup' -Force
+Update-TypeData -TypeName 'AAC.OrphanedIdentity' -DefaultDisplayPropertySet 'Severity', 'Kind', 'Identity', 'RoleAssignments', 'LastSignIn', 'Reason' -Force
+Update-TypeData -TypeName 'AAC.DiagnosticBundle' -DefaultDisplayPropertySet 'Path', 'Resources', 'Files', 'SizeKB', 'Redacted' -Force
+Update-TypeData -TypeName 'AAC.DiagnosticBundleResource' -DefaultDisplayPropertySet 'Status', 'Resource', 'ResourceType', 'Health', 'FailedOperations', 'Alerts', 'Issues' -Force
+Update-TypeData -TypeName 'AAC.Resource' -DefaultDisplayPropertySet 'Name', 'ResourceType', 'ResourceGroup', 'Subscription', 'Location', 'Details' -Force
+
 $publicFunctionNames = Get-ChildItem -LiteralPath (Join-Path -Path $moduleRoot -ChildPath 'Public') -Filter '*.ps1' -File -ErrorAction SilentlyContinue |
     Select-Object -ExpandProperty BaseName
 
