@@ -60,7 +60,7 @@ Describe 'Azure Admin Console - resource export' {
     BeforeAll { $script:r = & $script:build }
 
     It 'lists the resources by subscription, resource group, type and name' {
-        @($script:r.Resources | ForEach-Object Name) | Should -Be @('disk-old', 'pip-old', 'aks-contoso', 'vm-web-01', 'nic-web', 'sqldb-orders', 'stcontosodata', 'kv-contoso')
+        @($script:r.Resources | ForEach-Object Name) | Should -Be @('disk-old', 'ag-oncall', 'pip-old', 'aks-contoso', 'vm-web-01', 'nic-web', 'sqldb-orders', 'stcontosodata', 'kv-contoso')
         $script:r.Resources[0].PSObject.TypeNames | Should -Contain 'AAC.Resource'
     }
 
@@ -81,6 +81,7 @@ Describe 'Azure Admin Console - resource export' {
         $details['aks-contoso'] | Should -Be 'Kubernetes: 1.30.3; Node pools: 2; Nodes: 5; Network plugin: azure; Private: True'
         $details['disk-old'] | Should -Be 'Size (GiB): 128; State: Unattached'
         $details['pip-old'] | Should -Be 'IP: 20.0.0.9; Allocation: Static'
+        $details['ag-oncall'] | Should -Be '' -Because 'a type with no entry in the details table has no Details, and no error'
         ($script:r.Resources | Where-Object Name -EQ 'sqldb-orders').Parent | Should -Be 'sql-contoso'
         ($script:r.Resources | Where-Object Name -EQ 'sqldb-orders').Sku | Should -Be 'GP_S_Gen5 / GeneralPurpose'
     }
@@ -90,7 +91,7 @@ Describe 'Azure Admin Console - resource export' {
         $st.Tags['CostCenter'] | Should -Be 'CC-1001'
         $st.TagText | Should -Be 'CostCenter=CC-1001; Environment=prod'
         $script:r.TagKeys | Should -Be @('Environment', 'Owner', 'CostCenter')
-        "$($script:r.Stats.Resources) $($script:r.Stats.Types) $($script:r.Stats.Subscriptions) $($script:r.Stats.ResourceGroups) $($script:r.Stats.Untagged)" | Should -Be '8 8 2 5 3'
+        "$($script:r.Stats.Resources) $($script:r.Stats.Types) $($script:r.Stats.Subscriptions) $($script:r.Stats.ResourceGroups) $($script:r.Stats.Untagged)" | Should -Be '9 9 2 5 4'
     }
 
     It 'flattens every property with -Flatten, lists of objects capped with their count' {
@@ -119,15 +120,15 @@ Describe 'Azure Admin Console - Export-AACResource' {
     AfterEach { InModuleScope 'Azure.Admin.Console' { $script:AACSession = $null } }
 
     It 'reads the subscriptions in parallel queries, one share each' {
-        @(Export-AACResource -NoDisplay).Count | Should -Be 8
+        @(Export-AACResource -NoDisplay).Count | Should -Be 9
         @($script:batches[0].Keys) | Should -Be @('resources1', 'resources2')
         @($script:batches[0]['resources1'].SubscriptionId) | Should -Be @($script:f.Prod)
-        @(Export-AACResource -SubscriptionId $script:f.Dev -NoDisplay).Name | Should -Be @('disk-old', 'pip-old')
+        @(Export-AACResource -SubscriptionId $script:f.Dev -NoDisplay).Name | Should -Be @('disk-old', 'ag-oncall', 'pip-old')
         @($script:batches[-1].Keys) | Should -Be @('resources')
     }
 
     It 'filters wildcards, searches text and stops at -First' {
-        @(Export-AACResource -ResourceGroupName 'rg-d*' -NoDisplay).Name | Should -Be @('disk-old', 'pip-old', 'sqldb-orders', 'stcontosodata')
+        @(Export-AACResource -ResourceGroupName 'rg-d*' -NoDisplay).Name | Should -Be @('disk-old', 'ag-oncall', 'pip-old', 'sqldb-orders', 'stcontosodata')
         @(Export-AACResource -ResourceType 'microsoft.network/*' -NoDisplay).Name | Should -Be @('pip-old', 'nic-web')
         @(Export-AACResource -Name '*-old' -NoDisplay).Name | Should -Be @('disk-old', 'pip-old')
         @(Export-AACResource -Search 'jammy' -NoDisplay).Name | Should -Be @('vm-web-01') -Because 'the details are searched too'
@@ -139,7 +140,7 @@ Describe 'Azure Admin Console - Export-AACResource' {
         $csv = Join-Path $TestDrive 'resources.csv'
         $null = & $script:capture { Export-AACResource -CsvPath $csv }
         $rows = @(Import-Csv -LiteralPath $csv)
-        $rows.Count | Should -Be 8
+        $rows.Count | Should -Be 9
         $columns = @($rows[0].PSObject.Properties.Name)
         $columns[0..3] | Should -Be @('Name', 'ResourceType', 'Kind', 'ResourceGroup')
         @($columns | Where-Object { $_ -like 'Tag: *' }) | Should -Be @('Tag: Environment', 'Tag: Owner', 'Tag: CostCenter')
@@ -154,7 +155,7 @@ Describe 'Azure Admin Console - Export-AACResource' {
 
     It 'shows the resources at the prompt, in characters any console can show' {
         $text = (& $script:capture { Export-AACResource -NoPaging }).Text
-        foreach ($expected in 'Azure Admin Console :: Resources', '8 resource(s) of 8 type(s) in 5 resource group(s) across 2 subscription(s); 3 untagged', 'Top types', 'Resources (8)', 'vm-web-01') { $text | Should -Match ([regex]::Escape($expected)) }
+        foreach ($expected in 'Azure Admin Console :: Resources', '9 resource(s) of 9 type(s) in 5 resource group(s) across 2 subscription(s); 4 untagged', 'Top types', 'Resources (9)', 'vm-web-01') { $text | Should -Match ([regex]::Escape($expected)) }
         foreach ($codePage in 437, 850) {
             $encoding = [System.Text.Encoding]::GetEncoding($codePage)
             @($text.ToCharArray() | Select-Object -Unique | Where-Object { $encoding.GetString($encoding.GetBytes([string]$_)) -ne [string]$_ }) | Should -BeNullOrEmpty

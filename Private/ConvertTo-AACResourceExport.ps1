@@ -122,10 +122,14 @@ function ConvertTo-AACResourceExport {
         [array]::Reverse($names)
         $groupPath = $names -join ' > '
         $sku = $entry['sku']
-        $line = @(foreach ($d in @($details[$type])) {
-                $value = & $show (& $resolve $entry $d[1]) $(if ($d.Count -gt 2) { $d[2] } else { '' })
-                if ($null -ne $value -and '' -ne "$value") { "$($d[0]): $value" }
-            }) -join '; '
+        # Most types have no entry in $details: their Details stay empty.
+        $line = if ($details.Contains($type)) {
+            @(foreach ($d in $details[$type]) {
+                    $value = & $show (& $resolve $entry $d[1]) $(if ($d.Count -gt 2) { $d[2] } else { '' })
+                    if ($null -ne $value -and '' -ne "$value") { "$($d[0]): $value" }
+                }) -join '; '
+        }
+        else { '' }
         $created = @(foreach ($field in 'creationTime', 'timeCreated', 'createdTime', 'createdAt', 'creationDate', 'createdDate') { & $date (& $resolve $properties $field) }) | Where-Object { $_ } | Select-Object -First 1
         # A child resource (servers/databases) is named after its parent too.
         $segments = ($id -split '/providers/', 2)[-1] -split '/'

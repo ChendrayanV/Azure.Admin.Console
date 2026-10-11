@@ -58,6 +58,8 @@ function Get-AACContosoResource {
             (& $row $prod 'rg-security' 'Microsoft.KeyVault/vaults' 'kv-contoso' @{ enableSoftDelete = $true; enablePurgeProtection = $true; enableRbacAuthorization = $true; publicNetworkAccess = 'Disabled'; softDeleteRetentionInDays = 90 } @{ tags = @{ Environment = 'prod' } })
             (& $row $dev 'rg-dev' 'Microsoft.Compute/disks' 'disk-old' @{ diskSizeGB = 128; diskState = 'Unattached'; osType = '' } @{ sku = @{ name = 'Premium_LRS'; tier = 'Premium' }; tags = @{ environment = 'dev' } })
             (& $row $dev 'rg-dev' 'Microsoft.Network/publicIPAddresses' 'pip-old' @{ ipAddress = '20.0.0.9'; publicIPAllocationMethod = 'Static' } @{ sku = @{ name = 'Standard'; tier = 'Regional' } })
+            # A type with no Details of its own, and no sku, properties or tags to speak of.
+            (& $row $dev 'rg-dev' 'Microsoft.Insights/actionGroups' 'ag-oncall' @{} @{ location = 'global'; properties = $null; groupTags = $null })
         )
     }
 }
