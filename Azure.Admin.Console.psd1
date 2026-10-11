@@ -1,6 +1,6 @@
 @{
     RootModule           = 'Azure.Admin.Console.psm1'
-    ModuleVersion        = '0.14.3'
+    ModuleVersion        = '0.14.4'
     GUID                 = '9923da59-cf92-4a4a-b855-f59a088a3f09'
     Author               = 'Chendrayan Venkatesan'
     CompanyName          = 'Freelancer'
