@@ -2,6 +2,14 @@
 
 All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never published to the PowerShell Gallery.
 
+## v0.14.4
+
+A fix to `Export-AACResource`.
+
+### Fixed
+
+- `Export-AACResource` failed or wrote a broken row for a resource whose type has no entry in its details table (for example `Microsoft.Insights/actionGroups`): it tried to read settings that type doesn't have. Such resources now come out with an empty `Details` column, and the rest of the export is unchanged.
+
 ## v0.14.3
 
 A resource export admins can hand to anyone, Defender for Cloud alerts, eight commands for day-to-day operations and troubleshooting, faster HTML reports, and fixes to the alert queries and the HTML tiles.

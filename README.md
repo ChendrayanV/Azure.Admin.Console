@@ -2123,8 +2123,8 @@ It then checks the staged copy: the manifest is valid, the exports match
 2. Commit, then push a tag that matches the version:
 
    ```powershell
-   git tag -a v0.14.3 -m "Azure.Admin.Console v0.14.3"
-   git push origin v0.14.3
+   git tag -a v0.14.4 -m "Azure.Admin.Console v0.14.4"
+   git push origin v0.14.4
    ```
 
 Only a version tag publishes. Pushes and pull requests run CI only.
