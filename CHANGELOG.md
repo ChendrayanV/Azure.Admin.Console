@@ -6,6 +6,13 @@ All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never pu
 
 ### New
 
+- `Show-AACNetworkTopology`: the network topology of the tenant, management groups, subscriptions or regions, as an interactive diagram in your browser. Read-only, with Resource Graph.
+  - **What it reads:** networks, subnets and peerings (across subscriptions, and to networks you can't see); VPN and ExpressRoute gateways, connections and circuits; Virtual WAN hubs; Azure Firewalls and network virtual appliances (VMs whose NIC forwards IP traffic); NSGs, route tables, NAT, Bastion, load balancers and Application Gateways; VMs, scale sets and private endpoints in their subnets, with the PaaS resources the endpoints serve. `-NetworkOnly` leaves out the workloads.
+  - **Roles:** each network is a hub, a spoke of a hub, peered or standalone.
+  - **Two layouts, switched on the page:** *Hub & spoke* puts each hub at the centre with its spokes in rings around it. *Hierarchy* nests boxes: tenant, management group, subscription, region, resource group, network, subnet (`-GroupBy` for fewer levels). Subnets are drawn in rows, sized by their prefix.
+  - **Lines:** peerings with their state (red when not Connected), private endpoints to their PaaS, routes to the firewall or appliance that inspects them.
+  - **Findings:** peerings not connected, routes to unknown next hops, spoke subnets whose internet traffic isn't inspected, peerings to networks you can't see, standalone networks.
+- `Get-AACDiagnosticSetting -Status`: only the resources with these statuses (`Exported`, `Partial`, `Not to workspace`, `No setting`, `No logs`, `Unknown`). The view, objects, CSV, HTML and PDF, and the misconfigurations, then cover only those resources, while the coverage tiles still describe the whole scope. `-Status 'No setting'` lists the resources that support diagnostic logs but have no diagnostic setting at all.
 - `Get-AACEntraGroupMembership` shows each group's **owners** (users and service principals, `Name (UPN)`), **when it was created** (UTC) and its **membership type** (Assigned, Dynamic, or Dynamic (paused)), next to its type and source. You'll find them in the console (groups table and each group's heading), on every row (`MembershipType`, `GroupCreated`, `GroupOwners`), in the HTML and PDF groups tables, and in the CSV, as three columns after Export-EntraGroupMemberShip.ps1's five (`Owners`, `CreatedDateTime`, `MembershipType`). Owners are read only for the groups asked for, not for the groups nested in them.
 - `Get-AACEntraGroupMembership` reports are easier to read: each group is laid out the way admins read it, with its details first, then its direct members, then each nested group's members.
   - **Console:** each group has its own heading, then its details (type, source, membership type, created, owners, and counts with guests and disabled accounts), a **Direct members** table, and a **Nested group <path>** table for each nested group. A nested group in a table says its members are listed below, or that it's a loop already listed above.
@@ -13,6 +20,8 @@ All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never pu
   - **PDF:** a page per group with its details, its direct members, and each nested group's members.
 
 ### Fixed
+
+- `Show-AACResourceMap` drew false VNet peerings, with no state, between a hub's VPN gateway and its spokes. A spoke peering's `remoteGateways` and a gateway's `remoteVirtualNetworkPeerings` were read as peerings. Only a network's link to its remote network is a peering now.
 
 - `Get-AACEntraGroupMembership` left service principals out of every group, and so a nested group whose members were service principals looked empty, in the console view, the objects and every export. Microsoft Graph v1.0 leaves service principals out of `/groups/{id}/members` unless the request is an advanced query. The members are now read with `$count=true` and `ConsistencyLevel: eventual`, which returns them. Sign-in is unchanged: the `Connect-AAC` session.
 - Nested group members are now shown expanded, not hidden under their group:

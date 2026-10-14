@@ -151,6 +151,21 @@ Describe 'Azure Admin Console - Get-AACDiagnosticSetting' {
         (& $script:row $all 'stcontoso').Status | Should -Be 'No logs'
     }
 
+    It 'returns only the statuses asked for with -Status, and only their misconfigurations' {
+        $none = @(Get-AACDiagnosticSetting -Status 'No setting' -NoDisplay)
+        $none.Count | Should -BeGreaterThan 0
+        @($none.Status | Select-Object -Unique) | Should -Be @('No setting')
+        @(Get-AACDiagnosticSetting -Status 'No setting', 'Not to workspace' -NoDisplay | ForEach-Object Status | Select-Object -Unique | Sort-Object) | Should -Be @('No setting', 'Not to workspace')
+        @(Get-AACDiagnosticSetting -Status 'No logs' -NoDisplay | ForEach-Object Status | Select-Object -Unique) | Should -Be @('No logs') -Because 'asking for No logs lists them without -IncludeUnsupported'
+        $html = Join-Path $TestDrive 'nosetting.html'
+        $null = & $script:capture { Get-AACDiagnosticSetting -Status 'No setting' -HtmlPath $html }
+        $model = [regex]::Match((Get-Content -LiteralPath $html -Raw), '<script id="aac-data" type="application/json">(.*?)</script>', 'Singleline').Groups[1].Value | ConvertFrom-Json
+        @(($model.tables | Where-Object id -EQ 'coverage').rows.Status | Select-Object -Unique) | Should -Be @('No setting')
+        $ids = @($none.ResourceId)
+        @(($model.tables | Where-Object id -EQ 'findings').rows | Where-Object { $ids -notcontains $_.ResourceId }) | Should -BeNullOrEmpty -Because 'the findings are those of the resources shown'
+        { Get-AACDiagnosticSetting -Status 'Missing' -NoDisplay } | Should -Throw
+    }
+
     It 'sends KQL that Resource Graph accepts: no output column named after the keyword kind' {
         $null = Get-AACDiagnosticSetting -NoDisplay
         foreach ($name in @($script:graphQueries.Keys)) {

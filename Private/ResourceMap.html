@@ -100,6 +100,10 @@
   <div class="facts" id="facts"></div>
   <div class="tools">
     <input type="search" id="search" placeholder="Find a resource..." aria-label="Find a resource">
+    <div class="group" role="group" aria-label="Layout" id="layout-group" hidden>
+      <button id="lay-hub" title="Each hub at the centre, its spokes around it">&#10035; Hub &amp; spoke</button>
+      <button id="lay-layered" title="The boxes nested: tenant, management group, subscription, region, resource group">&#9638; Hierarchy</button>
+    </div>
     <div class="group" role="group" aria-label="Direction">
       <button id="dir-right" title="Left to right">&#8594; Left to right</button>
       <button id="dir-down" title="Top to bottom">&#8595; Top to bottom</button>
@@ -162,6 +166,8 @@
     hidden: new Set(), selected: null, layout: null, view: { x: 0, y: 0, k: 1 },
     // NSGs and route tables: chips on what they're applied to, or cards.
     mode: data.options.nsgView === 'cards' ? 'cards' : 'chips',
+    // layered: ELK lays out the nested boxes. hubspoke: each hub with its spokes around it.
+    layoutMode: ['hubspoke', 'packed'].includes(data.options.layout) ? data.options.layout : 'layered',
     flaggedOnly: false
   };
   const CHIP_H = 20, CHIP_ROW = 28;
@@ -201,8 +207,13 @@
   document.getElementById('facts').innerHTML = data.facts.map(f => esc(f).replace(/^(\d[\d,]*)/, '<b>$1</b>')).join(' &middot; ');
 
   // --- The ELK graph -------------------------------------------------------------------
-  function elkGraph(direction) {
+  // only: the IDs to lay out (a hub-and-spoke unit), or every box and resource.
+  // packed: boxes packed in a grid at every level, the lines drawn straight
+  // afterwards (finishLayout) - for a hub-and-spoke unit, and the topology's hierarchy.
+  function elkGraph(direction, only, packed) {
     const items = new Map();
+    const take = id => !only || only.has(id);
+    const boxed = !!only || !!packed;
     const root = {
       id: 'root', children: [], edges: [],
       layoutOptions: {
@@ -221,13 +232,21 @@
         'elk.json.edgeCoords': 'ROOT'
       }
     };
+    // Subnets packed in rows inside a network, resources in a grid inside each
+    // subnet, networks in their boxes - not one tall layered column.
+    if (boxed) {
+      Object.assign(root.layoutOptions, { 'elk.algorithm': 'box', 'elk.hierarchyHandling': 'SEPARATE_CHILDREN', 'elk.aspectRatio': '1.5', 'elk.spacing.nodeNode': '24' });
+    }
     const depth = c => { let d = 0; for (let p = c.parent; p && clustersById.has(p); p = clustersById.get(p).parent) d++; return d; };
     const sorted = data.clusters.slice().sort((a, b) => depth(a) - depth(b));
     for (const c of sorted) {
+      if (!take(c.id)) continue;
       const chips = state.mode === 'chips' ? chipsOf(c) : [];
-      const title = [c.name].concat(c.detail || [], state.mode === 'cards' ? (c.badges || []) : []).join(' · ');
+      const title = [c.name].concat(c.detail || [], state.mode === 'cards' ? (c.badges || []) : [], state.layoutMode === 'hubspoke' && c.context ? [c.context] : []).join(' · ');
       const chipsWidth = chips.reduce((w, x) => w + chipWidth(x) + 6, 0);
-      const minWidth = Math.min(900, Math.max(200, 52 + Math.max(String(c.name).length * 8, title.length * 6.2, chipsWidth)));
+      let minWidth = Math.min(900, Math.max(200, 52 + Math.max(String(c.name).length * 8, title.length * 6.2, chipsWidth)));
+      // A subnet is as wide as its prefix is big: a /20 wider than a /28.
+      if (c.kind === 'subnet' && c.prefixLength) minWidth = Math.min(900, Math.max(minWidth, 200 + (29 - c.prefixLength) * 24));
       const top = HEADER + (chips.length ? CHIP_ROW : 0);
       const item = {
         id: c.id, children: [],
@@ -237,19 +256,183 @@
           'elk.nodeSize.minimum': '(' + Math.round(minWidth) + ',' + (top + 24) + ')'
         }
       };
+      if (boxed) Object.assign(item.layoutOptions, { 'elk.algorithm': 'box', 'elk.aspectRatio': c.kind === 'subnet' ? '2.4' : '1.6', 'elk.spacing.nodeNode': c.kind === 'subnet' || c.kind === 'vnet' ? '20' : '36' });
       items.set(c.id, item);
       (c.parent && items.has(c.parent) ? items.get(c.parent).children : root.children).push(item);
     }
     for (const n of data.nodes) {
-      if (drawnAsChip(n)) continue;
+      if (drawnAsChip(n) || !take(n.id)) continue;
       const item = { id: n.id, width: NODE_W, height: NODE_H };
+      items.set(n.id, item);
       (n.parent && items.has(n.parent) ? items.get(n.parent).children : root.children).push(item);
     }
     for (const e of data.edges) {
-      if (!edgeVisible(e)) continue;
+      if (boxed || !edgeVisible(e) || !items.has(e.source) || !items.has(e.target)) continue;
       root.edges.push({ id: e.id, sources: [e.source], targets: [e.target] });
     }
     return root;
+  }
+
+  // --- Hub and spoke: each hub at the centre, its spokes in rings around it ----------------------
+  // Every virtual network - with its subnets and resources, and the resources
+  // outside networks that only it uses (a private endpoint's storage account)
+  // - is laid out on its own by ELK; the networks are then placed: each hub
+  // with its spokes around it, the hubs side by side, everything else below.
+  // Links between networks are drawn straight, from border to border.
+  // The virtual network a box or resource is in (itself, for a network).
+  function vnetOf(id) {
+    let p = id;
+    while (p) {
+      const c = clustersById.get(p);
+      if (c && c.kind === 'vnet') return c.id;
+      const n = nodesById.get(p);
+      p = n ? n.parent : c ? c.parent : null;
+    }
+    return null;
+  }
+
+  function hubSpokeLayout(direction) {
+    const unitOf = new Map();
+    for (const c of data.clusters) { const v = vnetOf(c.id); if (v) unitOf.set(c.id, v); }
+    const loose = [];
+    for (const n of data.nodes) {
+      if (drawnAsChip(n)) continue;
+      const v = vnetOf(n.id);
+      if (v) unitOf.set(n.id, v); else loose.push(n);
+    }
+    const adjacent = new Map();
+    for (const e of data.edges) {
+      if (!edgeVisible(e)) continue;
+      for (const [a, b] of [[e.source, e.target], [e.target, e.source]]) { if (!adjacent.has(a)) adjacent.set(a, []); adjacent.get(a).push(b); }
+    }
+    // Outside the networks: with the one network that uses it, or shared.
+    for (const n of loose) {
+      const users = new Set((adjacent.get(n.id) || []).map(x => unitOf.get(x)).filter(Boolean));
+      if (users.size === 1) unitOf.set(n.id, users.values().next().value);
+    }
+    const units = new Map();
+    for (const c of data.clusters) if (c.kind === 'vnet') units.set(c.id, { id: c.id, vnet: c, members: new Set() });
+    units.set('~shared', { id: '~shared', vnet: null, members: new Set() });
+    for (const [id, v] of unitOf) units.get(v).members.add(id);
+    for (const n of loose) if (!unitOf.has(n.id)) units.get('~shared').members.add(n.id);
+    const list = [...units.values()].filter(u => u.members.size);
+    return Promise.all(list.map(u => elk.layout(elkGraph(direction, u.members)).then(l => { u.layout = l; return u; }))).then(done => {
+      const GAP = 90;
+      const half = u => Math.hypot(u.layout.width, u.layout.height) / 2;
+      const placed = new Map();
+      const place = (u, x, y) => placed.set(u.id, { u, x, y });
+      const hubs = done.filter(u => u.vnet && u.vnet.role === 'hub').sort((a, b) => (b.members.size - a.members.size) || String(a.vnet.name).localeCompare(String(b.vnet.name)));
+      let cursorX = 0, starsBottom = 0;
+      for (const hub of hubs) {
+        const spokes = done.filter(u => u.vnet && u.vnet.role === 'spoke' && u.vnet.hub === hub.id && !placed.has(u.id))
+          .sort((a, b) => String(a.vnet.name).localeCompare(String(b.vnet.name)));
+        const local = [{ u: hub, cx: 0, cy: 0 }];
+        // Rings: as many spokes on each as fit side by side.
+        let radius = half(hub) + GAP, index = 0;
+        while (index < spokes.length) {
+          const biggest = Math.max(...spokes.slice(index).map(half));
+          radius += biggest;
+          const room = Math.max(1, Math.floor((2 * Math.PI * radius) / (2 * biggest + GAP)));
+          const ring = spokes.slice(index, index + room);
+          const widest = Math.max(...ring.map(half));
+          if (ring.length > 1) radius = Math.max(radius, (2 * widest + GAP) / (2 * Math.sin(Math.PI / ring.length)));
+          ring.forEach((u, i) => {
+            const angle = -Math.PI / 2 + (2 * Math.PI * i) / ring.length + (index ? Math.PI / ring.length : 0);
+            local.push({ u, cx: radius * Math.cos(angle), cy: radius * Math.sin(angle) });
+          });
+          index += ring.length;
+          radius += widest + GAP;
+        }
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const q of local) {
+          minX = Math.min(minX, q.cx - q.u.layout.width / 2); maxX = Math.max(maxX, q.cx + q.u.layout.width / 2);
+          minY = Math.min(minY, q.cy - q.u.layout.height / 2); maxY = Math.max(maxY, q.cy + q.u.layout.height / 2);
+        }
+        for (const q of local) place(q.u, cursorX - minX + q.cx - q.u.layout.width / 2, -minY + q.cy - q.u.layout.height / 2);
+        cursorX += maxX - minX + GAP * 2;
+        starsBottom = Math.max(starsBottom, maxY - minY);
+      }
+      // Everything else in rows below the hubs: networks first, the shared resources last.
+      const rest = done.filter(u => !placed.has(u.id)).sort((a, b) => ((a.id === '~shared') - (b.id === '~shared')) || (b.layout.height - a.layout.height));
+      const rowWidth = Math.max(cursorX - GAP * 2, 1800);
+      let x = 0, y = starsBottom ? starsBottom + GAP * 2 : 0, rowHeight = 0;
+      for (const u of rest) {
+        if (x > 0 && x + u.layout.width > rowWidth) { x = 0; y += rowHeight + GAP; rowHeight = 0; }
+        place(u, x, y);
+        x += u.layout.width + GAP; rowHeight = Math.max(rowHeight, u.layout.height);
+      }
+
+      // One layout, as ELK would give it: every box, resource and line in root coordinates.
+      const children = [], edges = [], rect = new Map();
+      for (const { u, x: ox, y: oy } of placed.values()) {
+        (function walk(item) {
+          for (const child of item.children || []) {
+            const b = { id: child.id, x: child.x + ox, y: child.y + oy, width: child.width, height: child.height };
+            children.push(b); rect.set(b.id, b); walk(child);
+          }
+        })(u.layout);
+        const move = q => ({ x: q.x + ox, y: q.y + oy });
+        for (const e of u.layout.edges || []) {
+          edges.push({ id: e.id, sections: (e.sections || []).map(sec => ({ startPoint: move(sec.startPoint), endPoint: move(sec.endPoint), bendPoints: (sec.bendPoints || []).map(move) })) });
+        }
+      }
+      return finishLayout(children, edges, rect, unitOf);
+    });
+  }
+
+  // The lines ELK didn't draw, straight from border to border, and the whole
+  // layout moved to start at 0,0. unitOf: the network each box or resource is in.
+  function finishLayout(children, edges, rect, unitOf) {
+    const inside = new Set(edges.map(e => e.id));
+    const border = (b, toward) => {
+      const cx = b.x + b.width / 2, cy = b.y + b.height / 2, dx = toward.x - cx, dy = toward.y - cy;
+      if (!dx && !dy) return { x: cx, y: cy };
+      const t = Math.min(dx ? (b.width / 2) / Math.abs(dx) : Infinity, dy ? (b.height / 2) / Math.abs(dy) : Infinity);
+      return { x: cx + dx * t, y: cy + dy * t };
+    };
+    // Between networks: one line per network and next hop for routes (not
+    // one per subnet), and no label unless something is wrong - a click on
+    // either end shows the details.
+    const routeSeen = new Set();
+    for (const e of data.edges) {
+      if (inside.has(e.id) || !edgeVisible(e)) continue;
+      let from = e.source;
+      const across = unitOf.get(e.source) !== unitOf.get(e.target);
+      if (e.kind === 'route' && across && unitOf.has(e.source)) {
+        from = unitOf.get(e.source);
+        const key = from + '|' + e.target;
+        if (routeSeen.has(key)) continue;
+        routeSeen.add(key);
+      }
+      const a = rect.get(from), b = rect.get(e.target);
+      if (!a || !b) continue;
+      const ca = { x: a.x + a.width / 2, y: a.y + a.height / 2 }, cb = { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+      edges.push({ id: e.id, noLabel: !e.warn, sections: [{ startPoint: border(a, cb), endPoint: border(b, ca), bendPoints: [] }] });
+    }
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const b of children) { minX = Math.min(minX, b.x); minY = Math.min(minY, b.y); maxX = Math.max(maxX, b.x + b.width); maxY = Math.max(maxY, b.y + b.height); }
+    if (!children.length) { minX = minY = maxX = maxY = 0; }
+    for (const b of children) { b.x -= minX; b.y -= minY; }
+    for (const e of edges) for (const sec of e.sections) for (const q of [sec.startPoint, sec.endPoint].concat(sec.bendPoints)) { q.x -= minX; q.y -= minY; }
+    return { id: 'root', width: maxX - minX, height: maxY - minY, children, edges };
+  }
+
+  // The topology's hierarchy: tenant, management groups, subscriptions,
+  // regions and resource groups packed in a grid, boxes inside boxes.
+  function packedLayout(direction) {
+    const unitOf = new Map();
+    for (const c of data.clusters) { const v = vnetOf(c.id); if (v) unitOf.set(c.id, v); }
+    for (const n of data.nodes) { const v = vnetOf(n.id); if (v) unitOf.set(n.id, v); }
+    return elk.layout(elkGraph(direction, null, true)).then(l => {
+      const children = [], rect = new Map();
+      (function walk(item) {
+        for (const child of item.children || []) {
+          const b = { id: child.id, x: child.x, y: child.y, width: child.width, height: child.height };
+          children.push(b); rect.set(b.id, b); walk(child);
+        }
+      })(l);
+      return finishLayout(children, [], rect, unitOf);
+    });
   }
 
   // --- Drawing ---------------------------------------------------------------------------
@@ -266,9 +449,15 @@
       '.cluster rect.box{stroke-width:1.6;}',
       '.cluster.subscription rect.box{fill:' + t.subscription[0] + ';stroke:' + t.subscription[1] + ';}',
       '.cluster.managementgroup rect.box{fill:' + t.vnet[0] + ';stroke:' + t.subscription[1] + ';stroke-width:2;}',
+      '.cluster.tenant rect.box{fill:' + t.page + ';stroke:' + t.subscription[1] + ';stroke-width:2.6;}',
+      '.cluster.region rect.box{fill:' + t.subscription[0] + ';stroke:' + t.muted + ';stroke-dasharray:12 5;}',
       '.cluster.resourcegroup rect.box{fill:' + t.resourcegroup[0] + ';stroke:' + t.resourcegroup[1] + ';stroke-dasharray:7 4;}',
       '.cluster.vnet rect.box{fill:' + t.vnet[0] + ';stroke:' + t.vnet[1] + ';}',
       '.cluster.subnet rect.box{fill:' + t.subnet[0] + ';stroke:' + t.subnet[1] + ';stroke-dasharray:5 3;}',
+      '.cluster.vnet.hub rect.box{stroke:' + t.edges.peering + ';stroke-width:3.4;}',
+      '.cluster.vnet.hub .name{fill:' + t.edges.peering + ';}',
+      '.edge.warn path.line{stroke:' + t.high + ';stroke-dasharray:7 5;}',
+      '.node.nva rect.card{stroke:' + t.edges.route + ';stroke-width:2.4;}',
       '.cluster.external rect.box{stroke-dasharray:2 4;opacity:.75;}',
       '.cluster .name{font-size:13px;font-weight:700;}',
       '.cluster .detail{font-size:11px;fill:' + t.muted + ';}',
@@ -370,12 +559,12 @@
     for (const c of data.clusters) {
       const b = boxes.get(c.id);
       if (!b) continue;
-      const g = el('g', { class: 'cluster ' + c.kind + (c.external ? ' external' : ''), 'data-id': c.id }, clusterLayer);
+      const g = el('g', { class: 'cluster ' + c.kind + (c.role ? ' ' + c.role : '') + (c.external ? ' external' : ''), 'data-id': c.id }, clusterLayer);
       el('rect', { class: 'box', x: b.x, y: b.y, width: b.width, height: b.height, rx: c.kind === 'subscription' ? 14 : 10 }, g);
       el('image', { href: icon(c.icon), x: b.x + 12, y: b.y + 11, width: 26, height: 26 }, g);
       const name = el('text', { class: 'name', x: b.x + 46, y: b.y + 22 }, g);
-      name.textContent = clip(c.kind === 'subscription' ? 'Subscription: ' + c.name : c.kind === 'resourcegroup' ? 'Resource group: ' + c.name : c.kind === 'managementgroup' ? 'Management group: ' + c.name : c.name, b.width - 60, 7.4);
-      const line = [].concat(c.detail || [], state.mode === 'cards' ? (c.badges || []) : []).join('  ·  ');
+      name.textContent = clip(c.kind === 'subscription' ? 'Subscription: ' + c.name : c.kind === 'resourcegroup' ? 'Resource group: ' + c.name : c.kind === 'managementgroup' ? 'Management group: ' + c.name : c.kind === 'tenant' ? 'Tenant: ' + c.name : c.kind === 'region' ? 'Region: ' + c.name : c.name, b.width - 60, 7.4);
+      const line = [].concat(c.detail || [], state.mode === 'cards' ? (c.badges || []) : [], state.layoutMode === 'hubspoke' && c.context ? [c.context] : []).join('  ·  ');
       if (line) {
         const detail = el('text', { class: 'detail', x: b.x + 46, y: b.y + 38 }, g);
         detail.textContent = clip(line, b.width - 60, 6.1);
@@ -396,14 +585,14 @@
     for (const e of layout.edges || []) {
       const model = edgeById.get(e.id);
       if (!model || !e.sections) continue;
-      const g = el('g', { class: 'edge ' + model.kind, 'data-id': model.id, 'data-source': model.source, 'data-target': model.target }, edgeLayer);
+      const g = el('g', { class: 'edge ' + model.kind + (model.warn ? ' warn' : ''), 'data-id': model.id, 'data-source': model.source, 'data-target': model.target }, edgeLayer);
       for (const s of e.sections) {
         const points = [s.startPoint].concat(s.bendPoints || [], [s.endPoint]);
         const attrs = { class: 'line', d: rounded(points, 7) };
         if (model.kind !== 'network') attrs['marker-end'] = 'url(#arrow-' + model.kind + ')';
         if (model.kind === 'peering') attrs['marker-start'] = 'url(#arrow-' + model.kind + ')';
         el('path', attrs, g);
-        if (model.label) {
+        if (model.label && !e.noLabel) {
           // On the longest straight piece.
           let best = null, length = -1;
           for (let i = 1; i < points.length; i++) {
@@ -424,7 +613,7 @@
     for (const n of data.nodes) {
       const b = boxes.get(n.id);
       if (!b || drawnAsChip(n)) continue;
-      const g = el('g', { class: 'node' + (n.orphan ? ' orphan' : '') + (n.external ? ' external' : '') + (n.risk ? ' risk-' + n.risk : ''), 'data-id': n.id, transform: 'translate(' + b.x + ',' + b.y + ')' }, nodeLayer);
+      const g = el('g', { class: 'node' + (n.orphan ? ' orphan' : '') + (n.external ? ' external' : '') + (n.risk ? ' risk-' + n.risk : '') + (n.nva ? ' nva' : ''), 'data-id': n.id, transform: 'translate(' + b.x + ',' + b.y + ')' }, nodeLayer);
       el('rect', { class: 'card', width: NODE_W, height: NODE_H, rx: 10 }, g);
       el('image', { href: icon(n.icon), x: NODE_W / 2 - 20, y: 9, width: 40, height: 40 }, g);
       const name = el('text', { class: 'name', x: NODE_W / 2, y: 66, 'text-anchor': 'middle' }, g);
@@ -762,11 +951,19 @@
   // --- Lay out and draw --------------------------------------------------------------------------
   const elk = new ELK();
   const status = document.getElementById('status');
+  const layoutButtons = { hub: document.getElementById('lay-hub'), layered: document.getElementById('lay-layered') };
+  document.getElementById('layout-group').hidden = !data.options.hubSpoke;
+  layoutButtons.hub.onclick = () => { if (state.layoutMode !== 'hubspoke') { state.layoutMode = 'hubspoke'; run(); } };
+  const hierarchyMode = data.options.hierarchy === 'packed' ? 'packed' : 'layered';
+  layoutButtons.layered.onclick = () => { if (state.layoutMode !== hierarchyMode) { state.layoutMode = hierarchyMode; run(); } };
   function run() {
     status.style.display = 'flex';
     status.textContent = 'Laying out the map...';
     for (const d in dirButtons) dirButtons[d].classList.toggle('on', d === state.direction);
-    return elk.layout(elkGraph(state.direction)).then(layout => {
+    layoutButtons.hub.classList.toggle('on', state.layoutMode === 'hubspoke');
+    layoutButtons.layered.classList.toggle('on', state.layoutMode !== 'hubspoke');
+    const laying = state.layoutMode === 'hubspoke' ? hubSpokeLayout(state.direction) : state.layoutMode === 'packed' ? packedLayout(state.direction) : elk.layout(elkGraph(state.direction));
+    return laying.then(layout => {
       state.layout = layout;
       draw(layout);
       legend();

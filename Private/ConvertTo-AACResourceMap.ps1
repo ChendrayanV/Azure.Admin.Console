@@ -376,6 +376,10 @@ function ConvertTo-AACResourceMap {
                 $subnetRow = @(Get-Path $row 'properties', 'subnets')[[int]$Matches[1]]
                 $from = & $lower (Get-Value $subnetRow 'id')
             }
+            # A peering is a network's link to its remote network. Other IDs
+            # that mention peerings - a spoke peering's remoteGateways, a
+            # gateway's remoteVirtualNetworkPeerings - are not peerings.
+            if ($reference.Path -match '(?i)virtualnetworkpeerings' -and ($type -ne 'microsoft.network/virtualnetworks' -or $reference.Path -notmatch '(?i)remotevirtualnetwork(\.id)?$')) { continue }
             $to = & $resolve $reference.Id
             if (-not $to -or $to -eq $from) { continue }
             $kind = if ($reference.Path -match '(?i)virtualnetworkpeerings') { 'peering' }

@@ -129,6 +129,9 @@ Get-AACEntraGroupMembership -GroupNameStartsWith 'grp-' -HtmlPath .\Groups.html
 # A diagram of a resource group, in your browser
 Show-AACResourceMap -ResourceGroupName 'rg-app'
 
+# The whole network: hubs at the centre of their spokes, peerings, firewalls, private endpoints
+Show-AACNetworkTopology
+
 # PSRule for Azure on the live estate, as a clickable HTML report
 Invoke-AACPSRule -HtmlPath .\PSRule.html
 
@@ -237,6 +240,7 @@ bookmarks are how you jump to the one you want.
 | [`Get-AACTerraformPlan`](docs/Get-AACTerraformPlan.md)                                           | A Terraform plan in JSON (`terraform show -json`), flattened: what will be created, updated, replaced, deleted, read, imported and moved - and why - down to each attribute's before and after value, with the outputs and what changed outside Terraform. Sensitive values are never shown. Offline: no sign-in. A console view, objects, and CSV and interactive HTML reports.                                                                                                                                                                                                                                                                  |
 | [`Get-AACDiagnosticSetting`](docs/Get-AACDiagnosticSetting.md)                                   | Every resource's diagnostic settings, flattened, and the resources whose logs don't reach a Log Analytics workspace: each one's status (exported, partial, not to a workspace, no setting), what's missing and why, and misconfigurations (deleted workspaces, nothing enabled, logs sent twice, another region, unexpected workspace, retired retention). Storage services and subscription activity logs included. A console view, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                          |
 | [`Get-AACEntraGroupMembership`](docs/Get-AACEntraGroupMembership.md)                             | Entra ID groups and everyone in them - direct and through nested groups - one row per group and member, with type, source, guests and disabled accounts. A console view with each group's members flattened, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                                                                                                                                                  |
+| [`Show-AACNetworkTopology`](docs/Show-AACNetworkTopology.md)                                     | The network topology of the tenant, management groups, subscriptions or regions, opened in your browser: hubs at the centre of their spokes, or every network inside its tenant, management group, subscription, region and resource group; peerings, gateways, Virtual WAN, firewalls and appliances, private endpoints to their PaaS, routes to their next hop; roles and findings. Saves as PNG, JPEG or SVG.                                                                                                                                                                                                                                  |
 | [`Show-AACResourceMap`](docs/Show-AACResourceMap.md)                                             | A map of one or more resource groups, opened in your browser: the resources with their Azure icons, in subscription, resource group, VNet and subnet boxes, with their connections, dependencies and network paths. Saves as PNG or JPEG.                                                                                                                                                                                                                                                                                                                                                                                                         |
 | [`Show-AACCost`](docs/Show-AACCost.md)                                                           | Subscription costs: month to date by subscription and by service, and a monthly trend, as charts and a table.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | [`Show-AACDashboard`](docs/Show-AACDashboard.md)                                                 | A one-screen dashboard: one status at the top (healthy, needs attention, action needed), the session, subscriptions, resources by region, Resource Health, active Azure Service Health events, Advisor and the latest resource changes - from one Resource Graph batch. `-Select` picks the subscriptions from a list.                                                                                                                                                                                                                                                                                                                           |
@@ -1494,6 +1498,66 @@ changed outside Terraform. `-HtmlPath` writes tables of the resources, every
 attribute change, the outputs and the drift, with tiles and charts that
 filter them.
 
+## Network topology
+
+`Show-AACNetworkTopology` draws the networks of the whole tenant - or of
+management groups, subscriptions or regions - and opens the diagram in your
+browser. Read-only, with Resource Graph; Reader is enough.
+
+```powershell
+Show-AACNetworkTopology                                                     # every network you can see
+Show-AACNetworkTopology -ManagementGroupId 'mg-landingzones' -GroupBy Subscription -Layout Hierarchy
+Show-AACNetworkTopology -NetworkOnly -Location 'uksouth', 'ukwest' -Theme Light -HtmlPath .\Network.html -NoBrowser
+(Show-AACNetworkTopology -NoBrowser -PassThru).Findings | Where-Object Severity -EQ 'High'
+```
+
+**What it reads**, in every region:
+
+- virtual networks, subnets and peerings, across subscriptions and to
+  networks you can't see
+- VPN and ExpressRoute gateways, connections, circuits and local gateways;
+  Virtual WAN and its hubs
+- Azure Firewalls, network virtual appliances (VMs whose NIC forwards IP
+  traffic), NSGs, route tables, NAT gateways, Bastion, load balancers,
+  Application Gateways, private link services and DNS resolvers
+- VMs, scale sets and private endpoints in their subnets, and the PaaS
+  resources the endpoints serve (`-NetworkOnly` leaves these out)
+
+A peering outside the scope is followed to the network at its other end, and
+a route's next hop to the firewall or appliance that owns the IP, so a
+spoke's diagram reaches its hub.
+
+**Roles.** Each network is a **hub** (gateway transit, or a gateway, firewall
+or appliance and peerings, or three or more peerings), a **spoke** of a hub,
+**peered** or **standalone**.
+
+**Two layouts**, switched at the top of the page:
+
+| Layout                  | What you see                                                                                                                                                                                                                 |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hub & spoke (`-Layout HubSpoke`) | Each hub at the centre, its spokes in rings around it, hubs side by side, other networks below. Each network's box names its subscription, region and resource group. The default when there are hubs with spokes. |
+| Hierarchy (`-Layout Hierarchy`)  | Boxes inside boxes, packed in a grid: tenant, management group, subscription, region, resource group, network, subnet (`-GroupBy Subscription` or `Region` for fewer levels).                                     |
+
+In both, subnets are drawn in rows inside their network, as wide as their
+prefix is big, and resources in a grid inside their subnet. A VM shows its
+NIC's IPs and NSG; an appliance is outlined in the route colour.
+
+**The lines.** Peerings between networks, with their state and what they let
+through (red and dashed when not Connected); private endpoints to the PaaS
+they serve; routes from a subnet to the firewall or appliance that inspects
+its traffic (one line per spoke in the hub & spoke view); a gateway's
+connections and circuits. Subnets in a network reach each other through
+Azure's system routes, so no lines are drawn between them.
+
+**At the prompt**, tiles, the hubs with their transit (firewall, gateway,
+appliance) and spokes, and findings:
+
+| Severity | Finding                                                                                                   |
+| -------- | --------------------------------------------------------------------------------------------------------- |
+| High     | A peering that isn't Connected; a route to an IP no resource you can see has                              |
+| Medium   | A spoke subnet with VMs whose internet traffic isn't sent through a firewall or appliance (no `0.0.0.0/0`) |
+| Info     | A peering to a network you can't see (another tenant, or no Reader); a standalone network                 |
+
 ## Resource map
 
 `Show-AACResourceMap` draws the resources in one or more resource groups, in
@@ -1896,6 +1960,7 @@ Analytics. Read-only, in three steps:
 ```powershell
 Get-AACDiagnosticSetting -SubscriptionId 00000000-0000-0000-0000-000000000000
 Get-AACDiagnosticSetting -ManagementGroupId 'mg-landingzones' -ExpectedWorkspace 'law-central' -HtmlPath .\Diagnostics.html -PdfPath .\Diagnostics.pdf
+Get-AACDiagnosticSetting -Status 'No setting' -CsvPath .\NoDiagnosticSetting.csv   # support logs, nothing configured
 Get-AACDiagnosticSetting -NotExportedOnly -NoDisplay | Group-Object ResourceType | Sort-Object Count -Descending
 Get-AACDiagnosticSetting -ResourceType 'microsoft.keyvault/vaults' -ExpandSetting -CsvPath .\KeyVaultSettings.csv
 ```
@@ -2091,6 +2156,7 @@ everything on this side for real:
 | `Export-AACDiagnosticBundle`                                                      | Resource Graph and Resource Manager, with made-up resources                                                                                                                                                                                                                         | Redaction by name and value, sections per resource, the zip and its files, -Force, -WhatIf, resource groups, pipeline input and the summary                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `Get-AACNetworkSecurityGroup`                                                     | Resource Graph and the parallel ARM reads                                                                                                                                                                                                                                           | Rule evaluation, associations and VMs protected, NIC-and-subnet conflicts, flow logs, findings, the view and the exports                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `Show-AACResourceMap`                                                             | Resource Graph, with a made-up hub-and-spoke estate                                                                                                                                                                                                                                 | Boxes, placement, connections, network paths, NSGs and route tables, the page                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `Show-AACNetworkTopology`                                                         | Resource Graph, with a made-up hub and spokes across two management groups                                                                                                                                                                                                          | Roles, peerings (and what isn't one), NICs as part of their VMs, appliances, the boxes by management group, subscription or region, networks you can't see, findings, scope, -NetworkOnly, the page                                                                                                                                                                                                                                                                                                                                                 |
 | `Get-AACAssignedPolicy`                                                           | Resource Graph and the parallel ARM reads, with a made-up tenant (management groups, an initiative, a missing definition)                                                                                                                                                           | Default, assigned and effective values, resource types from rules (parameters resolved, negated and alias-only rules, initiatives), inherited assignments for a subscription or management group, name filters, the view and the exports                                                                                                                                                                                                                                                                                                            |
 | `Get-AACStorageAccountContainerSize`                                              | Resource Graph, the container listing and the blob service (`Send-AACHttpRequest`, with List Blobs XML pages)                                                                                                                                                                       | The page parser (tiers, snapshots, versions, deleted blobs, Data Lake directories, encoded names, the largest blobs), paging, Entra ID and account SAS, `-AuthMode Auto`, Azure Storage's errors and what to do, filters, the view and the exports                                                                                                                                                                                                                                                                                                  |
 | `Get-AACTerraformPlan`                                                            | Nothing: it reads a made-up Contoso plan file                                                                                                                                                                                                                                       | Actions and reasons, attribute paths, blocks paired by name, JSON-encoded strings, forced replacements, sensitive values kept out of every output, drift, filters, UTF-16 files, the files it refuses, the view and the exports                                                                                                                                                                                                                                                                                                                     |

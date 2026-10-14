@@ -79,9 +79,17 @@ function Get-AACDiagnosticSetting {
     .PARAMETER ExpectedWorkspace
         The workspace (or workspaces) logs should go to - names or resource
         IDs. A setting sending to any other is a finding.
+    .PARAMETER Status
+        Only the resources with this status (or these): Exported, Partial,
+        'Not to workspace', 'No setting', 'No logs', Unknown. The view, the
+        objects, the CSV, HTML and PDF reports and the misconfigurations
+        then cover only those resources; the coverage tiles still describe
+        the whole scope. -Status 'No setting' gives the resources that
+        support diagnostic logs but have no diagnostic setting at all.
     .PARAMETER NotExportedOnly
         Only the resources whose logs don't all reach a workspace: No
-        setting, Not to workspace and Partial.
+        setting, Not to workspace and Partial - the same as -Status 'No
+        setting', 'Not to workspace', 'Partial'.
     .PARAMETER IncludeUnsupported
         Also list the resources whose type has no log categories (No logs).
     .PARAMETER ExpandSetting
@@ -111,6 +119,9 @@ function Get-AACDiagnosticSetting {
         Get-AACDiagnosticSetting -ManagementGroupId 'mg-landingzones' -ExpectedWorkspace 'law-central' -HtmlPath .\out\Diagnostics.html -PdfPath .\out\Diagnostics.pdf
         A management group against the central workspace, as HTML and PDF reports.
     .EXAMPLE
+        Get-AACDiagnosticSetting -Status 'No setting' -CsvPath .\out\NoDiagnosticSetting.csv -HtmlPath .\out\NoDiagnosticSetting.html
+        The resources that support diagnostic logs but have no diagnostic setting at all, as CSV and HTML.
+    .EXAMPLE
         Get-AACDiagnosticSetting -NotExportedOnly -NoDisplay | Group-Object ResourceType | Sort-Object Count -Descending
         The resource types with the most resources whose logs don't reach a workspace.
     .EXAMPLE
@@ -137,6 +148,9 @@ function Get-AACDiagnosticSetting {
 
         [ValidateNotNullOrEmpty()]
         [string[]] $ExpectedWorkspace,
+
+        [ValidateSet('Exported', 'Partial', 'Not to workspace', 'No setting', 'No logs', 'Unknown')]
+        [string[]] $Status,
 
         [switch] $NotExportedOnly,
 
@@ -182,6 +196,7 @@ function Get-AACDiagnosticSetting {
         ResourceType       = @($ResourceType | Where-Object { $_ } | ForEach-Object { $_.ToLowerInvariant() })
         ExpectedWorkspace  = @($ExpectedWorkspace | Where-Object { $_ })
         NotExportedOnly    = [bool]$NotExportedOnly
+        Status             = @($Status | Where-Object { $_ })
         IncludeUnsupported = [bool]$IncludeUnsupported
         ExpandSetting      = [bool]$ExpandSetting
         ThrottleLimit      = $ThrottleLimit
@@ -294,10 +309,16 @@ function Get-AACDiagnosticSetting {
 
         # --- What to return -----------------------------------------------------------------------------------------
         $shown = @($result.Coverage | Where-Object {
-                ($request.IncludeUnsupported -or $_.Status -ne 'No logs') -and
-                (-not $request.NotExportedOnly -or $_.Status -in 'No setting', 'Not to workspace', 'Partial')
+                ($request.IncludeUnsupported -or $request.Status -contains 'No logs' -or $_.Status -ne 'No logs') -and
+                (-not $request.NotExportedOnly -or $_.Status -in 'No setting', 'Not to workspace', 'Partial') -and
+                (-not $request.Status.Count -or $_.Status -in $request.Status)
             })
         $result['Shown'] = $shown
+        # With -Status, the misconfigurations are those of the resources shown.
+        if ($request.Status.Count) {
+            $ids = [System.Collections.Generic.HashSet[string]]::new([string[]]@($shown | ForEach-Object { [string]$_.ResourceId }), [System.StringComparer]::OrdinalIgnoreCase)
+            $result['Findings'] = @($result.Findings | Where-Object { $ids.Contains([string]$_.ResourceId) })
+        }
         $rows = if ($request.ExpandSetting) { @($shown | ForEach-Object { $_.Detail }) } else { $shown }
         $result['Rows'] = $rows
         $notices = [System.Collections.Generic.List[string]]::new()
@@ -311,6 +332,7 @@ function Get-AACDiagnosticSetting {
         if ($request.ResourceGroupName.Count) { $scope['Resource groups'] = $request.ResourceGroupName -join ', ' }
         if ($request.ResourceType.Count) { $scope['Resource types'] = $request.ResourceType -join ', ' }
         if ($request.ExpectedWorkspace.Count) { $scope['Expected workspace'] = $request.ExpectedWorkspace -join ', ' }
+        if ($request.Status.Count) { $scope['Status'] = $request.Status -join ', ' }
         $result['Scope'] = $scope
         $csvRows = if ($request.ExpandSetting) { $rows } else { @($rows | Select-Object -Property * -ExcludeProperty Detail) }
         $null = Invoke-AACExport -CsvPath $request.CsvPath -CsvObject @($csvRows) -Noun $(if ($request.ExpandSetting) { 'diagnostic setting' } else { 'resource' }) -PdfPath $request.PdfPath -WritePdf {

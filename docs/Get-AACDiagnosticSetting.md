@@ -21,9 +21,9 @@ Lists every resource's diagnostic settings, flattened, and finds the resources w
 ```
 Get-AACDiagnosticSetting [[-SubscriptionId] <string[]>] [[-ManagementGroupId] <string[]>]
  [[-ResourceGroupName] <string[]>] [[-ResourceType] <string[]>] [[-ExpectedWorkspace] <string[]>]
- [[-ThrottleLimit] <int>] [[-CsvPath] <string>] [[-PdfPath] <string>] [[-HtmlPath] <string>]
- [[-Title] <string>] [-NotExportedOnly] [-IncludeUnsupported] [-ExpandSetting] [-PassThru]
- [-NoDisplay] [-NoPaging]
+ [[-Status] <string[]>] [[-ThrottleLimit] <int>] [[-CsvPath] <string>] [[-PdfPath] <string>]
+ [[-HtmlPath] <string>] [[-Title] <string>] [-NotExportedOnly] [-IncludeUnsupported]
+ [-ExpandSetting] [-PassThru] [-NoDisplay] [-NoPaging]
 ```
 
 ## ALIASES
@@ -126,12 +126,20 @@ A management group against the central workspace, as HTML and PDF reports.
 ### Example 3
 
 ```powershell
+Get-AACDiagnosticSetting -Status 'No setting' -CsvPath .\out\NoDiagnosticSetting.csv -HtmlPath .\out\NoDiagnosticSetting.html
+```
+
+The resources that support diagnostic logs but have no diagnostic setting at all, as CSV and HTML.
+
+### Example 4
+
+```powershell
 Get-AACDiagnosticSetting -NotExportedOnly -NoDisplay | Group-Object ResourceType | Sort-Object Count -Descending
 ```
 
 The resource types with the most resources whose logs don't reach a workspace.
 
-### Example 4
+### Example 5
 
 ```powershell
 Get-AACDiagnosticSetting -ResourceType 'microsoft.keyvault/vaults' -ExpandSetting -CsvPath .\out\KeyVaultSettings.csv
@@ -152,7 +160,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 6
+  Position: 7
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -216,7 +224,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 8
+  Position: 9
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -313,7 +321,8 @@ HelpMessage: ''
 ### -NotExportedOnly
 
 Only the resources whose logs don't all reach a workspace: No
-setting, Not to workspace and Partial.
+setting, Not to workspace and Partial - the same as -Status 'No
+setting', 'Not to workspace', 'Partial'.
 
 ```yaml
 Type: System.Management.Automation.SwitchParameter
@@ -364,7 +373,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 7
+  Position: 8
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -419,6 +428,32 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -Status
+
+Only the resources with this status (or these): Exported, Partial,
+'Not to workspace', 'No setting', 'No logs', Unknown. The view, the
+objects, the CSV, HTML and PDF reports and the misconfigurations
+then cover only those resources; the coverage tiles still describe
+the whole scope. -Status 'No setting' gives the resources that
+support diagnostic logs but have no diagnostic setting at all.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 5
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -SubscriptionId
 
 Only these subscriptions.
@@ -452,7 +487,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 5
+  Position: 6
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -473,7 +508,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 9
+  Position: 10
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false

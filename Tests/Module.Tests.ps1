@@ -81,6 +81,7 @@ Describe 'Azure Admin Console - Module scaffold' {
             'Show-AACCost'
             'Show-AACDashboard'
             'Show-AACJson'
+            'Show-AACNetworkTopology'
             'Show-AACResource'
             'Show-AACResourceMap'
         )

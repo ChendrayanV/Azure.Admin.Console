@@ -12,3 +12,5 @@ AzureAssessment-*/
 
 # Demo video - hosted on YouTube
 video/*.mp4
+.claude/
+CLAUDE.MD

@@ -78,6 +78,7 @@
         'Show-AACCost'
         'Show-AACDashboard'
         'Show-AACJson'
+        'Show-AACNetworkTopology'
         'Show-AACResource'
         'Show-AACResourceMap'
     )

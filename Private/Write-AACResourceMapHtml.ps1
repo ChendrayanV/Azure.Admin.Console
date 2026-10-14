@@ -32,7 +32,18 @@ function Write-AACResourceMapHtml {
 
         # NSGs and route tables as chips on what they're applied to, or as cards.
         [ValidateSet('chips', 'cards')]
-        [string] $NsgView = 'chips'
+        [string] $NsgView = 'chips',
+
+        # layered: ELK's layered layout of the nested boxes. hubspoke: each
+        # hub with its spokes around it (Show-AACNetworkTopology), the page
+        # able to switch to layered.
+        [ValidateSet('layered', 'hubspoke', 'packed')]
+        [string] $Layout = 'layered',
+
+        # What the page's Hierarchy button draws: layered (ELK's layers), or
+        # packed - boxes inside boxes in a grid, the lines drawn straight.
+        [ValidateSet('layered', 'packed')]
+        [string] $Hierarchy = 'layered'
     )
 
     $asset = Get-AACResourceMapAsset
@@ -49,7 +60,7 @@ function Write-AACResourceMapHtml {
     $model = [ordered]@{
         title    = $Title
         facts    = @($Fact)
-        options  = @{ direction = $Direction; theme = $Theme; nsgView = $NsgView }
+        options  = @{ direction = $Direction; theme = $Theme; nsgView = $NsgView; layout = $Layout; hierarchy = $Hierarchy; hubSpoke = [bool]@($Map.Clusters | Where-Object { $_.Contains('role') -and $_['role'] -eq 'hub' }).Count }
         clusters = @($Map.Clusters)
         nodes    = @($Map.Nodes)
         edges    = @($Map.Edges)
