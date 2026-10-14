@@ -52,7 +52,10 @@ Entra ID.
 One row per member of each group (AAC.EntraGroupMember): GroupName,
 GroupType (Microsoft 365, Security, Mail-enabled security,
 Distribution - dynamic, role-assignable), GroupSource (Cloud, or
-synced from on-premises AD), MemberName, MemberType (User, Group,
+synced from on-premises AD), MembershipType (Assigned, Dynamic,
+Dynamic (paused)), GroupCreated (UTC), GroupOwners ('Name (UPN);
+...' - users and service principals - or '(No owners)'),
+MemberName, MemberType (User, Group,
 Device, Service principal, Contact), UserPrincipalName, Mail,
 UserType (Member or Guest), AccountEnabled, JobTitle, Department,
 Membership (Direct, Nested, or Empty for a group with no members),
@@ -62,9 +65,11 @@ MemberId. The same rows go to CSV, HTML and PDF.
 What you get depends on where the command runs:
 
 ```text
-  at the prompt    tiles, each group's type, source and counts, and
-                   each group's members as a tree (nested groups
-                   under their group) - a page at a time
+  at the prompt    tiles and a table of the groups, then each
+                   group in turn: its details (type, source,
+                   membership type, created, owners, counts), its
+                   direct members, and each nested group's members
+                   under its path - a page at a time
   piped onward     the rows, with no view
   -PassThru        the view and the rows
   -NoDisplay       the rows only
@@ -73,15 +78,21 @@ What you get depends on where the command runs:
 -CsvPath writes the CSV - by default in Export-EntraGroupMemberShip.ps1's
 layout: one row per group with GroupName, GroupSource (Cloud or
 Windows Server AD), GroupType ('Security', 'Microsoft 365 / Dynamic',
-'Mail-Enabled Security / Role-Assignable' ...), Members (the direct
-members, groups marked ' (Group)', or '(No members)') and
-NestedGroupMembers (each nested group's own members, 'Group: a, b;
-Other: c'). -CsvLayout Member writes the rows above instead, one per
-group and member. -HtmlPath writes an interactive report:
-tiles and charts that filter the tables, a table of groups and one of
-every membership - searchable, filterable by group, member type,
-guest or member, direct or nested, and downloadable as CSV. -PdfPath
-writes a PDF: the summary, the groups, and each group's members.
+'Mail-Enabled Security / Role-Assignable' ...), Members (everyone in
+the group, flattened: direct members and the members of every nested
+group at any depth - users, service principals, devices, contacts -
+each once, or '(No members)') and NestedGroupMembers
+(every nested group at any depth, by its path, with its own members:
+'Group: a, b; Group \> Inner: c'), then Owners, CreatedDateTime (UTC)
+and MembershipType. -CsvLayout Member writes the rows above instead, one per
+group and member. -HtmlPath writes an interactive report: tiles, the
+groups as a tree (each group's details, owners and direct members,
+nested groups opening to their own members - searchable), charts,
+and tabs with the groups, everyone in each group once (Direct,
+Nested or both, and through which nested group) and every
+membership row - filterable and downloadable as CSV. -PdfPath
+writes a PDF: the summary, the groups, then a page per group with
+its details, direct members and each nested group's members.
 With any of them, the console shows only the progress and the files
 written.
 

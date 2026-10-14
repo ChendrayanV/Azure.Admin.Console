@@ -59,8 +59,14 @@ function Write-AACHtmlReport {
                     score, drawn as a coloured pill; h, m, lo = high,
                     medium and low findings, as red, amber and blue pills;
                     co = a cost, drawn as a green pill (amber with cx), with
-                    ct as its tooltip }. Children
+                    ct as its tooltip; pl = @(@(text, tone, tooltip), ...)
+                    pills of any kind }. Children
                     are drawn when a node is opened, so big trees stay fast.
+                    For a hierarchy of something else: Levels = @{ code =
+                    @(label, tone) }, Order = @(codes, top first), Buttons =
+                    @(@(label, code), ...) ('Open to <label>') and
+                    Placeholder (the search box's hint); Top = $true draws
+                    it above the charts.
 
         Every table can be searched, filtered, sorted (click a header),
         grouped (with subtotals) and downloaded as CSV - the rows shown, all
@@ -167,6 +173,7 @@ function Write-AACHtmlReport {
     if ($OverviewTab) { $model['overviewTab'] = $OverviewTab }
     if ($Tree) {
         $model['tree'] = [ordered]@{ title = $Tree.Title; openTo = $(if ($Tree.Contains('OpenTo')) { $Tree.OpenTo } else { 's' }); root = $Tree.Root }
+        foreach ($key in 'Levels', 'Order', 'Buttons', 'Placeholder', 'Top') { if ($Tree.Contains($key) -and $Tree[$key]) { $model['tree'][$key.ToLowerInvariant()] = $Tree[$key] } }
     }
 
     # EscapeHtml turns < > & ' into \u escapes, so no value can close the

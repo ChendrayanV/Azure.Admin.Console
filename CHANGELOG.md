@@ -2,6 +2,22 @@
 
 All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never published to the PowerShell Gallery.
 
+## Unreleased
+
+### New
+
+- `Get-AACEntraGroupMembership` shows each group's **owners** (users and service principals, `Name (UPN)`), **when it was created** (UTC) and its **membership type** (Assigned, Dynamic, or Dynamic (paused)), next to its type and source. You'll find them in the console (groups table and each group's heading), on every row (`MembershipType`, `GroupCreated`, `GroupOwners`), in the HTML and PDF groups tables, and in the CSV, as three columns after Export-EntraGroupMemberShip.ps1's five (`Owners`, `CreatedDateTime`, `MembershipType`). Owners are read only for the groups asked for, not for the groups nested in them.
+- `Get-AACEntraGroupMembership` reports are easier to read: each group is laid out the way admins read it, with its details first, then its direct members, then each nested group's members.
+  - **Console:** each group has its own heading, then its details (type, source, membership type, created, owners, and counts with guests and disabled accounts), a **Direct members** table, and a **Nested group <path>** table for each nested group. A nested group in a table says its members are listed below, or that it's a loop already listed above.
+  - **HTML:** the overview opens on a tree of the groups. Each group opens to its owners and direct members, and each nested group opens to its own members, with GUEST and DISABLED flags and search. A report of a few groups opens fully. New **Members** tab: everyone in each group once, marked Direct, Nested or Direct and nested, with the nested groups they come through. A "groups without owners" tile.
+  - **PDF:** a page per group with its details, its direct members, and each nested group's members.
+
+### Fixed
+
+- `Get-AACEntraGroupMembership` left service principals out of every group, and so a nested group whose members were service principals looked empty, in the console view, the objects and every export. Microsoft Graph v1.0 leaves service principals out of `/groups/{id}/members` unless the request is an advanced query. The members are now read with `$count=true` and `ConsistencyLevel: eventual`, which returns them. Sign-in is unchanged: the `Connect-AAC` session.
+- Nested group members are now shown expanded, not hidden under their group:
+  - **CSV** (one row per group, Export-EntraGroupMemberShip.ps1's five columns): `Members` is everyone in the group, flattened. It holds the direct members and the members of every nested group at any depth, each once, with no `name (Group)` entries. `NestedGroupMembers` follows every depth and names each group by its path (`grp-a: x, y; grp-a > grp-b: z`), listing each group once.
+
 ## v0.14.4
 
 A fix to `Export-AACResource`.

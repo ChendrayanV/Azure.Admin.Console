@@ -5,12 +5,15 @@ function Write-AACGroupMembershipPdf {
     .DESCRIPTION
         1. Summary: title, scope, tiles (groups, unique users, guests,
            disabled accounts, nested groups, empty groups).
-        2. Groups: type, source, direct members, nested groups, users,
-           guests, disabled - and why a group's members couldn't be read.
-        3. Members, group by group: every row - name, type, user principal
-           name, member or guest, account, direct or nested (and through
-           which group) - up to -MaxRows; the CSV and HTML report have them
-           all. Guests in amber, disabled accounts in red.
+        2. Groups: type, membership type and owners under the name, source
+           and created date, direct members, nested groups, users, guests,
+           disabled - and why a group's members couldn't be read.
+        3. Each group on its own page: its details (type, source,
+           membership type, created, owners, counts), its direct members,
+           then each nested group's members under its path - name, type,
+           user principal name, member or guest, account - up to -MaxRows
+           rows; the CSV and HTML report have them all. Guests in amber,
+           disabled accounts in red.
 
         -Path must be a full path; see Save-AACPdfDocument.
     #>
@@ -91,8 +94,19 @@ function Write-AACGroupMembershipPdf {
             $why.Format.Font.Size = 7
             $why.Format.Font.Color = $colors.Amber
         }
+        $ownerLine = $row.Cells[0].AddParagraph("Owners: $($group.Owners)")
+        $ownerLine.Format.Font.Size = 7
+        $ownerLine.Format.Font.Color = $(if ($group.OwnerCount) { $colors.Muted } else { $colors.Amber })
         $row.Cells[1].AddParagraph($group.GroupType) | Out-Null
+        $kind = $row.Cells[1].AddParagraph($group.MembershipType)
+        $kind.Format.Font.Size = 7
+        $kind.Format.Font.Color = $colors.Muted
         $row.Cells[2].AddParagraph($group.GroupSource).Format.Font.Color = $colors.Muted
+        if ($group.Created) {
+            $when = $row.Cells[2].AddParagraph("Created $($group.Created.ToString('yyyy-MM-dd'))")
+            $when.Format.Font.Size = 7
+            $when.Format.Font.Color = $colors.Muted
+        }
         & $number $row.Cells[3] $group.DirectMembers
         & $number $row.Cells[4] $group.NestedGroups
         & $number $row.Cells[5] $group.Users
@@ -101,43 +115,72 @@ function Write-AACGroupMembershipPdf {
     }
 
     # --- 3. Members, group by group -------------------------------------------------------------------
+    # --- 3. Each group: its details, its direct members, then each nested group's members ---------------
     $shown = 0
-    $all = @($Membership.Rows)
+    $total = 0
+    foreach ($parts in $Membership.Sections.Values) { foreach ($part in @($parts)) { $total += $part.Members.Count } }
     foreach ($group in $Membership.Groups) {
         if ($shown -ge $MaxRows) { break }
-        $rows = @($all | Where-Object GroupId -EQ $group.GroupId | Select-Object -First ($MaxRows - $shown))
-        $shown += $rows.Count
+        $people = @($Membership.People | Where-Object GroupId -EQ $group.GroupId)
         $section.AddPageBreak()
         $section.AddParagraph("$($group.GroupName)", 'Heading2') | Out-Null
-        $note = $section.AddParagraph("$($group.GroupType) · $($group.GroupSource) · $($group.DirectMembers) direct member(s) · $($group.Users) user(s) at every level")
-        $note.Format.Font.Size = 8
-        $note.Format.Font.Color = $colors.Muted
-        $note.Format.SpaceAfter = & $pt 4
-        $table = & $pdf.NewTable @(5.6, 2.4, 6.4, 1.8, 1.9, 1.9, 6.0)
-        & $pdf.AddHeaderRow $table @('Member', 'Type', 'User principal name', 'User type', 'Account', 'Membership', 'Via')
-        foreach ($item in $rows) {
-            $row = & $pdf.AddBodyRow $table
-            if ($item.Membership -in 'Empty', 'Not read') {
-                $row.Cells[0].MergeRight = 6
-                $row.Cells[0].AddParagraph($(if ($item.Membership -eq 'Empty') { 'No members.' } else { "The members couldn't be read: $($group.Error)" })).Format.Font.Color = $colors.Amber
+
+        # The details: label and value, two pairs a row.
+        $facts = [ordered]@{
+            'Type'       = $group.GroupType
+            'Created'    = $(if ($group.Created) { $group.Created.ToString('yyyy-MM-dd HH:mm') + ' UTC' } else { 'unknown' })
+            'Source'     = $group.GroupSource
+            'Owners'     = $group.Owners
+            'Membership' = $group.MembershipType
+            'Members'    = "$($group.DirectMembers) direct · $($group.NestedGroups) nested group(s) · $($people.Count) in all ($(@($people | Where-Object UserType -EQ 'Guest').Count) guest(s), $(@($people | Where-Object { $_.AccountEnabled -eq $false }).Count) disabled)"
+        }
+        if ($group.MembershipRule) { $facts['Rule'] = $group.MembershipRule; $facts[' '] = '' }
+        $details = & $pdf.NewTable @(2.6, 8.0, 2.2, 13.8)
+        $keys = @($facts.Keys)
+        for ($i = 0; $i -lt $keys.Count; $i += 2) {
+            $row = $details.AddRow()
+            foreach ($j in 0, 1) {
+                if ($i + $j -ge $keys.Count) { break }
+                $label = $row.Cells[$j * 2].AddParagraph([string]$keys[$i + $j])
+                $label.Format.Font.Color = $colors.Muted
+                $value = $row.Cells[$j * 2 + 1].AddParagraph([string]$facts[$keys[$i + $j]])
+                if ($keys[$i + $j] -eq 'Owners' -and -not $group.OwnerCount) { $value.Format.Font.Color = $colors.Amber }
+            }
+        }
+
+        foreach ($part in @($Membership.Sections[$group.GroupId])) {
+            if ($shown -ge $MaxRows) { break }
+            $count = $part.Members.Count
+            $heading = if ($part.Depth -eq 0) { "Direct members ($count)" } else { "Nested group: $($part.Path) ($count member$(if ($count -ne 1) { 's' }))" }
+            $section.AddParagraph($heading, 'Heading3') | Out-Null
+            if ($part.Error -or -not $count) {
+                $note = $section.AddParagraph($(if ($part.Error) { "The members couldn't be read: $($part.Error)" } else { 'No members.' }))
+                $note.Format.Font.Color = $colors.Amber
                 continue
             }
-            $member = $row.Cells[0].AddParagraph(('  ' * [int]$item.Depth) + $item.MemberName)
-            if ($item.MemberType -eq 'Group') { $member.Format.Font.Name = 'Segoe UI Semibold' }
-            $row.Cells[1].AddParagraph($item.MemberType) | Out-Null
-            $row.Cells[2].AddParagraph($item.UserPrincipalName).Format.Font.Size = 7.5
-            $userType = $row.Cells[3].AddParagraph($item.UserType)
-            if ($item.UserType -eq 'Guest') { $userType.Format.Font.Color = $pdf.Tone.Warn.Solid; $userType.Format.Font.Name = 'Segoe UI Semibold' }
-            $account = $row.Cells[4].AddParagraph($(if ($item.MemberType -ne 'User') { '' } elseif ($item.AccountEnabled -eq $false) { 'Disabled' } else { 'Enabled' }))
-            if ($item.AccountEnabled -eq $false) { $account.Format.Font.Color = $pdf.Tone.Bad.Solid; $account.Format.Font.Name = 'Segoe UI Semibold' }
-            $row.Cells[5].AddParagraph($item.Membership).Format.Font.Color = $(if ($item.Membership -eq 'Nested') { $colors.Muted } else { $colors.Ink })
-            $via = $row.Cells[6].AddParagraph($item.Via)
-            $via.Format.Font.Size = 7
-            $via.Format.Font.Color = $colors.Muted
+            $table = & $pdf.NewTable @(6.4, 3.0, 8.2, 2.2, 2.2, 4.6)
+            & $pdf.AddHeaderRow $table @('Member', 'Type', 'User principal name', 'User type', 'Account', 'Note')
+            foreach ($item in @($part.Members | Sort-Object -Property @{ Expression = { $_.MemberType -eq 'Group' } }, MemberName | Select-Object -First ($MaxRows - $shown))) {
+                $shown++
+                $row = & $pdf.AddBodyRow $table
+                $member = $row.Cells[0].AddParagraph($(if ($item.MemberName) { $item.MemberName } elseif ($item.UserPrincipalName) { $item.UserPrincipalName } else { $item.MemberId }))
+                if ($item.MemberType -eq 'Group') {
+                    $member.Format.Font.Name = 'Segoe UI Semibold'
+                    $row.Cells[1].AddParagraph('Nested group').Format.Font.Color = $pdf.Tone.Warn.Solid
+                    $row.Cells[5].AddParagraph($(if ($part.Loops.Contains($item.MemberId)) { 'Already listed above (a loop)' } else { 'Its members follow' })).Format.Font.Color = $colors.Muted
+                    continue
+                }
+                $row.Cells[1].AddParagraph($item.MemberType) | Out-Null
+                $row.Cells[2].AddParagraph($item.UserPrincipalName).Format.Font.Size = 7.5
+                $userType = $row.Cells[3].AddParagraph($item.UserType)
+                if ($item.UserType -eq 'Guest') { $userType.Format.Font.Color = $pdf.Tone.Warn.Solid; $userType.Format.Font.Name = 'Segoe UI Semibold' }
+                $account = $row.Cells[4].AddParagraph($(if ($item.MemberType -ne 'User') { '' } elseif ($item.AccountEnabled -eq $false) { 'Disabled' } else { 'Enabled' }))
+                if ($item.AccountEnabled -eq $false) { $account.Format.Font.Color = $pdf.Tone.Bad.Solid; $account.Format.Font.Name = 'Segoe UI Semibold' }
+            }
         }
     }
-    if ($shown -lt $all.Count) {
-        $more = $section.AddParagraph("The first $('{0:N0}' -f $shown) of $('{0:N0}' -f $all.Count) rows are shown; the CSV and HTML report have them all.")
+    if ($shown -lt $total) {
+        $more = $section.AddParagraph("The first $('{0:N0}' -f $shown) of $('{0:N0}' -f $total) rows are shown; the CSV and HTML report have them all.")
         $more.Format.Font.Color = $colors.Muted
     }
 

@@ -9,7 +9,9 @@ function Read-AACEntraGroup {
           -GroupName            one exact displayName filter per name
           -GroupNameStartsWith  startswith(displayName, ...)
           neither               every group
-        Members (GET /v1.0/groups/{id}/members, $top=999): the groups found,
+        Members (GET /v1.0/groups/{id}/members, $top=999, as an advanced
+        query - $count=true with ConsistencyLevel: eventual - or Graph v1.0
+        leaves service principals out): the groups found,
         then the groups nested in them, and so on - each group read once,
         however many groups it is nested in - up to 20 levels.
 
@@ -18,9 +20,13 @@ function Read-AACEntraGroup {
         Connect-AAC sign-in (Get-AACAccessToken -Resource
         https://graph.microsoft.com) - no second sign-in.
 
+        Owners (GET /v1.0/groups/{id}/owners, the same advanced query): the
+        groups found, not the nested ones.
+
         Returns @{ Groups; Members (group ID -> members); MemberErrors
-        (group ID -> why they couldn't be read); Missing (names with no
-        group) }. Progress goes to the Invoke-AACProgress display.
+        (group ID -> why they couldn't be read); Owners (group ID ->
+        owners); OwnerErrors; Missing (names with no group) }. Progress
+        goes to the Invoke-AACProgress display.
     #>
     [CmdletBinding()]
     [OutputType([hashtable])]
@@ -31,7 +37,8 @@ function Read-AACEntraGroup {
     )
 
     $graph = 'https://graph.microsoft.com/v1.0'
-    $groupSelect = 'id,displayName,description,groupTypes,securityEnabled,mailEnabled,isAssignableToRole,onPremisesSyncEnabled,membershipRule,mail'
+    $groupSelect = 'id,displayName,description,groupTypes,securityEnabled,mailEnabled,isAssignableToRole,onPremisesSyncEnabled,membershipRule,membershipRuleProcessingState,mail,createdDateTime'
+    $ownerSelect = 'id,displayName,userPrincipalName,mail'
     $memberSelect = 'id,displayName,userPrincipalName,mail,userType,accountEnabled,jobTitle,department'
     # An OData string literal: single quotes doubled, then URL-escaped.
     $literal = { param([string] $Text) [System.Uri]::EscapeDataString("'" + ($Text -replace "'", "''") + "'") }
@@ -64,6 +71,29 @@ function Read-AACEntraGroup {
     $missing = @(foreach ($name in @($GroupName | Where-Object { $_ } | Select-Object -Unique)) { if (-not $found["name:$name"].Count) { $name } })
     Update-AACProgress -Id 'groups' -Complete -Description ('Found {0:N0} group(s){1}' -f $groups.Count, $(if ($missing.Count) { "; $($missing.Count) name(s) not found" }))
 
+    # --- Their owners (the groups asked for, not the nested ones) ---------------------------------------
+    $owners = @{}
+    $ownerErrors = @{}
+    foreach ($id in $groups.Keys) { $owners[$id] = [System.Collections.Generic.List[object]]::new() }
+    if ($groups.Count) {
+        Update-AACProgress -Id 'owners' -Total $groups.Count -Description ('Reading the owners of {0:N0} group(s)' -f $groups.Count)
+        $ownerPages = {
+            param($Key, [string] $Content)
+            $page = ConvertFrom-Json -InputObject $Content -AsHashtable -Depth 20
+            foreach ($item in @($page['value'])) { if ($null -ne $item) { $owners[$Key].Add($item) } }
+            if ($page['@odata.nextLink']) { @{ Uri = [string]$page['@odata.nextLink'] } }
+        }
+        # An advanced query, as for the members: service principals can own groups too.
+        $failures = Invoke-AACHttpBatch -Request @($groups.Keys | ForEach-Object { @{ Key = $_; Body = $null; Uri = "$graph/groups/$_/owners?`$select=$ownerSelect&`$top=999&`$count=true" } }) -OnResponse $ownerPages -Resource 'https://graph.microsoft.com' -Header @{ ConsistencyLevel = 'eventual' } -ThrottleLimit 8 -OnDone {
+            param($Key, $Failure, $Done, $Total)
+            Update-AACProgress -Id 'owners' -Increment 1 -Description ('Reading the owners of {0:N0} group(s)' -f $Done)
+        }
+        foreach ($key in $failures.Keys) { if ($failures[$key]) { $ownerErrors[$key] = $failures[$key] } }
+        $ownerCount = 0
+        foreach ($list in $owners.Values) { $ownerCount += $list.Count }
+        Update-AACProgress -Id 'owners' -Complete -Description ('Read {0:N0} owner(s) of {1:N0} group(s){2}' -f $ownerCount, $groups.Count, $(if ($ownerErrors.Count) { "; $($ownerErrors.Count) could not be read" }))
+    }
+
     # --- Their members, a level of nesting at a time -------------------------------------------------
     $members = @{}
     $memberErrors = @{}
@@ -84,7 +114,9 @@ function Read-AACEntraGroup {
             if ($page['@odata.nextLink']) { @{ Uri = [string]$page['@odata.nextLink'] } }
         }
         $before = $calls
-        $failures = Invoke-AACHttpBatch -Request @($batch | ForEach-Object { @{ Key = $_; Body = $null; Uri = "$graph/groups/$_/members?`$select=$memberSelect&`$top=999" } }) -OnResponse $memberPages -Resource 'https://graph.microsoft.com' -ThrottleLimit 8 -OnDone {
+        # Advanced query ($count with ConsistencyLevel: eventual): without
+        # it, v1.0 leaves service principals out of a group's members.
+        $failures = Invoke-AACHttpBatch -Request @($batch | ForEach-Object { @{ Key = $_; Body = $null; Uri = "$graph/groups/$_/members?`$select=$memberSelect&`$top=999&`$count=true" } }) -OnResponse $memberPages -Resource 'https://graph.microsoft.com' -Header @{ ConsistencyLevel = 'eventual' } -ThrottleLimit 8 -OnDone {
             param($Key, $Failure, $Done, $Total)
             Update-AACProgress -Id 'members' -Total ($before + $Total) -Increment 1 -Description ('Reading the members of {0:N0} group(s){1}' -f ($before + $Done), $(if ($level -gt 1) { " (nesting level $level)" }))
         }
@@ -99,10 +131,14 @@ function Read-AACEntraGroup {
 
     $plain = @{}
     foreach ($key in $members.Keys) { $plain[$key] = $members[$key].ToArray() }
+    $plainOwners = @{}
+    foreach ($key in $owners.Keys) { $plainOwners[$key] = $owners[$key].ToArray() }
     @{
         Groups       = @($groups.Values)
         Members      = $plain
         MemberErrors = $memberErrors
+        Owners       = $plainOwners
+        OwnerErrors  = $ownerErrors
         Missing      = $missing
     }
 }

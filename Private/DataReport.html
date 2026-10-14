@@ -135,6 +135,14 @@ button.hbar:hover { background: var(--panel-2); }
 .lvl.g { background: var(--info-soft); color: var(--info); }
 .lvl.r { background: var(--good-soft); color: var(--good); }
 .lvl.d { background: var(--warn-soft); color: var(--warn); }
+.lvl.x-good { background: var(--good-soft); color: var(--good); }
+.lvl.x-warn { background: var(--warn-soft); color: var(--warn); }
+.lvl.x-bad { background: var(--bad-soft); color: var(--bad); }
+.lvl.x-info { background: var(--info-soft); color: var(--info); }
+.lvl.x-violet { background: var(--violet-soft); color: var(--violet); }
+.lvl.x-neutral { background: var(--neutral-soft); color: var(--neutral); }
+.pill.violet { background: var(--violet-soft); color: var(--violet); }
+.pill.neutral { background: var(--neutral-soft); color: var(--neutral); }
 .pill.cost { background: var(--good-soft); color: var(--good); font-weight: 650; }
 .pill.cost.x { background: var(--warn-soft); color: var(--warn); }
 .tnode .tname { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
@@ -885,22 +893,27 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
   //         f: { table, filters } (what clicking it shows), k: children, x: flagged,
   //         co / ct / cx: cost text, its tooltip, and whether it is a warning }
   if (D.tree) (function (T) {
-    var LEVEL = { t: 'TENANT', m: 'MG', s: 'SUB', g: 'RG', r: 'RES', d: 'DEL' };
+    var LEVEL = { t: 'TENANT', m: 'MG', s: 'SUB', g: 'RG', r: 'RES', d: 'DEL' }, TONE = {};
+    // T.levels: { code: [label, tone] } for a hierarchy of other things (groups, people).
+    Object.keys(T.levels || {}).forEach(function (code) { LEVEL[code] = T.levels[code][0]; TONE[code] = T.levels[code][1]; });
+    function lvl(code) { return el('span', 'lvl ' + (TONE[code] ? 'x-' + TONE[code] : code), LEVEL[code] || code); }
     var card = el('section', 'card tree-card');
     card.appendChild(el('h2', null, T.title || 'Hierarchy'));
     var tools = el('div', 'tree-tools'); card.appendChild(tools);
     var search = el('label', 'search');
     search.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
-    var input = el('input'); input.type = 'search'; input.placeholder = 'Find a management group, subscription, resource group or resource...'; input.setAttribute('aria-label', 'Search the hierarchy');
+    var input = el('input'); input.type = 'search'; input.placeholder = T.placeholder || 'Find a management group, subscription, resource group or resource...'; input.setAttribute('aria-label', 'Search the hierarchy');
     search.appendChild(input); tools.appendChild(search);
-    [['Collapse', 1], ['Management groups', 'm'], ['Subscriptions', 's'], ['Resource groups', 'g']].forEach(function (b) {
+    [['Collapse', 1]].concat(T.buttons || [['Management groups', 'm'], ['Subscriptions', 's'], ['Resource groups', 'g']]).forEach(function (b) {
       var btn = el('button', 'tool-btn', b[1] === 1 ? 'Collapse all' : 'Open to ' + b[0].toLowerCase()); btn.type = 'button';
       btn.addEventListener('click', function () { input.value = ''; draw(b[1]); });
       tools.appendChild(btn);
     });
     var box = el('div', 'tree'); card.appendChild(box);
     $('tree').appendChild(card);
-    var order = ['t', 'm', 's', 'g', 'r', 'd'];
+    // T.top: the hierarchy is the point of the report - draw it above the charts.
+    if (T.top && $('charts')) $('charts').parentNode.insertBefore($('tree'), $('charts'));
+    var order = T.order || ['t', 'm', 's', 'g', 'r', 'd'];
 
     function counts(n) {
       var s = el('span', 'tcount');
@@ -912,6 +925,8 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
     }
     // A node's security posture: its score in colour, and findings by severity.
     function posture(row, n) {
+      // n.pl: [[text, tone, tooltip], ...] - pills of any kind.
+      (n.pl || []).forEach(function (p) { var x = el('span', 'pill ' + (p[1] || 'neutral'), p[0]); if (p[2]) x.title = p[2]; row.appendChild(x); });
       if (n.p !== undefined && n.p !== null) { var p = el('span', 'pill ' + (n.p >= 70 ? 'good' : n.p >= 40 ? 'warn' : 'bad'), n.p + '%'); p.title = 'Secure score'; row.appendChild(p); }
       [['h', 'H', 'bad', 'high'], ['m', 'M', 'warn', 'medium'], ['lo', 'L', 'info', 'low']].forEach(function (s) {
         if (n[s[0]]) { var x = el('span', 'pill ' + s[2], s[1] + n[s[0]]); x.title = n[s[0]] + ' ' + s[3] + '-severity finding' + (n[s[0]] === 1 ? '' : 's'); row.appendChild(x); }
@@ -930,7 +945,7 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
       var kids = n.k || [];
       var chev = el('span', 'chev' + (kids.length ? '' : ' leaf'), '›');
       row.appendChild(chev);
-      row.appendChild(el('span', 'lvl ' + n.l, LEVEL[n.l]));
+      row.appendChild(lvl(n.l));
       row.appendChild(nameOf(n));
       row.appendChild(el('span', 'tdetail', n.d || ''));
       row.appendChild(counts(n));
@@ -961,7 +976,7 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
         var here = path ? path + ' / ' + n.n : n.n;
         if (found < 500 && (n.n + ' ' + (n.d || '')).toLowerCase().indexOf(q) >= 0) {
           var li = el('li'); var row = el('div', 'tnode');
-          row.appendChild(el('span', 'chev leaf', '›')); row.appendChild(el('span', 'lvl ' + n.l, LEVEL[n.l])); row.appendChild(nameOf(n));
+          row.appendChild(el('span', 'chev leaf', '›')); row.appendChild(lvl(n.l)); row.appendChild(nameOf(n));
           row.appendChild(el('span', 'tpath', path)); li.appendChild(row); out.appendChild(li); found++;
         }
         (n.k || []).forEach(function (k) { walk(k, here); });
