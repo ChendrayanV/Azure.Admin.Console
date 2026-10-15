@@ -50,6 +50,7 @@
         'Get-AACEntraGroupMembership'
         'Get-AACFailoverReadiness'
         'Get-AACFirewallRule'
+        'Get-AACKeyVaultInsight'
         'Get-AACInventory'
         'Get-AACLegacyAuthentication'
         'Get-AACLoadBalancerHealth'
