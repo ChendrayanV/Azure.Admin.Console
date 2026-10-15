@@ -82,6 +82,7 @@ Describe 'Azure Admin Console - Module scaffold' {
             'Invoke-AACPSRule'
             'Invoke-AACVirtualNetworkAssessment'
             'Invoke-AACWafAssessment'
+            'Show-AACApplicationGatewayMap'
             'Show-AACCost'
             'Show-AACDashboard'
             'Show-AACJson'

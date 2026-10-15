@@ -19505,6 +19505,351 @@ A workload's review with the team's answers, and its trend from run to run.</dev
   </command:command>
   <command:command>
     <command:details>
+      <command:name>Show-AACApplicationGatewayMap</command:name>
+      <maml:description>
+        <maml:para>Draws Application Gateways as their connection flow - frontend IPs, listeners, rules, path rules and redirects, backend settings and probes, pools and targets, WAF policies - inside their network and subnet, with health and findings; shows each gateway's flows at the prompt and opens the map in your browser.</maml:para>
+      </maml:description>
+      <command:verb>Show</command:verb>
+      <command:noun>AACApplicationGatewayMap</command:noun>
+    </command:details>
+    <maml:description>
+      <maml:para>Read-only, with Azure Resource Graph (Reader is enough): every setting
+of each gateway, and what it refers to - public IPs, WAF policies,
+the network and subnet (with its NSG and route table), the NICs and
+VMs in the pools, and App Services whose host name is a target.
+
+The map, left to right: frontend IPs &gt; listeners (protocol, port,
+host names, certificate and its expiry, WAF policy) &gt; rules
+(priority, basic or path-based) &gt; path rules and redirects &gt; backend
+settings (protocol, port, timeout, host name, affinity, draining) and
+their probes &gt; pools &gt; targets. WAF policies sit on the left with a
+line to what they protect (the gateway, a site or a path). Pools and
+targets are outlined green, amber or red by health. Click a card for
+all its settings, its findings and its connections.
+
+Health: metrics always (healthy and unhealthy host counts per pool,
+last 30 minutes, v2 gateways); -IncludeHealth runs each gateway's live
+backend health check - every target's state and, when it fails, the
+probe's reason. That check takes 30-90 seconds and needs the
+Microsoft.Network/applicationGateways/backendhealth/action permission;
+a gateway that refuses is reported, not fatal.
+
+Findings (High, Medium, Low): v1 SKU, WAF tier without a WAF, WAF in
+Detection or disabled, old rule sets, old TLS policy, no zones or
+under 2 instances, HTTP not redirected to HTTPS, certificates
+expired, expiring (-CertificateDays) or uploaded instead of from Key
+Vault, backend settings without a custom probe, probe host mismatch,
+connection draining off, empty or unhealthy pools, and listeners,
+settings, probes and pools nothing uses.
+
+At the prompt: tiles, each gateway's flows (listener &gt; rule &gt; path &gt;
+settings &gt; pool, with health) and the findings. -CsvPath writes the
+flows; -PdfPath the gateways, flows and findings; -HtmlPath the map
+(a file in your temp folder by default).</maml:para>
+    </maml:description>
+    <command:syntax>
+      <command:syntaxItem>
+        <maml:name>Show-AACApplicationGatewayMap</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="none">
+          <maml:name>SubscriptionId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="1" aliases="none">
+          <maml:name>ResourceGroupName</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="2" aliases="none">
+          <maml:name>Name</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="3" aliases="none">
+          <maml:name>CertificateDays</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">int</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Int32</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="4" aliases="none">
+          <maml:name>Direction</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="5" aliases="none">
+          <maml:name>Theme</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="6" aliases="none">
+          <maml:name>HtmlPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="7" aliases="none">
+          <maml:name>CsvPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="8" aliases="none">
+          <maml:name>PdfPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="9" aliases="none">
+          <maml:name>Title</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>IncludeHealth</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoBrowser</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>PassThru</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="3" aliases="none">
+        <maml:name>CertificateDays</maml:name>
+        <maml:description>
+          <maml:para>A certificate expiring within this many days is a finding (30 by
+default).</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Int32</maml:name>
+        </dev:type>
+        <dev:defaultValue>30</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="7" aliases="none">
+        <maml:name>CsvPath</maml:name>
+        <maml:description>
+          <maml:para>Write the flows to this CSV file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="4" aliases="none">
+        <maml:name>Direction</maml:name>
+        <maml:description>
+          <maml:para>LeftToRight (the default) or TopToBottom.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+        <dev:defaultValue>'LeftToRight'</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="6" aliases="none">
+        <maml:name>HtmlPath</maml:name>
+        <maml:description>
+          <maml:para>Where to write the map. By default a file in your temp folder.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>IncludeHealth</maml:name>
+        <maml:description>
+          <maml:para>Run each gateway's live backend health check: every target's state
+and the probe's reason.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="true" pipelineInput="false" position="2" aliases="none">
+        <maml:name>Name</maml:name>
+        <maml:description>
+          <maml:para>Only gateways with these names; wildcards work.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoBrowser</maml:name>
+        <maml:description>
+          <maml:para>Write the map without opening it.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>PassThru</maml:name>
+        <maml:description>
+          <maml:para>Also return the map: gateways, flows, findings, cards and lines.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="8" aliases="none">
+        <maml:name>PdfPath</maml:name>
+        <maml:description>
+          <maml:para>Write a PDF report: gateways, flows and findings.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="1" aliases="none">
+        <maml:name>ResourceGroupName</maml:name>
+        <maml:description>
+          <maml:para>Only these resource groups.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="none">
+        <maml:name>SubscriptionId</maml:name>
+        <maml:description>
+          <maml:para>Only these subscriptions.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="5" aliases="none">
+        <maml:name>Theme</maml:name>
+        <maml:description>
+          <maml:para>Dark (the default), Light or Blueprint.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+        <dev:defaultValue>'Dark'</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="9" aliases="none">
+        <maml:name>Title</maml:name>
+        <maml:description>
+          <maml:para>The map's title.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes />
+    <command:returnValues>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>AAC.ApplicationGatewayMap, with -PassThru</maml:name>
+        </dev:type>
+        <maml:description>
+          <maml:para />
+        </maml:description>
+      </command:returnValue>
+    </command:returnValues>
+    <maml:alertSet>
+      <maml:alert>
+        <maml:para />
+      </maml:alert>
+    </maml:alertSet>
+    <command:examples>
+      <command:example>
+        <maml:title>--------- Example 1 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Connect-AAC
+Show-AACApplicationGatewayMap</dev:code>
+        <dev:remarks>
+          <maml:para>Every Application Gateway you can see, as a map in the browser.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 2 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Show-AACApplicationGatewayMap -ResourceGroupName 'rg-edge' -Name 'appgw-prod' -IncludeHealth</dev:code>
+        <dev:remarks>
+          <maml:para>One gateway with live backend health and the probes' reasons.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 3 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>(Show-AACApplicationGatewayMap -NoBrowser -PassThru).Flows | Where-Object Health -In 'unhealthy', 'degraded'</dev:code>
+        <dev:remarks>
+          <maml:para>The routes that reach unhealthy backends.</maml:para>
+        </dev:remarks>
+      </command:example>
+    </command:examples>
+    <command:relatedLinks>
+      <maml:navigationLink>
+        <maml:linkText>Online Version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Show-AACApplicationGatewayMap.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>Online version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Show-AACApplicationGatewayMap.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>about_Azure.Admin.Console</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md</maml:uri>
+      </maml:navigationLink>
+    </command:relatedLinks>
+  </command:command>
+  <command:command>
+    <command:details>
       <command:name>Show-AACCost</command:name>
       <maml:description>
         <maml:para>Shows what your Azure subscriptions cost - month to date and the last few months - as colourful Spectre.Console charts, with optional CSV, PDF and interactive HTML exports of the detail.</maml:para>

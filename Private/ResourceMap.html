@@ -13,6 +13,7 @@
   body[data-theme="light"] { --page: #f6f8fa; --panel: #ffffff; --panel-2: #f0f3f6; --line: #d0d7de; --text: #1f2328; --muted: #59636e; --accent: #0969da; --warn: #bc4c00; --high: #cf222e; --good: #1a7f37; --shadow: 0 8px 24px rgba(140,149,159,.25); }
   body[data-theme="blueprint"] { --page: #0b2545; --panel: #0f2f57; --panel-2: #13386a; --line: #3a6ea5; --text: #eaf4ff; --muted: #9fc3e8; --accent: #8fd3ff; --warn: #ffcf66; --high: #ff8a80; --good: #7ee2a8; --shadow: 0 8px 24px rgba(0,0,0,.35); }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html, body { margin: 0; height: 100%; background: var(--page); color: var(--text); font: 13px/1.4 "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif; overflow: hidden; }
   header { position: fixed; inset: 0 0 auto 0; z-index: 5; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
   header h1 { margin: 0; font-size: 15px; font-weight: 600; white-space: nowrap; }
@@ -138,17 +139,17 @@
     dark: {
       page: '#0d1117', text: '#e6edf3', muted: '#8b949e', node: '#161b22', nodeLine: '#30363d', orphan: '#f0a93b', high: '#ff6b6b', chip: '#1c2330',
       subscription: ['#11161d', '#3d4a5c'], resourcegroup: ['#131c2b', '#4f6fad'], vnet: ['#0f2a33', '#2fa3c8'], subnet: ['#15323a', '#38b2ac'],
-      edges: { network: '#4cc2ff', dependency: '#f6c343', peering: '#c792ea', privatelink: '#6ee7a8', route: '#ff7b72', dns: '#a5b4c8' }
+      edges: { network: '#4cc2ff', dependency: '#f6c343', peering: '#c792ea', privatelink: '#6ee7a8', route: '#ff7b72', dns: '#a5b4c8', flow: '#4cc2ff', probe: '#a5b4c8', waf: '#ff9e64', redirect: '#c792ea' }
     },
     light: {
       page: '#ffffff', text: '#1f2328', muted: '#59636e', node: '#ffffff', nodeLine: '#d0d7de', orphan: '#bc4c00', high: '#cf222e', chip: '#f6f8fa',
       subscription: ['#f6f8fa', '#8c959f'], resourcegroup: ['#eef4ff', '#6e8fd6'], vnet: ['#e6f6fb', '#1b95c0'], subnet: ['#e8f7f2', '#2f9e8f'],
-      edges: { network: '#0969da', dependency: '#b08800', peering: '#8250df', privatelink: '#1a7f37', route: '#cf222e', dns: '#6e7781' }
+      edges: { network: '#0969da', dependency: '#b08800', peering: '#8250df', privatelink: '#1a7f37', route: '#cf222e', dns: '#6e7781', flow: '#0969da', probe: '#6e7781', waf: '#bc4c00', redirect: '#8250df' }
     },
     blueprint: {
       page: '#0b2545', text: '#eaf4ff', muted: '#9fc3e8', node: '#0f2f57', nodeLine: '#3a6ea5', orphan: '#ffcf66', high: '#ff8a80', chip: '#123a66',
       subscription: ['#0d2b50', '#5b8cc4'], resourcegroup: ['#10345f', '#8fb8e8'], vnet: ['#123d6d', '#8fd3ff'], subnet: ['#154677', '#b5e3ff'],
-      edges: { network: '#8fd3ff', dependency: '#ffe08a', peering: '#e0b3ff', privatelink: '#9ff0c4', route: '#ff9d94', dns: '#cfe3f7' }
+      edges: { network: '#8fd3ff', dependency: '#ffe08a', peering: '#e0b3ff', privatelink: '#9ff0c4', route: '#ff9d94', dns: '#cfe3f7', flow: '#8fd3ff', probe: '#cfe3f7', waf: '#ffcf66', redirect: '#e0b3ff' }
     }
   };
   const KINDS = [
@@ -157,7 +158,11 @@
     ['peering', 'VNet peering', ''],
     ['privatelink', 'Private link', '2 3'],
     ['route', 'Route (next hop)', '8 3 2 3'],
-    ['dns', 'Private DNS link', '1 3']
+    ['dns', 'Private DNS link', '1 3'],
+    ['flow', 'Traffic flow', ''],
+    ['probe', 'Health probe', '4 3'],
+    ['waf', 'WAF policy', '2 3'],
+    ['redirect', 'Redirect', '6 3']
   ];
 
   const state = {
@@ -232,6 +237,8 @@
         'elk.json.edgeCoords': 'ROOT'
       }
     };
+    // Stages pinned to columns (n.elk partitions): ELK needs them switched on at the root too.
+    if (data.nodes.some(n => n.elk && n.elk['elk.partitioning.partition'] !== undefined)) root.layoutOptions['elk.partitioning.activate'] = 'true';
     // Subnets packed in rows inside a network, resources in a grid inside each
     // subnet, networks in their boxes - not one tall layered column.
     if (boxed) {
@@ -256,6 +263,7 @@
           'elk.nodeSize.minimum': '(' + Math.round(minWidth) + ',' + (top + 24) + ')'
         }
       };
+      if (c.elk) Object.assign(item.layoutOptions, c.elk);
       if (boxed) Object.assign(item.layoutOptions, { 'elk.algorithm': 'box', 'elk.aspectRatio': c.kind === 'subnet' ? '2.4' : '1.6', 'elk.spacing.nodeNode': c.kind === 'subnet' || c.kind === 'vnet' ? '20' : '36' });
       items.set(c.id, item);
       (c.parent && items.has(c.parent) ? items.get(c.parent).children : root.children).push(item);
@@ -263,6 +271,7 @@
     for (const n of data.nodes) {
       if (drawnAsChip(n) || !take(n.id)) continue;
       const item = { id: n.id, width: NODE_W, height: NODE_H };
+      if (n.elk) item.layoutOptions = Object.assign({}, n.elk);
       items.set(n.id, item);
       (n.parent && items.has(n.parent) ? items.get(n.parent).children : root.children).push(item);
     }
@@ -458,6 +467,11 @@
       '.cluster.vnet.hub .name{fill:' + t.edges.peering + ';}',
       '.edge.warn path.line{stroke:' + t.high + ';stroke-dasharray:7 5;}',
       '.node.nva rect.card{stroke:' + t.edges.route + ';stroke-width:2.4;}',
+      '.node.health-healthy rect.card{stroke:#3fb950;stroke-width:2.4;}',
+      '.node.health-degraded rect.card{stroke:' + t.orphan + ';stroke-width:2.4;}',
+      '.node.health-unhealthy rect.card{stroke:' + t.high + ';stroke-width:2.8;}',
+      '.node .hdot.healthy{fill:#3fb950;}', '.node .hdot.degraded{fill:' + t.orphan + ';}', '.node .hdot.unhealthy{fill:' + t.high + ';}', '.node .hdot.unknown{fill:' + t.muted + ';}',
+      '.cluster.appgw rect.box{fill:' + t.vnet[0] + ';stroke:' + t.edges.waf + ';stroke-width:2.2;}',
       '.cluster.external rect.box{stroke-dasharray:2 4;opacity:.75;}',
       '.cluster .name{font-size:13px;font-weight:700;}',
       '.cluster .detail{font-size:11px;fill:' + t.muted + ';}',
@@ -613,7 +627,7 @@
     for (const n of data.nodes) {
       const b = boxes.get(n.id);
       if (!b || drawnAsChip(n)) continue;
-      const g = el('g', { class: 'node' + (n.orphan ? ' orphan' : '') + (n.external ? ' external' : '') + (n.risk ? ' risk-' + n.risk : '') + (n.nva ? ' nva' : ''), 'data-id': n.id, transform: 'translate(' + b.x + ',' + b.y + ')' }, nodeLayer);
+      const g = el('g', { class: 'node' + (n.orphan ? ' orphan' : '') + (n.external ? ' external' : '') + (n.risk ? ' risk-' + n.risk : '') + (n.nva ? ' nva' : '') + (n.health ? ' health-' + n.health : ''), 'data-id': n.id, transform: 'translate(' + b.x + ',' + b.y + ')' }, nodeLayer);
       el('rect', { class: 'card', width: NODE_W, height: NODE_H, rx: 10 }, g);
       el('image', { href: icon(n.icon), x: NODE_W / 2 - 20, y: 9, width: 40, height: 40 }, g);
       const name = el('text', { class: 'name', x: NODE_W / 2, y: 66, 'text-anchor': 'middle' }, g);
@@ -629,6 +643,9 @@
         // A NIC's own NSG, on the card's top left.
         let y = 6;
         for (const chip of chipsOf(n)) { drawChip(g, Object.assign({}, chip, { name: chip.kind === 'nsg' ? 'NSG' : 'UDR' }), 6, y, chip.risk ? 64 : 52); y += CHIP_H + 4; }
+      }
+      if (n.health) {
+        el('circle', { class: 'hdot ' + n.health, cx: 12, cy: 12, r: 6 }, g);
       }
       if (n.orphan || n.risk) {
         el('circle', { class: 'flag', cx: NODE_W - 12, cy: 12, r: 9 }, g);
@@ -723,7 +740,7 @@
     if (!id) { panel.classList.remove('open', 'wide'); panel.innerHTML = ''; return; }
     const n = nodesById.get(id), c = clustersById.get(id);
     const item = n || c;
-    const kindLabel = { network: 'network', dependency: 'depends on', peering: 'peering', privatelink: 'private link', route: 'route', dns: 'private DNS' };
+    const kindLabel = { network: 'network', dependency: 'depends on', peering: 'peering', privatelink: 'private link', route: 'route', dns: 'private DNS', flow: 'traffic', probe: 'health probe', waf: 'WAF policy', redirect: 'redirect' };
     const rows = [];
     const add = (k, v) => { if (v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && !v.length)) rows.push('<tr><td>' + esc(k) + '</td><td>' + v + '</td></tr>'); };
     let heading, type, iconKey, portalId, extra = '';
@@ -752,7 +769,7 @@
         routes.filter(r => !r.risk && r.reason).map(r => '<div class="type">' + esc(r.reason) + '</div>').join('');
     }
     if (n) {
-      heading = n.name; type = n.typeLabel; iconKey = n.icon; portalId = n.id;
+      heading = n.name; type = n.typeLabel; iconKey = n.icon; portalId = n.portal || n.id;
       add('Type', '<code>' + esc(n.type) + '</code>');
       add('Resource group', esc(n.resourceGroup));
       add('Subscription', esc(n.subscription));
@@ -762,11 +779,15 @@
       if (n.type === 'microsoft.network/routetables') add('Gateway route propagation', n.propagation === 'off' ? 'Off (routes learned from the VPN/ExpressRoute gateway are not used)' : 'On');
       if (chipsOf(n).length) add('Own NSG', chipList(chipsOf(n)));
       add('Details', esc((n.facts || []).join(' · ')));
+      for (const [k, v] of (n.props || [])) add(k, esc(v));
+      if ((n.findings || []).length) extra = '<div class="risk ' + (n.risk || 'medium') + '"><b>Findings</b><ul>' + n.findings.map(f => '<li>' + esc(f) + '</li>').join('') + '</ul></div>' + extra;
       if (n.tags) add('Tags', Object.keys(n.tags).map(k => esc(k) + ' = ' + esc(n.tags[k])).join('<br>'));
-      add('Resource ID', '<code>' + esc(n.id) + '</code>');
+      add(n.portal ? 'ID' : 'Resource ID', '<code>' + esc(n.id) + '</code>');
     } else {
       heading = c.name;
-      type = { managementgroup: 'Management group', subscription: 'Subscription', resourcegroup: 'Resource group', vnet: 'Virtual network', subnet: 'Subnet' }[c.kind];
+      type = { managementgroup: 'Management group', subscription: 'Subscription', resourcegroup: 'Resource group', vnet: 'Virtual network', subnet: 'Subnet', appgw: 'Application Gateway' }[c.kind];
+      for (const [k, v] of (c.props || [])) add(k, esc(v));
+      if ((c.findings || []).length) extra = '<div class="risk ' + (c.risk || 'medium') + '"><b>Findings</b><ul>' + c.findings.map(f => '<li>' + esc(f) + '</li>').join('') + '</ul></div>';
       iconKey = c.icon;
       if (c.kind === 'subnet') {
         add('Address prefix', esc(c.prefix));
