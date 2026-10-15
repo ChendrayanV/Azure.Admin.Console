@@ -59,6 +59,7 @@ function Invoke-AACReportOutput {
                 if ($Report.Contains('Headline') -and $Report.Headline) { $html.Notice = @(@{ Tone = @{ Success = 'good'; Warning = 'warn'; Failed = 'bad'; Info = 'info' }[$(if ($Report.Contains('Status')) { [string]$Report.Status } else { 'Info' })]; Text = [string]$Report.Headline }) + @($html.Notice) }
                 if ($Report.Contains('Tabs') -and $Report.Tabs) { $html.Tab = @($Report.Tabs); $html.OverviewTab = 'Summary' }
                 if ($Report.Contains('Tree') -and $Report.Tree) { $html.Tree = $Report.Tree }
+                if ($Report.Contains('HeatMaps') -and $Report.HeatMaps) { $html.HeatMap = @($Report.HeatMaps) }
                 Write-AACHtmlReport @html
             }
         }

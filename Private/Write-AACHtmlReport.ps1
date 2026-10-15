@@ -96,6 +96,11 @@ function Write-AACHtmlReport {
 
         [System.Collections.IDictionary] $Tree,
 
+        # Workbook-style heat maps: @{ Title; Note; RowHeader; Columns; Rows =
+        # @{ Label; Group; Filter; Cells = @(@{ Score; Count; Failed } or $null); Total };
+        # Table; RowKey; ColumnKey } - a cell filters Table to its row and column.
+        [object[]] $HeatMap = @(),
+
         [object[]] $Tab = @(),
 
         [string] $OverviewTab
@@ -168,6 +173,16 @@ function Write-AACHtmlReport {
                 $c
             })
         tables        = @($tables)
+        heatmaps      = @(foreach ($item in $HeatMap) {
+                $h = & $camel $item
+                $h['rows'] = @(foreach ($row in @($item.Rows)) {
+                        $r = & $camel $row
+                        $r['cells'] = @(foreach ($c in @($row.Cells)) { if ($c) { & $camel $c } else { $null } })
+                        $r['total'] = if ($row.Contains('Total') -and $row.Total) { & $camel $row.Total } else { $null }
+                        $r
+                    })
+                $h
+            })
     }
     if ($Tab.Count) { $model['tabs'] = @(foreach ($item in $Tab) { & $camel $item }) }
     if ($OverviewTab) { $model['overviewTab'] = $OverviewTab }

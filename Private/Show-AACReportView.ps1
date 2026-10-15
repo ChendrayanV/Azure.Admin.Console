@@ -14,6 +14,10 @@ function Show-AACReportView {
           Notices    @{ Status; Text } status lines
           Charts     @{ Title; Items = @{ Label; Value }; Console = $true } -
                      those marked Console are drawn as bar charts
+          HeatMaps   @{ Title; RowHeader; Columns; Rows = @{ Label; Group;
+                     Cells = @(@{ Score } or $null); Total }; ConsoleColumns (8) } -
+                     rows by columns of 0-100 scores, each cell coloured by
+                     its score (the first ConsoleColumns columns, and All)
           Tables     @{ Title; Rows; Columns; ConsoleLimit (15) } - the
                      columns marked Console (else the first six shown) of
                      the first ConsoleLimit rows; badge columns in their
@@ -56,6 +60,42 @@ function Show-AACReportView {
             Show-AACBarChart -Item @(foreach ($i in @($c.Items) | Select-Object -First 12) { @{ Label = [string]$i.Label; Value = [double]$i.Value } }) -Title ([string]$c.Title)
             [Spectre.Console.AnsiConsole]::WriteLine()
         }
+    }
+
+    # Heat maps: a cell's background is its score, as in an Azure workbook.
+    $heat = {
+        param($Cell)
+        if ($null -eq $Cell -or $null -eq $Cell.Score) { return '[grey42]-[/]' }
+        $s = [double]$Cell.Score
+        $style = if ($s -ge 90) { 'black on green3' } elseif ($s -ge 75) { 'black on darkseagreen2' } elseif ($s -ge 50) { 'black on gold1' } elseif ($s -ge 25) { 'black on orange1' } else { 'white on red3' }
+        "[$style] $('{0,3:N0}' -f $s) [/]"
+    }
+    foreach ($h in @(if (& $has 'HeatMaps') { $Report.HeatMaps })) {
+        $limit = if ($h.Contains('ConsoleColumns')) { [int]$h.ConsoleColumns } else { 8 }
+        $shown = @($h.Columns | Select-Object -First $limit)
+        $table = [Spectre.Console.Table]::new()
+        $table.Border = [Spectre.Console.TableBorder]::Rounded
+        $table.BorderStyle = [Spectre.Console.Style]::Parse('grey35')
+        $table.Title = [Spectre.Console.TableTitle]::new("[bold]$(& $escape $h.Title)[/]$(if (@($h.Columns).Count -gt $limit) { " [grey58](first $limit of $(@($h.Columns).Count) columns; the HTML and PDF reports have them all)[/]" })")
+        $null = $table.AddColumn([Spectre.Console.TableColumn]::new("[grey70]$(& $escape $(if ($h.Contains('RowHeader')) { $h.RowHeader } else { '' }))[/]"))
+        foreach ($c in $shown + 'All') {
+            $column = [Spectre.Console.TableColumn]::new("[grey70]$(& $escape $c)[/]")
+            $column.Alignment = [Spectre.Console.Justify]::Center
+            $null = $table.AddColumn($column)
+        }
+        $group = $null
+        foreach ($r in @($h.Rows)) {
+            if ($r.Contains('Group') -and $r.Group -and $r.Group -ne $group) {
+                $group = $r.Group
+                $null = [Spectre.Console.TableExtensions]::AddRow($table, [Spectre.Console.Rendering.IRenderable[]]@(@("[bold]$(& $escape $group)[/]") + @($shown | ForEach-Object { '' }) + '' | ForEach-Object { [Spectre.Console.Markup]::new($_) }))
+            }
+            $cells = @(for ($i = 0; $i -lt $shown.Count; $i++) { & $heat @($r.Cells)[$i] })
+            $markup = @("  $(& $escape $r.Label)") + $cells + @(& $heat $(if ($r.Contains('Total')) { $r.Total }))
+            $null = [Spectre.Console.TableExtensions]::AddRow($table, [Spectre.Console.Rendering.IRenderable[]]@($markup | ForEach-Object { [Spectre.Console.Markup]::new($_) }))
+        }
+        [Spectre.Console.AnsiConsole]::Write($table)
+        Write-AACMarkup '[grey50]Score out of 100:[/] [white on red3] <25 [/] [black on orange1] 25-49 [/] [black on gold1] 50-74 [/] [black on darkseagreen2] 75-89 [/] [black on green3] 90+ [/] [grey42]- not assessed[/]'
+        [Spectre.Console.AnsiConsole]::WriteLine()
     }
 
     foreach ($t in @(if (& $has 'Tables') { $Report.Tables })) {

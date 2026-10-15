@@ -91,6 +91,23 @@ button.tile:hover { border-color: var(--accent); transform: translateY(-1px); }
 .notice.bad { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
 .notice.info { background: var(--info-soft); color: var(--info); border-color: transparent; }
 
+.heat-card { margin-top: 16px; overflow-x: auto; }
+.heat { border-collapse: separate; border-spacing: 3px; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.heat th { font-weight: 600; color: var(--muted); padding: 4px 8px; white-space: nowrap; text-align: center; vertical-align: bottom; }
+.heat th.rowh { text-align: left; }
+.heat td.lbl { padding: 4px 10px 4px 2px; white-space: nowrap; max-width: 360px; overflow: hidden; text-overflow: ellipsis; }
+.heat tr.grp td { padding-top: 10px; font-weight: 700; color: var(--ink); border-bottom: 1px solid var(--line); }
+.heat td.c { min-width: 54px; text-align: center; padding: 6px 6px; border-radius: 6px; font-weight: 650; cursor: pointer; }
+.heat td.c:hover { outline: 2px solid var(--accent); }
+.heat td.c.na { background: var(--panel-2); color: var(--faint); font-weight: 400; cursor: default; }
+.heat td.c.h0 { background: var(--bad-bar); color: #fff; }
+.heat td.c.h1 { background: var(--bad-soft); color: var(--bad); }
+.heat td.c.h2 { background: var(--warn-soft); color: var(--warn); }
+.heat td.c.h3 { background: var(--good-soft); color: var(--good); }
+.heat td.c.h4 { background: var(--good-bar); color: #fff; }
+.heat td.tot { border-left: 2px solid var(--line); }
+.heat-legend { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; font-size: 12px; color: var(--muted); align-items: center; }
+.heat-legend span.sw { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: middle; margin-right: 4px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 12px; margin-top: 16px; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 16px; min-width: 0; }
 .card.wide { grid-column: 1 / -1; }
@@ -316,6 +333,7 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
   <section class="tiles" id="tiles"></section>
   <div id="notices"></div>
   <section class="grid" id="charts"></section>
+  <div id="heatmaps"></div>
   <div id="tree"></div>
   <nav class="toc" id="toc" hidden></nav>
   <div id="tables"></div>
@@ -989,12 +1007,55 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
     draw(T.openTo || 's');
   })(D.tree);
 
+  // --- Heat maps: rows by columns of 0-100 scores, workbook style ------------------------------
+  //   { title, note, rowHeader, columns: [names], table, rowKey, columnKey,
+  //     rows: [{ label, group, filter, cells: [{ score, count, failed } | null], total }] }
+  // A cell's colour is its score; clicking it filters the table to that row and column.
+  var heatBand = function (s) { return s >= 90 ? 'h4' : s >= 75 ? 'h3' : s >= 50 ? 'h2' : s >= 25 ? 'h1' : 'h0'; };
+  (D.heatmaps || []).forEach(function (H) {
+    var card = el('section', 'card heat-card');
+    card.appendChild(el('h2', null, H.title));
+    if (H.note) card.appendChild(el('div', 'muted', H.note));
+    var table = el('table', 'heat'), head = el('tr');
+    head.appendChild(el('th', 'rowh', H.rowHeader || ''));
+    H.columns.forEach(function (c) { head.appendChild(el('th', null, c)); });
+    head.appendChild(el('th', null, 'All'));
+    var thead = el('thead'); thead.appendChild(head); table.appendChild(thead);
+    var body = el('tbody'), group = null;
+    var cell = function (c, row, column) {
+      if (!c || c.score === null || c.score === undefined) { var na = el('td', 'c na', '-'); na.title = 'Not assessed: nothing in scope to check'; return na; }
+      var td = el('td', 'c ' + heatBand(c.score), Math.round(c.score));
+      td.title = (row.label + (column ? ' · ' + column : '') + ': ' + Math.round(c.score) + ' / 100') + (c.count !== undefined ? ' - ' + (c.count - (c.failed || 0)) + ' of ' + c.count + ' passed' : '');
+      if (H.table && tables[H.table]) td.addEventListener('click', function () {
+        var f = {}; if (H.rowKey) f[H.rowKey] = row.filter || row.label; if (H.columnKey && column) f[H.columnKey] = column;
+        focusTable(H.table, f);
+      });
+      return td;
+    };
+    H.rows.forEach(function (r) {
+      if (r.group && r.group !== group) { group = r.group; var g = el('tr', 'grp'); var gt = el('td', null, group); gt.colSpan = H.columns.length + 2; g.appendChild(gt); body.appendChild(g); }
+      var tr = el('tr'); var lbl = el('td', 'lbl', r.label); lbl.title = r.label; tr.appendChild(lbl);
+      (r.cells || []).forEach(function (c, i) { tr.appendChild(cell(c, r, H.columns[i])); });
+      var total = cell(r.total, r, null); total.classList.add('tot'); tr.appendChild(total);
+      body.appendChild(tr);
+    });
+    table.appendChild(body); card.appendChild(table);
+    var legend = el('div', 'heat-legend');
+    [['h0', 'under 25'], ['h1', '25-49'], ['h2', '50-74'], ['h3', '75-89'], ['h4', '90+']].forEach(function (b) {
+      var item = el('span'); var sw = el('span', 'sw'); sw.style.background = getComputedStyle(document.documentElement).getPropertyValue(b[0] === 'h0' ? '--bad-bar' : b[0] === 'h1' ? '--bad-soft' : b[0] === 'h2' ? '--warn-soft' : b[0] === 'h3' ? '--good-soft' : '--good-bar');
+      item.appendChild(sw); item.appendChild(document.createTextNode(b[1])); legend.appendChild(item);
+    });
+    legend.appendChild(el('span', null, '· - not assessed · click a cell to see its checks'));
+    card.appendChild(legend);
+    $('heatmaps').appendChild(card);
+  });
+
   // --- Tabs: Overview (tiles, charts, notices, tree), then one per section --------------------
   if (D.tabs && sectionOrder.length) (function () {
     var OV = D.overviewTab || 'Overview';   // the first tab's name
     document.body.classList.add('tabbed');
     $('toc').hidden = true;
-    var overview = [$('tiles'), $('notices'), $('charts'), $('tree')];
+    var overview = [$('tiles'), $('notices'), $('charts'), $('heatmaps'), $('tree')];
     overview.forEach(function (e) { e.dataset.tab = OV; });
     var names = [OV].concat(D.tabs.map(function (t) { return t.name; }).filter(function (n) { return sections[n]; }));
     sectionOrder.forEach(function (n) { if (names.indexOf(n) < 0) names.push(n); });

@@ -36,6 +36,7 @@
         'Disconnect-AAC'
         'Export-AACDiagnosticBundle'
         'Export-AACResource'
+        'Export-AACWafQuestionnaire'
         'Get-AACAccessReview'
         'Get-AACAdvisorRecommendation'
         'Get-AACAssignedPolicy'
@@ -65,6 +66,7 @@
         'Get-AACStorageAccountContainerSize'
         'Get-AACTerraformPlan'
         'Get-AACUnusedResource'
+        'Get-AACWafCheck'
         'Invoke-AACAksAssessment'
         'Invoke-AACApplicationInsightQuery'
         'Invoke-AACAssessment'
@@ -75,12 +77,14 @@
         'Invoke-AACPolicyAssessment'
         'Invoke-AACPSRule'
         'Invoke-AACVirtualNetworkAssessment'
+        'Invoke-AACWafAssessment'
         'Show-AACCost'
         'Show-AACDashboard'
         'Show-AACJson'
         'Show-AACNetworkTopology'
         'Show-AACResource'
         'Show-AACResourceMap'
+        'Test-AACGoLiveReadiness'
     )
     CmdletsToExport      = @()
     VariablesToExport    = @()

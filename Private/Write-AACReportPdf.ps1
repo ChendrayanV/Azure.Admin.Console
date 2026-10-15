@@ -87,6 +87,52 @@ function Write-AACReportPdf {
         & $note ([string]$n.Text) $(if ($n.Contains('Status') -and $n.Status -eq 'Failed') { $pdf.Tone.Bad.Solid } elseif ($n.Contains('Status') -and $n.Status -eq 'Warning') { $pdf.Tone.Warn.Solid })
     }
 
+    # --- Heat maps: each cell shaded by its score, up to 10 columns a table ---------------------------------------
+    $band = {
+        param([double] $Score)
+        if ($Score -ge 90) { @($pdf.Tone.Good.Solid, $colors.White) } elseif ($Score -ge 75) { @($pdf.Tone.Good.Fill, $pdf.Tone.Good.Text) }
+        elseif ($Score -ge 50) { @($pdf.Tone.Warn.Fill, $pdf.Tone.Warn.Text) } elseif ($Score -ge 25) { @($pdf.Tone.Bad.Fill, $pdf.Tone.Bad.Text) } else { @($pdf.Tone.Bad.Solid, $colors.White) }
+    }
+    foreach ($h in @(if ($Report.Contains('HeatMaps')) { $Report.HeatMaps })) {
+        $all = @($h.Columns)
+        for ($start = 0; $start -lt [Math]::Max(1, $all.Count); $start += 10) {
+            $part = @(if ($all.Count) { $all[$start..([Math]::Min($start + 10, $all.Count) - 1)] })
+            $last = $start + 10 -ge $all.Count
+            $section.AddParagraph("$($h.Title)$(if ($all.Count -gt 10) { " ($($start + 1)-$($start + $part.Count) of $($all.Count))" })", 'Heading2') | Out-Null
+            if ($h.Contains('Note') -and $h.Note -and $start -eq 0) { & $note ([string]$h.Note) }
+            $labelWidth = 7.5
+            $count = $part.Count + $(if ($last) { 1 } else { 0 })
+            $cellWidth = if ($count) { ($pdf.PageWidth - $labelWidth) / $count } else { 2 }
+            $table = & $pdf.NewTable @(@($labelWidth) + @(1..[Math]::Max(1, $count) | ForEach-Object { $cellWidth }))
+            & $pdf.AddHeaderRow $table @(@($(if ($h.Contains('RowHeader')) { [string]$h.RowHeader } else { '' })) + @($part | ForEach-Object { [string]$_ }) + @(if ($last) { 'All' })) @(1..$count)
+            $group = $null
+            foreach ($r in @($h.Rows)) {
+                if ($r.Contains('Group') -and $r.Group -and $r.Group -ne $group) {
+                    $group = $r.Group
+                    $g = & $pdf.AddBodyRow $table
+                    $g.Cells[0].MergeRight = $count
+                    $gp = $g.Cells[0].AddParagraph([string]$group); $gp.Format.Font.Name = 'Segoe UI Semibold'; $gp.Format.Font.Size = 8.5
+                }
+                $row = & $pdf.AddBodyRow $table
+                $row.Cells[0].AddParagraph([string]$r.Label).Format.Font.Size = 7.5
+                $cells = @(for ($i = 0; $i -lt $part.Count; $i++) { , @(@($r.Cells)[$start + $i]) }) + @(if ($last) { , @($(if ($r.Contains('Total')) { $r.Total })) })
+                for ($i = 0; $i -lt $cells.Count; $i++) {
+                    $c = $cells[$i][0]
+                    $cell = $row.Cells[$i + 1]
+                    if ($null -eq $c -or $null -eq $c.Score) { $p = $cell.AddParagraph('-'); $p.Format.Font.Color = $colors.Muted }
+                    else {
+                        $shade = & $band ([double]$c.Score)
+                        $cell.Shading.Color = $shade[0]
+                        $p = $cell.AddParagraph(('{0:N0}' -f [double]$c.Score)); $p.Format.Font.Color = $shade[1]; $p.Format.Font.Name = 'Segoe UI Semibold'
+                    }
+                    $p.Format.Alignment = [MigraDoc.DocumentObjectModel.ParagraphAlignment]::Center
+                    $p.Format.Font.Size = 8
+                }
+            }
+        }
+        & $note 'Score out of 100 - 90+ dark green, 75-89 green, 50-74 amber, 25-49 red, under 25 dark red; - not assessed.'
+    }
+
     # --- 2. The tables -------------------------------------------------------------------------------------------
     $lastSection = ''
     foreach ($t in @(if ($Report.Contains('Tables')) { $Report.Tables })) {
