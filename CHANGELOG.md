@@ -2,10 +2,36 @@
 
 All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never published to the PowerShell Gallery.
 
-## Unreleased
+## v0.14.5
+
+A Well-Architected assessment with a go-live gate, insights for Key Vault, Application Gateways and the hybrid network, a network topology diagram, workbook-style heat maps in every report, and clearer Entra ID group membership.
 
 ### New
 
+- **Well-Architected assessment** across the five pillars, scored by pillar, design principle and check, from one Resource Graph batch:
+  - `Invoke-AACWafAssessment`: Reliability, Security, Cost Optimization, Operational Excellence and Performance Efficiency. Scores are 0-100, with checks weighted by severity, each pillar's maturity, and heat maps by subscription, resource group or resource type. It checks about 60 catalogue items plus Advisor and Defender for Cloud, counting a finding once when Advisor or Defender repeat a catalogue check (`-KeepDuplicates` counts both). `-AttestationPath` scores the team's questionnaire answers, and `-HistoryPath` keeps the trend.
+  - `Test-AACGoLiveReadiness`: a go-live gate. It checks pillar scores against `-MinimumScore` or `-PillarMinimum`, high-severity findings, `-RequiredCheck`, and principles covered. The verdict is Ready or Not ready, with the blockers listed. `-FailOnGap` fails a pipeline.
+  - `Export-AACWafQuestionnaire`: one question per design principle (24), for what no API can test.
+  - `Get-AACWafCheck`: the check catalogue, and how each principle is covered.
+- `Get-AACKeyVaultInsight`: what Azure Monitor's Key Vault workbook shows (availability, transactions, latency, failures by status code, operations from the audit logs), plus:
+  - saturation (`SaturationShoebox`);
+  - posture: soft delete, purge protection, RBAC, network, private endpoints, Defender, audit logs;
+  - callers denied or throttled, from both `AzureDiagnostics` and `AZKVAuditLogs`, with `-IncludeOperations`;
+  - secrets, keys and certificates expired, expiring or never expiring (metadata only), with `-IncludeObjects`;
+  - findings and a vault-by-signal heat map.
+- `Show-AACApplicationGatewayMap`: Application Gateways as their connection flow, opened in your browser. It shows frontend IPs, listeners, rules, path rules and redirects, backend settings and probes, pools and targets (resolved to VMs and App Services), and WAF policies, inside their network and subnet.
+  - **Health:** from metrics, or the live backend health check with `-IncludeHealth` (each target's state and the probe's reason).
+  - **At the prompt:** the flows and findings: v1 SKU, WAF off or in Detection, old TLS policy, HTTP not redirected, certificates expired, expiring or uploaded, missing or mismatched probes, empty or unhealthy pools, and unused parts.
+- `Get-AACNetworkHealth`: the Azure Network Monitoring workbook's signals with % of capacity, thresholds, findings and Resource Health, for:
+  - ExpressRoute circuits: BGP and ARP availability per peering and link, link utilisation, traffic on one link, QoS drops, provisioning;
+  - ExpressRoute gateways: CPU, packets per second, routes advertised and learned against their limits;
+  - VPN and point-to-site gateways: bandwidth, BGP peers, point-to-site users, active-active;
+  - connections and tunnels: connected or not, drops;
+  - Azure Firewall: health, SNAT, throughput, latency;
+  - NAT gateways: data path, drops, SNAT.
+
+  Every finding says when it happened (the peak, the first and last time it was seen, or since when), and each report gives the period covered.
+- **Heat maps** in the console, PDF and HTML reports of any command (the report engine's new `HeatMaps`). The HTML is workbook style: a cell's colour is its score, and clicking it lists its findings.
 - `Show-AACNetworkTopology`: the network topology of the tenant, management groups, subscriptions or regions, as an interactive diagram in your browser. Read-only, with Resource Graph.
   - **What it reads:** networks, subnets and peerings (across subscriptions, and to networks you can't see); VPN and ExpressRoute gateways, connections and circuits; Virtual WAN hubs; Azure Firewalls and network virtual appliances (VMs whose NIC forwards IP traffic); NSGs, route tables, NAT, Bastion, load balancers and Application Gateways; VMs, scale sets and private endpoints in their subnets, with the PaaS resources the endpoints serve. `-NetworkOnly` leaves out the workloads.
   - **Roles:** each network is a hub, a spoke of a hub, peered or standalone.
@@ -22,7 +48,7 @@ All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never pu
 ### Fixed
 
 - `Show-AACResourceMap` drew false VNet peerings, with no state, between a hub's VPN gateway and its spokes. A spoke peering's `remoteGateways` and a gateway's `remoteVirtualNetworkPeerings` were read as peerings. Only a network's link to its remote network is a peering now.
-
+- The map page (`Show-AACResourceMap`, `Show-AACNetworkTopology`) showed the hub-and-spoke layout buttons on every map: a CSS rule overrode their `hidden` attribute.
 - `Get-AACEntraGroupMembership` left service principals out of every group, and so a nested group whose members were service principals looked empty, in the console view, the objects and every export. Microsoft Graph v1.0 leaves service principals out of `/groups/{id}/members` unless the request is an advanced query. The members are now read with `$count=true` and `ConsistencyLevel: eventual`, which returns them. Sign-in is unchanged: the `Connect-AAC` session.
 - Nested group members are now shown expanded, not hidden under their group:
   - **CSV** (one row per group, Export-EntraGroupMemberShip.ps1's five columns): `Members` is everyone in the group, flattened. It holds the direct members and the members of every nested group at any depth, each once, with no `name (Group)` entries. `NestedGroupMembers` follows every depth and names each group by its path (`grp-a: x, y; grp-a > grp-b: z`), listing each group once.

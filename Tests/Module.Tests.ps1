@@ -57,6 +57,7 @@ Describe 'Azure Admin Console - Module scaffold' {
             'Get-AACInventory'
             'Get-AACLegacyAuthentication'
             'Get-AACLoadBalancerHealth'
+            'Get-AACNetworkHealth'
             'Get-AACNetworkSecurityGroup'
             'Get-AACOrphanedIdentity'
             'Get-AACPolicyState'
