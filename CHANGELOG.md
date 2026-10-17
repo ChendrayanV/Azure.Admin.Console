@@ -4,7 +4,7 @@ All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never pu
 
 ## v0.14.5
 
-A Well-Architected assessment with a go-live gate, insights for Key Vault, Application Gateways and the hybrid network, a network topology diagram, workbook-style heat maps in every report, and clearer Entra ID group membership.
+A Well-Architected assessment with a go-live gate, insights for Key Vault, storage accounts, Application Gateways and the hybrid network, a network topology diagram, workbook-style heat maps in every report, and clearer Entra ID group membership.
 
 ### New
 
@@ -31,6 +31,12 @@ A Well-Architected assessment with a go-live gate, insights for Key Vault, Appli
   - NAT gateways: data path, drops, SNAT.
 
   Every finding says when it happened (the peak, the first and last time it was seen, or since when), and each report gives the period covered.
+- `Invoke-AACStorageAccountAssessment`: what Azure Monitor's Storage accounts workbook shows - its Overview tab (transactions, end-to-end and server latency, errors by response type) and Capacity tab (used, blob, file, queue and table capacity, with blob, container and share counts) - plus:
+  - health: availability, throttling, server, authorization and network errors, slow responses, time lost between client and service;
+  - security: HTTPS, TLS, anonymous blob access, network access, shared keys and their age, key and SAS expiry policies, cross-tenant replication, blob logs, Defender for Storage;
+  - data protection: redundancy, blob, container and file share soft delete, versioning;
+  - cost: legacy account kinds, lifecycle rules, idle accounts, hot tier with little activity;
+  - findings and an account-by-signal heat map; the reports' tabs follow the workbook.
 - **Heat maps** in the console, PDF and HTML reports of any command (the report engine's new `HeatMaps`). The HTML is workbook style: a cell's colour is its score, and clicking it lists its findings.
 - `Show-AACNetworkTopology`: the network topology of the tenant, management groups, subscriptions or regions, as an interactive diagram in your browser. Read-only, with Resource Graph.
   - **What it reads:** networks, subnets and peerings (across subscriptions, and to networks you can't see); VPN and ExpressRoute gateways, connections and circuits; Virtual WAN hubs; Azure Firewalls and network virtual appliances (VMs whose NIC forwards IP traffic); NSGs, route tables, NAT, Bastion, load balancers and Application Gateways; VMs, scale sets and private endpoints in their subnets, with the PaaS resources the endpoints serve. `-NetworkOnly` leaves out the workloads.

@@ -14,3 +14,4 @@ AzureAssessment-*/
 video/*.mp4
 .claude/
 CLAUDE.MD
+tools/

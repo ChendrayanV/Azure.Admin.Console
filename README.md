@@ -267,6 +267,14 @@ bookmarks are how you jump to the one you want.
 | [`Invoke-AACVirtualNetworkAssessment`](docs/Invoke-AACVirtualNetworkAssessment.md)               | Virtual networks assessed: address space with total, used and available IPs and the free CIDR ranges; every subnet (capacity, NSG, routes, NAT gateway, outbound path, endpoints, delegations); peerings; NSGs and ASGs; DNS, DDoS, encryption, flow logs, gateways, firewalls and Bastion - with findings by severity. A console view, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                       |
 | [`Invoke-AACLogAnalyticsWorkspaceAssessment`](docs/Invoke-AACLogAnalyticsWorkspaceAssessment.md) | A Log Analytics workspace assessed: billable and not billable tables with their size, plan and retention; every workspace setting; recommendations (Azure Advisor's and its own: cost, reliability, security); data collection rules; and the Workspace Insights views - Overview, Usage, Health, Agents, Query Audit, Data Collection Rules, Change Log. Read-only. A console view, an object, and CSV and interactive HTML reports.                                                                                                                                                                                                             |
 | [`Invoke-AACApplicationInsightQuery`](docs/Invoke-AACApplicationInsightQuery.md)                 | Application Insights exceptions, flattened, from a Log Analytics workspace or Application Insights resource, or any KQL query.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| [`Invoke-AACWafAssessment`](docs/Invoke-AACWafAssessment.md)                                     | The estate against the Azure Well-Architected Framework's five pillars: about 60 checks plus Advisor and Defender for Cloud, scored 0-100 by pillar, design principle and check, with each pillar's maturity, workbook-style heat maps by subscription, resource group or resource type, team questionnaire answers (`-AttestationPath`) and the trend (`-HistoryPath`). A console view, objects, and CSV, PDF and interactive HTML reports. |
+| [`Test-AACGoLiveReadiness`](docs/Test-AACGoLiveReadiness.md)                                     | A go-live gate: the Well-Architected assessment on a workload, Ready or Not ready - pillar scores against a minimum, no high-severity findings, the checks that must pass - with the blockers. `-FailOnGap` fails a pipeline stage. |
+| [`Export-AACWafQuestionnaire`](docs/Export-AACWafQuestionnaire.md)                               | The Well-Architected questionnaire - one question per design principle, for what no API can test - as a CSV the team answers and `Invoke-AACWafAssessment -AttestationPath` scores. |
+| [`Get-AACWafCheck`](docs/Get-AACWafCheck.md)                                                     | The checks the Well-Architected assessment runs, by pillar and design principle, with the resource type, severity, fix and link for each. |
+| [`Get-AACKeyVaultInsight`](docs/Get-AACKeyVaultInsight.md)                                       | Key Vaults: what Azure Monitor's Key Vault workbook shows (availability, transactions, latency, failures by status, operations from the audit logs) plus saturation, posture, callers denied or throttled, and secrets, keys and certificates near expiry (`-IncludeObjects`) - as a heat map and findings. |
+| [`Invoke-AACStorageAccountAssessment`](docs/Invoke-AACStorageAccountAssessment.md)               | Storage accounts: what Azure Monitor's Storage accounts workbook shows (transactions, latency, errors by response type, capacity by service) plus availability, throttling, security posture, data protection (soft delete, versioning, redundancy) and cost (lifecycle rules, legacy kinds, idle and hot-but-quiet accounts) - as a heat map and findings. |
+| [`Show-AACApplicationGatewayMap`](docs/Show-AACApplicationGatewayMap.md)                         | Application Gateways drawn as their traffic flow - frontend IPs, listeners, rules, path rules and redirects, backend settings and probes, pools and targets, WAF policies - with health (`-IncludeHealth` for the live backend health) and findings, opened in your browser. |
+| [`Get-AACNetworkHealth`](docs/Get-AACNetworkHealth.md)                                           | The hybrid and edge network's health - ExpressRoute circuits and gateways, VPN gateways, connections and tunnels, Azure Firewalls and NAT gateways - from metrics, configuration and Resource Health: % of capacity, thresholds and findings, each with when it happened. |
 
 Full help:
 
@@ -1460,6 +1468,44 @@ couldn't be read. `-HtmlPath` writes tables of the accounts, containers and
 largest blobs with charts that filter them; `-CsvPath` the containers,
 `-BlobCsvPath` every blob.
 
+## Storage account assessment
+
+`Invoke-AACStorageAccountAssessment` brings Azure Monitor's **Storage
+accounts** workbook to the prompt and the reports, and adds what the
+workbook doesn't check:
+
+```powershell
+Invoke-AACStorageAccountAssessment                                              # every account, the last day
+Invoke-AACStorageAccountAssessment -TimeRange 4h                                # the workbook's default period
+Invoke-AACStorageAccountAssessment -ResourceGroupName 'rg-data' -HtmlPath .\Storage.html -PdfPath .\Storage.pdf
+Invoke-AACStorageAccountAssessment -View Finding -NoDisplay | Where-Object Signal -EQ 'Security'
+Invoke-AACStorageAccountAssessment -NoDisplay | Sort-Object UsedGB -Descending | Select-Object -First 10 Account, UsedGB, AccessTier, LifecycleRules
+```
+
+- **Overview** (the workbook's first tab): transactions, end-to-end and
+  server latency, and errors by response type, plus availability, ingress
+  and egress. Response types are grouped as Success, Throttling, Server,
+  Authorization, Network and Client. Client errors (404, 409) are often
+  normal, so they aren't counted as errors.
+- **Capacity** (the workbook's second tab): used capacity and blob, file,
+  queue and table capacity, with blob, container and file share counts. It
+  shows the latest value, read over at least two days, because Azure reports
+  capacity hourly or daily.
+- **Security & protection:**
+  - HTTPS, TLS, anonymous blob access, network access and private endpoints;
+  - shared keys, key age, and key and SAS expiry policies;
+  - cross-tenant replication, encryption, blob logs and Defender for
+    Storage;
+  - redundancy, blob, container and file share soft delete, versioning,
+    change feed, point-in-time restore and lifecycle rules.
+- **Findings**, worst first, under seven signals: availability, errors,
+  throttling, latency, security, protection and cost. The heat map scores
+  each account 0-100 on every signal, and clicking a cell in the HTML report
+  lists its findings.
+
+It reads Resource Graph, Azure Monitor metrics and each account's service
+settings: Reader is enough. It reads no data and no keys.
+
 ## Terraform plans
 
 `Get-AACTerraformPlan` reads a whole Terraform plan - every resource
@@ -2171,6 +2217,7 @@ everything on this side for real:
 | PSRule runner                                                                     | Nothing                                                                                                                                                                                                                                                                             | Real PSRule for Azure in a child `pwsh`: the AAC.\* rules (naming with its defaults, tags), `-Type` binding for custom rules, wildcard include/exclude, a rule error not stopping the run                                                                                                                                                                                                                                                                                                                                                           |
 | `Invoke-AACLogAnalyticsWorkspaceAssessment`                                       | Resource Manager, Resource Graph and the KQL batch, with a made-up Contoso workspace; the HTTP batch for the query helper                                                                                                                                                           | Table sizes and billing, settings (anything new under Other), every recommendation rule and what it leaves out, agents' states, DCRs and associations, the change log, missing LAQueryLogs and Heartbeat, `-Section`, `-Days`, the view and the exports                                                                                                                                                                                                                                                                                             |
 | `Invoke-AACVirtualNetworkAssessment`                                              | Resource Graph, with a made-up Contoso hub and spokes                                                                                                                                                                                                                               | The CIDR arithmetic and free ranges, IPs per network and subnet, outbound paths, roles, peerings (reverse, remote not visible), ASGs, private endpoints and DNS zones, every finding and no others, the NSG engine's findings, scope and `-Name`, a query that fails, the view and the exports                                                                                                                                                                                                                                                      |
+| `Invoke-AACWafAssessment`, `Get-AACKeyVaultInsight`, `Invoke-AACStorageAccountAssessment`, `Show-AACApplicationGatewayMap`, `Get-AACNetworkHealth`, `Show-AACNetworkTopology` | Resource Graph, Azure Monitor metrics, Resource Health, Log Analytics and the services' settings and data planes, each with a made-up Contoso fixture | Every check, signal and finding, the heat maps, scores, timestamps, scope and `-Name`, the views, and the console, CSV, PDF and HTML outputs |
 | `Invoke-AACApplicationInsightQuery`                                               | Resource Graph and the query API (`Invoke-AACArmRequest`)                                                                                                                                                                                                                           | The KQL built from the parameters (with escaping), both table schemas flattened, `-Query`, errors, the view and the exports                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 The console views are checked by swapping the Spectre console for one that
