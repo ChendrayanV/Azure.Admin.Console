@@ -43,7 +43,11 @@ function Write-AACResourceMapHtml {
         # What the page's Hierarchy button draws: layered (ELK's layers), or
         # packed - boxes inside boxes in a grid, the lines drawn straight.
         [ValidateSet('layered', 'packed')]
-        [string] $Hierarchy = 'layered'
+        [string] $Hierarchy = 'layered',
+
+        # The print page, for a PDF: no toolbar or panels, the whole map at
+        # full size with its legend below, on a page that fits it.
+        [switch] $Print
     )
 
     $asset = Get-AACResourceMapAsset
@@ -60,7 +64,7 @@ function Write-AACResourceMapHtml {
     $model = [ordered]@{
         title    = $Title
         facts    = @($Fact)
-        options  = @{ direction = $Direction; theme = $Theme; nsgView = $NsgView; layout = $Layout; hierarchy = $Hierarchy; hubSpoke = [bool]@($Map.Clusters | Where-Object { $_.Contains('role') -and $_['role'] -eq 'hub' }).Count }
+        options  = @{ direction = $Direction; theme = $Theme; nsgView = $NsgView; layout = $Layout; hierarchy = $Hierarchy; print = [bool]$Print; hubSpoke = [bool]@($Map.Clusters | Where-Object { $_.Contains('role') -and $_['role'] -eq 'hub' }).Count }
         clusters = @($Map.Clusters)
         nodes    = @($Map.Nodes)
         edges    = @($Map.Edges)

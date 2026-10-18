@@ -33,7 +33,7 @@
   #stage { position: fixed; inset: 0; cursor: grab; }
   #stage.panning { cursor: grabbing; }
   #map { width: 100%; height: 100%; display: block; }
-  #legend { position: fixed; left: 16px; bottom: 16px; z-index: 4; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; box-shadow: var(--shadow); font-size: 12px; }
+  #legend { position: fixed; left: 16px; bottom: 16px; z-index: 4; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; box-shadow: var(--shadow); font-size: 12px; max-height: calc(100vh - 96px); overflow: auto; }
   #legend h2 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
   #legend label { display: flex; align-items: center; gap: 8px; margin: 3px 0; cursor: pointer; user-select: none; }
   #legend svg { flex: 0 0 auto; }
@@ -88,6 +88,19 @@
   #legend .pill { display: inline-block; width: 22px; height: 12px; border-radius: 6px; border: 2px solid var(--line); }
   #legend .pill.high { border-color: var(--high); }
   #legend .pill.medium { border-color: var(--warn); }
+  #legend section + section { margin-top: 10px; }
+  #legend .box { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+  body.print, html.print { height: auto; overflow: visible; background: var(--page); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body.print header { position: static; display: block; padding: 22px 28px 14px; border-bottom: 0; background: var(--page); }
+  body.print header h1 { font-size: 22px; white-space: normal; }
+  body.print header .facts { margin-top: 6px; font-size: 12.5px; }
+  body.print .tools, body.print #zoom, body.print #details, body.print #status { display: none !important; }
+  body.print #stage { position: static; cursor: default; }
+  body.print #map { width: auto; height: auto; }
+  body.print #legend { position: static; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px 40px; margin: 0 28px 28px; padding: 14px 18px; box-shadow: none; max-height: none; font-size: 12.5px; }
+  body.print #legend section + section { margin-top: 0; }
+  body.print #legend label { cursor: default; }
+  body.print #legend input { display: none; }
   #details a.portal { display: inline-block; margin-top: 8px; color: var(--accent); text-decoration: none; font-weight: 600; }
   #status { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 6; color: var(--muted); font-size: 14px; pointer-events: none; }
   #zoom { position: fixed; right: 16px; bottom: 16px; z-index: 4; display: flex; flex-direction: column; gap: 4px; }
@@ -117,6 +130,7 @@
     <button id="save-png" class="save" title="Save the map as a PNG image">Save PNG</button>
     <button id="save-jpeg" class="save" title="Save the map as a JPEG image">Save JPEG</button>
     <button id="save-svg" title="Save the map as an SVG drawing">SVG</button>
+    <button id="save-drawio" title="Save as an editable draw.io diagram - real containers, Azure icons, attached connections - for draw.io, app.diagrams.net or VS Code; Export-AACDiagram -Update can refresh it later">draw.io</button>
   </div>
 </header>
 <div id="stage"><svg id="map" xmlns="http://www.w3.org/2000/svg"></svg></div>
@@ -823,8 +837,21 @@
   }
 
   // --- Legend ------------------------------------------------------------------------------
+  // The kinds of box, drawn as the map draws them (see styleText).
+  const BOXES = [
+    ['tenant', 'Tenant', t => [t.page, t.subscription[1], 2.6, '']],
+    ['managementgroup', 'Management group', t => [t.vnet[0], t.subscription[1], 2, '']],
+    ['subscription', 'Subscription', t => [t.subscription[0], t.subscription[1], 1.6, '']],
+    ['region', 'Region', t => [t.subscription[0], t.muted, 1.6, '5 2']],
+    ['resourcegroup', 'Resource group', t => [t.resourcegroup[0], t.resourcegroup[1], 1.6, '4 2']],
+    ['vnet', 'Virtual network', t => [t.vnet[0], t.vnet[1], 1.6, '']],
+    ['hub', 'Hub virtual network', t => [t.vnet[0], t.edges.peering, 2.6, '']],
+    ['subnet', 'Subnet', t => [t.subnet[0], t.subnet[1], 1.6, '3 2']],
+    ['appgw', 'Application Gateway', t => [t.vnet[0], t.edges.waf, 2.2, '']]
+  ];
   function legend() {
     const t = THEMES[state.theme];
+    const print = !!data.options.print;
     const counts = {};
     for (const e of data.edges) if (!e.view || e.view === state.mode) counts[e.kind] = (counts[e.kind] || 0) + 1;
     const box = document.getElementById('legend');
@@ -843,9 +870,32 @@
       (medium ? '<div class="note"><span class="pill medium"></span>Worth a review (' + medium + ')</div>' : '') +
       (high + medium ? '<label><input type="checkbox" id="flagged"' + (state.flaggedOnly ? ' checked' : '') + '>Show only what is flagged</label>' : '<div class="note"><span class="pill"></span>Nothing flagged</div>') +
       '<div class="note">Click a chip for its rules or routes</div>' : '';
-    box.innerHTML = '<h2>Connections</h2>' + (items.join('') || '<div class="note">No connections</div>') +
-      (orphans ? '<div class="note"><span class="swatch"></span>Unattached (' + orphans + ')</div>' : '') +
-      (outside ? '<div class="note"><span class="swatch ext"></span>Outside the selection (' + outside + ')</div>' : '') + security;
+    const boxCounts = {};
+    // The boxes drawn, not all in the map: hub and spoke leaves out the tenant, management groups and so on.
+    svg.querySelectorAll('g.cluster').forEach(g => { const k = g.classList.contains('hub') ? 'hub' : g.classList[1]; boxCounts[k] = (boxCounts[k] || 0) + 1; });
+    const boxes = BOXES.filter(([k]) => boxCounts[k]).map(([k, label, look]) => {
+      const [fill, stroke, width, dash] = look(t);
+      return '<div class="box"><svg width="34" height="18"><rect x="2" y="2" width="30" height="14" rx="4" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + width + '"' + (dash ? ' stroke-dasharray="' + dash + '"' : '') + '/></svg>' +
+        esc(label) + '<span class="count">' + boxCounts[k] + '</span></div>';
+    });
+    const health = {};
+    for (const n of data.nodes) if (n.health) health[n.health] = (health[n.health] || 0) + 1;
+    const healthLook = { healthy: ['Healthy', '#3fb950'], degraded: ['Degraded', t.orphan], unhealthy: ['Unhealthy', t.high], unknown: ['Health unknown', t.muted] };
+    const nvas = data.nodes.filter(n => n.nva).length;
+    const flags = [].concat(
+      orphans ? ['<div class="note"><span class="swatch"></span>Unattached (' + orphans + ')</div>'] : [],
+      outside ? ['<div class="note"><span class="swatch ext"></span>Outside the selection (' + outside + ')</div>'] : [],
+      nvas ? ['<div class="note"><span class="swatch" style="border-color:' + t.edges.route + '"></span>Network virtual appliance (' + nvas + ')</div>'] : [],
+      Object.keys(healthLook).filter(h => health[h]).map(h => '<div class="note"><span class="swatch" style="border-color:' + healthLook[h][1] + '"></span>' + healthLook[h][0] + ' (' + health[h] + ')</div>'));
+    // A printed page can't be clicked: the legend without its switches.
+    const printSecurity = owners.length ? '<section><h2>NSGs &amp; route tables</h2>' +
+      (high ? '<div class="note"><span class="pill high"></span>High risk (' + high + ')</div>' : '') +
+      (medium ? '<div class="note"><span class="pill medium"></span>Worth a review (' + medium + ')</div>' : '') +
+      (high + medium ? '' : '<div class="note"><span class="pill"></span>Nothing flagged</div>') + '</section>' : '';
+    box.innerHTML = '<section><h2>Connections</h2>' + (items.join('') || '<div class="note">No connections</div>') + (print ? '' : flags.join('')) + '</section>' +
+      (boxes.length ? '<section><h2>Boxes</h2>' + boxes.join('') + '</section>' : '') +
+      (print && flags.length ? '<section><h2>Resources</h2>' + flags.join('') + '</section>' : '') +
+      (print ? printSecurity : security ? '<section>' + security.replace(' style="margin-top:10px"', '') + '</section>' : '');
     box.querySelectorAll('input[data-kind]').forEach(cb => cb.onchange = () => {
       if (cb.checked) state.hidden.delete(cb.dataset.kind); else state.hidden.add(cb.dataset.kind);
       run();
@@ -859,7 +909,7 @@
   const stage = document.getElementById('stage');
   function applyView() { if (viewport) viewport.setAttribute('transform', 'translate(' + state.view.x + ',' + state.view.y + ') scale(' + state.view.k + ')'); }
   function fit() {
-    if (!state.layout) return;
+    if (!state.layout || data.options.print) return;
     const top = document.querySelector('header').offsetHeight + 16;
     const right = document.getElementById('details').classList.contains('open') ? 392 : 16;
     const w = window.innerWidth - 16 - right, h = window.innerHeight - top - 16;
@@ -966,8 +1016,130 @@
   }
   document.getElementById('save-png').onclick = () => saveImage('image/png').then(b => download(b, fileName('png'))).catch(e => alert(e.message));
   document.getElementById('save-jpeg').onclick = () => saveImage('image/jpeg').then(b => download(b, fileName('jpg'))).catch(e => alert(e.message));
+
+  // --- Save as an editable draw.io diagram ---------------------------------------------------------
+  // The map as laid out here, as draw.io XML: boxes as containers (positions relative to the box that
+  // holds them), resources as icons with their data and portal link, connections attached at both
+  // ends with this layout's bends. Cell IDs are those Export-AACDiagram (ConvertTo-AACDrawio) gives -
+  // 'aac-' and the first 16 hex digits of the SHA-1 of the lower-case resource ID - so a diagram
+  // saved here can be refreshed later with Export-AACDiagram -Update. Keep the styles in step with
+  // ConvertTo-AACDrawio.
+  function sha1Hex(text) {
+    const bytes = new TextEncoder().encode(text);
+    const words = [], len = bytes.length;
+    for (let i = 0; i < len; i++) words[i >> 2] |= bytes[i] << (24 - (i % 4) * 8);
+    words[len >> 2] |= 0x80 << (24 - (len % 4) * 8);
+    words[(((len + 8) >> 6) + 1) * 16 - 1] = len * 8;
+    let h0 = 0x67452301, h1 = 0xEFCDAB89, h2 = 0x98BADCFE, h3 = 0x10325476, h4 = 0xC3D2E1F0;
+    const w = new Array(80);
+    for (let i = 0; i < words.length; i += 16) {
+      let a = h0, b = h1, c = h2, d = h3, e = h4;
+      for (let t = 0; t < 80; t++) {
+        w[t] = t < 16 ? (words[i + t] | 0) : ((x => (x << 1) | (x >>> 31))(w[t - 3] ^ w[t - 8] ^ w[t - 14] ^ w[t - 16]));
+        const f = t < 20 ? ((b & c) | (~b & d)) + 0x5A827999 : t < 40 ? (b ^ c ^ d) + 0x6ED9EBA1 : t < 60 ? ((b & c) | (b & d) | (c & d)) + 0x8F1BBCDC : (b ^ c ^ d) + 0xCA62C1D6;
+        const temp = (((a << 5) | (a >>> 27)) + f + e + w[t]) | 0;
+        e = d; d = c; c = (b << 30) | (b >>> 2); b = a; a = temp;
+      }
+      h0 = (h0 + a) | 0; h1 = (h1 + b) | 0; h2 = (h2 + c) | 0; h3 = (h3 + d) | 0; h4 = (h4 + e) | 0;
+    }
+    return [h0, h1, h2, h3, h4].map(v => (v >>> 0).toString(16).padStart(8, '0')).join('');
+  }
+  function exportDrawio() {
+    const xml = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const cellId = id => 'aac-' + sha1Hex(String(id).toLowerCase()).slice(0, 16);
+    const box = 'swimlane;html=1;whiteSpace=wrap;startSize=34;rounded=1;arcSize=2;fontStyle=1;align=left;spacingLeft=12;';
+    const boxStyle = {
+      tenant: 'fillColor=#E3E7ED;swimlaneFillColor=#FAFBFC;strokeColor=#6B7A90;fontSize=15;fontColor=#1B2A41;',
+      managementgroup: 'fillColor=#E7E3F4;swimlaneFillColor=#FBFAFE;strokeColor=#7A5CC7;fontSize=14;fontColor=#33236B;',
+      subscription: 'fillColor=#E7ECF3;swimlaneFillColor=#F7F9FC;strokeColor=#8C9BB0;fontSize=14;fontColor=#1B2A41;',
+      region: 'fillColor=#E6F3EF;swimlaneFillColor=#F8FCFA;strokeColor=#008A6E;dashed=1;fontSize=13;fontColor=#0B4A3C;',
+      resourcegroup: 'fillColor=#F1F3F6;swimlaneFillColor=#FFFFFF;strokeColor=#A3AEBE;dashed=1;fontSize=13;fontColor=#1B2A41;',
+      vnet: 'fillColor=#DCEBFA;swimlaneFillColor=#F2F8FE;strokeColor=#0078D4;fontSize=13;fontColor=#0B3B66;',
+      subnet: 'fillColor=#EAF3FD;swimlaneFillColor=#FFFFFF;strokeColor=#5EA0EF;dashed=1;fontSize=12;fontColor=#0B3B66;',
+      appgw: 'fillColor=#FCEBDC;swimlaneFillColor=#FFFBF7;strokeColor=#D9730D;fontSize=13;fontColor=#5C2E05;'
+    };
+    const edgeStyle = {
+      network: 'strokeColor=#0078D4;endArrow=block;endFill=1;',
+      peering: 'strokeColor=#7A5CC7;strokeWidth=2;dashed=1;startArrow=block;startFill=1;endArrow=block;endFill=1;',
+      privatelink: 'strokeColor=#00809C;dashed=1;endArrow=block;endFill=1;',
+      route: 'strokeColor=#B8730A;strokeWidth=2;endArrow=block;endFill=1;',
+      dns: 'strokeColor=#8C9BB0;dashed=1;dashPattern=1 3;endArrow=open;',
+      flow: 'strokeColor=#0078D4;strokeWidth=2;endArrow=block;endFill=1;',
+      probe: 'strokeColor=#008A6E;dashed=1;endArrow=open;',
+      waf: 'strokeColor=#D13447;dashed=1;endArrow=block;endFill=1;',
+      redirect: 'strokeColor=#B8730A;dashed=1;endArrow=block;endFill=1;',
+      dependency: 'strokeColor=#8C9BB0;endArrow=open;'
+    };
+    const healthColor = { healthy: '#008A6E', degraded: '#B8730A', unhealthy: '#D13447', unknown: '#8C9BB0', redirect: '#0078D4' };
+    const portal = item => { const t = item.portal || item.id; return /^\/subscriptions\//i.test(t) ? 'https://portal.azure.com/#resource' + t : ''; };
+    const svgUri = {};
+    const iconOf = key => {
+      const k = data.icons[key] ? key : 'resource';
+      if (!data.icons[k]) return '';
+      if (!svgUri[k]) svgUri[k] = 'data:image/svg+xml,' + btoa(unescape(encodeURIComponent(data.icons[k].svg)));
+      return svgUri[k];
+    };
+    const boxes = new Map();
+    (function walk(item) { for (const child of item.children || []) { boxes.set(child.id, child); walk(child); } })(state.layout);
+    const ids = new Map();
+    const cells = [];
+    const parentCell = id => { const p = clustersById.get(id) ? clustersById.get(id).parent : (nodesById.get(id) || {}).parent; return p && boxes.has(p) && ids.has(p) ? p : ''; };
+    for (const c of data.clusters) {
+      const b = boxes.get(c.id);
+      if (!b) continue;
+      const cid = cellId(c.id); ids.set(c.id, cid);
+      const p = parentCell(c.id), pb = p ? boxes.get(p) : null;
+      const extra = [].concat(c.detail || [], c.badges || [], c.role ? [c.role] : []).filter(Boolean);
+      const label = '<b>' + xml(c.name) + '</b>' + (extra.length ? '&nbsp;&nbsp;<span style="font-weight:normal;font-size:11px;color:#5B6B80">' + xml([...new Set(extra)].join('  ·  ')) + '</span>' : '');
+      const style = box + (boxStyle[c.kind] || boxStyle.resourcegroup) + (c.external ? 'opacity=60;' : '');
+      const link = portal(c);
+      cells.push('<object id="' + cid + '" label="' + xml(label) + '" aacKind="' + xml(c.kind) + '" resourceId="' + xml(c.id) + '" aacLabel="' + xml(label) + '"' + (link ? ' link="' + xml(link) + '"' : '') + '>' +
+        '<mxCell style="' + xml(style) + '" vertex="1" parent="' + (p ? ids.get(p) : '1') + '"><mxGeometry x="' + Math.round(b.x - (pb ? pb.x : 0)) + '" y="' + Math.round(b.y - (pb ? pb.y : 0)) + '" width="' + Math.round(b.width) + '" height="' + Math.round(b.height) + '" as="geometry"/></mxCell></object>');
+    }
+    for (const n of data.nodes) {
+      const b = boxes.get(n.id);
+      if (!b || drawnAsChip(n)) continue;
+      const cid = cellId(n.id); ids.set(n.id, cid);
+      const p = parentCell(n.id), pb = p ? boxes.get(p) : null;
+      let label = '<b>' + xml(n.name) + '</b><br><span style="font-size:9px;color:#5B6B80">' + xml(n.typeLabel || '') + '</span>';
+      if (n.health && healthColor[n.health]) label += '<br><span style="font-size:9px;color:' + healthColor[n.health] + '">&#9679; ' + xml(n.health) + '</span>';
+      const uri = iconOf(n.icon);
+      let style = uri ? 'image;html=1;aspect=fixed;image=' + uri + ';verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=11;whiteSpace=wrap;labelWidth=136;' : 'rounded=1;html=1;whiteSpace=wrap;fillColor=#FFFFFF;strokeColor=#8C9BB0;fontSize=10;verticalLabelPosition=bottom;verticalAlign=top;labelWidth=136;';
+      if (n.orphan) style += 'fontColor=#D13447;';
+      if (n.risk === 'high') style += 'imageBorder=#D13447;';
+      if (n.external) style += 'opacity=55;';
+      const tip = [n.type, n.id, n.orphan ? 'Unattached: ' + n.orphan : '', (n.facts || []).join(' · ')].concat(n.findings || []).filter(Boolean).join('\n');
+      const link = portal(n);
+      cells.push('<object id="' + cid + '" label="' + xml(label) + '" tooltip="' + xml(tip) + '" resourceType="' + xml(n.type) + '" resourceId="' + xml(n.id) + '" location="' + xml(n.location) + '" resourceGroup="' + xml(n.resourceGroup) + '" subscription="' + xml(n.subscription) + '" aacLabel="' + xml(label) + '"' + (link ? ' link="' + xml(link) + '"' : '') + '>' +
+        '<mxCell style="' + xml(style) + '" vertex="1" parent="' + (p ? ids.get(p) : '1') + '"><mxGeometry x="' + Math.round(b.x + (NODE_W - 48) / 2 - (pb ? pb.x : 0)) + '" y="' + Math.round(b.y + 8 - (pb ? pb.y : 0)) + '" width="48" height="48" as="geometry"/></mxCell></object>');
+    }
+    const common = 'edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;fontColor=#475569;labelBackgroundColor=#FFFFFF;';
+    const laid = new Map((state.layout.edges || []).map(e => [e.id, e]));
+    const seen = new Set();
+    let connections = 0;
+    for (const e of data.edges) {
+      if (!edgeVisible(e) || !ids.has(e.source) || !ids.has(e.target)) continue;
+      const eid = 'aac-e-' + sha1Hex((e.source + '|' + e.target + '|' + e.kind).toLowerCase()).slice(0, 16);
+      if (seen.has(eid)) continue;
+      seen.add(eid);
+      // This layout's bends, as waypoints (absolute: a connection's parent is the page).
+      const l = laid.get(e.id);
+      const bends = l && l.sections ? [].concat(...l.sections.map(sec => sec.bendPoints || [])) : [];
+      const points = bends.length ? '<Array as="points">' + bends.map(pt => '<mxPoint x="' + Math.round(pt.x) + '" y="' + Math.round(pt.y) + '"/>').join('') + '</Array>' : '';
+      const style = common + (edgeStyle[e.kind] || edgeStyle.dependency) + (e.warn ? 'strokeColor=#D13447;' : '');
+      cells.push('<mxCell id="' + eid + '" value="' + xml(e.label || '') + '" style="' + xml(style) + '" edge="1" parent="1" source="' + ids.get(e.source) + '" target="' + ids.get(e.target) + '"><mxGeometry relative="1" as="geometry">' + points + '</mxGeometry></mxCell>');
+      connections++;
+    }
+    const page = 'aac-page-' + sha1Hex(String(data.title || 'map').toLowerCase()).slice(0, 16);
+    const text = '<mxfile host="Azure.Admin.Console" agent="Azure.Admin.Console map page" modified="' + new Date().toISOString() + '" version="24.7.0">\n' +
+      '  <diagram id="' + page + '" name="' + xml(data.title || 'Azure resources') + '">\n' +
+      '    <mxGraphModel grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" math="0" shadow="0">\n' +
+      '      <root>\n        <mxCell id="0"/>\n        <mxCell id="1" parent="0"/>\n        ' + cells.join('\n        ') + '\n      </root>\n    </mxGraphModel>\n  </diagram>\n</mxfile>\n';
+    return { text: text, shapes: ids.size, connections: connections };
+  }
   document.getElementById('save-svg').onclick = () => download(new Blob([exportSvg().text], { type: 'image/svg+xml' }), fileName('svg'));
-  window.AACResourceMap = { saveImage: saveImage, exportSvg: exportSvg, state: state };
+  document.getElementById('save-drawio').onclick = () => download(new Blob([exportDrawio().text], { type: 'application/vnd.jgraph.mxfile' }), fileName('drawio'));
+  window.AACResourceMap = { saveImage: saveImage, exportSvg: exportSvg, exportDrawio: exportDrawio, state: state };
 
   // --- Lay out and draw --------------------------------------------------------------------------
   const elk = new ELK();
@@ -977,6 +1149,25 @@
   layoutButtons.hub.onclick = () => { if (state.layoutMode !== 'hubspoke') { state.layoutMode = 'hubspoke'; run(); } };
   const hierarchyMode = data.options.hierarchy === 'packed' ? 'packed' : 'layered';
   layoutButtons.layered.onclick = () => { if (state.layoutMode !== hierarchyMode) { state.layoutMode = hierarchyMode; run(); } };
+  // The print page (a PDF): the whole map at full size - shrunk only past what a PDF page can hold -
+  // on a page exactly the size of the title, the map and the legend.
+  function printPage() {
+    const pad = 28, most = 18000;
+    // One paper colour, the map's, behind the title and the legend too - and the page's edges.
+    const paper = THEMES[state.theme].page;
+    document.documentElement.style.setProperty('--page', paper);
+    document.body.style.setProperty('--page', paper);
+    const k = Math.min(1, most / (state.layout.width + pad * 2), most / (state.layout.height + pad * 2 + 400));
+    const w = Math.ceil((state.layout.width + pad * 2) * k), h = Math.ceil((state.layout.height + pad * 2) * k);
+    svg.setAttribute('width', w); svg.setAttribute('height', h);
+    state.view = { k: k, x: pad * k, y: pad * k };
+    applyView();
+    document.getElementById('legend').style.maxWidth = Math.max(w - 56, 600) + 'px';
+    const page = document.createElement('style');
+    const width = Math.max(w, 760);
+    page.textContent = '@page { size: ' + width + 'px ' + (document.documentElement.scrollHeight + 2) + 'px; margin: 0; }';
+    document.head.appendChild(page);
+  }
   function run() {
     status.style.display = 'flex';
     status.textContent = 'Laying out the map...';
@@ -988,7 +1179,7 @@
       state.layout = layout;
       draw(layout);
       legend();
-      fit();
+      if (data.options.print) printPage(); else fit();
       status.style.display = 'none';
       document.body.dataset.ready = 'true';
     }).catch(err => {
@@ -997,6 +1188,7 @@
     });
   }
   document.body.dataset.theme = state.theme;
+  if (data.options.print) { document.body.classList.add('print'); document.documentElement.classList.add('print'); }
   window.addEventListener('resize', fit);
   run();
 })();

@@ -154,107 +154,16 @@ function Show-AACResourceMap {
     else {
         Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath ('AAC-ResourceMap-{0:yyyyMMdd-HHmmss}.html' -f (Get-Date))
     }
-    $quote = { param([string] $Text) "'" + ($Text -replace '\\', '\\' -replace "'", "\'") + "'" }
-
-    # Resource Graph queries, several at once (Invoke-AACGraphBatch): rows
-    # as hashtables (tags whose keys differ only by case are fine).
-    $graph = {
-        param([System.Collections.IDictionary] $Query, [string[]] $Subscriptions)
-        (Invoke-AACGraphBatch -Query $Query -SubscriptionId $Subscriptions).Rows
-    }
-    $columns = '| project id, name, type, kind, location, resourceGroup, subscriptionId, sku, properties, tags'
+    $request = @{ SubscriptionId = @($SubscriptionId | Where-Object { $_ }); ResourceGroupName = @($ResourceGroupName | Where-Object { $_ }); ExcludeType = @($ExcludeType | Where-Object { $_ }); Title = $Title }
 
     Write-AACRule -Title 'Azure Admin Console :: Resource map' -Color 'deepskyblue3_1'
     $state = Invoke-AACProgress -ScriptBlock {
         $null = Get-AACAccessToken
-        $asset = Get-AACResourceMapAsset
-
-        # --- What to map ------------------------------------------------------------------------
-        Update-AACProgress -Id 'scope' -Description 'Finding the subscriptions and resource groups' -Indeterminate
-        # The subscriptions, resource groups and resources together.
-        $groupFilter = if ($ResourceGroupName) { " and resourceGroup in~ ($((@($ResourceGroupName | ForEach-Object { & $quote $_ })) -join ', '))" } else { '' }
-        $read = & $graph ([ordered]@{
-                subscriptions = "resourcecontainers | where type =~ 'microsoft.resources/subscriptions' | project subscriptionId, name"
-                groups        = "resourcecontainers | where type =~ 'microsoft.resources/subscriptions/resourcegroups'$($groupFilter -replace 'resourceGroup', 'name') | project name, subscriptionId"
-                resources     = "resources | where isnotempty(resourceGroup)$groupFilter $columns"
-            }) $SubscriptionId
-        $subscriptionNames = @{}
-        foreach ($row in @($read['subscriptions'])) {
-            $subscriptionNames[([string]$row['subscriptionId']).ToLowerInvariant()] = [string]$row['name']
-        }
-        $groups = @($read['groups'])
-        if ($ResourceGroupName) {
-            $missing = @($ResourceGroupName | Where-Object { $name = $_; -not @($groups | Where-Object { [string]$_['name'] -eq $name }).Count })
-            if ($missing.Count -eq $ResourceGroupName.Count) {
-                throw "No resource group named $(($missing | ForEach-Object { "'$_'" }) -join ', ') was found$(if ($SubscriptionId) { " in subscription $($SubscriptionId -join ', ')" } else { ' in any subscription you can see' })."
-            }
-            foreach ($name in $missing) { Write-Warning "No resource group named '$name' was found; the map leaves it out." }
-        }
-        Update-AACProgress -Id 'scope' -Complete -Description ('Found {0} resource group(s) in {1} subscription(s)' -f $groups.Count, @($groups | ForEach-Object { $_['subscriptionId'] } | Sort-Object -Unique).Count)
-
-        # --- The resources, and those outside the selection they use ----------------------------
-        Update-AACProgress -Id 'read' -Description 'Reading the resources from Azure Resource Graph' -Indeterminate
-        $resources = @($read['resources'])
-        $known = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-        foreach ($row in $resources) { [void]$known.Add([string]$row['id']) }
-        $referenced = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-        foreach ($row in $resources) {
-            $text = ConvertTo-Json -InputObject $row['properties'] -Depth 30 -Compress
-            foreach ($match in [regex]::Matches($text, '(?i)/subscriptions/[^/"]+/resourcegroups/[^/"]+/providers/[^/"]+/[^/"]+/[^/"]+')) {
-                if (-not $known.Contains($match.Value)) { [void]$referenced.Add($match.Value) }
-            }
-        }
-        # Those outside it, 200 IDs a query, the queries at once.
-        $external = [System.Collections.Generic.List[object]]::new()
-        $ids = @($referenced)
-        $chunks = [ordered]@{}
-        for ($i = 0; $i -lt $ids.Count; $i += 200) {
-            $chunk = $ids[$i..([Math]::Min($i + 199, $ids.Count - 1))]
-            $chunks["chunk$i"] = "resources | where id in~ ($((@($chunk | ForEach-Object { & $quote $_ })) -join ', ')) $columns"
-        }
-        if ($chunks.Count) {
-            $read = & $graph $chunks @()
-            foreach ($name in @($chunks.Keys)) { foreach ($row in @($read[$name])) { $external.Add($row) } }
-        }
-        # Route next hops (a firewall or appliance IP) that nothing read so far
-        # has: look for their owner in every subscription, so a spoke's routes
-        # reach the hub's firewall.
-        $owned = [System.Collections.Generic.HashSet[string]]::new()
-        foreach ($row in @($resources) + @($external)) {
-            foreach ($match in [regex]::Matches((ConvertTo-Json -InputObject $row['properties'] -Depth 30 -Compress), '"privateIPAddress":"([^"]+)"')) { [void]$owned.Add($match.Groups[1].Value) }
-        }
-        $hops = @(foreach ($row in $resources) {
-                if ([string]$row['type'] -ne 'microsoft.network/routetables' -and [string]$row['type'] -ne 'Microsoft.Network/routeTables') { continue }
-                foreach ($match in [regex]::Matches((ConvertTo-Json -InputObject $row['properties'] -Depth 30 -Compress), '"nextHopIpAddress":"([^"]+)"')) { $match.Groups[1].Value }
-            }) | Where-Object { $_ -and -not $owned.Contains($_) } | Select-Object -Unique
-        if ($hops) {
-            $types = "'microsoft.network/azurefirewalls', 'microsoft.network/networkinterfaces', 'microsoft.network/loadbalancers', 'microsoft.network/applicationgateways'"
-            $filter = (@($hops | ForEach-Object { "properties contains $(& $quote $_)" })) -join ' or '
-            foreach ($row in @((& $graph @{ hops = "resources | where type in~ ($types) | where $filter $columns" } @())['hops'])) {
-                if (-not $known.Contains([string]$row['id']) -and -not @($external | Where-Object { [string]$_['id'] -eq [string]$row['id'] }).Count) { $external.Add($row) }
-            }
-        }
-        Update-AACProgress -Id 'read' -Complete -Description ('Read {0:N0} resource(s), and {1:N0} outside the selection they use' -f $resources.Count, $external.Count)
-
-        # --- The map ------------------------------------------------------------------------------
-        Update-AACProgress -Id 'map' -Description 'Working out the connections and network paths' -Indeterminate
-        $labels = @{}
-        foreach ($key in $asset.Icons.icons.Keys) { $labels[$key] = [string]$asset.Icons.icons[$key].label }
-        $map = ConvertTo-AACResourceMap -Resource $resources -External $external.ToArray() -SubscriptionName $subscriptionNames -IconType $asset.Icons.types -IconLabel $labels -ExcludeType @($ExcludeType | Where-Object { $_ })
-        Update-AACProgress -Id 'map' -Complete -Description ('Mapped {0:N0} resource(s) and {1:N0} connection(s)' -f $map.Stats.Resources, $map.Stats.Connections)
-
-        $scopeText = if ($ResourceGroupName) { $ResourceGroupName -join ', ' } else { @($SubscriptionId | ForEach-Object { if ($subscriptionNames.Contains($_.ToLowerInvariant())) { $subscriptionNames[$_.ToLowerInvariant()] } else { $_ } }) -join ', ' }
-        $mapTitle = if ($Title) { $Title } else { "Resource map: $scopeText" }
-        $facts = @(
-            '{0:N0} resources' -f $map.Stats.Resources
-            '{0:N0} resource group(s)' -f $map.Stats.Groups
-            '{0:N0} virtual network(s)' -f $map.Stats.Networks
-            '{0:N0} connections' -f $map.Stats.Connections
-            if ($map.Stats.Outside) { '{0:N0} outside the selection' -f $map.Stats.Outside }
-            if ($map.Stats.Orphans) { '{0:N0} unattached' -f $map.Stats.Orphans }
-            if ($map.Stats.Flagged) { '{0:N0} NSG / route table(s) flagged' -f $map.Stats.Flagged }
-            "drawn $((Get-Date).ToString('d MMM yyyy HH:mm'))"
-        )
+        # The read and the model: Read-AACResourceMap (shared with Export-AACDiagram).
+        $built = Read-AACResourceMap -SubscriptionId $request.SubscriptionId -ResourceGroupName $request.ResourceGroupName -ExcludeType $request.ExcludeType -Title $request.Title
+        $map = $built.Map
+        $mapTitle = $built.Title
+        $facts = $built.Facts
         Update-AACProgress -Id 'html' -Description 'Writing the map' -Indeterminate
         Write-AACResourceMapHtml -Map $map -Path $htmlFullPath -Title $mapTitle -Fact $facts -Direction $(if ($Direction -eq 'TopToBottom') { 'DOWN' } else { 'RIGHT' }) -Theme $Theme.ToLowerInvariant() -NsgView $NsgView.ToLowerInvariant()
         Update-AACProgress -Id 'html' -Complete -Description "Map: $htmlFullPath"

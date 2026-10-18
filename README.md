@@ -226,6 +226,7 @@ bookmarks are how you jump to the one you want.
 | [`Invoke-AACAksAssessment`](docs/Invoke-AACAksAssessment.md)                                     | AKS clusters through every lens: current settings, about 35 Well-Architected checks scored per pillar, PSRule for Azure, Azure Policy for Kubernetes consolidated by namespace, workload, policy and cluster (the AKS Policy Compliance Toolkit's view) with Gatekeeper's complete counts, versions and upgrades, subnet capacity, Advisor and Defender. A console view, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                      |
 | [`Invoke-AACAssessment`](docs/Invoke-AACAssessment.md)                                           | An Azure environment assessed end to end, in the spirit of Azure Resource Inventory: a sheet per resource type (~95) with its key settings, the organization, Advisor and retirements, Defender, Policy, outages, quotas, reservations and cost - CSV, an interactive HTML report, a PDF and interactive network and organization diagrams, with a live progress display. Runs in Azure Automation with a managed identity and uploads to blob storage.                                                                                                                                                                                           |
 | [`Get-AACInventory`](docs/Get-AACInventory.md)                                                   | The tenant as a tree: management groups, subscriptions, resource groups and resources, with counts, the Defender for Cloud secure score and - with `-Cost` - the cost at every level. A console tree, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                                                                                                                                                         |
+| [`Export-AACDiagram`](docs/Export-AACDiagram.md)                                                 | Your existing resources as an editable draw.io diagram - the resources, the network topology or Application Gateways - with real containers (move a box and what's in it moves too), Azure icons, attached connections, each shape's data and portal link, and a page per subscription or resource group. `-Update` refreshes it from Azure and keeps your changes: new resources added and marked, removed ones faded. |
 | [`Export-AACResource`](docs/Export-AACResource.md)                                               | Every resource - for the tenant, a management group, subscriptions, resource groups or types - with its subscription and management group by name, resource group tags, tags as columns and each type's key settings, to CSV, HTML and PDF. Filters in Resource Graph (type, group, name, location, tag, missing tag, KQL) and free-text search.                                                                                                                                                                                                                                                                                                  |
 | [`Get-AACSecurityPosture`](docs/Get-AACSecurityPosture.md)                                       | Microsoft Defender for Cloud and Azure Policy in one report: secure scores, recommendations grouped by control with remediation links, active alerts, Defender plans, regulatory compliance traced to the failing resources, and policy compliance per assignment - one list of findings. A console view, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                                                     |
 | [`Get-AACSecurityAlert`](docs/Get-AACSecurityAlert.md)                                           | Microsoft Defender for Cloud security alerts across every subscription in one query - the Get-AzSecurityAlert equivalent, with more in each alert: MITRE ATT&CK tactics and techniques, the hosts, accounts and IP addresses involved, extended properties, remediation steps, incidents and recurring alerts. Filters by status, severity, age, name, type, tactic and resource, and takes resources from the pipeline.                                                                                                                                                                                                                          |
@@ -1685,6 +1686,8 @@ remote gateway.
   themes;
 - hide a kind of connection;
 - **Save PNG** or **Save JPEG**, at twice the screen's resolution, or SVG.
+- **draw.io**: the map as you see it, as an editable draw.io diagram (see
+  [Editable diagrams](#editable-diagrams-drawio)).
 
 The page is one self-contained file that opens offline. Its layout comes from
 the [Eclipse Layout Kernel](https://eclipse.dev/elk/) (`elkjs`, EPL-2.0), and
@@ -1693,6 +1696,87 @@ it uses Microsoft's
 under Microsoft's terms for architecture diagrams. `-PassThru` also returns
 the map's resources and connections as objects, e.g. `(... -PassThru).Nodes |
 Where-Object Orphan`.
+
+## Editable diagrams (draw.io)
+
+`Export-AACDiagram` draws your existing resources as a diagram you can
+**edit** - not a picture. It writes a `.drawio` file. You open it in
+draw.io: the desktop app, [app.diagrams.net](https://app.diagrams.net), the
+*Draw.io Integration* extension for VS Code, or Confluence. From there you
+can export to Visio (`.vsdx`), PNG, SVG or PDF.
+
+```powershell
+Export-AACDiagram -ResourceGroupName 'rg-hub', 'rg-spoke-app' -Path .\estate.drawio -Open
+Export-AACDiagram -SubscriptionId $sub -SplitBy ResourceGroup -Path .\estate.drawio        # a page per resource group
+Export-AACDiagram -View Network -ManagementGroupId 'mg-landingzones' -Path .\network.drawio
+Export-AACDiagram -View ApplicationGateway -ResourceGroupName 'rg-edge' -IncludeHealth -Path .\gateways.drawio
+Export-AACDiagram -ResourceGroupName 'rg-hub', 'rg-spoke-app' -Path .\estate.drawio -Update # refresh, keep your edits
+```
+
+**What's drawn.** `-View` chooses the picture: the same model as the
+browser maps.
+
+| `-View` | What it draws | Like |
+|---|---|---|
+| `Resources` (default) | The resources in resource groups or subscriptions, with network links, peerings, private endpoints, routes, DNS links and dependencies | `Show-AACResourceMap` |
+| `Network` | The topology of a tenant, management groups, subscriptions or regions: hubs and spokes, peerings, gateways, firewalls, appliances | `Show-AACNetworkTopology` |
+| `ApplicationGateway` | Each gateway's flow, a column per stage: frontends, listeners, rules, path rules, backend settings, pools and targets, with probes, WAF policies and health | `Show-AACApplicationGatewayMap` |
+
+**Made to edit.**
+- **Boxes are draw.io containers:** subscription, resource group, virtual
+  network, subnet, and so on. Move a box and everything in it moves too;
+  drag a resource into another box and it belongs there.
+- **Resources** carry the official Azure icons (vector, sharp at any zoom),
+  their name and type. Unattached resources are red, and those outside the
+  selection are faded.
+- **Connections are attached at both ends**, so they follow what you move,
+  and draw.io re-routes them.
+- **Every shape keeps its data:** resource ID, type, location, resource group
+  and subscription. See it with *Edit > Edit Data* or by hovering;
+  Ctrl+click opens the resource in the Azure portal.
+- **A Legend page** shows the kinds of box and connection used, what was
+  read and when (`-NoLegend` leaves it out).
+- **`-SplitBy`** puts each subscription, resource group, management group,
+  region or gateway on a page of its own, for large estates.
+
+**Refresh without losing your edits.** Move things, restyle them, rename
+them, and add notes, users or on-premises shapes. Then run the same command
+with `-Update`. It reads Azure again and merges into your file:
+- what you moved, restyled or renamed stays as you left it;
+- new resources are added into their box (which grows to fit) and marked
+  green until the next refresh;
+- resources no longer in Azure are faded red, with the date they went.
+  `-Prune` deletes them instead;
+- shapes and connections you drew yourself are left alone.
+
+The merge works because every shape's ID comes from its Azure resource ID,
+so a refresh finds it again. Without `-Update`, an existing file isn't
+overwritten unless you add `-Force`.
+
+**A clean copy to view or share.** Add `-HtmlPath`, `-PdfPath` or both to
+write the same diagram in light colours, with a legend of its connections,
+boxes and flags:
+- **HTML**: an interactive page that works offline, to pan, zoom, search and
+  click a resource for its details.
+- **PDF**: one page with the title, what was read and when, the whole diagram
+  and its legend. It is vector, so it stays sharp when you zoom in or print
+  it. Microsoft Edge or Google Chrome draws it, headless.
+
+Both show what was read from Azure this time, on one page whatever
+`-SplitBy` says. They don't include the changes you made in draw.io.
+
+```powershell
+Export-AACDiagram -SubscriptionId $sub -Path .\estate.drawio -HtmlPath .\estate.html -PdfPath .\estate.pdf
+```
+
+**From the browser maps.** `Show-AACResourceMap`, `Show-AACNetworkTopology`
+and `Show-AACApplicationGatewayMap` have a **draw.io** button at the top of
+the page. It saves the map exactly as laid out there, bends included, with
+the same shape IDs, so `Export-AACDiagram -Update` can refresh it later.
+
+**What it needs.** Reader on what you draw, and nothing to install: the
+diagram is written by PowerShell, with no Graphviz, Python or Visio.
+`-PdfPath` uses Microsoft Edge or Google Chrome if either is installed.
 
 ## PSRule for Azure
 

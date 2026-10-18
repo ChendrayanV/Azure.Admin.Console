@@ -38,6 +38,7 @@ Describe 'Azure Admin Console - Module scaffold' {
             'Deploy-AACStorageAccount'
             'Disconnect-AAC'
             'Export-AACDiagnosticBundle'
+            'Export-AACDiagram'
             'Export-AACResource'
             'Export-AACWafQuestionnaire'
             'Get-AACAccessReview'
