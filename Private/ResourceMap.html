@@ -101,7 +101,7 @@
   body.print #legend section + section { margin-top: 0; }
   body.print #legend label { cursor: default; }
   body.print #legend input { display: none; }
-  #details a.portal { display: inline-block; margin-top: 8px; color: var(--accent); text-decoration: none; font-weight: 600; }
+  #details a.portal { display: inline-block; margin: 0 0 8px; color: var(--accent); text-decoration: none; font-weight: 600; }
   #status { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 6; color: var(--muted); font-size: 14px; pointer-events: none; }
   #zoom { position: fixed; right: 16px; bottom: 16px; z-index: 4; display: flex; flex-direction: column; gap: 4px; }
   #details.open ~ #zoom { right: 392px; }
@@ -826,10 +826,10 @@
     panel.innerHTML =
       '<div class="head"><img alt="" src="' + icon(iconKey) + '"><div><h2>' + esc(heading) + '</h2><div class="type">' + esc(type) + (item.external ? ' &middot; outside the selection' : '') + '</div></div>' +
       '<button class="close" title="Close" aria-label="Close">&times;</button></div>' +
+      '<a class="portal" target="_blank" rel="noopener" href="https://portal.azure.com/#@/resource' + esc(portalId) + '">Open in the Azure portal &#8599;</a>' +
       (n && n.orphan ? '<div class="flag">Unattached: ' + esc(n.orphan) + '</div>' : '') +
       '<table>' + rows.join('') + '</table>' + extra +
-      (links.length ? '<h3>Connections (' + links.length + ')</h3><ul>' + links.join('') + '</ul>' : '') +
-      '<a class="portal" target="_blank" rel="noopener" href="https://portal.azure.com/#@/resource' + esc(portalId) + '">Open in the Azure portal &#8599;</a>';
+      (links.length ? '<h3>Connections (' + links.length + ')</h3><ul>' + links.join('') + '</ul>' : '');
     panel.classList.add('open');
     panel.classList.toggle('wide', !!(n && (n.type === 'microsoft.network/networksecuritygroups' || n.type === 'microsoft.network/routetables')));
     panel.querySelector('.close').onclick = () => { state.selected = null; applyHighlight(); showDetails(null); };

@@ -191,7 +191,8 @@ Describe 'Azure Admin Console - the dashboard' {
             $d.Status | Should -Be 'Failed'
             $d.Hours | Should -Be 72
             $script:batches.Count | Should -Be 2
-            @($script:batches[1].Keys) | Should -Be @('totals', 'regions', 'health', 'unhealthy', 'serviceIssues', 'advisor', 'changes', 'recentChanges')
+            @($script:batches[1].Keys | Select-Object -First 8) | Should -Be @('totals', 'regions', 'health', 'unhealthy', 'serviceIssues', 'advisor', 'changes', 'recentChanges')
+            @($script:batches[1].Keys).Count | Should -Be 24 -Because 'security, policy, governance, Advisor, estate and the change timeline come in the same batch'
             $script:batches[1].AllowFailure | Should -Not -Contain 'totals'
             $script:batches[1].SubscriptionId.Count | Should -Be 0 -Because 'with no scope, everything the account can see'
             (& $script:inModule { Get-AACDashboardQuery -Hours 72 }).changes | Should -BeLike '*where at > ago(72h)*'

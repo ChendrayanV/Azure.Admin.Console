@@ -61,7 +61,12 @@ function Write-AACResourceMapPdf {
             "`"--print-to-pdf=$pdf`""
             "`"$(([System.Uri]::new($page)).AbsoluteUri)`""
         ) -join ' '
-        $process = Start-Process -FilePath $browser -ArgumentList $arguments -PassThru
+        # Started directly rather than with Start-Process: no window, and nothing
+        # that wraps Start-Process (a demo, a test) gets in the way.
+        $start = [System.Diagnostics.ProcessStartInfo]::new($browser, $arguments)
+        $start.UseShellExecute = $false
+        $start.CreateNoWindow = $true
+        $process = [System.Diagnostics.Process]::Start($start)
         $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
         $written = $false
         # The browser may hand off to a child process: wait for the PDF itself,

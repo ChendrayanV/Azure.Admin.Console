@@ -186,8 +186,9 @@ function ConvertTo-AACTerraformPlan {
         if ($change.Mode -eq 'output') { if ($change.Action -ne 'NoOp') { $stats.Outputs++ }; continue }
         $stats.Resources++
         if ($stats.Contains($change.Action)) { $stats[$change.Action]++ }
-        if ($change.Importing) { $stats.Import++ }
-        if ($change.PreviousAddress) { $stats.Move++ }
+        # A pure import or move is already counted by its action; an import or move with changes is counted here too.
+        if ($change.Importing -and $change.Action -ne 'Import') { $stats.Import++ }
+        if ($change.PreviousAddress -and $change.Action -ne 'Move') { $stats.Move++ }
     }
     foreach ($row in $attributeRows) {
         if ($row.Source -eq 'Plan') { $stats.Attributes++ }

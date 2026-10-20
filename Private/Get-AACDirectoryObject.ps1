@@ -9,21 +9,26 @@ function Get-AACDirectoryObject {
         it: @odata.type, displayName, userPrincipalName, userType,
         accountEnabled, appId, servicePrincipalType...); Error (why Graph
         refused, or '') }. An ID Graph doesn't return is a deleted object.
+        -Property adds properties to the ones read (appOwnerOrganizationId,
+        alternativeNames...).
     #>
     [CmdletBinding()]
     [OutputType([hashtable])]
     param(
         [AllowEmptyCollection()]
-        [string[]] $Id = @()
+        [string[]] $Id = @(),
+
+        [string[]] $Property = @()
     )
 
     $ids = @($Id | Where-Object { $_ -match '^[0-9a-fA-F-]{36}$' } | ForEach-Object { $_.ToLowerInvariant() } | Select-Object -Unique)
     # Script blocks below run inside Invoke-AACHttpBatch: their names are prefixed 'directory'.
     $directoryFound = @{}
+    $select = (@('id', 'displayName', 'userPrincipalName', 'userType', 'accountEnabled', 'appId', 'servicePrincipalType', 'mail') + @($Property | Where-Object { $_ }) | Select-Object -Unique) -join ','
     if (-not $ids.Count) { return @{ Objects = $directoryFound; Error = '' } }
     $requests = @(for ($i = 0; $i -lt $ids.Count; $i += 1000) {
             $chunk = @($ids[$i..([Math]::Min($i + 999, $ids.Count - 1))])
-            @{ Key = "ids$i"; Uri = 'https://graph.microsoft.com/v1.0/directoryObjects/getByIds?$select=id,displayName,userPrincipalName,userType,accountEnabled,appId,servicePrincipalType,mail'; Body = (ConvertTo-Json -InputObject @{ ids = $chunk; types = @('user', 'group', 'servicePrincipal') } -Depth 4 -Compress) }
+            @{ Key = "ids$i"; Uri = "https://graph.microsoft.com/v1.0/directoryObjects/getByIds?`$select=$select"; Body = (ConvertTo-Json -InputObject @{ ids = $chunk; types = @('user', 'group', 'servicePrincipal') } -Depth 4 -Compress) }
         })
     $failures = Invoke-AACHttpBatch -Request $requests -Resource 'https://graph.microsoft.com' -ThrottleLimit 4 -OnResponse {
         param($DirectoryKey, [string] $DirectoryContent)

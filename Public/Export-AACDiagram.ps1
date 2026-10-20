@@ -27,6 +27,11 @@ function Export-AACDiagram {
                               backend settings > pools and targets - with
                               probes, WAF policies and health (as
                               Show-AACApplicationGatewayMap)
+          Governance          the management group hierarchy: the tenant
+                              root and management groups as nested boxes,
+                              each subscription inside its group, with the
+                              policy and role assignments at each level (as
+                              Show-AACManagementGroupMap)
 
         In the diagram:
           - boxes are draw.io containers: move a box and what is in it moves
@@ -66,13 +71,14 @@ function Export-AACDiagram {
         Both show what was read from Azure this time, on one page whatever
         -SplitBy says - not the changes you made in draw.io.
     .PARAMETER View
-        Resources (the default), Network or ApplicationGateway.
+        Resources (the default), Network, ApplicationGateway or Governance.
     .PARAMETER SubscriptionId
         Only these subscriptions.
     .PARAMETER ResourceGroupName
         Only these resource groups (Resources and ApplicationGateway views).
     .PARAMETER ManagementGroupId
-        Only the subscriptions under these management groups (Network view).
+        Only the subscriptions under these management groups (Network and
+        Governance views).
     .PARAMETER Location
         Only these regions (Network view).
     .PARAMETER Name
@@ -132,6 +138,9 @@ function Export-AACDiagram {
         Export-AACDiagram -View ApplicationGateway -ResourceGroupName 'rg-edge' -IncludeHealth -Path .\gateways.drawio
         The gateways' flows with live backend health.
     .EXAMPLE
+        Export-AACDiagram -View Governance -Path .\hierarchy.drawio -PdfPath .\hierarchy.pdf
+        The management group hierarchy as an editable diagram, and a one-page PDF.
+    .EXAMPLE
         Export-AACDiagram -SubscriptionId $sub -Path .\estate.drawio -HtmlPath .\estate.html -PdfPath .\estate.pdf
         The editable diagram, plus a clean interactive page and a one-page PDF, each with a legend, to share.
     .OUTPUTS
@@ -140,7 +149,7 @@ function Export-AACDiagram {
     [CmdletBinding()]
     [OutputType('AAC.Diagram')]
     param(
-        [ValidateSet('Resources', 'Network', 'ApplicationGateway')]
+        [ValidateSet('Resources', 'Network', 'ApplicationGateway', 'Governance')]
         [string] $View = 'Resources',
 
         [ValidatePattern('^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$')]
@@ -200,6 +209,7 @@ function Export-AACDiagram {
         Resources          = @('SubscriptionId', 'ResourceGroupName', 'ExcludeType')
         Network            = @('SubscriptionId', 'ManagementGroupId', 'Location', 'GroupBy', 'NetworkOnly', 'ExcludeType')
         ApplicationGateway = @('SubscriptionId', 'ResourceGroupName', 'Name', 'IncludeHealth')
+        Governance         = @('SubscriptionId', 'ManagementGroupId')
     }
     foreach ($parameter in 'ResourceGroupName', 'ManagementGroupId', 'Location', 'Name', 'GroupBy', 'NetworkOnly', 'IncludeHealth', 'ExcludeType') {
         if ($PSBoundParameters.ContainsKey($parameter) -and $parameter -notin $takes[$View]) {
@@ -227,6 +237,7 @@ function Export-AACDiagram {
         $null = Get-AACAccessToken
         $built = switch ($request.View) {
             'Network' { Read-AACNetworkTopology -ManagementGroupId $request.ManagementGroupId -SubscriptionId $request.SubscriptionId -Location $request.Location -GroupBy $request.GroupBy -NetworkOnly:$request.NetworkOnly -ExcludeType $request.ExcludeType -Title $request.Title }
+            'Governance' { Read-AACManagementGroupMap -ManagementGroupId $request.ManagementGroupId -SubscriptionId $request.SubscriptionId -Title $request.Title }
             'ApplicationGateway' { Read-AACApplicationGatewayMap -SubscriptionId $request.SubscriptionId -ResourceGroupName $request.ResourceGroupName -Name $request.Name -IncludeHealth:$request.IncludeHealth -Title $request.Title }
             default { Read-AACResourceMap -SubscriptionId $request.SubscriptionId -ResourceGroupName $request.ResourceGroupName -ExcludeType $request.ExcludeType -Title $request.Title }
         }
@@ -247,6 +258,7 @@ function Export-AACDiagram {
         if ($htmlFullPath -or $pdfFullPath) {
             # Laid out as the view's own map command lays it out: the network as hub and spoke when there are hubs.
             $look = @{ Map = $built.Map; Title = $built.Title; Fact = $built.Facts; Theme = 'light'; Layout = 'layered'; Hierarchy = 'layered' }
+            if ($request.View -eq 'Governance') { $look.Layout = 'packed'; $look.Hierarchy = 'packed' }
             if ($request.View -eq 'Network') {
                 $look.Layout = if ($built.Map['Layout'] -eq 'hubspoke') { 'hubspoke' } else { 'packed' }
                 $look.Hierarchy = 'packed'

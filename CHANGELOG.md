@@ -2,6 +2,59 @@
 
 All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never published to the PowerShell Gallery.
 
+## v0.14.6
+
+Governance across the tenant in the spirit of the Azure Governance Visualizer - eleven new commands and one workbook - editable draw.io diagrams of what you have, existing resources exported as Terraform, and a dashboard that now covers security, policy, governance, cost and what to do next. Published as a pre-release (0.14.6-preview1) first.
+
+### New
+
+- **Terraform export.** `Export-AACTerraform` exports existing resources as Terraform through the Azure Export for Terraform API (2026-09-01-preview):
+  - a resource group (several in one subscription exported together, with their child resources), resource IDs - or anything piped with an `Id` or `ResourceId` - or a Resource Graph where-clause; a folder per subscription;
+  - the export is a long-running operation: submitted, polled as Azure asks (`Retry-After`), with Azure's reason when it fails; each export shows its status, how long it has run and how many batches are done (Azure gives no percentage);
+  - large exports: the resources are counted first (Resource Graph), with advice when an export is large; `-BatchSize` splits it into exports that run at the same time (`-ThrottleLimit`) and merges them into one folder - a resource two batches return is kept once, and references to it follow; several subscriptions are exported at the same time;
+  - `-Resume`: the operations are saved in `export.json` as soon as Azure accepts them, so an export still running after Ctrl+C or `-TimeoutMinutes` is collected later without exporting again;
+  - a folder ready for `terraform init` and `plan`: `terraform.tf`, `providers.tf` (with the subscription ID), `main.tf`, `import.tf` (import blocks - no `terraform import` to run) and `export.json`;
+  - what couldn't be exported is listed, never dropped; `-FallbackToAzApi` exports what azurerm can't again with the azapi provider, merged into one module (`azapi.tf`);
+  - `-Plan` runs `terraform init`, `validate` and `plan` and reads the plan as `Get-AACTerraformPlan` does: a faithful export plans only imports, anything else is listed;
+  - sensitive values masked unless `-IncludeSensitive`; existing Terraform files not overwritten without `-Force`; `-RegisterProvider` registers `Microsoft.AzureTerraform` where it isn't (asks first, honours `-WhatIf`).
+- **Editable diagrams.** `Export-AACDiagram` draws your existing resources as a draw.io diagram you can edit - not a picture:
+  - four views: `Resources` (resource groups or subscriptions, with network links, peerings, private endpoints, routes, DNS links and dependencies), `Network` (hubs and spokes, gateways, firewalls), `ApplicationGateway` (each gateway's flow) and `Governance` (the management group hierarchy);
+  - boxes are draw.io containers; resources carry the Azure icons, their data and a portal link; connections stay attached when you move things;
+  - `-Update` refreshes the diagram from Azure and keeps your edits: new resources are added and marked, removed ones faded (`-Prune` deletes them);
+  - `-SplitBy` puts each subscription, resource group, management group, region or gateway on its own page; a Legend page explains the boxes and lines;
+  - `-HtmlPath` and `-PdfPath` write a clean copy with a legend: an interactive page, and a one-page vector PDF drawn by Microsoft Edge or Google Chrome.
+- **Governance**, each question a command of its own:
+  - `Invoke-AACGovernanceAssessment`: the hierarchy, access, identities, policy remediation, limits, settings, tags, locks and changes in one tabbed workbook, with the high and medium findings of every area; `-MarkdownPath` writes it as a wiki page (GitHub or Azure DevOps) with the hierarchy as a Mermaid diagram.
+  - `Show-AACManagementGroupMap`: the management group hierarchy as an interactive map and a console tree, with the subscriptions, policy and role assignments at each level.
+  - `Get-AACRoleAssignment`: every role assignment at every scope - user, guest, group, application or another tenant's, system- or user-assigned identity, deleted - what the role can do, how far it reaches, standing or PIM, group members (`-ExpandGroup`), who created it; orphaned assignments, privileged guests, applications as Owner and custom roles unused or equivalent to Owner flagged.
+  - `Get-AACServicePrincipalInsight`: applications and managed identities with Azure roles, their credentials about to expire, other tenants' applications, user-assigned identities attached to nothing or shared too widely.
+  - `Test-AACAzureLimit`: scopes close to an Azure limit - role assignments, custom roles, policy assignments, definitions, initiatives and exemptions, resource groups, tags, management group depth - with what to do; `-Maximum` for a raised limit, `-FailOnLimit` for a pipeline gate.
+  - `Get-AACGovernanceSetting`: who can create management groups, where new subscriptions land, management group activity logs, Defender security contacts, classic administrators, preview features, resource providers registered unevenly, each subscription's offer and state.
+  - `Get-AACPolicyRemediation`: DeployIfNotExists and Modify policies with resources they could fix, and what their remediation tasks did - never run, failed, drifted again, or no identity to run with.
+  - `Get-AACTagUsage`: tag coverage and consistency - names that clash in casing, near-duplicates, values in mixed casing, how far `-RequiredTag` reaches.
+  - `Get-AACResourceLock`: every lock, the critical resources no lock protects, and ReadOnly locks that break more than they protect.
+  - `Get-AACGovernanceChange`: policy and access created or updated in the last days, with the author resolved and privileged grants flagged.
+  - `Test-AACAlzPolicy`: your management groups' policy assignments against the Azure Landing Zones archetypes (a local copy of the ALZ Library) - missing, different or present, and the library file to deploy from.
+
+### Changed
+
+- `Show-AACDashboard` - the second edition, from the same single Resource Graph batch (24 queries instead of 8):
+  - an Estate score (0-100) from availability, secure score, policy compliance and the Advisor score, and a second row of score tiles;
+  - Security (secure score, alerts and recommendations by severity, Defender plans), Governance (policy compliance, the closest role assignment limit, privileged role assignments, unused disks, public IPs and NICs, tag coverage), Advisor savings, resources by type and subscription, the last 14 days of changes and who made them;
+  - `-IncludeCost`: month to date against the same days last month, a forecast, 30 days and what costs most (Cost Management);
+  - What to do next: the actions that matter most, ranked across every section, each with the command that goes deeper (`.Actions` returns them);
+  - `-Section` shows only some sections; `-HtmlPath`, `-PdfPath` and `-CsvPath` write it as a report with a tab per section; `-Watch` refreshes it for a screen on the wall.
+  - Every property of `AAC.Dashboard` is still there; the status also turns to Needs attention for high-severity security alerts, policy compliance below 80%, a subscription at 80% of the role assignment limit, or spend more than 10% above last month.
+- The browser maps (`Show-AACResourceMap`, `Show-AACNetworkTopology`, `Show-AACApplicationGatewayMap`): a **draw.io** button saves the map as an editable diagram exactly as laid out; the legend now explains the boxes too (subscription, resource group, virtual network, hub, subnet, Application Gateway) and the resource flags; "Open in the Azure portal" sits at the top of a resource's details.
+- `Show-AACResourceMap`, `Show-AACNetworkTopology` and `Show-AACApplicationGatewayMap` read Azure through shared readers, the same ones the diagrams use (no change to what they show).
+- `Invoke-AACArmWrite` (the module's write helper) runs POST actions too and returns their result; the new `Invoke-AACArmOperationBatch` runs several long-running operations side by side.
+- `Get-AACServicePrincipalInsight` asks Microsoft Graph for the app registrations in a fixed order, so the same principals always make the same requests.
+- The release workflow publishes pre-releases: a `Prerelease` value in the manifest (`0.14.6-preview1`) is tagged `v0.14.6-preview1` and published as a pre-release; `tools/Step-ModuleVersion.ps1 -Prerelease` sets or clears it.
+
+### Fixed
+
+- `Get-AACTerraformPlan` counted a pure import (or move) twice in its totals: once as its action, and again as an import (or move).
+
 ## v0.14.5
 
 A Well-Architected assessment with a go-live gate, insights for Key Vault, storage accounts, Application Gateways and the hybrid network, a network topology diagram, workbook-style heat maps in every report, and clearer Entra ID group membership.

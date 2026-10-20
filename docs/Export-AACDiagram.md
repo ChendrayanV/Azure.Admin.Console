@@ -54,6 +54,11 @@ Confluence - and export from there to Visio (.vsdx), PNG, SVG or PDF.
                       backend settings > pools and targets - with
                       probes, WAF policies and health (as
                       Show-AACApplicationGatewayMap)
+  Governance          the management group hierarchy: the tenant
+                      root and management groups as nested boxes,
+                      each subscription inside its group, with the
+                      policy and role assignments at each level (as
+                      Show-AACManagementGroupMap)
 ```
 
 In the diagram:
@@ -142,6 +147,14 @@ Export-AACDiagram -View ApplicationGateway -ResourceGroupName 'rg-edge' -Include
 The gateways' flows with live backend health.
 
 ### Example 5
+
+```powershell
+Export-AACDiagram -View Governance -Path .\hierarchy.drawio -PdfPath .\hierarchy.pdf
+```
+
+The management group hierarchy as an editable diagram, and a one-page PDF.
+
+### Example 6
 
 ```powershell
 Export-AACDiagram -SubscriptionId $sub -Path .\estate.drawio -HtmlPath .\estate.html -PdfPath .\estate.pdf
@@ -283,7 +296,8 @@ HelpMessage: ''
 
 ### -ManagementGroupId
 
-Only the subscriptions under these management groups (Network view).
+Only the subscriptions under these management groups (Network and
+Governance views).
 
 ```yaml
 Type: System.String[]
@@ -584,7 +598,7 @@ HelpMessage: ''
 
 ### -View
 
-Resources (the default), Network or ApplicationGateway.
+Resources (the default), Network, ApplicationGateway or Governance.
 
 ```yaml
 Type: System.String

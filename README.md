@@ -3,6 +3,7 @@
 [![CI](https://github.com/ChendrayanV/Azure.Admin.Console/actions/workflows/ci.yml/badge.svg)](https://github.com/ChendrayanV/Azure.Admin.Console/actions/workflows/ci.yml)
 [![PowerShell Gallery](https://img.shields.io/powershellgallery/v/Azure.Admin.Console?label=PowerShell%20Gallery)](https://www.powershellgallery.com/packages/Azure.Admin.Console)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Sponsor](https://img.shields.io/github/sponsors/ChendrayanV?label=Sponsor&logo=githubsponsors&color=EA4AAA)](https://github.com/sponsors/ChendrayanV)
 
 Azure admin reports and checks from PowerShell, over plain REST. No Az or
 Microsoft.Graph modules, and no app registration.
@@ -239,12 +240,13 @@ bookmarks are how you jump to the one you want.
 | [`Get-AACNetworkSecurityGroup`](docs/Get-AACNetworkSecurityGroup.md)                             | A detailed assessment of network security groups: associations, every rule, flow logs and diagnostic settings, and findings by severity (open to the internet, shadowed rules, subnet and NIC conflicts, logging gaps). A console view, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                                                                                                                       |
 | [`Get-AACStorageAccountContainerSize`](docs/Get-AACStorageAccountContainerSize.md)               | How much is stored in every blob container of your storage accounts: blobs, bytes, access tiers (Hot, Cool, Cold, Archive), snapshots, versions and deleted blobs, the newest change and the largest blobs - read in parallel, a page of 5,000 blobs at a time. Entra ID or a short-lived account SAS. A console view with every account and container as a tree, objects, and CSV and interactive HTML reports.                                                                                                                                                                                                                                  |
 | [`Get-AACTerraformPlan`](docs/Get-AACTerraformPlan.md)                                           | A Terraform plan in JSON (`terraform show -json`), flattened: what will be created, updated, replaced, deleted, read, imported and moved - and why - down to each attribute's before and after value, with the outputs and what changed outside Terraform. Sensitive values are never shown. Offline: no sign-in. A console view, objects, and CSV and interactive HTML reports.                                                                                                                                                                                                                                                                  |
+| [`Export-AACTerraform`](docs/Export-AACTerraform.md)                                             | Existing resources as Terraform - a resource group, resources by ID or piped, or a Resource Graph query - through the Azure Export for Terraform API (a long-running operation, polled with progress): a folder ready for terraform init and plan, with import blocks. What azurerm can't export is listed, and `-FallbackToAzApi` exports it with azapi; `-Plan` runs terraform plan to prove the export. A console view, objects, and CSV, HTML and PDF reports.                                                                                                                                                                                |
 | [`Get-AACDiagnosticSetting`](docs/Get-AACDiagnosticSetting.md)                                   | Every resource's diagnostic settings, flattened, and the resources whose logs don't reach a Log Analytics workspace: each one's status (exported, partial, not to a workspace, no setting), what's missing and why, and misconfigurations (deleted workspaces, nothing enabled, logs sent twice, another region, unexpected workspace, retired retention). Storage services and subscription activity logs included. A console view, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                          |
 | [`Get-AACEntraGroupMembership`](docs/Get-AACEntraGroupMembership.md)                             | Entra ID groups and everyone in them - direct and through nested groups - one row per group and member, with type, source, guests and disabled accounts. A console view with each group's members flattened, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                                                                                                                                                  |
 | [`Show-AACNetworkTopology`](docs/Show-AACNetworkTopology.md)                                     | The network topology of the tenant, management groups, subscriptions or regions, opened in your browser: hubs at the centre of their spokes, or every network inside its tenant, management group, subscription, region and resource group; peerings, gateways, Virtual WAN, firewalls and appliances, private endpoints to their PaaS, routes to their next hop; roles and findings. Saves as PNG, JPEG or SVG.                                                                                                                                                                                                                                  |
 | [`Show-AACResourceMap`](docs/Show-AACResourceMap.md)                                             | A map of one or more resource groups, opened in your browser: the resources with their Azure icons, in subscription, resource group, VNet and subnet boxes, with their connections, dependencies and network paths. Saves as PNG or JPEG.                                                                                                                                                                                                                                                                                                                                                                                                         |
 | [`Show-AACCost`](docs/Show-AACCost.md)                                                           | Subscription costs: month to date by subscription and by service, and a monthly trend, as charts and a table.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| [`Show-AACDashboard`](docs/Show-AACDashboard.md)                                                 | A one-screen dashboard: one status at the top (healthy, needs attention, action needed), the session, subscriptions, resources by region, Resource Health, active Azure Service Health events, Advisor and the latest resource changes - from one Resource Graph batch. `-Select` picks the subscriptions from a list.                                                                                                                                                                                                                                                                                                                           |
+| [`Show-AACDashboard`](docs/Show-AACDashboard.md)                                                 | The estate on one screen: one status and an Estate score at the top; health, security, policy, governance (limits, privileged access, unused resources, tags), Advisor and savings, resources by region and type, 14 days of changes and who made them, and with `-IncludeCost` the spend; then what to do next, ranked, with the command that goes deeper. `-HtmlPath`/`-PdfPath` for a report with a tab per section, `-Watch` for a screen on the wall. |
 | [`Show-AACJson`](docs/Show-AACJson.md)                                                           | JSON - or any object, as JSON - indented and syntax-coloured in a panel: ARM templates, REST responses, resources, this module's objects.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | [`Get-AACCostAnomaly`](docs/Get-AACCostAnomaly.md)                                               | Spend anomalies before the invoice: spikes, drops, new spend, level shifts and steady rises by service, resource group, region or meter (robust median/MAD statistics), the resources behind each, a month-end forecast and a subscription benchmark.                                                                                                                                                                                                                                                                                                                                                                                             |
 | [`Get-AACAttackPath`](docs/Get-AACAttackPath.md)                                                 | Attack paths from the Internet, through managed identities, to what an attacker could control or read - with blast radius, risk and the fix; plus Defender for Clouds own paths.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -276,6 +278,17 @@ bookmarks are how you jump to the one you want.
 | [`Invoke-AACStorageAccountAssessment`](docs/Invoke-AACStorageAccountAssessment.md)               | Storage accounts: what Azure Monitor's Storage accounts workbook shows (transactions, latency, errors by response type, capacity by service) plus availability, throttling, security posture, data protection (soft delete, versioning, redundancy) and cost (lifecycle rules, legacy kinds, idle and hot-but-quiet accounts) - as a heat map and findings. |
 | [`Show-AACApplicationGatewayMap`](docs/Show-AACApplicationGatewayMap.md)                         | Application Gateways drawn as their traffic flow - frontend IPs, listeners, rules, path rules and redirects, backend settings and probes, pools and targets, WAF policies - with health (`-IncludeHealth` for the live backend health) and findings, opened in your browser. |
 | [`Get-AACNetworkHealth`](docs/Get-AACNetworkHealth.md)                                           | The hybrid and edge network's health - ExpressRoute circuits and gateways, VPN gateways, connections and tunnels, Azure Firewalls and NAT gateways - from metrics, configuration and Resource Health: % of capacity, thresholds and findings, each with when it happened. |
+| [`Invoke-AACGovernanceAssessment`](docs/Invoke-AACGovernanceAssessment.md)                       | Governance across the tenant in one run, in the spirit of the Azure Governance Visualizer: the management group hierarchy, access, workload identities, policy remediation, Azure limits, settings, tags, locks and recent changes - a tabbed workbook, and a Markdown page with the hierarchy as a Mermaid diagram for a GitHub or Azure DevOps wiki. |
+| [`Show-AACManagementGroupMap`](docs/Show-AACManagementGroupMap.md)                               | The management group hierarchy as an interactive map: nested boxes, each subscription inside its group, and the policy and role assignments at each level. `Export-AACDiagram -View Governance` draws it for draw.io. |
+| [`Get-AACRoleAssignment`](docs/Get-AACRoleAssignment.md)                                         | Every Azure role assignment at every scope - who holds it and what they are (user, guest, group, application or another tenant's, system- or user-assigned identity, deleted), what the role can do, how far it reaches, standing or PIM, group members, who created it - with orphaned assignments, risky grants and unused or Owner-equivalent custom roles flagged. |
+| [`Get-AACServicePrincipalInsight`](docs/Get-AACServicePrincipalInsight.md)                       | Every application and managed identity with Azure roles: its kind, privileged roles, the resources a user-assigned identity is attached to, secrets and certificates about to expire, and other tenants' applications with access. |
+| [`Test-AACAzureLimit`](docs/Test-AACAzureLimit.md)                                               | Which scopes are close to an Azure limit - role assignments, custom roles, policy assignments, definitions, initiatives and exemptions, resource groups, tags, management group depth - with what to do, and a gate for pipelines (`-FailOnLimit`). |
+| [`Get-AACGovernanceSetting`](docs/Get-AACGovernanceSetting.md)                                   | The settings governance depends on: who can create management groups, where new subscriptions land, management group activity logs, Defender security contacts, classic administrators, preview features, resource providers registered unevenly, each subscription's offer and state. |
+| [`Get-AACPolicyRemediation`](docs/Get-AACPolicyRemediation.md)                                   | DeployIfNotExists and Modify policies with resources they could fix, and what their remediation tasks did: never run, failed, drifted again, still running, or no identity to run with. |
+| [`Get-AACTagUsage`](docs/Get-AACTagUsage.md)                                                     | How tags are really used: each tag name's coverage and values, names that clash in casing, near-duplicates, values in mixed casing, and how far your required tags reach. |
+| [`Get-AACResourceLock`](docs/Get-AACResourceLock.md)                                             | Every resource lock, and the critical resources (key vaults, storage, databases, vaults, networks, DNS zones...) no lock protects - with ReadOnly locks that break more than they protect flagged. |
+| [`Get-AACGovernanceChange`](docs/Get-AACGovernanceChange.md)                                     | Who changed policy and access in the last days: policy definitions, initiatives and assignments, custom roles and role assignments created or updated, with the author resolved and privileged grants flagged. |
+| [`Test-AACAlzPolicy`](docs/Test-AACAlzPolicy.md)                                                 | Your management groups' policy assignments against the Azure Landing Zones reference (a local copy of the ALZ Library): what each archetype assigns that is missing, different or present - and the library file to deploy the missing ones from. |
 
 Full help:
 
@@ -457,12 +470,17 @@ same colours.
 ## Dashboard
 
 `Show-AACDashboard` puts the state of your estate on one screen, from one
-Azure Resource Graph batch:
+Azure Resource Graph batch - health, security, policy, governance, Advisor,
+the estate, the latest changes and, with `-IncludeCost`, the spend - with an
+Estate score at the top and what to do next at the bottom:
 
 ```powershell
 Show-AACDashboard                                # every subscription you can see
 Show-AACDashboard -Select -Hours 72              # tick the subscriptions in a list; changes of the last 3 days
+Show-AACDashboard -IncludeCost -HtmlPath .\Dashboard.html   # with the spend, as a report with a tab per section
+Show-AACDashboard -Section Health, Security -Watch 300      # a screen on the wall: refreshed every 5 minutes
 (Show-AACDashboard -NoDisplay).Status            # Success, Warning or Failed - for a script or a pipeline
+(Show-AACDashboard -NoDisplay).Actions           # what to do next, as objects
 ```
 
 ```text
@@ -478,16 +496,38 @@ admin@contoso.com · tenant ... · Scope: all subscriptions · 9 Oct 2026 10:42
 ╰───────────────────────────────────────╯ ╰────────────────────────────────╯
 ```
 
-Then the subscriptions and their state, resources by region, the active
+Then the scores (Estate score, secure score, policy compliance, Advisor
+score, the closest Azure limit, spend month to date), Security (alerts and
+recommendations by severity, Defender plans), Governance (policy, the
+closest role assignment limit, privileged role assignments, unused disks,
+public IPs and NICs, tag coverage), Cost (month to date against the same
+days last month, a forecast, 30 days as a sparkline, what costs most), the
+subscriptions and their state, resources by region and by type, the active
 Azure Service Health events (service issues, planned maintenance,
 advisories, once each however many subscriptions they touch), the unhealthy
-resources, Advisor recommendations by category and impact, and the latest
-resource changes: what was created, updated or deleted, where and by whom.
+resources, Advisor recommendations by category and impact, the last 14 days of
+changes as a sparkline and who made the most, the latest resource changes -
+what was created, updated or deleted, where and by whom - and **What to do
+next**: the actions that matter most, ranked across every section, each with
+the command that goes deeper (`Get-AACSecurityAlert`, `Test-AACAzureLimit`,
+`Invoke-AACPolicyAssessment`...).
+
+The **Estate score** (0-100) is the average of the parts that could be read -
+the share of resources available, the secure score, the share of resources
+compliant with policy and the Advisor score - less 5 when a subscription is
+at 95% of the role assignment limit (2 at 80%), and less 3 when spend is more
+than 20% above last month. `-Section` shows only some sections;
+`-HtmlPath`/`-PdfPath` write the dashboard as a report (an Overview, then a
+tab per section) and `-CsvPath` what to do next; `-Watch` refreshes it until
+Ctrl+C.
 
 The status at the top is **Action needed** when resources are unavailable or
 a service issue is active; **Needs attention** when resources are degraded,
 Advisor has High-impact recommendations, maintenance or an advisory is
-active, or something couldn't be read; and **Healthy** otherwise. Anything
+active, there are high-severity security alerts, policy compliance is
+below 80%, a subscription is at 80% of the role assignment limit, spend is
+more than 10% above last month, or something couldn't be read; and
+**Healthy** otherwise. Anything
 the account can't read is listed at the end, and the rest is still shown.
 `-Select` asks at the console (arrow keys, space, Enter); in a script, use
 `-SubscriptionId`.
@@ -1507,6 +1547,75 @@ Invoke-AACStorageAccountAssessment -NoDisplay | Sort-Object UsedGB -Descending |
 It reads Resource Graph, Azure Monitor metrics and each account's service
 settings: Reader is enough. It reads no data and no keys.
 
+## Terraform export
+
+`Export-AACTerraform` turns resources you already have into Terraform,
+through Azure's own [Export for Terraform API](https://learn.microsoft.com/rest/api/terraform/terraform/export-terraform).
+The export is a long-running operation: the command submits it, polls it as
+Azure asks (`Retry-After`), shows its progress, and writes a folder you can
+run straight away.
+
+```powershell
+Export-AACTerraform -ResourceGroupName rg-app -Path .\terraform\rg-app
+Export-AACTerraform -ResourceGroupName rg-platform -BatchSize 50 -Path .\terraform\platform   # a large one, in batches at once
+Export-AACTerraform -Resume -Path .\terraform\platform                                       # collect one still running
+Export-AACTerraform -ResourceGroupName rg-hub, rg-spoke -FallbackToAzApi -Plan -Path .\terraform\network
+Export-AACTerraform -Query 'type =~ "microsoft.keyvault/vaults"' -Include RoleAssignment, Lock -Path .\terraform\vaults
+Get-AACUnusedResource -NoDisplay | Export-AACTerraform -Path .\terraform\unused   # piped by ID
+```
+
+The folder:
+
+| File | What |
+|---|---|
+| `terraform.tf` | The providers the configuration needs |
+| `providers.tf` | The provider blocks, with the subscription ID |
+| `main.tf` | The resources |
+| `azapi.tf` | With `-FallbackToAzApi`: what azurerm couldn't export, as azapi resources |
+| `import.tf` | Import blocks: `terraform plan` brings the existing resources under Terraform, with no `terraform import` to run |
+| `export.json` | What was asked, what was skipped and why |
+| `plan.json` | With `-Plan`: the plan, for `Get-AACTerraformPlan` |
+
+- **Large exports, faster.** The export runs on Azure's side and its time
+  grows with the number of resources - a large resource group takes
+  minutes. The command counts the resources first and says when an export
+  is large (and which types are often left out with `-ExcludeType`).
+  `-BatchSize 50` splits it into exports of 50 resources that run at the
+  same time (`-ThrottleLimit`, 8 at once by default) and merges them into
+  one folder: each batch has names of its own (`res-b1-0`), and a resource
+  two batches both return is kept once. Several subscriptions are exported
+  at the same time too.
+- **Progress you can read.** Each export shows its status, how long it has
+  run and how many batches are done - Azure gives no percentage.
+- **Stop and come back.** The operations are saved in `export.json` as soon
+  as Azure accepts them. After Ctrl+C, or when `-TimeoutMinutes` (30) runs
+  out, the export goes on in Azure: `-Resume -Path <folder>` collects it
+  without exporting again.
+- **Three ways to choose.** Resource groups (several in one subscription
+  are exported together, with their child resources, so their names can't
+  clash), resource IDs (or anything piped with an `Id` or `ResourceId`), or
+  a Resource Graph where-clause. Several subscriptions get a folder each.
+- **Nothing silently dropped.** A type the azurerm provider doesn't support
+  yet is listed as Skipped; `-FallbackToAzApi` exports those again with the
+  azapi provider, which covers every Azure resource type, and merges both
+  into one module.
+- **Proved with `-Plan`.** It runs `terraform init`, `validate` and `plan`
+  in the folder and reads the plan as `Get-AACTerraformPlan` does. A
+  faithful export plans only imports; anything else is what the export
+  didn't capture, listed by address. Terraform signs in on its own (`az
+  login`, or `ARM_CLIENT_ID`, `ARM_CLIENT_SECRET` and `ARM_TENANT_ID`).
+- **Safe.** The export reads Azure and changes nothing there. Sensitive
+  values are masked unless `-IncludeSensitive`; Terraform files already in
+  the folder aren't overwritten without `-Force`.
+- **The resource provider.** The API needs `Microsoft.AzureTerraform`
+  registered on the subscription. When it isn't, the command says so;
+  `-RegisterProvider` registers it (it asks first, and honours `-WhatIf`).
+- `-Provider azapi`, `-Include` (the resource group, role assignments,
+  locks, diagnostic settings, Azure-managed resources), `-Recurse`,
+  `-Exclude`, `-ExcludeType`, `-NamePrefix` and `-Compact` map to the API's
+  options. The API is in preview (`2026-09-01-preview`); `-ApiVersion`
+  picks another.
+
 ## Terraform plans
 
 `Get-AACTerraformPlan` reads a whole Terraform plan - every resource
@@ -1721,6 +1830,7 @@ browser maps.
 | `Resources` (default) | The resources in resource groups or subscriptions, with network links, peerings, private endpoints, routes, DNS links and dependencies | `Show-AACResourceMap` |
 | `Network` | The topology of a tenant, management groups, subscriptions or regions: hubs and spokes, peerings, gateways, firewalls, appliances | `Show-AACNetworkTopology` |
 | `ApplicationGateway` | Each gateway's flow, a column per stage: frontends, listeners, rules, path rules, backend settings, pools and targets, with probes, WAF policies and health | `Show-AACApplicationGatewayMap` |
+| `Governance` | The management group hierarchy: the tenant root and management groups as nested boxes, each subscription inside its group, with the policy and role assignments at each level | `Show-AACManagementGroupMap` |
 
 **Made to edit.**
 - **Boxes are draw.io containers:** subscription, resource group, virtual
@@ -1777,6 +1887,52 @@ the same shape IDs, so `Export-AACDiagram -Update` can refresh it later.
 **What it needs.** Reader on what you draw, and nothing to install: the
 diagram is written by PowerShell, with no Graphviz, Python or Visio.
 `-PdfPath` uses Microsoft Edge or Google Chrome if either is installed.
+
+## Governance
+
+Governance questions across the whole tenant, in the spirit of the
+[Azure Governance Visualizer](https://github.com/Azure/Azure-Governance-Visualizer) -
+each one a command of its own, and all of them together in one workbook.
+
+```powershell
+Invoke-AACGovernanceAssessment -HtmlPath .\Governance.html                     # everything, as a tabbed workbook
+Invoke-AACGovernanceAssessment -MarkdownPath .\wiki\Governance.md -MarkdownFlavor AzureDevOps -NoDisplay   # a wiki page, from a pipeline
+Show-AACManagementGroupMap                                                     # the hierarchy, in the browser
+Get-AACRoleAssignment -ExpandGroup -HtmlPath .\Rbac.html                       # every role assignment, groups expanded
+Test-AACAzureLimit -FailOnLimit Warning                                        # fail a pipeline at 80% of any limit
+Test-AACAlzPolicy -LibraryPath C:\alz-library -ManagementGroupMap @{ alz = 'contoso' }
+```
+
+| Area | Command | What it answers |
+|---|---|---|
+| Hierarchy | `Show-AACManagementGroupMap` | Each management group, its subscriptions, policy and role assignments - a map, a tree, or `Export-AACDiagram -View Governance` for draw.io |
+| Access | `Get-AACRoleAssignment` | Every role assignment at every scope; orphaned ones, privileged guests, applications as Owner, custom roles unused or as powerful as Owner |
+| Identities | `Get-AACServicePrincipalInsight` | Applications and managed identities with Azure roles; credentials about to expire; other tenants' apps |
+| Policy | `Get-AACPolicyRemediation` | Policies that could fix what they find, and whether remediation ran (`Invoke-AACPolicyAssessment` covers assignments, compliance, exemptions and identities' roles) |
+| Limits | `Test-AACAzureLimit` | Scopes close to an Azure limit, with what to do |
+| Settings | `Get-AACGovernanceSetting` | Hierarchy settings, management group activity logs, security contacts, classic administrators, preview features, providers |
+| Tags | `Get-AACTagUsage` | Tag coverage and consistency |
+| Locks | `Get-AACResourceLock` | Locks, and critical resources left unlocked |
+| Changes | `Get-AACGovernanceChange` | Policy and access changes, and who made them |
+| Reference | `Test-AACAlzPolicy` | Policy assignments against the Azure Landing Zones archetypes |
+
+**The workbook.** `Invoke-AACGovernanceAssessment` runs the areas (or those in
+`-Area`), keeps going when one fails (it says which, and why), and writes a
+Summary with the hierarchy as a tree, a Findings tab with the high and medium
+findings of every area, and a tab per area. `-MarkdownPath` writes the same as
+one Markdown page - the hierarchy as a Mermaid diagram, a table per area -
+for a GitHub or Azure DevOps wiki (`-MarkdownFlavor`).
+
+**The Azure Landing Zones check.** `Test-AACAlzPolicy` reads a copy of the
+[Azure Landing Zones Library](https://github.com/Azure/Azure-Landing-Zones-Library)
+you clone yourself, at the release you want - nothing is downloaded. If your
+management groups are named differently from the reference, map them:
+`-ManagementGroupMap @{ alz = 'contoso'; landingzones = 'contoso-lz' }`.
+
+**What it needs.** Reader on the scope (Reader on the tenant root group for
+its settings), and in Entra ID Directory.Read.All and Application.Read.All for
+names and credentials (GroupMember.Read.All for `-ExpandGroup`). What can't
+be read is left out, and said.
 
 ## PSRule for Azure
 
@@ -2290,6 +2446,7 @@ everything on this side for real:
 | `Get-AACAssignedPolicy`                                                           | Resource Graph and the parallel ARM reads, with a made-up tenant (management groups, an initiative, a missing definition)                                                                                                                                                           | Default, assigned and effective values, resource types from rules (parameters resolved, negated and alias-only rules, initiatives), inherited assignments for a subscription or management group, name filters, the view and the exports                                                                                                                                                                                                                                                                                                            |
 | `Get-AACStorageAccountContainerSize`                                              | Resource Graph, the container listing and the blob service (`Send-AACHttpRequest`, with List Blobs XML pages)                                                                                                                                                                       | The page parser (tiers, snapshots, versions, deleted blobs, Data Lake directories, encoded names, the largest blobs), paging, Entra ID and account SAS, `-AuthMode Auto`, Azure Storage's errors and what to do, filters, the view and the exports                                                                                                                                                                                                                                                                                                  |
 | `Get-AACTerraformPlan`                                                            | Nothing: it reads a made-up Contoso plan file                                                                                                                                                                                                                                       | Actions and reasons, attribute paths, blocks paired by name, JSON-encoded strings, forced replacements, sensitive values kept out of every output, drift, filters, UTF-16 files, the files it refuses, the view and the exports                                                                                                                                                                                                                                                                                                                     |
+| `Export-AACTerraform`                                                             | The Export for Terraform API (submitted, answered 202, polled to Succeeded or Failed), Resource Graph, and the terraform CLI                                                                                                                                                        | The HCL splitter (braces in strings, comments and heredocs), azurerm and azapi exports merged into one module, the request each switch makes, folders per subscription, the resource provider unregistered and registered (never under -WhatIf), failures, no overwrite without -Force, terraform plan read, a failed terraform step, the view and the exports                                                                                                                                                                                      |
 | `Deploy-AACStorageAccount`                                                        | An in-memory fake of Azure: Resource Manager reads and writes, checkNameAvailability, checkPolicyRestrictions, the policy assignments, PSRule and blob uploads all go to one store, which answers as Azure does (false values left out, its own fields added, bodies taken as JSON) | Idempotency (the second run writes nothing), PATCH of only what changed, merged service updates, immutable properties and redundancy, the name, policy Deny and Modify, a failing PSRule rule blocking with its fix, `-UseSuggestedFix` - and, against the real PSRule for Azure rules, that every automatic fix makes its rule pass, drift and `-Prune` under a lock, role assignments found again or adopted, blob MD5, one-item lists sent as lists, a failure part-way and the re-run, AVM parameters files and unsupported settings, `-WhatIf` |
 | `Get-AACDiagnosticSetting`                                                        | Resource Graph and the parallel ARM reads, with a made-up Contoso estate (storage services, activity logs, a deleted workspace)                                                                                                                                                     | Which types have logs, every status and its reason, category groups, every misconfiguration, `-ExpectedWorkspace`, the flattened settings, the filters, how many calls are made, the view and the CSV, HTML and PDF reports                                                                                                                                                                                                                                                                                                                         |
 | `Get-AACEntraGroupMembership`                                                     | Microsoft Graph (`Send-AACHttpRequest`), with made-up groups                                                                                                                                                                                                                        | Name filters and OData quoting, paging, nested groups and loops, a group that can't be read, the Connect-AAC Graph token, the view and the exports                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -2343,22 +2500,39 @@ It then checks the staged copy: the manifest is valid, the exports match
 
 1. Bump `ModuleVersion` in `Azure.Admin.Console.psd1` and add the release to
    `CHANGELOG.md`. A published version can never be replaced.
+   `./tools/Step-ModuleVersion.ps1 -Version 0.14.6 -Prerelease preview1` does
+   the manifest, the release notes, this tag example and the docs.
 2. Commit, then push a tag that matches the version:
 
    ```powershell
-   git tag -a v0.14.5 -m "Azure.Admin.Console v0.14.5"
-   git push origin v0.14.5
+   git tag -a v0.14.6-preview1 -m "Azure.Admin.Console v0.14.6-preview1"
+   git push origin v0.14.6-preview1
    ```
+
+**Pre-releases.** A `Prerelease` value in the manifest's `PSData` (for
+example `preview1` or `rc1`) publishes the version as a pre-release -
+`0.14.6-preview1`, tagged `v0.14.6-preview1`, marked as a pre-release on
+GitHub. The Gallery installs it only when asked:
+
+```powershell
+Install-Module -Name Azure.Admin.Console -AllowPrerelease
+Install-PSResource -Name Azure.Admin.Console -Prerelease
+```
+
+Each pre-release uses the same `## v0.14.6` changelog entry. When it's
+ready, `./tools/Step-ModuleVersion.ps1 -Version 0.14.6 -Prerelease ''`
+removes the label, and the tag `v0.14.6` publishes the stable release.
 
 Only a version tag publishes. Pushes and pull requests run CI only.
 [`.github/workflows/release.yml`](.github/workflows/release.yml) first runs a
 gate with no secrets and no approval. It stops the release unless all of
 these hold:
 
-- the tag matches `ModuleVersion`;
+- the tag matches `ModuleVersion` (and `Prerelease`, when there is one);
 - the tagged commit is on `main`;
 - `CHANGELOG.md` has a `## v<version>` entry;
-- the version is higher than the one on the PowerShell Gallery.
+- the version is higher than the one on the PowerShell Gallery, and that
+  exact version (with its pre-release label) isn't published yet.
 
 The run summary shows each check. Only after the gate passes, the workflow:
 
@@ -2380,6 +2554,21 @@ $env:PSGALLERY_API_KEY = '<API key from powershellgallery.com>'
 ./build.ps1 -Task Publish -WhatIf     # dry run
 ./build.ps1 -Task Publish
 ```
+
+## Sponsor
+
+Azure.Admin.Console is free and open source, built and maintained in spare
+time. If it saves you time, please consider sponsoring its development - it
+keeps new commands, fixes and the docs coming.
+
+<p>
+  <a href="https://github.com/sponsors/ChendrayanV">
+    <img src="https://img.shields.io/badge/Sponsor-ChendrayanV-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Sponsor ChendrayanV on GitHub">
+  </a>
+</p>
+
+Not able to sponsor? A star on the repository, an issue or an idea helps
+just as much.
 
 ## License
 

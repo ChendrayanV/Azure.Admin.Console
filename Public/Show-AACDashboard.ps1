@@ -2,10 +2,10 @@ function Show-AACDashboard {
     <#
     .EXTERNALHELP Azure.Admin.Console-help.xml
     .SYNOPSIS
-        A one-screen dashboard of your Azure estate: who you're signed in
-        as, the subscriptions in scope, resources by region, Resource Health,
-        active Azure Service Health events, Advisor and the latest changes -
-        with one status at the top.
+        A dashboard of your Azure estate: health, security, policy,
+        governance, Advisor, the estate itself, the latest changes and (with
+        -IncludeCost) the spend - one status and an Estate score at the top,
+        and what to do next at the bottom.
     .DESCRIPTION
         Reads it all in one Azure Resource Graph batch (no Az modules), with
         the Connect-AAC sign-in:
@@ -36,6 +36,32 @@ function Show-AACDashboard {
                               something couldn't be read
           ✓ Healthy           none of these
 
+        Beyond that one screen, from the same Resource Graph batch:
+          Scores       the Estate score (0-100: the average of the share of
+                       resources available, the secure score, the policy
+                       compliance and the Advisor score that could be read,
+                       less a little when a subscription nears the role
+                       assignment limit or spend jumps)
+          Security     secure score, active alerts and unresolved
+                       recommendations by severity, Defender plans on
+          Governance   policy compliance and the assignments with the most
+                       non-compliant resources, the closest role assignment
+                       limit, privileged role assignments at subscription or
+                       above, unused disks, public IPs and NICs, tag coverage
+          Advisor      the Advisor score and the potential annual savings
+          Estate       resources by type and by subscription
+          Changes      the last 14 days, day by day, and who made the most
+          Cost         with -IncludeCost (Cost Management, one query per
+                       subscription): month to date against the same days
+                       last month, a forecast, the last 30 days, the services
+                       that cost most
+          Next         what to do, ranked across every section, with the
+                       command that goes deeper
+        -Section shows only some sections. -HtmlPath and -PdfPath write it
+        as a report - an Overview, then a tab per section; -CsvPath writes
+        what to do next. -Watch refreshes it every so many seconds, for a
+        screen on the wall (Ctrl+C stops it).
+
         Symbols and colours are the module's (Unicode, or ASCII in a console
         that isn't UTF-8), so the state never depends on colour alone. What
         couldn't be read (Resource Health, Service Health, Advisor or the
@@ -54,6 +80,24 @@ function Show-AACDashboard {
     .PARAMETER Hours
         How far back the recent changes go, in hours (1 to 336 - Resource
         Graph keeps 14 days). Defaults to 24.
+    .PARAMETER Section
+        Only these sections: Health, Security, Policy, Governance, Advisor,
+        Estate, Changes, Cost. The status, scores and what to do next always
+        show.
+    .PARAMETER IncludeCost
+        Read the spend from Cost Management (slower: Cost Management allows
+        a few queries a minute).
+    .PARAMETER HtmlPath
+        Write the dashboard as an interactive HTML report.
+    .PARAMETER PdfPath
+        Write the dashboard as a PDF report.
+    .PARAMETER CsvPath
+        Write what to do next to this CSV file.
+    .PARAMETER Title
+        The reports' title.
+    .PARAMETER Watch
+        Refresh the dashboard every this many seconds (30 or more) until
+        Ctrl+C.
     .PARAMETER PassThru
         Show the dashboard and also return it as an AAC.Dashboard object.
     .PARAMETER NoDisplay
@@ -67,6 +111,15 @@ function Show-AACDashboard {
     .EXAMPLE
         Show-AACDashboard -Select -Hours 72
         Pick the subscriptions from a list, with the changes of the last three days.
+    .EXAMPLE
+        Show-AACDashboard -IncludeCost -HtmlPath .\Dashboard.html
+        Everything, with the spend, as a report with a tab per section.
+    .EXAMPLE
+        Show-AACDashboard -Section Health, Security -Watch 300
+        Health and security, refreshed every five minutes.
+    .EXAMPLE
+        (Show-AACDashboard -NoDisplay).Actions | Format-Table
+        What to do next, as objects.
     .EXAMPLE
         (Show-AACDashboard -NoDisplay).UnhealthyResources | Format-Table
         The unavailable and degraded resources, as objects.
@@ -88,6 +141,22 @@ function Show-AACDashboard {
 
         [ValidateRange(1, 336)]
         [int] $Hours = 24,
+
+        [ValidateSet('Health', 'Security', 'Policy', 'Governance', 'Advisor', 'Estate', 'Changes', 'Cost')]
+        [string[]] $Section,
+
+        [switch] $IncludeCost,
+
+        [string] $HtmlPath,
+
+        [string] $PdfPath,
+
+        [string] $CsvPath,
+
+        [string] $Title = 'Azure dashboard',
+
+        [ValidateRange(30, 86400)]
+        [int] $Watch,
 
         [switch] $PassThru,
 
@@ -131,23 +200,48 @@ function Show-AACDashboard {
     }
     $scopeIds = @(if ($SubscriptionId -or $Select) { $subscriptions | ForEach-Object { [string]$_['subscriptionId'] } })
 
-    # --- Everything else, in one batch -------------------------------------------------------------------------------
+    # --- Everything else, in one batch - again and again with -Watch ---------------------------------------------------
+    $sections = @(if ($Section) { $Section } else { 'Health', 'Security', 'Policy', 'Governance', 'Advisor', 'Estate', 'Changes'; if ($IncludeCost) { 'Cost' } })
+    if ($IncludeCost -and $sections -notcontains 'Cost') { $sections += 'Cost' }
+    $resolve = { param([string] $Path) if ($Path) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path) } }
+    $exporting = [bool]($CsvPath -or $HtmlPath -or $PdfPath)
     $queries = Get-AACDashboardQuery -Hours $Hours
-    $read = Invoke-AACProgress -ScriptBlock {
-        Update-AACProgress -Id 'dashboard' -Total $queries.Count -Description 'Reading the estate, Resource Health, Service Health, Advisor and the recent changes'
-        $batch = Invoke-AACGraphBatch -Query $queries -SubscriptionId $scopeIds -AllowFailure @($queries.Keys | Where-Object { $_ -ne 'totals' }) -OnProgress {
-            param($Name, $Done, $Total)
-            Update-AACProgress -Id 'dashboard' -Increment 1 -Description "Read $Name ($Done of $Total)"
+    $scope = [ordered]@{ Scope = $(if ($scopeIds.Count) { "$($scopeIds.Count) subscription(s)" } else { 'all subscriptions' }) }
+    $costIds = @($subscriptions | Where-Object { -not $_['state'] -or [string]$_['state'] -eq 'Enabled' } | ForEach-Object { [string]$_['subscriptionId'] })
+    $names = @{}; foreach ($sub in $subscriptions) { $names[([string]$sub['subscriptionId']).ToLowerInvariant()] = [string]$sub['name'] }
+    $pass = 0
+    do {
+        $pass++
+        if ($pass -gt 1 -and $showView) {
+            # No real console (redirected, a CI log) can't be cleared: keep scrolling instead.
+            try { [Spectre.Console.AnsiConsole]::Clear() } catch { [Spectre.Console.AnsiConsole]::WriteLine() }
+            Write-AACRule -Title 'Azure Admin Console :: Dashboard' -Color 'deepskyblue3_1'
         }
-        $unread = @($batch.Errors.Keys | Where-Object { $batch.Errors[$_] }).Count
-        Update-AACProgress -Id 'dashboard' -Complete -Description ('Read the dashboard for {0:N0} subscription(s){1}' -f $subscriptions.Count, $(if ($unread) { "; $unread source(s) couldn't be read" }))
-        $batch
-    }
-    $dashboard = ConvertTo-AACDashboard -Read $read -Subscription $subscriptions -Hours $Hours -Session $script:AACSession
+        $read = Invoke-AACProgress -ScriptBlock {
+            Update-AACProgress -Id 'dashboard' -Total $queries.Count -Description 'Reading the estate, health, security, policy, governance, Advisor and the changes'
+            $batch = Invoke-AACGraphBatch -Query $queries -SubscriptionId $scopeIds -AllowFailure @($queries.Keys | Where-Object { $_ -ne 'totals' }) -OnProgress {
+                param($Name, $Done, $Total)
+                Update-AACProgress -Id 'dashboard' -Increment 1 -Description "Read $Name ($Done of $Total)"
+            }
+            $unread = @($batch.Errors.Keys | Where-Object { $batch.Errors[$_] }).Count
+            Update-AACProgress -Id 'dashboard' -Complete -Description ('Read the dashboard for {0:N0} subscription(s){1}' -f $subscriptions.Count, $(if ($unread) { "; $unread source(s) couldn't be read" }))
+            $batch
+        }
+        $cost = $null
+        if ($sections -contains 'Cost') { $cost = Invoke-AACProgress -ScriptBlock { Read-AACDashboardCost -SubscriptionId $costIds -SubscriptionName $names } }
+        $dashboard = ConvertTo-AACDashboard -Read $read -Subscription $subscriptions -Hours $Hours -Session $script:AACSession -Cost $cost
 
-    if ($showView) {
-        $scope = [ordered]@{ Scope = $(if ($scopeIds.Count) { "$($scopeIds.Count) subscription(s)" } else { 'all subscriptions' }) }
-        Invoke-AACPagedOutput -NoPaging:$NoPaging -ScriptBlock { Show-AACDashboardView -Dashboard $dashboard -Scope $scope }
-    }
-    if ($returnObject) { $dashboard }
+        if ($exporting) {
+            Invoke-AACReportOutput -Report (ConvertTo-AACDashboardReport -Dashboard $dashboard -Section $sections -Scope $scope) -Title $Title -CsvObject @($dashboard.Actions) -Noun 'action' `
+                -CsvPath (& $resolve $CsvPath) -HtmlPath (& $resolve $HtmlPath) -PdfPath (& $resolve $PdfPath)
+        }
+        elseif ($showView) {
+            Invoke-AACPagedOutput -NoPaging:($NoPaging -or [bool]$Watch) -ScriptBlock { Show-AACDashboardView -Dashboard $dashboard -Scope $scope -Section $sections }
+        }
+        if ($returnObject -and -not $Watch) { $dashboard }
+        if ($Watch) {
+            Write-AACMarkup "[grey42]Refreshing every $Watch second(s) - Ctrl+C to stop. Read at $((Get-Date).ToString('HH:mm:ss')).[/]"
+            Start-Sleep -Seconds $Watch
+        }
+    } while ($Watch)
 }
