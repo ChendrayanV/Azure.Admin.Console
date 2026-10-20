@@ -14,4 +14,8 @@ AzureAssessment-*/
 video/*.mp4
 .claude/
 CLAUDE.MD
-tools/
+# Local tools stay out of the repo - except the two CI runs (help build, module installs).
+# tools/* rather than tools/: git can't let a file back in from a folder ignored as a whole.
+tools/*
+!tools/Build-Help.ps1
+!tools/Install-BuildModule.ps1
