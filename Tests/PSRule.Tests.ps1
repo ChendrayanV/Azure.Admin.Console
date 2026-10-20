@@ -384,6 +384,8 @@ Describe 'Azure Admin Console - PSRule view' {
         $settings = [Spectre.Console.AnsiConsoleSettings]::new()
         $settings.Out = [Spectre.Console.AnsiConsoleOutput]::new($buffer)
         $settings.Ansi = [Spectre.Console.AnsiSupport]::No
+        # The default enrichers detect CI (GitHub Actions) and turn colours back on, whatever Ansi says.
+        $settings.Enrichment.UseDefaultEnrichers = $false
         $console = [Spectre.Console.AnsiConsole]::Create($settings)
         $console.Profile.Width = 120
         $long = 'The name doesn''t match ''^id-'', the naming convention for Microsoft.ManagedIdentity/userAssignedIdentities - and this reason goes on well past one hundred and ten characters to END-OF-REASON.'

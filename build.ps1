@@ -18,7 +18,9 @@
                 Microsoft.PowerShell.PlatyPS).
       Test      Runs the unit tests in Tests\ (no Azure sign-in needed) and
                 stops the build if any fail. -TestResultPath also writes
-                JUnit XML for CI.
+                JUnit XML for CI. Needs Pester 6.2+, which needs
+                PowerShell 7.4+ (Install-PSResource Pester -Version
+                '[6.2.0,7.0)').
       Build     Copies only what the module needs at run time into
                 out\Azure.Admin.Console, then validates the staged copy:
                 Test-ModuleManifest, every exported function has a
@@ -102,8 +104,13 @@ function Invoke-TestTask {
     Write-Step 'Test: running the unit tests in Tests'
     # A fresh process, so the tests import the module the way a user would.
     $resultPath = if ($TestResultPath) { $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($TestResultPath) } else { '' }
+    # Pester 6 (it runs on PowerShell 7.4+): said up front, rather than an import error in the child process.
+    if ($PSVersionTable.PSVersion -lt [version]'7.4') { throw "The tests need PowerShell 7.4 or later (Pester 6); this is $($PSVersionTable.PSVersion). The module itself still runs on 7.2." }
+    if (-not (Get-Module -Name Pester -ListAvailable | Where-Object { $_.Version -ge [version]'6.2.0' -and $_.Version -lt [version]'7.0' })) {
+        throw "The tests need Pester 6.2 or later (below 7): Install-PSResource -Name Pester -Version '[6.2.0,7.0)' -Scope CurrentUser"
+    }
     $script = @"
-Import-Module Pester -MinimumVersion 5.7.1
+Import-Module Pester -MinimumVersion 6.2.0 -MaximumVersion 6.99.99
 `$config = New-PesterConfiguration
 `$config.Run.Path = '$(Join-Path $root 'Tests')'
 `$config.Run.PassThru = `$true

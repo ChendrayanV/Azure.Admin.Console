@@ -93,7 +93,8 @@ Describe 'Azure Admin Console - Get-AACPolicyRemediation' {
     It 'shows the policies at the prompt, and writes CSV' {
         $real = [Spectre.Console.AnsiConsole]::Console
         $buffer = [System.IO.StringWriter]::new()
-        $settings = [Spectre.Console.AnsiConsoleSettings]::new(); $settings.Out = [Spectre.Console.AnsiConsoleOutput]::new($buffer); $settings.Ansi = [Spectre.Console.AnsiSupport]::No
+        # The default enrichers detect CI (GitHub Actions) and turn colours back on, whatever Ansi says.
+        $settings = [Spectre.Console.AnsiConsoleSettings]::new(); $settings.Out = [Spectre.Console.AnsiConsoleOutput]::new($buffer); $settings.Ansi = [Spectre.Console.AnsiSupport]::No; $settings.Enrichment.UseDefaultEnrichers = $false
         $console = [Spectre.Console.AnsiConsole]::Create($settings); $console.Profile.Width = 220; $console.Profile.Capabilities.Unicode = $false
         try { [Spectre.Console.AnsiConsole]::Console = $console; Get-AACPolicyRemediation -NoPaging } finally { [Spectre.Console.AnsiConsole]::Console = $real }
         $text = $buffer.ToString()

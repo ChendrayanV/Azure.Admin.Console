@@ -2480,6 +2480,15 @@ Azure.Admin.Console/
 
 ### Testing
 
+The tests run on **Pester 6.2 or later** (below 7), which needs PowerShell
+7.4 or later to run them - the module itself still runs on 7.2:
+
+```powershell
+Install-PSResource -Name Pester -Version '[6.2.0,7.0)' -Scope CurrentUser
+./build.ps1 -Task Test                                         # every test
+Invoke-Pester -Path ./Tests/Cost.Tests.ps1 -Output Detailed    # one file
+```
+
 The unit tests in `Tests\` cover every command, with no Azure account needed.
 Each one mocks the point where the module leaves the machine and runs
 everything on this side for real:
