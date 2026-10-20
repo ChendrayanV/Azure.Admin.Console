@@ -119,10 +119,10 @@ jobs:
           # -TrustRepository rather than Set-PSResourceRepository: on a fresh
           # runner the repository store doesn't exist yet, and
           # Set-PSResourceRepository fails before anything creates it.
-          Install-PSResource -Name Pester -Version '[6.2.0,7.0)' -Scope CurrentUser -TrustRepository -Quiet
-          Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -TrustRepository -Quiet
+          ./tools/Install-BuildModule.ps1 -Name Pester -Version '[6.2.0,7.0)'
+          ./tools/Install-BuildModule.ps1 -Name PSScriptAnalyzer
           # A required module: the package's clean-import check needs it.
-          Install-PSResource -Name PSRule.Rules.Azure -Version '[1.47.0,2.0)' -Scope CurrentUser -TrustRepository -Quiet
+          ./tools/Install-BuildModule.ps1 -Name PSRule.Rules.Azure -Version '[1.47.0,2.0)'
 
       - name: Test and build
         run: ./build.ps1 -Task Test, Build

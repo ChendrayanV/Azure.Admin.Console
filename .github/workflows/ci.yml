@@ -39,10 +39,10 @@ jobs:
           # -TrustRepository rather than Set-PSResourceRepository: on a fresh
           # runner the repository store doesn't exist yet, and
           # Set-PSResourceRepository fails before anything creates it.
-          Install-PSResource -Name Pester -Version '[6.2.0,7.0)' -Scope CurrentUser -TrustRepository -Quiet
-          Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -TrustRepository -Quiet
+          ./tools/Install-BuildModule.ps1 -Name Pester -Version '[6.2.0,7.0)'
+          ./tools/Install-BuildModule.ps1 -Name PSScriptAnalyzer
           # A required module: the package's clean-import check needs it.
-          Install-PSResource -Name PSRule.Rules.Azure -Version '[1.47.0,2.0)' -Scope CurrentUser -TrustRepository -Quiet
+          ./tools/Install-BuildModule.ps1 -Name PSRule.Rules.Azure -Version '[1.47.0,2.0)'
           "PowerShell $($PSVersionTable.PSVersion) on $($PSVersionTable.OS)"
           Get-Module Pester, PSScriptAnalyzer -ListAvailable | Format-Table Name, Version
 
@@ -69,16 +69,16 @@ jobs:
           # -TrustRepository rather than Set-PSResourceRepository: on a fresh
           # runner the repository store doesn't exist yet, and
           # Set-PSResourceRepository fails before anything creates it.
-          Install-PSResource -Name Pester -Version '[6.2.0,7.0)' -Scope CurrentUser -TrustRepository -Quiet
-          Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -TrustRepository -Quiet
+          ./tools/Install-BuildModule.ps1 -Name Pester -Version '[6.2.0,7.0)'
+          ./tools/Install-BuildModule.ps1 -Name PSScriptAnalyzer
           # A required module: the package's clean-import check needs it.
-          Install-PSResource -Name PSRule.Rules.Azure -Version '[1.47.0,2.0)' -Scope CurrentUser -TrustRepository -Quiet
+          ./tools/Install-BuildModule.ps1 -Name PSRule.Rules.Azure -Version '[1.47.0,2.0)'
 
       # docs\ and the MAML help are built by PlatyPS from the comment-based
       # help; a change to the help without ./build.ps1 -Task Docs fails here.
       - name: Check the help is up to date
         run: |
-          Install-PSResource -Name Microsoft.PowerShell.PlatyPS -Version '[1.0.3,2.0)' -Scope CurrentUser -TrustRepository -Quiet
+          ./tools/Install-BuildModule.ps1 -Name Microsoft.PowerShell.PlatyPS -Version '[1.0.3,2.0)'
           ./build.ps1 -Task Docs
           git add --intent-to-add -- docs en-US
           git diff --ignore-cr-at-eol --exit-code -- docs en-US

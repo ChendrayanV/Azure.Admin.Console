@@ -52,6 +52,7 @@ Governance across the tenant in the spirit of the Azure Governance Visualizer - 
 - `Invoke-AACArmWrite` (the module's write helper) runs POST actions too and returns their result; the new `Invoke-AACArmOperationBatch` runs several long-running operations side by side.
 - `Get-AACServicePrincipalInsight` asks Microsoft Graph for the app registrations in a fixed order, so the same principals always make the same requests.
 - The tests run on **Pester 6.2+** (below 7) instead of Pester 5: `build.ps1`, CI and the release workflow install and require it, and `build.ps1 -Task Test` says what to install when it's missing. Pester 6 needs PowerShell 7.4 or later to run the tests; the module itself still runs on 7.2. The test files needed no change.
+- CI and the release workflow install their modules through `tools/Install-BuildModule.ps1`, which tries again (up to four times, waiting longer each time) when the PowerShell Gallery answers 5xx - a 504 from the Gallery had failed a release.
 - The release workflow publishes pre-releases: a `Prerelease` value in the manifest (`0.14.6-preview1`) is tagged `v0.14.6-preview1` and published as a pre-release; `tools/Step-ModuleVersion.ps1 -Prerelease` sets or clears it.
 
 ### Fixed
