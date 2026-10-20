@@ -276,6 +276,8 @@ bookmarks are how you jump to the one you want.
 | [`Get-AACWafCheck`](docs/Get-AACWafCheck.md)                                                     | The checks the Well-Architected assessment runs, by pillar and design principle, with the resource type, severity, fix and link for each. |
 | [`Get-AACKeyVaultInsight`](docs/Get-AACKeyVaultInsight.md)                                       | Key Vaults: what Azure Monitor's Key Vault workbook shows (availability, transactions, latency, failures by status, operations from the audit logs) plus saturation, posture, callers denied or throttled, and secrets, keys and certificates near expiry (`-IncludeObjects`) - as a heat map and findings. |
 | [`Invoke-AACStorageAccountAssessment`](docs/Invoke-AACStorageAccountAssessment.md)               | Storage accounts: what Azure Monitor's Storage accounts workbook shows (transactions, latency, errors by response type, capacity by service) plus availability, throttling, security posture, data protection (soft delete, versioning, redundancy) and cost (lifecycle rules, legacy kinds, idle and hot-but-quiet accounts) - as a heat map and findings. |
+| [`Invoke-AACServiceBusAssessment`](docs/Invoke-AACServiceBusAssessment.md)                       | Service Bus namespaces assessed: requests, errors and throttling, Premium CPU and memory, every queue, topic and subscription's messages (active, dead-lettered, scheduled) and how full it is, security (TLS, SAS keys, network, logs), resilience (zones, geo-disaster recovery) and cost, as a heat map and findings. A console view, objects, and CSV, HTML and PDF reports.|
+| [`Invoke-AACCosmosDBAssessment`](docs/Invoke-AACCosmosDBAssessment.md)                           | Cosmos DB accounts assessed in every API: availability, requests by status and rate limiting (429), throughput and the busiest partition, storage, every database and container with its throughput, security (network, keys, TLS, logs, Defender), resilience (regions, failover, zones, backup) and cost, as a heat map and findings. A console view, objects, and CSV, HTML and PDF reports.|
 | [`Show-AACApplicationGatewayMap`](docs/Show-AACApplicationGatewayMap.md)                         | Application Gateways drawn as their traffic flow - frontend IPs, listeners, rules, path rules and redirects, backend settings and probes, pools and targets, WAF policies - with health (`-IncludeHealth` for the live backend health) and findings, opened in your browser. |
 | [`Get-AACNetworkHealth`](docs/Get-AACNetworkHealth.md)                                           | The hybrid and edge network's health - ExpressRoute circuits and gateways, VPN gateways, connections and tunnels, Azure Firewalls and NAT gateways - from metrics, configuration and Resource Health: % of capacity, thresholds and findings, each with when it happened. |
 | [`Invoke-AACGovernanceAssessment`](docs/Invoke-AACGovernanceAssessment.md)                       | Governance across the tenant in one run, in the spirit of the Azure Governance Visualizer: the management group hierarchy, access, workload identities, policy remediation, Azure limits, settings, tags, locks and recent changes - a tabbed workbook, and a Markdown page with the hierarchy as a Mermaid diagram for a GitHub or Azure DevOps wiki. |
@@ -1546,6 +1548,70 @@ Invoke-AACStorageAccountAssessment -NoDisplay | Sort-Object UsedGB -Descending |
 
 It reads Resource Graph, Azure Monitor metrics and each account's service
 settings: Reader is enough. It reads no data and no keys.
+
+## Service Bus assessment
+
+`Invoke-AACServiceBusAssessment` looks at every Service Bus namespace - and
+every queue, topic and subscription in it:
+
+```powershell
+Invoke-AACServiceBusAssessment                                                  # every namespace, the last day
+Invoke-AACServiceBusAssessment -View Entity -NoDisplay | Where-Object DeadLetters | Sort-Object DeadLetters -Descending
+Invoke-AACServiceBusAssessment -ResourceGroupName 'rg-integration' -TimeRange 7d -HtmlPath .\ServiceBus.html -PdfPath .\ServiceBus.pdf
+Invoke-AACServiceBusAssessment -View Finding -NoDisplay | Where-Object Signal -EQ 'Security'
+```
+
+- **Overview:** requests, server and client errors and throttled requests
+  over the period, messages in and out, and for Premium the CPU and memory
+  of the messaging units.
+- **Entities:** every queue, topic and subscription as it is now - active,
+  dead-lettered, transfer dead-lettered and scheduled messages, size against
+  its maximum, delivery and lock settings, and when it was last used.
+- **Security & resilience:** TLS, SAS keys (and namespace-wide Manage
+  keys), network access and private endpoints, encryption, logs, zone
+  redundancy and geo-disaster recovery.
+- **Findings**, worst first, under six signals: health, capacity, messages,
+  security, resilience and cost - dead letters, entities filling up (sends
+  fail at 100%), backlogs, topics with no subscription, expired messages
+  dropped, throttling, CPU and memory, SAS keys, open networks, no logs, no
+  zones or Geo-DR, idle entities and too many messaging units. The heat map
+  scores each namespace 0-100 on every signal.
+
+It reads Resource Graph, Resource Manager and Azure Monitor metrics: Reader
+is enough. It reads no messages and no keys.
+
+## Cosmos DB assessment
+
+`Invoke-AACCosmosDBAssessment` looks at every Azure Cosmos DB account, in
+every API (NoSQL, MongoDB, Cassandra, Gremlin, Table):
+
+```powershell
+Invoke-AACCosmosDBAssessment                                                    # every account, the last day
+Invoke-AACCosmosDBAssessment -NoDisplay | Where-Object Throttled | Select-Object Account, Throttled, ThrottleRate, NormalizedRuMax, ProvisionedRU, AutoscaleMaxRU
+Invoke-AACCosmosDBAssessment -View Container -NoDisplay | Where-Object ThroughputMode -EQ 'Manual' | Sort-Object RU -Descending
+Invoke-AACCosmosDBAssessment -ResourceGroupName 'rg-data' -TimeRange 7d -HtmlPath .\CosmosDB.html -PdfPath .\CosmosDB.pdf
+```
+
+- **Overview:** service availability, requests by status code - rate
+  limited (429), server errors (5xx), client errors (404, 409 and 412 are
+  counted apart: they are often normal) - request units, the busiest
+  partition's share of its throughput, server-side latency, and the latest
+  data, index and document counts.
+- **Containers:** every database and container with its partition key, its
+  throughput (autoscale, manual, shared database or serverless) and RU/s,
+  default TTL, analytical store and indexing.
+- **Security & resilience:** network access and private endpoints, account
+  keys, TLS, encryption, logs and Defender for Azure Cosmos DB; regions,
+  automatic failover, availability zones, consistency and backup.
+- **Findings**, worst first, under six signals: availability, throttling,
+  errors, security, resilience and cost - rate limiting, running close to
+  the throughput, single regions, no failover, periodic backup only, open
+  networks, keys, throughput higher than needed and many small containers
+  with their own throughput. The heat map scores each account 0-100 on
+  every signal.
+
+It reads Resource Graph, Resource Manager and Azure Monitor metrics: Reader
+is enough. It reads no documents and no keys.
 
 ## Terraform export
 

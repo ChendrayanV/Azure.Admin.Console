@@ -4,10 +4,12 @@ All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never pu
 
 ## v0.14.6
 
-Governance across the tenant in the spirit of the Azure Governance Visualizer - eleven new commands and one workbook - editable draw.io diagrams of what you have, existing resources exported as Terraform, and a dashboard that now covers security, policy, governance, cost and what to do next. Published as a pre-release (0.14.6-preview1) first.
+Governance across the tenant in the spirit of the Azure Governance Visualizer - eleven new commands and one workbook - Service Bus and Cosmos DB assessments, editable draw.io diagrams of what you have, existing resources exported as Terraform, and a dashboard that now covers security, policy, governance, cost and what to do next. Published as a pre-release (0.14.6-preview1) first.
 
 ### New
 
+- **Service Bus assessment.** `Invoke-AACServiceBusAssessment`: every namespace's requests, errors and throttling, Premium CPU and memory, and every queue, topic and subscription's messages as they are now - active, dead-lettered, transfer dead-lettered, scheduled, how full it is, when it was last used; findings under health, capacity, messages, security, resilience and cost (dead letters, entities filling up, backlogs, topics with no subscription, SAS keys, open networks, no logs, no zones or Geo-DR, idle entities, too many messaging units), a heat map, and `-View Namespace|Entity|Finding`.
+- **Cosmos DB assessment.** `Invoke-AACCosmosDBAssessment`, for every API (NoSQL, MongoDB, Cassandra, Gremlin, Table): availability, requests by status and rate limiting (429), request units and the busiest partition, latency, storage, every database and container with its throughput (autoscale, manual, shared, serverless); findings under availability, throttling, errors, security, resilience and cost (single region, no failover, periodic backup, open networks, account keys, over-provisioned throughput, many small containers with their own throughput), a heat map, and `-View Account|Container|Finding`.
 - **Terraform export.** `Export-AACTerraform` exports existing resources as Terraform through the Azure Export for Terraform API (2026-09-01-preview):
   - a resource group (several in one subscription exported together, with their child resources), resource IDs - or anything piped with an `Id` or `ResourceId` - or a Resource Graph where-clause; a folder per subscription;
   - the export is a long-running operation: submitted, polled as Azure asks (`Retry-After`), with Azure's reason when it fails; each export shows its status, how long it has run and how many batches are done (Azure gives no percentage);
