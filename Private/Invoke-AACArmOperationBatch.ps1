@@ -53,12 +53,8 @@ function Invoke-AACArmOperationBatch {
     foreach ($item in $Request) { $queue.Enqueue($item) }
     $active = [System.Collections.Generic.List[hashtable]]::new()
     $parse = { param([string] $Text) if ([string]::IsNullOrWhiteSpace($Text)) { @{} } else { ConvertFrom-Json -InputObject $Text -AsHashtable -Depth 100 } }
-    $retryAfter = {
-        param($Headers)
-        $seconds = 5
-        if ($Headers -and $Headers.ContainsKey('Retry-After')) { $parsed = 0; if ([int]::TryParse([string]$Headers['Retry-After'], [ref]$parsed)) { $seconds = [Math]::Min([Math]::Max($parsed, 1), 60) } }
-        $seconds
-    }
+    # As Azure asks (Retry-After and the services' own retry headers), 5 seconds otherwise, never more than 60.
+    $retryAfter = { param($Headers) Get-AACRetryDelay -Headers $Headers -Status 200 }
     $finish = {
         param([string] $Key, [bool] $Succeeded, $Result, [string] $ErrorText, [string] $OperationUrl, [bool] $TimedOut = $false)
         $results[$Key] = @{ Succeeded = $Succeeded; Result = $Result; Error = $ErrorText; OperationUrl = $OperationUrl; TimedOut = $TimedOut }

@@ -29,7 +29,7 @@ function Read-AACResourceMap {
 
     $SubscriptionId = @($SubscriptionId | Where-Object { $_ })
     $ResourceGroupName = @($ResourceGroupName | Where-Object { $_ })
-    $quote = { param([string] $Text) "'" + ($Text -replace '\\', '\\' -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
     # Resource Graph queries, several at once (Invoke-AACGraphBatch): rows
     # as hashtables (tags whose keys differ only by case are fine).
     $graph = {

@@ -40,7 +40,7 @@ function ConvertTo-AACCosmosDBAssessment {
         # Read-AACCosmosDBResource's result, by account ID.
         [hashtable] $Resource = @{},
 
-        # Read-AACNetworkHealthMetric's result (Requests, Usage, Availability, Latency, Storage), by account ID.
+        # Read-AACMetric's result (Requests, Usage, Availability, Latency, Storage), by account ID.
         [hashtable] $Metric = @{},
 
         [AllowEmptyCollection()]
@@ -55,18 +55,7 @@ function ConvertTo-AACCosmosDBAssessment {
         [hashtable] $SubscriptionName = @{}
     )
 
-    $at = {
-        param($Row, [string[]] $Keys)
-        $value = $Row
-        foreach ($key in $Keys) {
-            if ($value -isnot [System.Collections.IDictionary]) { return $null }
-            if ($value.Contains($key)) { $value = $value[$key]; continue }
-            $found = $null
-            foreach ($name in $value.Keys) { if ($name -eq $key) { $found = $value[$name]; break } }
-            $value = $found
-        }
-        $value
-    }
+    $at = { param($Row, [string[]] $Keys) Get-AACMember -InputObject $Row -Key $Keys }
     $sum = { param([object[]] $Points, [string] $Field) $t = 0.0; foreach ($p in $Points) { $v = & $at $p $Field; if ($null -ne $v) { $t += [double]$v } }; $t }
     $values = { param([object[]] $Points, [string] $Field) @(foreach ($p in $Points) { $v = & $at $p $Field; if ($null -ne $v) { [double]$v } }) }
     $mean = { param($Numbers) $n = @($Numbers | Where-Object { $null -ne $_ }); if ($n.Count) { ($n | Measure-Object -Average).Average } else { $null } }

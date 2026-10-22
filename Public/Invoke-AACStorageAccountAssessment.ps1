@@ -145,7 +145,7 @@ function Invoke-AACStorageAccountAssessment {
     $interactive = -not $NoDisplay -and -not $pipedOnward
     $resolve = { param([string] $Path) if ($Path) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path) } }
     # TimeRange -> hours and the metric grain (an interval Azure Monitor accepts).
-    $range = @{ '1h' = @(1, 'PT5M'); '4h' = @(4, 'PT15M'); '12h' = @(12, 'PT30M'); '1d' = @(24, 'PT1H'); '3d' = @(72, 'PT6H'); '7d' = @(168, 'PT6H'); '14d' = @(336, 'PT12H'); '30d' = @(720, 'P1D') }[$TimeRange]
+    $range = Get-AACTimeRange -TimeRange $TimeRange
     $end = [datetime]::UtcNow
     $span = { param([int] $Hours) "$($end.AddHours(-$Hours).ToString('yyyy-MM-ddTHH:mm:ssZ'))/$($end.ToString('yyyy-MM-ddTHH:mm:ssZ'))" }
     $request = @{
@@ -194,8 +194,8 @@ function Invoke-AACStorageAccountAssessment {
         foreach ($a in $services) { if ($a.Blob) { $settingCount += 3 }; if ($a.File) { $settingCount += 1 } }
         Update-AACProgress -Id 'metrics' -Total ([Math]::Max(1, $overview.Count + $capacity.Count + $settingCount)) -Description 'Reading metrics, capacity and data protection settings'
         $tick = { param($Done, $Total) Update-AACProgress -Id 'metrics' -Increment 1 }
-        $metrics = Read-AACNetworkHealthMetric -Call $overview -Timespan $request.Timespan -Interval $request.Interval -ThrottleLimit $request.ThrottleLimit -OnProgress $tick
-        $capacityRead = Read-AACNetworkHealthMetric -Call $capacity -Timespan $request.CapacityTimespan -Interval 'PT1H' -ThrottleLimit $request.ThrottleLimit -OnProgress $tick
+        $metrics = Read-AACMetric -Call $overview -Timespan $request.Timespan -Interval $request.Interval -ThrottleLimit $request.ThrottleLimit -OnProgress $tick
+        $capacityRead = Read-AACMetric -Call $capacity -Timespan $request.CapacityTimespan -Interval 'PT1H' -ThrottleLimit $request.ThrottleLimit -OnProgress $tick
         $settings = Read-AACStorageAccountSetting -Account @($services | ForEach-Object { @{ Id = $_.Id; Blob = $_.Blob; File = $_.File } }) -ThrottleLimit $request.ThrottleLimit -OnProgress $tick
         Update-AACProgress -Id 'metrics' -Complete -Description ('Read metrics, capacity and settings for {0:N0} account(s)' -f $accounts.Count)
         $failedMetrics = @($accounts | Where-Object { $m = $metrics[[string]$_['id']]; $m -and $m['Core'] -and $m['Core'].Error }).Count

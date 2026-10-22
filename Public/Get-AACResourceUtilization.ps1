@@ -146,7 +146,7 @@ function Get-AACResourceUtilization {
         $definitions = Get-AACUtilizationMetric
         $types = @($definitions.Keys | Where-Object { $t = $_; -not $request.ResourceType.Count -or @($request.ResourceType | Where-Object { $t -like $_ }).Count } | Sort-Object)
         if (-not $types.Count) { throw "None of the types $($request.ResourceType -join ', ') is one this command measures: $(@($definitions.Keys | Sort-Object) -join ', ')." }
-        $quote = { param([string] $Text) "'" + ($Text -replace "'", "\'") + "'" }
+        $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
         $groupFilter = if ($request.ResourceGroupName.Count) { " | where resourceGroup in~ ($((@($request.ResourceGroupName | ForEach-Object { & $quote $_ })) -join ', '))" } else { '' }
         Update-AACProgress -Id 'resources' -Indeterminate -Description 'Finding the resources to measure'
         $read = Invoke-AACGraphBatch -SubscriptionId $scope.GraphScope -Query ([ordered]@{

@@ -33,7 +33,7 @@ function Get-AACAksQuery {
         [string[]] $ResourceGroupName
     )
 
-    $quote = { param([string] $Text) "'" + ($Text -replace '\\', '\\' -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
     $groups = @($ResourceGroupName | Where-Object { $_ })
     $queries = [ordered]@{}
     if ($Stage -eq 'Clusters') {

@@ -2,7 +2,7 @@ function Get-AACNetworkHealthCall {
     <#
     .SYNOPSIS
         The metric calls Get-AACNetworkHealth makes for each network resource
-        (Read-AACNetworkHealthMetric's -Call).
+        (Read-AACMetric's -Call).
     .DESCRIPTION
           ExpressRoute circuit   bgp     BgpAvailability, ArpAvailability by
                                          PeeringType and Peer

@@ -155,7 +155,7 @@ function Get-AACSecurityPosture {
     $csvFullPath = & $resolve $CsvPath
     $pdfFullPath = & $resolve $PdfPath
     $htmlFullPath = & $resolve $HtmlPath
-    $quote = { param([string] $Text) "'" + ($Text -replace '\\', '\\' -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
 
     # The Defender queries each section needs (Get-AACDefenderQuery, shared with Get-AACInventory).
     $needs = @{

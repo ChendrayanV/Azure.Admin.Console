@@ -35,7 +35,7 @@ function Get-AACAssessmentQuery {
         [switch] $Filter
     )
 
-    $quote = { param([string] $Text) "'" + ($Text -replace '\\', '\\' -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
     $scope = [System.Text.StringBuilder]::new()
     $groups = @($ResourceGroupName | Where-Object { $_ })
     if ($groups.Count) {

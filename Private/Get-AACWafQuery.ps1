@@ -36,7 +36,7 @@ function Get-AACWafQuery {
         [switch] $NoDefender
     )
 
-    $quote = { param([string] $Text) "'" + ($Text -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
     $list = { param([string[]] $Items) (@($Items | ForEach-Object { & $quote $_ })) -join ', ' }
     $groups = @($ResourceGroupName | Where-Object { $_ })
     $in = if ($groups.Count) { " | where resourceGroup in~ ($(& $list $groups))" } else { '' }

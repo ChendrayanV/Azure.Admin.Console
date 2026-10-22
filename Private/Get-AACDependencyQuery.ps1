@@ -17,7 +17,7 @@ function Get-AACDependencyQuery {
         [string[]] $ResourceGroupName = @()
     )
 
-    $quote = { param([string] $Text) "'" + ($Text -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
     $groups = if ($ResourceGroupName.Count) { " | where resourceGroup in~ ($((@($ResourceGroupName | ForEach-Object { & $quote $_ })) -join ', '))" } else { '' }
     [ordered]@{
         vms        = "resources | where type =~ 'microsoft.compute/virtualmachines'$groups | project id = tolower(id), name, type = tolower(type), resourceGroup, subscriptionId, zones, avset = tolower(tostring(properties.availabilitySet.id)), osDisk = tolower(tostring(properties.storageProfile.osDisk.managedDisk.id)), dataDisks = properties.storageProfile.dataDisks, identity"

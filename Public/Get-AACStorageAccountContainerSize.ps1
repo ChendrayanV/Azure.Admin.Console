@@ -191,7 +191,7 @@ function Get-AACStorageAccountContainerSize {
     $htmlFullPath = & $resolve $HtmlPath
     $keepBlob = $IncludeBlob -or $BlobCsvPath
     $include = @(if ($IncludeSnapshot) { 'snapshots' }; if ($IncludeVersion) { 'versions' }; if ($IncludeDeleted) { 'deleted' })
-    $quote = { param([string] $Text) "'" + ($Text -replace '\\', '\\' -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
     $groupFilter = if ($ResourceGroupName) { " | where resourceGroup in~ ($((@($ResourceGroupName | ForEach-Object { & $quote $_ })) -join ', '))" } else { '' }
     $matchesAny = { param([string] $Value, [string[]] $Pattern) foreach ($p in $Pattern) { if ($Value -like $p) { return $true } }; $false }
 

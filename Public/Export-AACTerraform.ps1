@@ -304,7 +304,7 @@ function Export-AACTerraform {
         if ($extensions.Count) { $common.includeExtensions = $extensions }
         if ($Include -contains 'ManagedResource') { $common.includeManagedResource = $true }
         $withCommon = { param([System.Collections.IDictionary] $Body) $copy = [ordered]@{}; foreach ($key in $Body.Keys) { $copy[$key] = $Body[$key] }; foreach ($key in $common.Keys) { if (-not $copy.Contains($key)) { $copy[$key] = $common[$key] } }; $copy }
-        $quote = { param([string] $Value) "'$($Value -replace "'", "\'")'" }
+        $quote = { param([string] $Value) ConvertTo-AACKqlLiteral -Text $Value }
         $clock = { param([timespan] $Span) if ($Span.TotalHours -ge 1) { '{0}:{1:mm\:ss}' -f [int][Math]::Floor($Span.TotalHours), $Span } else { '{0:m\:ss}' -f $Span } }
 
         # export.json: written when the export starts, updated as Azure accepts each operation, final when done.

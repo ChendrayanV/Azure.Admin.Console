@@ -26,7 +26,7 @@ function Get-AACPolicyStateQuery {
         [string[]] $ResourceGroupName = @()
     )
 
-    $quote = { param([string] $Text) "'" + ($Text -replace '\\', '\\' -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
     $where = @(
         if ($ComplianceState.Count) { "state in~ ($((@($ComplianceState | ForEach-Object { & $quote $_ })) -join ', '))" }
         if ($ResourceGroupName.Count) { "resourceGroup in~ ($((@($ResourceGroupName | ForEach-Object { & $quote $_ })) -join ', '))" }

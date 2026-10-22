@@ -212,7 +212,7 @@ function Get-AACDiagnosticSetting {
     }
     $state = Invoke-AACProgress -ScriptBlock {
         $null = Get-AACAccessToken
-        $quote = { param([string] $Text) "'" + ($Text -replace '\\', '\\' -replace "'", "\'") + "'" }
+        $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
         $groupFilter = if ($request.ResourceGroupName.Count) { " | where resourceGroup in~ ($(@($request.ResourceGroupName | ForEach-Object { & $quote $_ }) -join ', '))" } else { '' }
 
         # --- 1. Every resource (KQL), the subscriptions, the workspaces -----------------------------------------

@@ -1,8 +1,9 @@
-function Read-AACNetworkHealthMetric {
+function Read-AACMetric {
     <#
     .SYNOPSIS
-        Reads the Azure Monitor metrics Get-AACNetworkHealth needs, several
-        calls at once, and returns them as series by resource and call.
+        Reads Azure Monitor metrics, several calls at once, and returns them
+        as series by resource and call - for Get-AACNetworkHealth and the
+        storage, Service Bus and Cosmos DB assessments.
     .DESCRIPTION
         -Call: @(@{ Id (resource ID); Key (a name for the call); Metric
         (names); Aggregation; Filter (a $filter splitting by dimensions, or

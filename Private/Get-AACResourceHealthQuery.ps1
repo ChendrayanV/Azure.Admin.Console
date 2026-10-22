@@ -24,7 +24,7 @@ function Get-AACResourceHealthQuery {
         [int] $Days = 7
     )
 
-    $quote = { param([string] $Text) "'" + ($Text -replace "'", "\'").ToLowerInvariant() + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text -Lower }
     $groups = @($ResourceGroupName | Where-Object { $_ })
     $in = if ($groups.Count) { " | where tolower(tostring(split(resourceId, '/')[4])) in ($((@($groups | ForEach-Object { & $quote $_ })) -join ', '))" } else { '' }
     $target = "extend resourceId = tolower(tostring(properties.targetResourceId)) | extend resourceId = iff(isempty(resourceId), tolower(tostring(split(id, '/providers/Microsoft.ResourceHealth/', 0)[0])), resourceId)"

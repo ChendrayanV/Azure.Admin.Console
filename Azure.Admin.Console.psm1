@@ -48,7 +48,8 @@ if (-not (Test-Path -LiteralPath $spectreConsolePath)) {
 # Pinned SHA-256 of the vendored Spectre.Console 0.49.1 - a swapped or
 # tampered DLL is refused rather than loaded. Update it together with the DLL.
 $spectreConsoleHash = '26BB8DC1CA36D7ADA9979FFC9DDF658FF48068CEE0154AC540A8870FA7434359'
-if ((Get-FileHash -LiteralPath $spectreConsolePath -Algorithm SHA256).Hash -ne $spectreConsoleHash) {
+# .NET's SHA-256 rather than Get-FileHash: the same check, about 70 ms sooner at every import.
+if ([System.Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData([System.IO.File]::ReadAllBytes($spectreConsolePath))) -ne $spectreConsoleHash) {
     throw "Azure Admin Console refused to load '$spectreConsolePath': its SHA-256 hash doesn't match the Spectre.Console.dll this module was released with. Reinstall the module."
 }
 try {
@@ -58,163 +59,187 @@ catch {
     throw "Azure Admin Console failed to load Spectre.Console.dll: $($_.Exception.Message)"
 }
 
-# Load order matters: Private helpers first, then the public, exported
-# commands that use them.
-foreach ($folder in 'Private', 'Public') {
-    $folderPath = Join-Path -Path $moduleRoot -ChildPath $folder
-    if (-not (Test-Path -LiteralPath $folderPath)) {
-        continue
+# The packaged module (build.ps1) carries every function in one file, which
+# loads 1.5-2 seconds faster than ~385 files dot-sourced one by one; it also
+# sets $publicFunctionNames. The repository loads the files themselves -
+# Private helpers first, then the public commands that use them.
+$bundlePath = Join-Path -Path $moduleRoot -ChildPath 'Azure.Admin.Console.Functions.ps1'
+if (Test-Path -LiteralPath $bundlePath) {
+    try {
+        . $bundlePath
     }
-
-    $files = Get-ChildItem -LiteralPath $folderPath -Filter '*.ps1' -File | Sort-Object -Property Name
-    foreach ($file in $files) {
-        try {
-            . $file.FullName
-        }
-        catch {
-            throw "Azure Admin Console failed to load '$($file.FullName)': $($_.Exception.Message)"
-        }
+    catch {
+        throw "Azure Admin Console failed to load its functions ('$bundlePath'): $($_.Exception.Message) Reinstall the module."
     }
 }
+else {
+    foreach ($folder in 'Private', 'Public') {
+        $folderPath = Join-Path -Path $moduleRoot -ChildPath $folder
+        if (-not (Test-Path -LiteralPath $folderPath)) {
+            continue
+        }
 
-# Get-AACFirewallRule's objects carry ~35 properties (all of them go to
-# CSV); at the console show a readable table by default. Select-Object * or
-# Format-List * shows everything.
-Update-TypeData -TypeName 'AAC.FirewallRule' -DefaultDisplayPropertySet 'FirewallPolicy', 'RuleCollection', 'RuleName', 'Action' -Force
-# Same for Get-AACAdvisorRecommendation's ~25 (or more, with Ext_ columns).
-Update-TypeData -TypeName 'AAC.AdvisorRecommendation' -DefaultDisplayPropertySet 'Category', 'Impact', 'ResourceName', 'Problem' -Force
-# Invoke-AACApplicationInsightQuery's ~30 properties per exception.
-Update-TypeData -TypeName 'AAC.ApplicationInsightsException' -DefaultDisplayPropertySet 'TimeGenerated', 'Severity', 'ExceptionType', 'Message', 'AppRoleName' -Force
-# Invoke-AACPSRule's ~18 properties.
-Update-TypeData -TypeName 'AAC.PSRuleResult' -DefaultDisplayPropertySet 'Outcome', 'RuleName', 'ResourceName', 'Reason' -Force
-# Show-AACCost -PassThru: one property per month on top of these.
-# Get-AACTerraformPlan's ~20 properties per resource change.
-Update-TypeData -TypeName 'AAC.TerraformChange' -DefaultDisplayPropertySet 'Action', 'Address', 'ResourceName', 'ChangedAttributes' -Force
-# Invoke-AACLogAnalyticsWorkspaceAssessment: one object per workspace, its sections as properties.
-Update-TypeData -TypeName 'AAC.LogAnalyticsWorkspaceAssessment' -DefaultDisplayPropertySet 'Name', 'PricingTier', 'RetentionDays', 'BillableGB', 'AverageDailyGB', 'Recommendations' -Force
-Update-TypeData -TypeName 'AAC.LogAnalyticsTable' -DefaultDisplayPropertySet 'Table', 'Billing', 'BillableGB', 'NonBillableGB', 'SharePercent', 'Plan', 'RetentionDays' -Force
-Update-TypeData -TypeName 'AAC.LogAnalyticsRecommendation' -DefaultDisplayPropertySet 'Severity', 'Category', 'Recommendation', 'Action' -Force
-# Get-AACDiagnosticSetting: coverage per resource, one row per setting, findings.
-Update-TypeData -TypeName 'AAC.DiagnosticCoverage' -DefaultDisplayPropertySet 'Status', 'Resource', 'ResourceType', 'Workspaces', 'MissingCategories' -Force
-Update-TypeData -TypeName 'AAC.DiagnosticSettingDetail' -DefaultDisplayPropertySet 'Resource', 'Setting', 'Destinations', 'Workspace', 'LogsEnabled' -Force
-Update-TypeData -TypeName 'AAC.DiagnosticFinding' -DefaultDisplayPropertySet 'Severity', 'Finding', 'Resource', 'Detail' -Force
-# Deploy-AACStorageAccount: the deployment, its changes, gates and apply results.
-Update-TypeData -TypeName 'AAC.StorageDeployment' -DefaultDisplayPropertySet 'Name', 'Status', 'Writes', 'ResourceGroupName', 'Location' -Force
-Update-TypeData -TypeName 'AAC.StorageChange' -DefaultDisplayPropertySet 'Order', 'Action', 'Resource', 'Reason' -Force
-Update-TypeData -TypeName 'AAC.StorageGate' -DefaultDisplayPropertySet 'Outcome', 'Gate', 'Resource', 'Item', 'Detail' -Force
-Update-TypeData -TypeName 'AAC.StorageApplyResult' -DefaultDisplayPropertySet 'Status', 'Resource', 'Action', 'Seconds', 'Detail' -Force
-# Invoke-AACAksAssessment: clusters, node pools, settings, checks, findings, policy views.
-Update-TypeData -TypeName 'AAC.AksCluster' -DefaultDisplayPropertySet 'Name', 'Version', 'Support', 'Tier', 'Nodes', 'WafScore', 'High', 'Medium', 'Low', 'PolicyViolations' -Force
-Update-TypeData -TypeName 'AAC.AksNodePool' -DefaultDisplayPropertySet 'Cluster', 'Pool', 'Mode', 'VmSize', 'Nodes', 'Autoscale', 'Zones', 'Version', 'NodeImageAge' -Force
-Update-TypeData -TypeName 'AAC.AksSetting' -DefaultDisplayPropertySet 'Cluster', 'Area', 'Setting', 'Value' -Force
-Update-TypeData -TypeName 'AAC.AksCheck' -DefaultDisplayPropertySet 'Cluster', 'Pillar', 'Check', 'Status', 'Severity' -Force
-Update-TypeData -TypeName 'AAC.AksFinding' -DefaultDisplayPropertySet 'Severity', 'Pillar', 'Source', 'Cluster', 'Check' -Force
-Update-TypeData -TypeName 'AAC.AksUpgrade' -DefaultDisplayPropertySet 'Cluster', 'Component', 'Current', 'Support', 'Available' -Force
-Update-TypeData -TypeName 'AAC.AksPolicyViolation' -DefaultDisplayPropertySet 'Cluster', 'Namespace', 'Workload', 'Component', 'Policy', 'Effect' -Force
-Update-TypeData -TypeName 'AAC.AksPolicyNamespace' -DefaultDisplayPropertySet 'Namespace', 'Violations', 'Workloads', 'Policies', 'Deny' -Force
-Update-TypeData -TypeName 'AAC.AksPolicyWorkload' -DefaultDisplayPropertySet 'Cluster', 'Namespace', 'WorkloadKind', 'Workload', 'Violations', 'Policies' -Force
-Update-TypeData -TypeName 'AAC.AksPolicySummary' -DefaultDisplayPropertySet 'Policy', 'Effect', 'Violations', 'Clusters', 'Namespaces', 'Workloads' -Force
-# Invoke-AACPolicyAssessment: assignments, compliance, exemptions, definitions, findings.
-Update-TypeData -TypeName 'AAC.PolicyAssignmentReport' -DefaultDisplayPropertySet 'Assignment', 'Scope', 'Kind', 'Enforcement', 'CompliancePercent', 'Rating', 'NonCompliant', 'Exemptions' -Force
-Update-TypeData -TypeName 'AAC.PolicyAssignmentCompliance' -DefaultDisplayPropertySet 'Assignment', 'Subscription', 'CompliancePercent', 'Rating', 'NonCompliant', 'Resources' -Force
-Update-TypeData -TypeName 'AAC.PolicyAssessmentPolicy' -DefaultDisplayPropertySet 'Assignment', 'Policy', 'Effect', 'Category', 'CompliancePercent', 'NonCompliant' -Force
-Update-TypeData -TypeName 'AAC.PolicyInitiativeMember' -DefaultDisplayPropertySet 'Assignment', 'Policy', 'Effect', 'Parameters', 'CompliancePercent', 'NonCompliant' -Force
-Update-TypeData -TypeName 'AAC.PolicyCategory'-DefaultDisplayPropertySet 'Category', 'Policies', 'Assignments', 'CompliancePercent', 'Rating', 'NonCompliant' -Force
-Update-TypeData -TypeName 'AAC.PolicySubscription' -DefaultDisplayPropertySet 'Subscription', 'ManagementGroups', 'CompliancePercent', 'Rating', 'NonCompliant', 'Assignments', 'Exemptions' -Force
-Update-TypeData -TypeName 'AAC.PolicyManagementGroup' -DefaultDisplayPropertySet 'ManagementGroup', 'Parent', 'CompliancePercent', 'Rating', 'Assignments', 'Subscriptions' -Force
-Update-TypeData -TypeName 'AAC.PolicyInitiative' -DefaultDisplayPropertySet 'Initiative', 'PolicyType', 'Category', 'Policies', 'Assigned', 'Deprecated' -Force
-Update-TypeData -TypeName 'AAC.PolicyDefinitionReport' -DefaultDisplayPropertySet 'Definition', 'PolicyType', 'Category', 'Effect', 'Assigned', 'Deprecated' -Force
-Update-TypeData -TypeName 'AAC.PolicyExemptionReport' -DefaultDisplayPropertySet 'Exemption', 'Assignment', 'Scope', 'Category', 'ExpiresOn', 'Status' -Force
-Update-TypeData -TypeName 'AAC.PolicyRoleAssignment' -DefaultDisplayPropertySet 'Assignment', 'Identity', 'Role', 'Scope', 'Required' -Force
-Update-TypeData -TypeName 'AAC.PolicyFinding' -DefaultDisplayPropertySet 'Severity', 'Area', 'Finding', 'Item', 'Scope' -Force
-# Invoke-AACDefenderAssessment: the assessment, and the rows of each of its tables.
-Update-TypeData -TypeName 'AAC.DefenderAssessment' -DefaultDisplayPropertySet 'SecureScore', 'Subscriptions', 'Findings', 'Recommendations', 'AttackPaths', 'Alerts', 'Inventory' -Force
-Update-TypeData -TypeName 'AAC.DefenderFinding' -DefaultDisplayPropertySet 'Severity', 'Area', 'Finding', 'Item', 'SubscriptionName' -Force
-Update-TypeData -TypeName 'AAC.DefenderSubscription' -DefaultDisplayPropertySet 'Subscription', 'SecureScore', 'PlansOn', 'UnhealthyResources', 'AttackPaths', 'ActiveAlerts', 'Findings' -Force
-Update-TypeData -TypeName 'AAC.DefenderRecommendation' -DefaultDisplayPropertySet 'Recommendation', 'Severity', 'RiskLevel', 'Status', 'UnhealthyResources', 'HealthyResources', 'Control' -Force
-Update-TypeData -TypeName 'AAC.DefenderUnhealthyResource' -DefaultDisplayPropertySet 'Resource', 'Recommendation', 'Severity', 'RiskLevel', 'SubscriptionName' -Force
-Update-TypeData -TypeName 'AAC.DefenderAttackPath' -DefaultDisplayPropertySet 'AttackPath', 'RiskLevel', 'EntryPoint', 'Target', 'Steps' -Force
-Update-TypeData -TypeName 'AAC.DefenderAlert' -DefaultDisplayPropertySet 'Alert', 'Severity', 'Status', 'Resource', 'Tactics', 'TimeGenerated' -Force
-Update-TypeData -TypeName 'AAC.DefenderResource' -DefaultDisplayPropertySet 'Resource', 'Type', 'Plan', 'PlanState', 'Unhealthy', 'High', 'Vulnerabilities', 'Alerts', 'AttackPaths' -Force
-Update-TypeData -TypeName 'AAC.DefenderVulnerability' -DefaultDisplayPropertySet 'Vulnerability', 'Severity', 'CVEs', 'Resource', 'Patchable' -Force
-Update-TypeData -TypeName 'AAC.DefenderPlanReport' -DefaultDisplayPropertySet 'SubscriptionName', 'Plan', 'State', 'SubPlan', 'Resources' -Force
-Update-TypeData -TypeName 'AAC.DefenderSetting' -DefaultDisplayPropertySet 'SubscriptionName', 'Setting', 'Value', 'Status' -Force
-Update-TypeData -TypeName 'AAC.DefenderComplianceControl' -DefaultDisplayPropertySet 'Standard', 'Control', 'State', 'FailedAssessments', 'SubscriptionName' -Force
-# Invoke-AACM365Assessment: the assessment, and the rows of its tables.
-Update-TypeData -TypeName 'AAC.M365Assessment' -DefaultDisplayPropertySet 'Tenant', 'SecureScore', 'Findings', 'ConditionalAccess', 'RoleAssignments', 'ManagedDevices', 'Permissions' -Force
-Update-TypeData -TypeName 'AAC.M365Finding' -DefaultDisplayPropertySet 'Severity', 'Area', 'Finding', 'Item' -Force
-Update-TypeData -TypeName 'AAC.M365Setting' -DefaultDisplayPropertySet 'Area', 'Setting', 'Value', 'Status' -Force
-Update-TypeData -TypeName 'AAC.M365ConditionalAccessPolicy' -DefaultDisplayPropertySet 'Policy', 'State', 'Users', 'Applications', 'Grant' -Force
-Update-TypeData -TypeName 'AAC.M365RoleAssignment' -DefaultDisplayPropertySet 'Role', 'Principal', 'Assignment', 'Privileged', 'MfaRegistered' -Force
-Update-TypeData -TypeName 'AAC.M365UserRegistration' -DefaultDisplayPropertySet 'UserPrincipalName', 'Admin', 'MfaRegistered', 'DefaultMethod' -Force
-Update-TypeData -TypeName 'AAC.M365SecureScoreControl' -DefaultDisplayPropertySet 'Control', 'Status', 'Score', 'MaxScore', 'Category' -Force
-Update-TypeData -TypeName 'AAC.M365ManagedDevice' -DefaultDisplayPropertySet 'Device', 'User', 'OS', 'Compliance', 'Encrypted', 'LastSync', 'Stale' -Force
-Update-TypeData -TypeName 'AAC.M365EntraDevice' -DefaultDisplayPropertySet 'Device', 'OS', 'Join', 'Managed', 'LastSignIn', 'Stale' -Force
-Update-TypeData -TypeName 'AAC.M365Permission' -DefaultDisplayPropertySet 'Data', 'Status', 'Permission' -Force
-Update-TypeData -TypeName 'AAC.M365MfaCoverage' -DefaultDisplayPropertySet 'Scope', 'Users', 'MfaPercent', 'PhishingResistantPercent', 'NoMethod' -Force
-Update-TypeData -TypeName 'AAC.M365EmergencyAccount' -DefaultDisplayPropertySet 'UserPrincipalName', 'DetectedBy', 'GlobalAdministrator', 'CloudOnly', 'PhishingResistant' -Force
-Update-TypeData -TypeName 'AAC.M365PrivilegedAccount' -DefaultDisplayPropertySet 'Principal', 'Roles', 'Dangling', 'Issues', 'Overlap' -Force
-Update-TypeData -TypeName 'AAC.M365AppCredential' -DefaultDisplayPropertySet 'App', 'Type', 'Status', 'End', 'DaysLeft', 'ValidityDays' -Force
-Update-TypeData -TypeName 'AAC.M365AppPermission' -DefaultDisplayPropertySet 'App', 'Permission', 'Kind', 'Risk', 'Owner' -Force
-Update-TypeData -TypeName 'AAC.M365RedirectUri' -DefaultDisplayPropertySet 'App', 'Uri', 'Resolves', 'Issue', 'Severity' -Force
-Update-TypeData -TypeName 'AAC.M365LegacySignIn' -DefaultDisplayPropertySet 'Protocol', 'Successful', 'Failed', 'Users', 'Latest' -Force
-Update-TypeData -TypeName 'AAC.M365PimRoleSetting' -DefaultDisplayPropertySet 'Role', 'MfaOnActivation', 'Approval', 'MaxActivationHours', 'PermanentActive' -Force
-Update-TypeData -TypeName 'AAC.M365GroupExposure' -DefaultDisplayPropertySet 'Group', 'Why', 'Members', 'Guests', 'Dynamic' -Force
-Update-TypeData -TypeName 'AAC.M365AccessReview' -DefaultDisplayPropertySet 'Review', 'Covers', 'Status', 'Recurrence' -Force
-Update-TypeData -TypeName 'AAC.M365RiskyUser' -DefaultDisplayPropertySet 'UserPrincipalName', 'RiskLevel', 'RiskState', 'Updated' -Force
-Update-TypeData -TypeName 'AAC.M365RiskDetection' -DefaultDisplayPropertySet 'Detection', 'Detections', 'High', 'Users', 'Latest' -Force
-Update-TypeData -TypeName 'AAC.M365Incident' -DefaultDisplayPropertySet 'Incident', 'Severity', 'Status', 'AssignedTo', 'AgeDays' -Force
-Update-TypeData -TypeName 'AAC.M365InactiveUser' -DefaultDisplayPropertySet 'UserPrincipalName', 'Products', 'LastActivity' -Force
-Update-TypeData -TypeName 'AAC.M365AppProtectionPolicy' -DefaultDisplayPropertySet 'Policy', 'Platform', 'Assigned', 'PinRequired', 'SendDataTo' -Force
-Update-TypeData -TypeName 'AAC.M365Coverage' -DefaultDisplayPropertySet 'Area', 'Lens', 'Status', 'Reads', 'Reason' -Force
-# Invoke-AACAssessment: the run's summary (its sheets are plain rows).
-Update-TypeData -TypeName 'AAC.Assessment' -DefaultDisplayPropertySet 'Subscriptions', 'Resources', 'ResourceTypes', 'AdvisorHigh', 'Retirements', 'SecurityHigh', 'ReportFolder' -Force
-# Invoke-AACVirtualNetworkAssessment: networks, subnets, peerings, free ranges, findings.
-Update-TypeData -TypeName 'AAC.VirtualNetwork' -DefaultDisplayPropertySet 'Name', 'Role', 'AddressSpace', 'UsedIps', 'AvailableIps', 'UsedPercent', 'SubnetCount', 'PeeringCount', 'High', 'Medium', 'Low' -Force
-Update-TypeData -TypeName 'AAC.VirtualNetworkSubnet' -DefaultDisplayPropertySet 'VirtualNetwork', 'Subnet', 'Prefix', 'Usable', 'Used', 'Available', 'UsedPercent', 'Nsg', 'Outbound' -Force
-Update-TypeData -TypeName 'AAC.VirtualNetworkPeering' -DefaultDisplayPropertySet 'VirtualNetwork', 'Peering', 'RemoteVirtualNetwork', 'State', 'Sync', 'UseRemoteGateways', 'AllowGatewayTransit' -Force
-Update-TypeData -TypeName 'AAC.VirtualNetworkFreeRange' -DefaultDisplayPropertySet 'VirtualNetwork', 'AddressSpace', 'Prefix', 'Size' -Force
-Update-TypeData -TypeName 'AAC.VirtualNetworkFinding' -DefaultDisplayPropertySet 'Severity', 'Category', 'Finding', 'VirtualNetwork', 'Item', 'Action' -Force
-Update-TypeData -TypeName 'AAC.VirtualNetworkPrivateEndpoint' -DefaultDisplayPropertySet 'VirtualNetwork', 'Subnet', 'PrivateEndpoint', 'Target', 'Groups', 'Status', 'ZoneLinked' -Force
-Update-TypeData -TypeName 'AAC.ApplicationSecurityGroupUse' -DefaultDisplayPropertySet 'Asg', 'Nics', 'Rules', 'VirtualNetworks', 'ResourceGroup' -Force
-Update-TypeData -TypeName 'AAC.SubscriptionCost' -DefaultDisplayPropertySet 'SubscriptionName', 'Currency', 'MonthToDate', 'Total', 'TopServices', 'Status' -Force
+        $files = Get-ChildItem -LiteralPath $folderPath -Filter '*.ps1' -File | Sort-Object -Property Name
+        foreach ($file in $files) {
+            try {
+                . $file.FullName
+            }
+            catch {
+                throw "Azure Admin Console failed to load '$($file.FullName)': $($_.Exception.Message)"
+            }
+        }
+    }
+    $publicFunctionNames = Get-ChildItem -LiteralPath (Join-Path -Path $moduleRoot -ChildPath 'Public') -Filter '*.ps1' -File -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty BaseName
+}
 
-# Show-AACDashboard: the status and headline first.
-Update-TypeData -TypeName 'AAC.Dashboard' -DefaultDisplayPropertySet 'Status', 'Headline', 'Resources', 'Regions', 'AdvisorHigh', 'Health' -Force
-Update-TypeData -TypeName 'AAC.DashboardChange' -DefaultDisplayPropertySet 'Time', 'Change', 'Resource', 'ResourceGroup', 'ChangedBy' -Force
-Update-TypeData -TypeName 'AAC.DashboardServiceEvent' -DefaultDisplayPropertySet 'Type', 'Title', 'TrackingId', 'Started', 'Subscription' -Force
-Update-TypeData -TypeName 'AAC.DashboardUnhealthyResource' -DefaultDisplayPropertySet 'Resource', 'State', 'Summary', 'ResourceGroup' -Force
+# What each AAC.* type shows at the console by default (Select-Object * or
+# Format-List * shows everything) - registered in one Update-TypeData call below:
+# a call per type rebuilt the session's type table 113 times, about 1.4 seconds
+# of every import.
+$displayProperties = [ordered]@{
+    # Get-AACFirewallRule's objects carry ~35 properties (all of them go to
+    # CSV); at the console show a readable table by default. Select-Object * or
+    # Format-List * shows everything.
+    'AAC.FirewallRule' = 'FirewallPolicy', 'RuleCollection', 'RuleName', 'Action'
+    # Same for Get-AACAdvisorRecommendation's ~25 (or more, with Ext_ columns).
+    'AAC.AdvisorRecommendation' = 'Category', 'Impact', 'ResourceName', 'Problem'
+    # Invoke-AACApplicationInsightQuery's ~30 properties per exception.
+    'AAC.ApplicationInsightsException' = 'TimeGenerated', 'Severity', 'ExceptionType', 'Message', 'AppRoleName'
+    # Invoke-AACPSRule's ~18 properties.
+    'AAC.PSRuleResult' = 'Outcome', 'RuleName', 'ResourceName', 'Reason'
+    # Show-AACCost -PassThru: one property per month on top of these.
+    # Get-AACTerraformPlan's ~20 properties per resource change.
+    'AAC.TerraformChange' = 'Action', 'Address', 'ResourceName', 'ChangedAttributes'
+    # Invoke-AACLogAnalyticsWorkspaceAssessment: one object per workspace, its sections as properties.
+    'AAC.LogAnalyticsWorkspaceAssessment' = 'Name', 'PricingTier', 'RetentionDays', 'BillableGB', 'AverageDailyGB', 'Recommendations'
+    'AAC.LogAnalyticsTable' = 'Table', 'Billing', 'BillableGB', 'NonBillableGB', 'SharePercent', 'Plan', 'RetentionDays'
+    'AAC.LogAnalyticsRecommendation' = 'Severity', 'Category', 'Recommendation', 'Action'
+    # Get-AACDiagnosticSetting: coverage per resource, one row per setting, findings.
+    'AAC.DiagnosticCoverage' = 'Status', 'Resource', 'ResourceType', 'Workspaces', 'MissingCategories'
+    'AAC.DiagnosticSettingDetail' = 'Resource', 'Setting', 'Destinations', 'Workspace', 'LogsEnabled'
+    'AAC.DiagnosticFinding' = 'Severity', 'Finding', 'Resource', 'Detail'
+    # Deploy-AACStorageAccount: the deployment, its changes, gates and apply results.
+    'AAC.StorageDeployment' = 'Name', 'Status', 'Writes', 'ResourceGroupName', 'Location'
+    'AAC.StorageChange' = 'Order', 'Action', 'Resource', 'Reason'
+    'AAC.StorageGate' = 'Outcome', 'Gate', 'Resource', 'Item', 'Detail'
+    'AAC.StorageApplyResult' = 'Status', 'Resource', 'Action', 'Seconds', 'Detail'
+    # Invoke-AACAksAssessment: clusters, node pools, settings, checks, findings, policy views.
+    'AAC.AksCluster' = 'Name', 'Version', 'Support', 'Tier', 'Nodes', 'WafScore', 'High', 'Medium', 'Low', 'PolicyViolations'
+    'AAC.AksNodePool' = 'Cluster', 'Pool', 'Mode', 'VmSize', 'Nodes', 'Autoscale', 'Zones', 'Version', 'NodeImageAge'
+    'AAC.AksSetting' = 'Cluster', 'Area', 'Setting', 'Value'
+    'AAC.AksCheck' = 'Cluster', 'Pillar', 'Check', 'Status', 'Severity'
+    'AAC.AksFinding' = 'Severity', 'Pillar', 'Source', 'Cluster', 'Check'
+    'AAC.AksUpgrade' = 'Cluster', 'Component', 'Current', 'Support', 'Available'
+    'AAC.AksPolicyViolation' = 'Cluster', 'Namespace', 'Workload', 'Component', 'Policy', 'Effect'
+    'AAC.AksPolicyNamespace' = 'Namespace', 'Violations', 'Workloads', 'Policies', 'Deny'
+    'AAC.AksPolicyWorkload' = 'Cluster', 'Namespace', 'WorkloadKind', 'Workload', 'Violations', 'Policies'
+    'AAC.AksPolicySummary' = 'Policy', 'Effect', 'Violations', 'Clusters', 'Namespaces', 'Workloads'
+    # Invoke-AACPolicyAssessment: assignments, compliance, exemptions, definitions, findings.
+    'AAC.PolicyAssignmentReport' = 'Assignment', 'Scope', 'Kind', 'Enforcement', 'CompliancePercent', 'Rating', 'NonCompliant', 'Exemptions'
+    'AAC.PolicyAssignmentCompliance' = 'Assignment', 'Subscription', 'CompliancePercent', 'Rating', 'NonCompliant', 'Resources'
+    'AAC.PolicyAssessmentPolicy' = 'Assignment', 'Policy', 'Effect', 'Category', 'CompliancePercent', 'NonCompliant'
+    'AAC.PolicyInitiativeMember' = 'Assignment', 'Policy', 'Effect', 'Parameters', 'CompliancePercent', 'NonCompliant'
+    'AAC.PolicyCategory' = 'Category', 'Policies', 'Assignments', 'CompliancePercent', 'Rating', 'NonCompliant'
+    'AAC.PolicySubscription' = 'Subscription', 'ManagementGroups', 'CompliancePercent', 'Rating', 'NonCompliant', 'Assignments', 'Exemptions'
+    'AAC.PolicyManagementGroup' = 'ManagementGroup', 'Parent', 'CompliancePercent', 'Rating', 'Assignments', 'Subscriptions'
+    'AAC.PolicyInitiative' = 'Initiative', 'PolicyType', 'Category', 'Policies', 'Assigned', 'Deprecated'
+    'AAC.PolicyDefinitionReport' = 'Definition', 'PolicyType', 'Category', 'Effect', 'Assigned', 'Deprecated'
+    'AAC.PolicyExemptionReport' = 'Exemption', 'Assignment', 'Scope', 'Category', 'ExpiresOn', 'Status'
+    'AAC.PolicyRoleAssignment' = 'Assignment', 'Identity', 'Role', 'Scope', 'Required'
+    'AAC.PolicyFinding' = 'Severity', 'Area', 'Finding', 'Item', 'Scope'
+    # Invoke-AACDefenderAssessment: the assessment, and the rows of each of its tables.
+    'AAC.DefenderAssessment' = 'SecureScore', 'Subscriptions', 'Findings', 'Recommendations', 'AttackPaths', 'Alerts', 'Inventory'
+    'AAC.DefenderFinding' = 'Severity', 'Area', 'Finding', 'Item', 'SubscriptionName'
+    'AAC.DefenderSubscription' = 'Subscription', 'SecureScore', 'PlansOn', 'UnhealthyResources', 'AttackPaths', 'ActiveAlerts', 'Findings'
+    'AAC.DefenderRecommendation' = 'Recommendation', 'Severity', 'RiskLevel', 'Status', 'UnhealthyResources', 'HealthyResources', 'Control'
+    'AAC.DefenderUnhealthyResource' = 'Resource', 'Recommendation', 'Severity', 'RiskLevel', 'SubscriptionName'
+    'AAC.DefenderAttackPath' = 'AttackPath', 'RiskLevel', 'EntryPoint', 'Target', 'Steps'
+    'AAC.DefenderAlert' = 'Alert', 'Severity', 'Status', 'Resource', 'Tactics', 'TimeGenerated'
+    'AAC.DefenderResource' = 'Resource', 'Type', 'Plan', 'PlanState', 'Unhealthy', 'High', 'Vulnerabilities', 'Alerts', 'AttackPaths'
+    'AAC.DefenderVulnerability' = 'Vulnerability', 'Severity', 'CVEs', 'Resource', 'Patchable'
+    'AAC.DefenderPlanReport' = 'SubscriptionName', 'Plan', 'State', 'SubPlan', 'Resources'
+    'AAC.DefenderSetting' = 'SubscriptionName', 'Setting', 'Value', 'Status'
+    'AAC.DefenderComplianceControl' = 'Standard', 'Control', 'State', 'FailedAssessments', 'SubscriptionName'
+    # Invoke-AACM365Assessment: the assessment, and the rows of its tables.
+    'AAC.M365Assessment' = 'Tenant', 'SecureScore', 'Findings', 'ConditionalAccess', 'RoleAssignments', 'ManagedDevices', 'Permissions'
+    'AAC.M365Finding' = 'Severity', 'Area', 'Finding', 'Item'
+    'AAC.M365Setting' = 'Area', 'Setting', 'Value', 'Status'
+    'AAC.M365ConditionalAccessPolicy' = 'Policy', 'State', 'Users', 'Applications', 'Grant'
+    'AAC.M365RoleAssignment' = 'Role', 'Principal', 'Assignment', 'Privileged', 'MfaRegistered'
+    'AAC.M365UserRegistration' = 'UserPrincipalName', 'Admin', 'MfaRegistered', 'DefaultMethod'
+    'AAC.M365SecureScoreControl' = 'Control', 'Status', 'Score', 'MaxScore', 'Category'
+    'AAC.M365ManagedDevice' = 'Device', 'User', 'OS', 'Compliance', 'Encrypted', 'LastSync', 'Stale'
+    'AAC.M365EntraDevice' = 'Device', 'OS', 'Join', 'Managed', 'LastSignIn', 'Stale'
+    'AAC.M365Permission' = 'Data', 'Status', 'Permission'
+    'AAC.M365MfaCoverage' = 'Scope', 'Users', 'MfaPercent', 'PhishingResistantPercent', 'NoMethod'
+    'AAC.M365EmergencyAccount' = 'UserPrincipalName', 'DetectedBy', 'GlobalAdministrator', 'CloudOnly', 'PhishingResistant'
+    'AAC.M365PrivilegedAccount' = 'Principal', 'Roles', 'Dangling', 'Issues', 'Overlap'
+    'AAC.M365AppCredential' = 'App', 'Type', 'Status', 'End', 'DaysLeft', 'ValidityDays'
+    'AAC.M365AppPermission' = 'App', 'Permission', 'Kind', 'Risk', 'Owner'
+    'AAC.M365RedirectUri' = 'App', 'Uri', 'Resolves', 'Issue', 'Severity'
+    'AAC.M365LegacySignIn' = 'Protocol', 'Successful', 'Failed', 'Users', 'Latest'
+    'AAC.M365PimRoleSetting' = 'Role', 'MfaOnActivation', 'Approval', 'MaxActivationHours', 'PermanentActive'
+    'AAC.M365GroupExposure' = 'Group', 'Why', 'Members', 'Guests', 'Dynamic'
+    'AAC.M365AccessReview' = 'Review', 'Covers', 'Status', 'Recurrence'
+    'AAC.M365RiskyUser' = 'UserPrincipalName', 'RiskLevel', 'RiskState', 'Updated'
+    'AAC.M365RiskDetection' = 'Detection', 'Detections', 'High', 'Users', 'Latest'
+    'AAC.M365Incident' = 'Incident', 'Severity', 'Status', 'AssignedTo', 'AgeDays'
+    'AAC.M365InactiveUser' = 'UserPrincipalName', 'Products', 'LastActivity'
+    'AAC.M365AppProtectionPolicy' = 'Policy', 'Platform', 'Assigned', 'PinRequired', 'SendDataTo'
+    'AAC.M365Coverage' = 'Area', 'Lens', 'Status', 'Reads', 'Reason'
+    # Invoke-AACAssessment: the run's summary (its sheets are plain rows).
+    'AAC.Assessment' = 'Subscriptions', 'Resources', 'ResourceTypes', 'AdvisorHigh', 'Retirements', 'SecurityHigh', 'ReportFolder'
+    # Invoke-AACVirtualNetworkAssessment: networks, subnets, peerings, free ranges, findings.
+    'AAC.VirtualNetwork' = 'Name', 'Role', 'AddressSpace', 'UsedIps', 'AvailableIps', 'UsedPercent', 'SubnetCount', 'PeeringCount', 'High', 'Medium', 'Low'
+    'AAC.VirtualNetworkSubnet' = 'VirtualNetwork', 'Subnet', 'Prefix', 'Usable', 'Used', 'Available', 'UsedPercent', 'Nsg', 'Outbound'
+    'AAC.VirtualNetworkPeering' = 'VirtualNetwork', 'Peering', 'RemoteVirtualNetwork', 'State', 'Sync', 'UseRemoteGateways', 'AllowGatewayTransit'
+    'AAC.VirtualNetworkFreeRange' = 'VirtualNetwork', 'AddressSpace', 'Prefix', 'Size'
+    'AAC.VirtualNetworkFinding' = 'Severity', 'Category', 'Finding', 'VirtualNetwork', 'Item', 'Action'
+    'AAC.VirtualNetworkPrivateEndpoint' = 'VirtualNetwork', 'Subnet', 'PrivateEndpoint', 'Target', 'Groups', 'Status', 'ZoneLinked'
+    'AAC.ApplicationSecurityGroupUse' = 'Asg', 'Nics', 'Rules', 'VirtualNetworks', 'ResourceGroup'
+    'AAC.SubscriptionCost' = 'SubscriptionName', 'Currency', 'MonthToDate', 'Total', 'TopServices', 'Status'
 
-# The expert commands (issue 10): what matters first at the prompt.
-Update-TypeData -TypeName 'AAC.CostAnomaly' -DefaultDisplayPropertySet 'Severity', 'Kind', 'Name', 'Subscription', 'Start', 'CostImpact', 'Currency' -Force
-Update-TypeData -TypeName 'AAC.AttackPath' -DefaultDisplayPropertySet 'Severity', 'Category', 'Resource', 'BlastRadius', 'Path' -Force
-Update-TypeData -TypeName 'AAC.AccessAssignment' -DefaultDisplayPropertySet 'Severity', 'Principal', 'PrincipalType', 'Role', 'Scope', 'Assignment', 'Recommendation' -Force
-Update-TypeData -TypeName 'AAC.ChangeRecord' -DefaultDisplayPropertySet 'Time', 'Severity', 'Category', 'Resource', 'Caller', 'Status', 'Detail' -Force
-Update-TypeData -TypeName 'AAC.HealthCheck' -DefaultDisplayPropertySet 'Status', 'Tier', 'Category', 'Check', 'Detail' -Force
-Update-TypeData -TypeName 'AAC.ComplianceGap' -DefaultDisplayPropertySet 'Severity', 'Phase', 'Framework', 'ControlId', 'FailingResources', 'Effort' -Force
-Update-TypeData -TypeName 'AAC.FailoverReadiness' -DefaultDisplayPropertySet 'Severity', 'Resource', 'Protection', 'Confidence', 'Rpo', 'Finding' -Force
-Update-TypeData -TypeName 'AAC.DependencyNode' -DefaultDisplayPropertySet 'Resource', 'Type', 'BlastRadius', 'Dependents', 'Redundant', 'SinglePointOfFailure' -Force
-Update-TypeData -TypeName 'AAC.ResourceUtilization' -DefaultDisplayPropertySet 'Category', 'Resource', 'Kind', 'CpuP95', 'MemoryP95', 'Trend', 'SuggestedSize', 'EstimatedSaving' -Force
-Update-TypeData -TypeName 'AAC.ConfigurationDrift' -DefaultDisplayPropertySet 'Severity', 'Resource', 'Category', 'Property', 'Detail', 'Origin', 'Strategy' -Force
+    # Show-AACDashboard: the status and headline first.
+    'AAC.Dashboard' = 'Status', 'Headline', 'Resources', 'Regions', 'AdvisorHigh', 'Health'
+    'AAC.DashboardChange' = 'Time', 'Change', 'Resource', 'ResourceGroup', 'ChangedBy'
+    'AAC.DashboardServiceEvent' = 'Type', 'Title', 'TrackingId', 'Started', 'Subscription'
+    'AAC.DashboardUnhealthyResource' = 'Resource', 'State', 'Summary', 'ResourceGroup'
 
-# Security alerts, operations and troubleshooting (issue 8), and the resource export.
-Update-TypeData -TypeName 'AAC.SecurityAlert' -DefaultDisplayPropertySet 'Severity', 'Status', 'Alert', 'Resource', 'Intent', 'AgeDays' -Force
-Update-TypeData -TypeName 'AAC.ResourceHealth' -DefaultDisplayPropertySet 'State', 'Resource', 'ResourceType', 'Summary', 'Hours', 'LastEvent' -Force
-Update-TypeData -TypeName 'AAC.ServiceHealthEvent' -DefaultDisplayPropertySet 'Status', 'EventType', 'Title', 'Regions', 'ImpactedResources', 'TrackingId' -Force
-Update-TypeData -TypeName 'AAC.UnusedResource' -DefaultDisplayPropertySet 'Severity', 'Category', 'Resource', 'Billed', 'AgeDays', 'MonthlyCost', 'ResourceGroup' -Force
-Update-TypeData -TypeName 'AAC.ResourceError' -DefaultDisplayPropertySet 'Time', 'Category', 'ErrorCode', 'Resource', 'Caller', 'Message' -Force
-Update-TypeData -TypeName 'AAC.PrivateEndpoint' -DefaultDisplayPropertySet 'Status', 'Endpoint', 'Target', 'GroupId', 'ConnectionState', 'ZoneLinked', 'Issues' -Force
-Update-TypeData -TypeName 'AAC.PrivateEndpointFinding' -DefaultDisplayPropertySet 'Severity', 'Finding', 'Resource', 'Detail' -Force
-Update-TypeData -TypeName 'AAC.LoadBalancerBackend' -DefaultDisplayPropertySet 'Health', 'Balancer', 'Pool', 'Backend', 'Address', 'Availability' -Force
-Update-TypeData -TypeName 'AAC.LoadBalancer' -DefaultDisplayPropertySet 'Health', 'Balancer', 'Kind', 'Sku', 'Backends', 'Unhealthy', 'Issues' -Force
-Update-TypeData -TypeName 'AAC.LoadBalancerFinding' -DefaultDisplayPropertySet 'Severity', 'Finding', 'Resource', 'Detail' -Force
-Update-TypeData -TypeName 'AAC.LegacyAuthentication' -DefaultDisplayPropertySet 'Severity', 'Area', 'Finding', 'Resource', 'ResourceGroup' -Force
-Update-TypeData -TypeName 'AAC.OrphanedIdentity' -DefaultDisplayPropertySet 'Severity', 'Kind', 'Identity', 'RoleAssignments', 'LastSignIn', 'Reason' -Force
-Update-TypeData -TypeName 'AAC.DiagnosticBundle' -DefaultDisplayPropertySet 'Path', 'Resources', 'Files', 'SizeKB', 'Redacted' -Force
-Update-TypeData -TypeName 'AAC.DiagnosticBundleResource' -DefaultDisplayPropertySet 'Status', 'Resource', 'ResourceType', 'Health', 'FailedOperations', 'Alerts', 'Issues' -Force
-Update-TypeData -TypeName 'AAC.Resource' -DefaultDisplayPropertySet 'Name', 'ResourceType', 'ResourceGroup', 'Subscription', 'Location', 'Details' -Force
+    # The expert commands (issue 10): what matters first at the prompt.
+    'AAC.CostAnomaly' = 'Severity', 'Kind', 'Name', 'Subscription', 'Start', 'CostImpact', 'Currency'
+    'AAC.AttackPath' = 'Severity', 'Category', 'Resource', 'BlastRadius', 'Path'
+    'AAC.AccessAssignment' = 'Severity', 'Principal', 'PrincipalType', 'Role', 'Scope', 'Assignment', 'Recommendation'
+    'AAC.ChangeRecord' = 'Time', 'Severity', 'Category', 'Resource', 'Caller', 'Status', 'Detail'
+    'AAC.HealthCheck' = 'Status', 'Tier', 'Category', 'Check', 'Detail'
+    'AAC.ComplianceGap' = 'Severity', 'Phase', 'Framework', 'ControlId', 'FailingResources', 'Effort'
+    'AAC.FailoverReadiness' = 'Severity', 'Resource', 'Protection', 'Confidence', 'Rpo', 'Finding'
+    'AAC.DependencyNode' = 'Resource', 'Type', 'BlastRadius', 'Dependents', 'Redundant', 'SinglePointOfFailure'
+    'AAC.ResourceUtilization' = 'Category', 'Resource', 'Kind', 'CpuP95', 'MemoryP95', 'Trend', 'SuggestedSize', 'EstimatedSaving'
+    'AAC.ConfigurationDrift' = 'Severity', 'Resource', 'Category', 'Property', 'Detail', 'Origin', 'Strategy'
 
-$publicFunctionNames = Get-ChildItem -LiteralPath (Join-Path -Path $moduleRoot -ChildPath 'Public') -Filter '*.ps1' -File -ErrorAction SilentlyContinue |
-    Select-Object -ExpandProperty BaseName
+    # Security alerts, operations and troubleshooting (issue 8), and the resource export.
+    'AAC.SecurityAlert' = 'Severity', 'Status', 'Alert', 'Resource', 'Intent', 'AgeDays'
+    'AAC.ResourceHealth' = 'State', 'Resource', 'ResourceType', 'Summary', 'Hours', 'LastEvent'
+    'AAC.ServiceHealthEvent' = 'Status', 'EventType', 'Title', 'Regions', 'ImpactedResources', 'TrackingId'
+    'AAC.UnusedResource' = 'Severity', 'Category', 'Resource', 'Billed', 'AgeDays', 'MonthlyCost', 'ResourceGroup'
+    'AAC.ResourceError' = 'Time', 'Category', 'ErrorCode', 'Resource', 'Caller', 'Message'
+    'AAC.PrivateEndpoint' = 'Status', 'Endpoint', 'Target', 'GroupId', 'ConnectionState', 'ZoneLinked', 'Issues'
+    'AAC.PrivateEndpointFinding' = 'Severity', 'Finding', 'Resource', 'Detail'
+    'AAC.LoadBalancerBackend' = 'Health', 'Balancer', 'Pool', 'Backend', 'Address', 'Availability'
+    'AAC.LoadBalancer' = 'Health', 'Balancer', 'Kind', 'Sku', 'Backends', 'Unhealthy', 'Issues'
+    'AAC.LoadBalancerFinding' = 'Severity', 'Finding', 'Resource', 'Detail'
+    'AAC.LegacyAuthentication' = 'Severity', 'Area', 'Finding', 'Resource', 'ResourceGroup'
+    'AAC.OrphanedIdentity' = 'Severity', 'Kind', 'Identity', 'RoleAssignments', 'LastSignIn', 'Reason'
+    'AAC.DiagnosticBundle' = 'Path', 'Resources', 'Files', 'SizeKB', 'Redacted'
+    'AAC.DiagnosticBundleResource' = 'Status', 'Resource', 'ResourceType', 'Health', 'FailedOperations', 'Alerts', 'Issues'
+    'AAC.Resource' = 'Name', 'ResourceType', 'ResourceGroup', 'Subscription', 'Location', 'Details'
+}
+$typeData = foreach ($typeName in $displayProperties.Keys) {
+    $type = [System.Management.Automation.Runspaces.TypeData]::new($typeName)
+    $type.DefaultDisplayPropertySet = [System.Management.Automation.Runspaces.PropertySetData]::new([string[]]$displayProperties[$typeName])
+    $type
+}
+Update-TypeData -TypeData $typeData -Force
 
 Export-ModuleMember -Function $publicFunctionNames

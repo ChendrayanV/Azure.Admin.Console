@@ -21,13 +21,13 @@ function Get-AACCosmosDBQuery {
         [string[]] $ResourceGroupName
     )
 
-    $quote = { param([string] $Text) "'" + ($Text -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
     $groups = @($ResourceGroupName | Where-Object { $_ })
     $in = if ($groups.Count) { " | where resourceGroup in~ ($((@($groups | ForEach-Object { & $quote $_ })) -join ', '))" } else { '' }
     [ordered]@{
         accounts   = "resources | where type =~ 'microsoft.documentdb/databaseaccounts'$in | project id = tolower(id), name, location, resourceGroup, subscriptionId = tolower(subscriptionId), kind, properties, identity, tags"
-        pricing    = "securityresources | where type =~ 'microsoft.security/pricings' and name =~ 'CosmosDbs' | project subscriptionId = tolower(subscriptionId), tier = tostring(properties.pricingTier)"
-        alerts     = "securityresources | where type =~ 'microsoft.security/locations/alerts' and tostring(properties.resourceIdentifiers) contains 'microsoft.documentdb/databaseaccounts'$in | where todatetime(properties.timeGeneratedUtc) > ago(30d) | mv-expand rid = properties.resourceIdentifiers | where tostring(rid.azureResourceId) contains 'microsoft.documentdb/databaseaccounts' | project resourceId = tolower(tostring(rid.azureResourceId)), name = tostring(properties.alertDisplayName), severity = tostring(properties.severity), status = tostring(properties.status)"
-        workspaces = @{ Tenant = $true; Query = "resources | where type =~ 'microsoft.operationalinsights/workspaces' | project id = tolower(id), name" }
+        pricing    = Get-AACCommonQuery -Kind DefenderPlan -Plan 'CosmosDbs'
+        alerts     = Get-AACCommonQuery -Kind DefenderAlert -ResourceType 'microsoft.documentdb/databaseaccounts' -Filter $in
+        workspaces = Get-AACCommonQuery -Kind WorkspaceName
     }
 }

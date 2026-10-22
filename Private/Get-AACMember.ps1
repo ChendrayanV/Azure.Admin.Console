@@ -12,14 +12,17 @@ function Get-AACMember {
 
         A plain function on purpose: converters call it for every value they read,
         and an advanced function's parameter binding costs several times more.
-    #>
-    param($InputObject, [string] $Path)
 
-    foreach ($part in $Path.Split('.')) {
+        -Key takes the steps as separate keys instead of a dotted path, for
+        keys that contain a dot themselves ('@odata.type').
+    #>
+    param($InputObject, [string] $Path, [string[]] $Key)
+
+    foreach ($part in $(if ($Key) { $Key } else { $Path.Split('.') })) {
         if ($InputObject -isnot [System.Collections.IDictionary]) { return $null }
         if ($InputObject.Contains($part)) { $InputObject = $InputObject[$part]; continue }
         $found = $null
-        foreach ($key in $InputObject.Keys) { if ($key -eq $part) { $found = $InputObject[$key]; break } }
+        foreach ($name in $InputObject.Keys) { if ($name -eq $part) { $found = $InputObject[$name]; break } }
         $InputObject = $found
     }
     $InputObject

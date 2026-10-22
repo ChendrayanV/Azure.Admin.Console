@@ -168,7 +168,7 @@ function Invoke-AACVirtualNetworkAssessment {
     $csvFullPath = & $resolve $CsvPath
     $pdfFullPath = & $resolve $PdfPath
     $htmlFullPath = & $resolve $HtmlPath
-    $quote = { param([string] $Text) "'" + ($Text -replace '\\', '\\' -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
     # Read here, not inside the progress block (it runs in Invoke-AACProgress's scope).
     $request = @{
         SubscriptionId    = @($SubscriptionId | Where-Object { $_ })

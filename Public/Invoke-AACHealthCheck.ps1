@@ -203,7 +203,7 @@ function Invoke-AACHealthCheck {
                 $scope = Resolve-AACScope -SubscriptionId $request.SubscriptionId -ManagementGroupId $request.ManagementGroupId
                 $scopeLabel = $scope.Label
                 Update-AACProgress -Id 'scope' -Complete -Description "Scope: $($scope.Label)"
-                $quote = { param([string] $Text) "'" + ($Text -replace "'", "\'") + "'" }
+                $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
                 $groupFilter = if ($request.ResourceGroupName.Count) { " | where resourceGroup in~ ($((@($request.ResourceGroupName | ForEach-Object { & $quote $_ })) -join ', '))" } else { '' }
                 $queries = [ordered]@{
                     health   = "healthresources | where type =~ 'microsoft.resourcehealth/availabilitystatuses' | extend resourceId = tolower(tostring(properties.targetResourceId)), resourceGroup = tostring(split(tostring(properties.targetResourceId), '/')[4]) $groupFilter | project id, resourceId, state = tostring(properties.availabilityState), summary = tostring(properties.summary), since = tostring(properties.occuredTime)"

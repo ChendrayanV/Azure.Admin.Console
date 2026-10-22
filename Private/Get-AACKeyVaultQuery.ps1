@@ -18,13 +18,13 @@ function Get-AACKeyVaultQuery {
         [string[]] $ResourceGroupName
     )
 
-    $quote = { param([string] $Text) "'" + ($Text -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
     $groups = @($ResourceGroupName | Where-Object { $_ })
     $in = if ($groups.Count) { " | where resourceGroup in~ ($((@($groups | ForEach-Object { & $quote $_ })) -join ', '))" } else { '' }
     [ordered]@{
         vaults     = "resources | where type =~ 'microsoft.keyvault/vaults'$in | project id = tolower(id), name, location, resourceGroup, subscriptionId = tolower(subscriptionId), sku = tostring(properties.sku.name), properties, tags"
-        pricing    = "securityresources | where type =~ 'microsoft.security/pricings' and name =~ 'KeyVaults' | project subscriptionId = tolower(subscriptionId), tier = tostring(properties.pricingTier)"
-        alerts     = "securityresources | where type =~ 'microsoft.security/locations/alerts' and tostring(properties.resourceIdentifiers) contains 'microsoft.keyvault/vaults'$in | where todatetime(properties.timeGeneratedUtc) > ago(30d) | mv-expand rid = properties.resourceIdentifiers | where tostring(rid.azureResourceId) contains 'microsoft.keyvault/vaults' | project resourceId = tolower(tostring(rid.azureResourceId)), name = tostring(properties.alertDisplayName), severity = tostring(properties.severity), status = tostring(properties.status)"
+        pricing    = Get-AACCommonQuery -Kind DefenderPlan -Plan 'KeyVaults'
+        alerts     = Get-AACCommonQuery -Kind DefenderAlert -ResourceType 'microsoft.keyvault/vaults' -Filter $in
         workspaces = @{ Tenant = $true; Query = "resources | where type =~ 'microsoft.operationalinsights/workspaces' | project id = tolower(id), name, customerId = tostring(properties.customerId)" }
     }
 }

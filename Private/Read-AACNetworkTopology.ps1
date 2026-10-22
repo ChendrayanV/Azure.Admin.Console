@@ -38,7 +38,7 @@ function Read-AACNetworkTopology {
         Location          = @($Location | Where-Object { $_ } | ForEach-Object { $_.ToLowerInvariant() -replace '\s', '' })
         NetworkOnly       = [bool]$NetworkOnly
     }
-    $quote = { param([string] $Text) "'" + ($Text -replace '\\', '\\' -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
     # A value deep in a row, or nothing when a step along the way is missing.
     $at = {
         param($Row, [string[]] $Keys)

@@ -40,7 +40,7 @@ function Get-AACAssessmentExtraQuery {
         [switch] $FullEnvironment
     )
 
-    $quote = { param([string] $Text) "'" + ($Text -replace '\\', '\\' -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
     $groups = @($ResourceGroupName | Where-Object { $_ })
     $groupFilter = if ($groups.Count) { " | where resourceGroup in~ ($((@($groups | ForEach-Object { & $quote $_ })) -join ', '))" } else { '' }
     $queries = [ordered]@{}

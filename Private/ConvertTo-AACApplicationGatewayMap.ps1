@@ -49,18 +49,7 @@ function ConvertTo-AACApplicationGatewayMap {
         [datetime] $Now = [datetime]::UtcNow
     )
 
-    $at = {
-        param($Row, [string[]] $Keys)
-        $value = $Row
-        foreach ($key in $Keys) {
-            if ($value -isnot [System.Collections.IDictionary]) { return $null }
-            if ($value.Contains($key)) { $value = $value[$key]; continue }
-            $found = $null
-            foreach ($name in $value.Keys) { if ($name -eq $key) { $found = $value[$name]; break } }
-            $value = $found
-        }
-        $value
-    }
+    $at = { param($Row, [string[]] $Keys) Get-AACMember -InputObject $Row -Key $Keys }
     $lower = { param($Text) ([string]$Text).ToLowerInvariant() }
     $ref = { param($Row, [string] $Key) & $lower (& $at $Row 'properties', $Key, 'id') }
     $leaf = { param([string] $Id) ($Id -split '/')[-1] }

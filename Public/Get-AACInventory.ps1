@@ -214,7 +214,7 @@ function Get-AACInventory {
     $csvFullPath = & $resolve $CsvPath
     $pdfFullPath = & $resolve $PdfPath
     $htmlFullPath = & $resolve $HtmlPath
-    $quote = { param([string] $Text) "'" + ($Text -replace '\\', '\\' -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
 
     $groupFilter = if ($ResourceGroupName) { "($((@($ResourceGroupName | ForEach-Object { & $quote $_ })) -join ', '))" } else { '' }
 

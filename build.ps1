@@ -153,12 +153,6 @@ function Invoke-BuildTask {
     }
     Write-Host "    exports OK: $($declared.Count) functions"
 
-    $imported = & pwsh -NoProfile -Command "Import-Module '$stagedManifest' -ErrorAction Stop; (Get-Command -Module $moduleName).Count"
-    if ($LASTEXITCODE -ne 0 -or [int]($imported | Select-Object -Last 1) -ne $declared.Count) {
-        throw "The staged module did not import cleanly: $imported"
-    }
-    Write-Host '    clean import OK'
-
     if (Get-Module -Name PSScriptAnalyzer -ListAvailable) {
         # Errors and warnings, less the exclusions (each with its reason) in
         # PSScriptAnalyzerSettings.psd1.
@@ -172,6 +166,29 @@ function Invoke-BuildTask {
     else {
         Write-Warning 'PSScriptAnalyzer is not installed; skipped (Install-PSResource PSScriptAnalyzer).'
     }
+
+    # One file for every function: the module loads 1.5-2 seconds faster than
+    # from ~385 files dot-sourced one by one. The analyzer has checked the files
+    # above; the loader (Azure.Admin.Console.psm1) prefers this file when it is
+    # there. Private\*.html (the report templates) stays.
+    $bundle = [System.Text.StringBuilder]::new()
+    $null = $bundle.AppendLine("# Every function of $moduleName $($manifest.Version), in one file for a faster import - built by build.ps1 from Private\*.ps1 and Public\*.ps1.")
+    $null = $bundle.AppendLine("`$publicFunctionNames = @($(($publicFiles | Sort-Object | ForEach-Object { "'$_'" }) -join ', '))")
+    foreach ($folder in 'Private', 'Public') {
+        foreach ($file in (Get-ChildItem -LiteralPath (Join-Path $stage $folder) -Filter '*.ps1' -File | Sort-Object -Property Name)) {
+            $null = $bundle.AppendLine().AppendLine("#region $folder\$($file.Name)").AppendLine([System.IO.File]::ReadAllText($file.FullName).TrimEnd()).AppendLine('#endregion')
+        }
+    }
+    [System.IO.File]::WriteAllText((Join-Path $stage "$moduleName.Functions.ps1"), $bundle.ToString(), [System.Text.UTF8Encoding]::new($true))
+    Get-ChildItem -LiteralPath (Join-Path $stage 'Private') -Filter '*.ps1' -File | Remove-Item -Force
+    Remove-Item -LiteralPath (Join-Path $stage 'Public') -Recurse -Force
+    Write-Host "    functions merged into $moduleName.Functions.ps1"
+
+    $imported = & pwsh -NoProfile -Command "Import-Module '$stagedManifest' -ErrorAction Stop; (Get-Command -Module $moduleName).Count"
+    if ($LASTEXITCODE -ne 0 -or [int]($imported | Select-Object -Last 1) -ne $declared.Count) {
+        throw "The staged module did not import cleanly: $imported"
+    }
+    Write-Host '    clean import OK'
 
     $psData = (Import-PowerShellDataFile $stagedManifest).PrivateData.PSData
     foreach ($key in 'ProjectUri', 'LicenseUri') {

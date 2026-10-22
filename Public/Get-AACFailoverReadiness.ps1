@@ -122,7 +122,7 @@ function Get-AACFailoverReadiness {
         Update-AACProgress -Id 'scope' -Indeterminate -Description 'Finding the subscriptions'
         $scope = Resolve-AACScope -SubscriptionId $request.SubscriptionId -ManagementGroupId $request.ManagementGroupId
         Update-AACProgress -Id 'scope' -Complete -Description "Scope: $($scope.Label)"
-        $quote = { param([string] $Text) "'" + ($Text -replace "'", "\'") + "'" }
+        $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
         $groupFilter = if ($request.ResourceGroupName.Count) { " | where resourceGroup in~ ($((@($request.ResourceGroupName | ForEach-Object { & $quote $_ })) -join ', '))" } else { '' }
         $queries = [ordered]@{
             vms      = "resources | where type =~ 'microsoft.compute/virtualmachines'$groupFilter | project id = tolower(id), name, resourceGroup, subscriptionId, location"

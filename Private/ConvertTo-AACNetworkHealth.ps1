@@ -38,7 +38,7 @@ function ConvertTo-AACNetworkHealth {
         [Parameter(Mandatory)]
         [System.Collections.IDictionary] $Read,
 
-        # Read-AACNetworkHealthMetric's result.
+        # Read-AACMetric's result.
         [hashtable] $Metric = @{},
 
         [ValidateRange(50, 99)]
@@ -47,18 +47,7 @@ function ConvertTo-AACNetworkHealth {
         [hashtable] $SubscriptionName = @{}
     )
 
-    $at = {
-        param($Row, [string[]] $Keys)
-        $value = $Row
-        foreach ($key in $Keys) {
-            if ($value -isnot [System.Collections.IDictionary]) { return $null }
-            if ($value.Contains($key)) { $value = $value[$key]; continue }
-            $found = $null
-            foreach ($name in $value.Keys) { if ($name -eq $key) { $found = $value[$name]; break } }
-            $value = $found
-        }
-        $value
-    }
+    $at = { param($Row, [string[]] $Keys) Get-AACMember -InputObject $Row -Key $Keys }
     $rows = { param([string] $Name) @(if ($Read.Contains($Name)) { $Read[$Name] | Where-Object { $null -ne $_ } }) }
     $subName = { param([string] $Id) if ($SubscriptionName.Contains($Id)) { $SubscriptionName[$Id] } else { $Id } }
     $round = { param($Value, [int] $Digits = 1) if ($null -eq $Value) { $null } else { [Math]::Round([double]$Value, $Digits) } }

@@ -137,7 +137,7 @@ function Get-AACNetworkHealth {
     $pipedOnward = $MyInvocation.PipelinePosition -lt $MyInvocation.PipelineLength
     $interactive = -not $NoDisplay -and -not $pipedOnward
     $resolve = { param([string] $Path) if ($Path) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path) } }
-    $range = @{ '1h' = @(1, 'PT5M'); '4h' = @(4, 'PT15M'); '12h' = @(12, 'PT30M'); '1d' = @(24, 'PT1H'); '3d' = @(72, 'PT6H'); '7d' = @(168, 'PT6H'); '14d' = @(336, 'PT12H'); '30d' = @(720, 'P1D') }[$TimeRange]
+    $range = Get-AACTimeRange -TimeRange $TimeRange
     $end = [datetime]::UtcNow
     $request = @{
         SubscriptionId = @($SubscriptionId | Where-Object { $_ }); ManagementGroupId = @($ManagementGroupId | Where-Object { $_ }); ResourceGroupName = @($ResourceGroupName | Where-Object { $_ })
@@ -172,7 +172,7 @@ function Get-AACNetworkHealth {
 
         $calls = @(Get-AACNetworkHealthCall -Resource $resources)
         Update-AACProgress -Id 'metrics' -Total ([Math]::Max(1, $calls.Count)) -Description ('Reading {0:N0} metric set(s)' -f $calls.Count)
-        $metrics = Read-AACNetworkHealthMetric -Call $calls -Timespan $request.Timespan -Interval $request.Interval -ThrottleLimit $request.ThrottleLimit -OnProgress { param($Done, $Total) Update-AACProgress -Id 'metrics' -Increment 1 }
+        $metrics = Read-AACMetric -Call $calls -Timespan $request.Timespan -Interval $request.Interval -ThrottleLimit $request.ThrottleLimit -OnProgress { param($Done, $Total) Update-AACProgress -Id 'metrics' -Increment 1 }
         $failed = @(foreach ($id in @($metrics.Keys)) { foreach ($k in @($metrics[$id].Keys)) { if ($metrics[$id][$k].Error) { "$k" } } })
         Update-AACProgress -Id 'metrics' -Complete -Description ('Read {0:N0} metric set(s){1}' -f ($calls.Count - $failed.Count), $(if ($failed.Count) { "; $($failed.Count) unavailable" }))
         # Resource Health, each component's current status (Resource Graph doesn't have network resources').

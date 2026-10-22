@@ -25,7 +25,7 @@ function Resolve-AACLogResource {
 
     $type = @{ Workspace = 'microsoft.operationalinsights/workspaces'; Component = 'microsoft.insights/components' }[$Kind]
     $noun = @{ Workspace = 'Log Analytics workspace'; Component = 'Application Insights resource' }[$Kind]
-    $quote = { param([string] $Text) "'" + ($Text -replace '\\', '\\' -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
     $query = "resources | where type =~ '$type' and name =~ $(& $quote $Name)"
     if ($ResourceGroupName) { $query += " and resourceGroup =~ $(& $quote $ResourceGroupName)" }
     $query += ' | project id, name, resourceGroup, subscriptionId, location, customerId = tostring(properties.customerId), appId = tostring(properties.AppId), workspaceId = tostring(properties.WorkspaceResourceId)'

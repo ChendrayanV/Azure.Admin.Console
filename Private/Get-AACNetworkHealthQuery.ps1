@@ -20,7 +20,7 @@ function Get-AACNetworkHealthQuery {
         [string[]] $ResourceGroupName
     )
 
-    $quote = { param([string] $Text) "'" + ($Text -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
     $groups = @($ResourceGroupName | Where-Object { $_ })
     $in = if ($groups.Count) { " | where resourceGroup in~ ($((@($groups | ForEach-Object { & $quote $_ })) -join ', '))" } else { '' }
     $columns = '| project id = tolower(id), name, type = tolower(type), location, resourceGroup, subscriptionId = tolower(subscriptionId), sku, zones, properties'

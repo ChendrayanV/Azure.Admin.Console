@@ -62,7 +62,7 @@ function Get-AACPolicyAssessmentQuery {
             $queries['complianceByPolicy'] = "$states | extend assignmentId = tolower(tostring(properties.policyAssignmentId)), definitionId = tolower(tostring(properties.policyDefinitionId)), referenceId = tostring(properties.policyDefinitionReferenceId), effect = tolower(tostring(properties.policyDefinitionAction)) | summarize worst = max(stateWeight), effect = take_any(effect) by resourceId, assignmentId, definitionId, referenceId, subscriptionId | summarize resources = count(), effect = take_any(effect) by assignmentId, definitionId, referenceId, subscriptionId, worst | summarize $count, effect = take_any(effect) by assignmentId, definitionId, referenceId, subscriptionId | extend id = strcat(assignmentId, '|', referenceId, '|', definitionId, '|', subscriptionId)"
         }
         { $_ -in 'Definitions', 'Roles' } {
-            $quote = { param([string] $Text) "'" + ($Text -replace '\\', '\\' -replace "'", "\'") + "'" }
+            $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
             $ids = @($Id | Where-Object { $_ } | ForEach-Object { $_.ToLowerInvariant() } | Sort-Object -Unique)
             for ($i = 0; $i -lt $ids.Count; $i += 100) {
                 $chunk = @($ids[$i..([Math]::Min($i + 99, $ids.Count - 1))] | ForEach-Object { & $quote $_ }) -join ', '

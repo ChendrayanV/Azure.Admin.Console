@@ -146,7 +146,7 @@ function Get-AACNetworkSecurityGroup {
     $csvFullPath = & $resolve $CsvPath
     $pdfFullPath = & $resolve $PdfPath
     $htmlFullPath = & $resolve $HtmlPath
-    $quote = { param([string] $Text) "'" + ($Text -replace '\\', '\\' -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
     $groupFilter = if ($ResourceGroupName) { " | where resourceGroup in~ ($((@($ResourceGroupName | ForEach-Object { & $quote $_ })) -join ', '))" } else { '' }
     $last = { param([string] $Id) if ($Id) { ($Id -split '/')[-1] } else { '' } }
     # A nested value from Resource Graph hashtables, or $null where a level is missing.

@@ -35,7 +35,7 @@ function Get-AACResourceExportQuery {
         [string] $Filter
     )
 
-    $quote = { param([string] $Text) "'" + ($Text -replace '\\', '\\' -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
     $exact = { param([string[]] $Value) @($Value | Where-Object { $_ -and $_ -notmatch '[*?]' }) }
     $hasWildcard = { param([string[]] $Value) [bool]@($Value | Where-Object { $_ -match '[*?]' }).Count }
     $in = { param([string] $Column, [string[]] $Value) "| where $Column in~ ($((@($Value | ForEach-Object { & $quote $_ })) -join ', '))" }

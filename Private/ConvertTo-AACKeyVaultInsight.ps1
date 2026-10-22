@@ -58,18 +58,7 @@ function ConvertTo-AACKeyVaultInsight {
         [datetime] $Now = [datetime]::UtcNow
     )
 
-    $at = {
-        param($Row, [string[]] $Keys)
-        $value = $Row
-        foreach ($key in $Keys) {
-            if ($value -isnot [System.Collections.IDictionary]) { return $null }
-            if ($value.Contains($key)) { $value = $value[$key]; continue }
-            $found = $null
-            foreach ($name in $value.Keys) { if ($name -eq $key) { $found = $value[$name]; break } }
-            $value = $found
-        }
-        $value
-    }
+    $at = { param($Row, [string[]] $Keys) Get-AACMember -InputObject $Row -Key $Keys }
     # A metric answer's series: @(@{ Name; Dimension; Points }).
     $series = {
         param($Answer)

@@ -177,7 +177,7 @@ function Get-AACConfigurationDrift {
         Update-AACProgress -Id 'scope' -Indeterminate -Description 'Finding the subscriptions'
         $scope = Resolve-AACScope -SubscriptionId $request.SubscriptionId -ManagementGroupId $request.ManagementGroupId
         Update-AACProgress -Id 'scope' -Complete -Description "Scope: $($scope.Label)"
-        $quote = { param([string] $Text) "'" + ($Text -replace "'", "\'") + "'" }
+        $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
         $filters = @(
             if ($request.ResourceGroupName.Count) { "resourceGroup in~ ($((@($request.ResourceGroupName | ForEach-Object { & $quote $_ })) -join ', '))" }
             if ($request.ResourceType.Count) { "($((@($request.ResourceType | ForEach-Object { "tolower(type) matches regex @'^$([regex]::Escape($_) -replace '\\\*', '.*')$'" })) -join ' or '))" }

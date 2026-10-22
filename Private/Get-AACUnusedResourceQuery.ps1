@@ -41,7 +41,7 @@ function Get-AACUnusedResourceQuery {
         [string[]] $ResourceGroupName
     )
 
-    $quote = { param([string] $Text) "'" + ($Text -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
     $groups = @($ResourceGroupName | Where-Object { $_ })
     $in = if ($groups.Count) { " | where resourceGroup in~ ($((@($groups | ForEach-Object { & $quote $_ })) -join ', '))" } else { '' }
     $base = { param([string] $Type, [string] $Where, [string] $Extra) "resources | where type =~ '$Type'$in$(if ($Where) { " | where $Where" }) | project id = tolower(id), name, type = tolower(type), resourceGroup, subscriptionId, location$(if ($Extra) { ", $Extra" })" }

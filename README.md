@@ -2474,7 +2474,7 @@ Azure.Admin.Console/
   tools/                     Build-Help.ps1: builds docs\ and the MAML with PlatyPS (not packaged)
   Tests/                     Unit tests, no Azure needed (not packaged)
   .github/workflows/         CI and release pipelines
-  build.ps1                  Docs, tests, packaging and publishing
+  build.ps1                  Docs, tests, packaging and publishing (the package merges Private\ and Public\ into one file, for a faster import)
   CHANGELOG.md, LICENSE
 ```
 

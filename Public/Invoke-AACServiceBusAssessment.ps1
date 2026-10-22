@@ -135,7 +135,7 @@ function Invoke-AACServiceBusAssessment {
     $interactive = -not $NoDisplay -and -not $pipedOnward
     $resolve = { param([string] $Path) if ($Path) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path) } }
     # TimeRange -> hours and the metric grain (an interval Azure Monitor accepts).
-    $range = @{ '1h' = @(1, 'PT5M'); '4h' = @(4, 'PT15M'); '12h' = @(12, 'PT30M'); '1d' = @(24, 'PT1H'); '3d' = @(72, 'PT6H'); '7d' = @(168, 'PT6H'); '14d' = @(336, 'PT12H'); '30d' = @(720, 'P1D') }[$TimeRange]
+    $range = Get-AACTimeRange -TimeRange $TimeRange
     $end = [datetime]::UtcNow
     $request = @{
         SubscriptionId = @($SubscriptionId | Where-Object { $_ }); ManagementGroupId = @($ManagementGroupId | Where-Object { $_ }); ResourceGroupName = @($ResourceGroupName | Where-Object { $_ }); Name = @($Name | Where-Object { $_ })
@@ -166,7 +166,7 @@ function Invoke-AACServiceBusAssessment {
         $entities = Read-AACServiceBusEntity -NamespaceId $ids -ThrottleLimit $request.ThrottleLimit
         Update-AACProgress -Id 'entities' -Complete -Description ('Read the entities and settings of {0:N0} namespace(s)' -f $ids.Count)
         Update-AACProgress -Id 'metrics' -Total ([Math]::Max(1, $calls.Count)) -Description 'Reading the metrics (Azure Monitor)'
-        $metrics = Read-AACNetworkHealthMetric -Call $calls -Timespan $request.Timespan -Interval $request.Interval -ThrottleLimit $request.ThrottleLimit -OnProgress { param($Done, $Total) Update-AACProgress -Id 'metrics' -Increment 1 }
+        $metrics = Read-AACMetric -Call $calls -Timespan $request.Timespan -Interval $request.Interval -ThrottleLimit $request.ThrottleLimit -OnProgress { param($Done, $Total) Update-AACProgress -Id 'metrics' -Increment 1 }
         Update-AACProgress -Id 'metrics' -Complete -Description ('Read the metrics of {0:N0} namespace(s)' -f $ids.Count)
         $failedMetrics = @($ids | Where-Object { $m = $metrics[$_]; $m -and $m['Core'] -and $m['Core'].Error }).Count
         if ($failedMetrics) { $notices.Add("Metrics couldn't be read for $failedMetrics namespace(s) - their health is left blank (see MetricsError).") }

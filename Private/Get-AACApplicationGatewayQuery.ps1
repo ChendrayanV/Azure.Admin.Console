@@ -23,7 +23,7 @@ function Get-AACApplicationGatewayQuery {
         [string[]] $HostName = @()
     )
 
-    $quote = { param([string] $Text) "'" + ($Text -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
     $list = { param([string[]] $Items) (@($Items | ForEach-Object { & $quote $_ })) -join ', ' }
     $queries = [ordered]@{}
     if ($Stage -eq 'Gateway') {

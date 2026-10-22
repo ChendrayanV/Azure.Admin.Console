@@ -79,18 +79,7 @@ function ConvertTo-AACWafAssessment {
         [switch] $KeepDuplicates
     )
 
-    $at = {
-        param($Row, [string[]] $Keys)
-        $value = $Row
-        foreach ($key in $Keys) {
-            if ($value -isnot [System.Collections.IDictionary]) { return $null }
-            if ($value.Contains($key)) { $value = $value[$key]; continue }
-            $found = $null
-            foreach ($name in $value.Keys) { if ($name -eq $key) { $found = $value[$name]; break } }
-            $value = $found
-        }
-        $value
-    }
+    $at = { param($Row, [string[]] $Keys) Get-AACMember -InputObject $Row -Key $Keys }
     $rows = { param([string] $Name) @(if ($Read.Contains($Name)) { $Read[$Name] | Where-Object { $null -ne $_ } }) }
     $weight = @{ High = 3; Medium = 2; Low = 1 }
     $subName = { param([string] $Id) if ($SubscriptionName.Contains($Id)) { $SubscriptionName[$Id] } else { $Id } }

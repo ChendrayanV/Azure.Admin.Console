@@ -49,7 +49,7 @@ function Get-AACWorkspaceAssessmentQuery {
         [string[]] $RuleId
     )
 
-    $quote = { param([string] $Text) "'" + ($Text.ToLowerInvariant() -replace '\\', '\\' -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text -Lower }
     $queries = [ordered]@{}
     $want = { param([string[]] $Name) @($Name | Where-Object { $Section -contains $_ }).Count -gt 0 }
     $billable = "tostring(IsBillable) =~ 'true'"

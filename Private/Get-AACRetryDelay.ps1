@@ -9,11 +9,17 @@ function Get-AACRetryDelay {
         Graph's x-ms-user-quota-resets-after (hh:mm:ss). Without one: a
         dropped connection waits -Attempt seconds, anything else 5 x
         -Attempt. Never more than 60 seconds.
+
+        -Response reads the headers of an HttpResponseMessage; -Headers the
+        dictionary Invoke-AACHttp returns (the long-running operations'
+        polls), by the same rules.
     #>
     [CmdletBinding()]
     [OutputType([double])]
     param(
         [System.Net.Http.HttpResponseMessage] $Response,
+
+        [System.Collections.IDictionary] $Headers,
 
         [int] $Status,
 
@@ -21,6 +27,19 @@ function Get-AACRetryDelay {
     )
 
     $wait = 0.0
+    if ($Headers) {
+        foreach ($key in @($Headers.Keys)) {
+            foreach ($value in @($Headers[$key])) {
+                $text = [string]$value
+                $seconds = 0
+                $span = [TimeSpan]::Zero
+                $date = [datetimeoffset]::MinValue
+                if ($key -match 'retry-after$' -and [int]::TryParse($text, [ref]$seconds)) { $wait = [Math]::Max($wait, $seconds) }
+                elseif ($key -match '^retry-after$' -and [datetimeoffset]::TryParse($text, [cultureinfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AssumeUniversal, [ref]$date)) { $wait = [Math]::Max($wait, ($date.UtcDateTime - [datetime]::UtcNow).TotalSeconds) }
+                elseif ($key -match 'resets-after$' -and [TimeSpan]::TryParse($text, [cultureinfo]::InvariantCulture, [ref]$span)) { $wait = [Math]::Max($wait, $span.TotalSeconds) }
+            }
+        }
+    }
     if ($Response) {
         $retryAfter = $Response.Headers.RetryAfter
         # (PowerShell unwraps the nullable Delta and Date.)

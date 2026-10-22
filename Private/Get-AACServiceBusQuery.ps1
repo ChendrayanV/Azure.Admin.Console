@@ -20,11 +20,11 @@ function Get-AACServiceBusQuery {
         [string[]] $ResourceGroupName
     )
 
-    $quote = { param([string] $Text) "'" + ($Text -replace "'", "\'") + "'" }
+    $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
     $groups = @($ResourceGroupName | Where-Object { $_ })
     $in = if ($groups.Count) { " | where resourceGroup in~ ($((@($groups | ForEach-Object { & $quote $_ })) -join ', '))" } else { '' }
     [ordered]@{
         namespaces = "resources | where type =~ 'microsoft.servicebus/namespaces'$in | project id = tolower(id), name, location, resourceGroup, subscriptionId = tolower(subscriptionId), tier = tostring(sku.tier), capacity = toint(sku.capacity), properties, identity, tags"
-        workspaces = @{ Tenant = $true; Query = "resources | where type =~ 'microsoft.operationalinsights/workspaces' | project id = tolower(id), name" }
+        workspaces = Get-AACCommonQuery -Kind WorkspaceName
     }
 }

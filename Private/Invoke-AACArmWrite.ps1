@@ -56,8 +56,8 @@ function Invoke-AACArmWrite {
     $deadline = [datetime]::UtcNow.AddMinutes($TimeoutMinutes)
     $wait = {
         param($Headers)
-        $seconds = 5
-        if ($Headers -and $Headers.ContainsKey('Retry-After')) { $parsed = 0; if ([int]::TryParse([string]$Headers['Retry-After'], [ref]$parsed)) { $seconds = [Math]::Min([Math]::Max($parsed, 1), 60) } }
+        # As Azure asks (Retry-After and the services' own retry headers), 5 seconds otherwise, never more than 60.
+        $seconds = Get-AACRetryDelay -Headers $Headers -Status 200
         if ([datetime]::UtcNow.AddSeconds($seconds) -gt $deadline) { throw "Azure didn't finish $($Method.ToUpperInvariant()) $Uri within $TimeoutMinutes minute(s)." }
         Start-Sleep -Seconds $seconds
     }

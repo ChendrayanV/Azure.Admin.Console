@@ -38,7 +38,7 @@ function ConvertTo-AACServiceBusAssessment {
         # Read-AACServiceBusEntity's result, by namespace ID.
         [hashtable] $Entity = @{},
 
-        # Read-AACNetworkHealthMetric's result (Core, Premium), by namespace ID.
+        # Read-AACMetric's result (Core, Premium), by namespace ID.
         [hashtable] $Metric = @{},
 
         # Workspace resource ID (lower case) -> name.
@@ -49,18 +49,7 @@ function ConvertTo-AACServiceBusAssessment {
         [datetime] $Now = [datetime]::UtcNow
     )
 
-    $at = {
-        param($Row, [string[]] $Keys)
-        $value = $Row
-        foreach ($key in $Keys) {
-            if ($value -isnot [System.Collections.IDictionary]) { return $null }
-            if ($value.Contains($key)) { $value = $value[$key]; continue }
-            $found = $null
-            foreach ($name in $value.Keys) { if ($name -eq $key) { $found = $value[$name]; break } }
-            $value = $found
-        }
-        $value
-    }
+    $at = { param($Row, [string[]] $Keys) Get-AACMember -InputObject $Row -Key $Keys }
     $sum = { param([object[]] $Points, [string] $Field) $t = 0.0; foreach ($p in $Points) { $v = & $at $p $Field; if ($null -ne $v) { $t += [double]$v } }; $t }
     $peak = { param([object[]] $Points, [string] $Field) $m = $null; foreach ($p in $Points) { $v = & $at $p $Field; if ($null -ne $v -and ($null -eq $m -or [double]$v -gt $m)) { $m = [double]$v } }; $m }
     # Measure-Object returns nothing for no input (and .Sum then fails under StrictMode): this returns 0.
