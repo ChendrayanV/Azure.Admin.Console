@@ -1,5 +1,6 @@
 # build.ps1 output
 out/
+script/
 TestResults/
 release-notes.md
 *.zip

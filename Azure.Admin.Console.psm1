@@ -59,10 +59,16 @@ catch {
     throw "Azure Admin Console failed to load Spectre.Console.dll: $($_.Exception.Message)"
 }
 
+# The module is a parent with child areas under src\ - Core (sign-in, the REST
+# helpers, views and reports), then Azure, M365 and DevOps - each with its own
+# Public\ (one exported command per file) and Private\ (helpers). An area may
+# use Core and itself, not another area (Tests\Core\Module.Tests.ps1 checks
+# it); src\<Area>\area.psd1 says what the area is and its load order.
+#
 # The packaged module (build.ps1) carries every function in one file, which
-# loads 1.5-2 seconds faster than ~385 files dot-sourced one by one; it also
-# sets $publicFunctionNames. The repository loads the files themselves -
-# Private helpers first, then the public commands that use them.
+# loads 1.5-2 seconds faster than ~400 files dot-sourced one by one; it also
+# sets $publicFunctionNames. The repository loads the files themselves - area
+# by area (Core first), each area's Private helpers before its commands.
 $bundlePath = Join-Path -Path $moduleRoot -ChildPath 'Azure.Admin.Console.Functions.ps1'
 if (Test-Path -LiteralPath $bundlePath) {
     try {
@@ -73,24 +79,29 @@ if (Test-Path -LiteralPath $bundlePath) {
     }
 }
 else {
-    foreach ($folder in 'Private', 'Public') {
-        $folderPath = Join-Path -Path $moduleRoot -ChildPath $folder
-        if (-not (Test-Path -LiteralPath $folderPath)) {
-            continue
-        }
-
-        $files = Get-ChildItem -LiteralPath $folderPath -Filter '*.ps1' -File | Sort-Object -Property Name
-        foreach ($file in $files) {
-            try {
-                . $file.FullName
+    $areas = @(Get-ChildItem -LiteralPath (Join-Path -Path $moduleRoot -ChildPath 'src') -Directory |
+            Where-Object { Test-Path -LiteralPath (Join-Path -Path $_.FullName -ChildPath 'area.psd1') } |
+            Sort-Object -Property @{ Expression = { [int](Import-PowerShellDataFile -LiteralPath (Join-Path -Path $_.FullName -ChildPath 'area.psd1')).Order } }, Name)
+    $publicFunctionNames = [System.Collections.Generic.List[string]]::new()
+    foreach ($area in $areas) {
+        foreach ($folder in 'Private', 'Public') {
+            $folderPath = Join-Path -Path $area.FullName -ChildPath $folder
+            if (-not (Test-Path -LiteralPath $folderPath)) {
+                continue
             }
-            catch {
-                throw "Azure Admin Console failed to load '$($file.FullName)': $($_.Exception.Message)"
+
+            $files = Get-ChildItem -LiteralPath $folderPath -Filter '*.ps1' -File | Sort-Object -Property Name
+            foreach ($file in $files) {
+                try {
+                    . $file.FullName
+                }
+                catch {
+                    throw "Azure Admin Console failed to load '$($file.FullName)': $($_.Exception.Message)"
+                }
+                if ($folder -eq 'Public') { $publicFunctionNames.Add($file.BaseName) }
             }
         }
     }
-    $publicFunctionNames = Get-ChildItem -LiteralPath (Join-Path -Path $moduleRoot -ChildPath 'Public') -Filter '*.ps1' -File -ErrorAction SilentlyContinue |
-        Select-Object -ExpandProperty BaseName
 }
 
 # What each AAC.* type shows at the console by default (Select-Object * or

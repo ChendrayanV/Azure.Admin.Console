@@ -1,16 +1,28 @@
-# Azure.Admin.Console 0.14.6
+# Azure.Admin.Console 0.14.7
 
-Azure administration from PowerShell over plain REST - no Az or Microsoft.Graph modules, no app registration. Inventory and resource export, cost, Advisor, security (Defender for Cloud, alerts, attack paths, access reviews, legacy authentication), Azure Policy and compliance, operations and troubleshooting (Resource Health, failed operations, load balancers, private endpoints, unused resources, diagnostic bundles), networks, AKS, Log Analytics and Microsoft 365 - each command with a console view, objects, and CSV, HTML and PDF reports. Documentation: https://github.com/ChendrayanV/Azure.Admin.Console/tree/main/docs
+Azure administration from PowerShell over plain REST - no Az or Microsoft.Graph modules, no app registration. Inventory and resource export, cost, Advisor, security (Defender for Cloud, alerts, attack paths, access reviews, legacy authentication), Azure Policy and compliance, operations and troubleshooting (Resource Health, failed operations, load balancers, private endpoints, unused resources, diagnostic bundles), networks, AKS, Log Analytics, Microsoft 365 and Entra ID (application permissions, groups), and Azure DevOps (pipelines, the tools they run, security posture, delivery metrics) - each command with a console view, objects, and CSV, HTML and PDF reports. Documentation: https://github.com/ChendrayanV/Azure.Admin.Console/tree/main/docs
 
 Start with [about_Azure.Admin.Console](about_Azure.Admin.Console.md), or `Get-Help about_Azure.Admin.Console` once the module is imported. Every command also has full help in PowerShell: `Get-Help <command> -Full`.
 
 ## Commands
 
+### Core: sign-in, REST and reports
+
+Signing in to Azure, the REST helpers every command uses (Resource Manager, Resource Graph, Microsoft Graph), the console views and the CSV, HTML and PDF reports.
+
 | Command | Synopsis |
 |---|---|
 | [Connect-AAC](Connect-AAC.md) | Signs in to Azure - in the browser (OAuth 2.0 Authorization Code flow with PKCE and a loopback redirect), with a device code, as a service principal (client secret or certificate) or with a managed identity - no Az or Microsoft.Graph module, and no app registration required by default. |
-| [Deploy-AACStorageAccount](Deploy-AACStorageAccount.md) | Creates or updates a storage account - and its containers, file shares, queues, tables, blobs and settings - idempotently, with the Azure REST APIs: plan, gates (Azure Policy and PSRule), then apply. No ARM, Bicep or Terraform template. |
 | [Disconnect-AAC](Disconnect-AAC.md) | Clears the current Azure sign-in from memory. |
+| [Show-AACJson](Show-AACJson.md) | Shows JSON - or any PowerShell object, as JSON - at the console, indented and syntax-coloured in a panel, so an ARM template, a REST response or a resource's properties are easy to read. |
+
+### Azure
+
+Commands for an Azure estate - subscriptions and management groups: inventory, cost, policy, governance, networking, security, identity in Azure (RBAC, managed identities), health, assessments, Terraform and deployment.
+
+| Command | Synopsis |
+|---|---|
+| [Deploy-AACStorageAccount](Deploy-AACStorageAccount.md) | Creates or updates a storage account - and its containers, file shares, queues, tables, blobs and settings - idempotently, with the Azure REST APIs: plan, gates (Azure Policy and PSRule), then apply. No ARM, Bicep or Terraform template. |
 | [Export-AACDiagnosticBundle](Export-AACDiagnosticBundle.md) | Packages everything needed to troubleshoot Azure resources into one zip for a support case or a colleague - each resource's configuration, health and its history, Activity Log, diagnostic settings, locks, recommendations, compliance, alerts, recent changes and role assignments - with secrets redacted and a summary on top. |
 | [Export-AACDiagram](Export-AACDiagram.md) | Draws your existing Azure resources as an editable draw.io diagram - resources, the network topology or Application Gateways - with real containers, Azure icons and attached connections; -Update refreshes it from Azure and keeps the changes you made. |
 | [Export-AACResource](Export-AACResource.md) | Exports your Azure resources - for the whole tenant, a management group, subscriptions, resource groups or resource types - to CSV, HTML and PDF, with the subscription and management group by name, the tags as columns and each resource's key settings flattened into plain values. |
@@ -26,7 +38,6 @@ Start with [about_Azure.Admin.Console](about_Azure.Admin.Console.md), or `Get-He
 | [Get-AACCostAnomaly](Get-AACCostAnomaly.md) | Finds unusual Azure spend before it reaches the invoice - spikes, drops, new spend, level shifts and steady rises by service, resource group, region or meter - with the resources behind each, a month-end forecast and how each subscription compares with the others. |
 | [Get-AACDependencyGraph](Get-AACDependencyGraph.md) | Maps which Azure resources depend on which - networks, gateways and Front Door to their backends, apps to their plans and data, private endpoints, managed identities, and (from Application Insights) who calls whom - and finds each one's blast radius, the single points of failure, circular dependencies and the most critical services. |
 | [Get-AACDiagnosticSetting](Get-AACDiagnosticSetting.md) | Lists every resource's diagnostic settings, flattened, and finds the resources whose logs don't reach a Log Analytics workspace - and the settings that are misconfigured - with a Spectre.Console view, objects, and CSV, PDF and interactive HTML reports. |
-| [Get-AACEntraGroupMembership](Get-AACEntraGroupMembership.md) | Who is in your Entra ID groups - direct members and everyone in the groups nested in them - flattened to one row per group and member, with a Spectre.Console view, objects, and CSV, PDF and interactive HTML reports. |
 | [Get-AACFailoverReadiness](Get-AACFailoverReadiness.md) | How ready you are to recover: each workload's backups (fresh, succeeding, ever restored) and Site Recovery replication (healthy, within its RPO, failover tested and possible), the vaults' settings, and the recovery plans and their runbooks - with a recovery confidence score and RPO on track or at risk. |
 | [Get-AACFirewallRule](Get-AACFirewallRule.md) | Gets every Azure Firewall Policy rule - DNAT, network and application: a colour-coded Spectre.Console view at the prompt, PowerShell objects down a pipeline, and optional CSV, PDF and interactive HTML exports. |
 | [Get-AACGovernanceChange](Get-AACGovernanceChange.md) | Shows who changed policy and access in the last days - policy definitions, initiatives and assignments, custom roles and role assignments created or updated - with the author resolved to a name and the notable changes flagged. |
@@ -63,7 +74,6 @@ Start with [about_Azure.Admin.Console](about_Azure.Admin.Console.md), or `Get-He
 | [Invoke-AACGovernanceAssessment](Invoke-AACGovernanceAssessment.md) | Assesses governance across the tenant in one run - the management group hierarchy, access, workload identities, policy remediation, Azure limits, tenant settings, tags, locks and recent changes - as a tabbed workbook, and as a Markdown page for a wiki. |
 | [Invoke-AACHealthCheck](Invoke-AACHealthCheck.md) | Checks that your applications and their Azure platform are healthy right now - endpoints answering (synthetic requests, latency, TLS certificates), databases reachable, queues flowing, Resource Health, Service Health and fired alerts - by tier, with an SLA report. |
 | [Invoke-AACLogAnalyticsWorkspaceAssessment](Invoke-AACLogAnalyticsWorkspaceAssessment.md) | Assesses a Log Analytics workspace: billable and free tables and their size, every workspace setting, recommendations, data collection rules and the Workspace Insights views (Overview, Usage, Health, Agents, Query Audit, Data Collection Rules, Change Log) - with a Spectre.Console view, an object, and CSV and interactive HTML reports. |
-| [Invoke-AACM365Assessment](Invoke-AACM365Assessment.md) | Microsoft 365 tenant discovery and security posture - Entra ID, Microsoft 365 and Intune - read from the Microsoft Graph REST API with one token, with zero-trust findings, as a Spectre.Console view, an object, CSV files and a tabbed, interactive HTML report. |
 | [Invoke-AACPolicyAssessment](Invoke-AACPolicyAssessment.md) | Assesses Azure Policy across a tenant, management group or set of subscriptions - what is assigned, how compliant it is (overall, by subscription, assignment, policy and category), the exemptions and the managed identities' roles - and what to improve, with a Spectre.Console view, objects, and CSV, PDF and interactive HTML reports. In the spirit of AzPolicyLens (github.com/Azure/AzPolicyLens). |
 | [Invoke-AACPSRule](Invoke-AACPSRule.md) | Checks your live Azure estate with PSRule for Azure - its Azure Well-Architected Framework rules, the module's own rules and your custom rules - with a console view, objects, and CSV, PDF and interactive HTML reports. |
 | [Invoke-AACServiceBusAssessment](Invoke-AACServiceBusAssessment.md) | Assesses Azure Service Bus namespaces across subscriptions - health, capacity, every queue, topic and subscription's messages (active, dead-lettered, scheduled), security, resilience and cost - as a heat map, findings, a Spectre.Console view, objects, and CSV, PDF and interactive HTML reports. |
@@ -73,7 +83,6 @@ Start with [about_Azure.Admin.Console](about_Azure.Admin.Console.md), or `Get-He
 | [Show-AACApplicationGatewayMap](Show-AACApplicationGatewayMap.md) | Draws Application Gateways as their connection flow - frontend IPs, listeners, rules, path rules and redirects, backend settings and probes, pools and targets, WAF policies - inside their network and subnet, with health and findings; shows each gateway's flows at the prompt and opens the map in your browser. |
 | [Show-AACCost](Show-AACCost.md) | Shows what your Azure subscriptions cost - month to date and the last few months - as colourful Spectre.Console charts, with optional CSV, PDF and interactive HTML exports of the detail. |
 | [Show-AACDashboard](Show-AACDashboard.md) | A dashboard of your Azure estate: health, security, policy, governance, Advisor, the estate itself, the latest changes and (with -IncludeCost) the spend - one status and an Estate score at the top, and what to do next at the bottom. |
-| [Show-AACJson](Show-AACJson.md) | Shows JSON - or any PowerShell object, as JSON - at the console, indented and syntax-coloured in a panel, so an ARM template, a REST response or a resource's properties are easy to read. |
 | [Show-AACManagementGroupMap](Show-AACManagementGroupMap.md) | Draws the management group hierarchy as an interactive map - the tenant root and management groups as nested boxes, each subscription inside its group - with the subscriptions, policy assignments and role assignments at each level. |
 | [Show-AACNetworkTopology](Show-AACNetworkTopology.md) | Draws the network topology of the tenant - or of management groups, subscriptions or regions - as an interactive diagram: hubs with their spokes around them, or every network inside its tenant, management group, subscription, region and resource group; with the peerings, private endpoints and the firewalls and appliances traffic is routed through. Opens it in your browser, ready to save as PNG, JPEG or SVG. |
 | [Show-AACResource](Show-AACResource.md) | Shows how many Azure resources you have - by type, location, resource group or subscription - as a colourful Spectre.Console bar chart. |
@@ -81,3 +90,22 @@ Start with [about_Azure.Admin.Console](about_Azure.Admin.Console.md), or `Get-He
 | [Test-AACAlzPolicy](Test-AACAlzPolicy.md) | Compares the policy assignments on your management groups with the Azure Landing Zones reference - what each archetype assigns - and lists what is missing, assigned differently, or present. |
 | [Test-AACAzureLimit](Test-AACAzureLimit.md) | Shows which scopes are close to an Azure limit - role assignments, custom roles, policy assignments, definitions, initiatives and exemptions, resource groups, tags, management group depth - before a deployment fails on one. |
 | [Test-AACGoLiveReadiness](Test-AACGoLiveReadiness.md) | A go-live gate: runs the Well-Architected assessment on a workload and says Ready or Not ready - each pillar's score against a minimum, no high-severity findings, the checks that must pass - with the blockers, a Spectre.Console view, and CSV, PDF and HTML reports. -FailOnGap fails a pipeline stage when it isn't ready. |
+
+### Microsoft 365 and Entra ID
+
+Commands for the Microsoft 365 and Entra ID tenant: the Microsoft 365 assessment, group membership, and what applications and managed identities may do.
+
+| Command | Synopsis |
+|---|---|
+| [Get-AACApplicationPermission](Get-AACApplicationPermission.md) | Lists every permission an enterprise application or managed identity holds - API permissions, delegated consents, Entra directory roles (and their scope), Azure roles, owned objects and groups - with findings for the privileged ones, as a Spectre.Console view, objects, and CSV, HTML and PDF reports. |
+| [Get-AACEntraGroupMembership](Get-AACEntraGroupMembership.md) | Who is in your Entra ID groups - direct members and everyone in the groups nested in them - flattened to one row per group and member, with a Spectre.Console view, objects, and CSV, PDF and interactive HTML reports. |
+| [Invoke-AACM365Assessment](Invoke-AACM365Assessment.md) | Microsoft 365 tenant discovery and security posture - Entra ID, Microsoft 365 and Intune - read from the Microsoft Graph REST API with one token, with zero-trust findings, as a Spectre.Console view, an object, CSV files and a tabbed, interactive HTML report. |
+| [New-AACApplicationPermission](New-AACApplicationPermission.md) | Lets an enterprise application or managed identity manage specific Entra groups only - not every group in the tenant - with an administrative unit, a custom (or built-in) directory role and a role assignment scoped to the unit. Plan, confirm, apply, verify. |
+
+### Azure DevOps
+
+Commands for Azure DevOps organizations: projects, pipelines and the tools they run, repositories, security posture and delivery metrics.
+
+| Command | Synopsis |
+|---|---|
+| [Get-AACADOInventory](Get-AACADOInventory.md) | Inventories one or more Azure DevOps organizations - projects, pipelines (YAML, or classic with no YAML file - flagged) with their last run and delivery metrics, every task and tool they use (with versions), repositories, service connections, variable groups and environments with their security posture - as a Spectre.Console view, objects, and CSV, HTML and PDF reports. |

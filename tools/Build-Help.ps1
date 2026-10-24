@@ -3,10 +3,14 @@
 
       docs\<Command>.md                        one PlatyPS page per command
       en-US\Azure.Admin.Console-help.xml       MAML help, for Get-Help
-      docs\Azure.Admin.Console.md              the command index
+      docs\Azure.Admin.Console.md              the command index, by area
       docs\about_Azure.Admin.Console.md        a readable copy of the about topic
 
-    The comment-based help in Public\*.ps1 stays the one place help is
+    The pages stay flat (docs\<Command>.md) whatever area a command is in,
+    so Get-Help -Online and links to them keep working; the index groups
+    them by the module's child areas (src\<Area>\area.psd1).
+
+    The comment-based help in src\<Area>\Public\*.ps1 stays the one place help is
     written. PlatyPS reads it (New-CommandHelp), this script tidies what
     PlatyPS can't know from comment-based help, and PlatyPS writes the
     Markdown and the MAML:
@@ -263,10 +267,23 @@ $index.Add("Start with [about_$moduleName](about_$moduleName.md), or ``Get-Help 
 $index.Add('')
 $index.Add('## Commands')
 $index.Add('')
-$index.Add('| Command | Synopsis |')
-$index.Add('|---|---|')
-foreach ($help in $helps) {
-    $index.Add("| [$($help.Title)]($($help.Title).md) | $($help.Synopsis -replace '\|', '\|') |")
+# Grouped by the module's child areas (src\<Area>, each described by its area.psd1), in their order.
+$areaOf = @{}
+foreach ($command in $commands) { $areaOf[$command.Name] = if ($command.ScriptBlock.File -match '[\\/]src[\\/]([^\\/]+)[\\/]Public[\\/]') { $Matches[1] } else { 'Core' } }
+$areaInfo = @{}
+foreach ($file in @(Get-ChildItem -Path (Join-Path $module.ModuleBase 'src') -Filter 'area.psd1' -Recurse -File -ErrorAction SilentlyContinue)) { $data = Import-PowerShellDataFile -LiteralPath $file.FullName; $areaInfo[$data.Name] = $data }
+foreach ($area in @($areaOf.Values | Select-Object -Unique | Sort-Object -Property @{ Expression = { if ($areaInfo.ContainsKey($_)) { [int]$areaInfo[$_].Order } else { 99 } } }, { $_ })) {
+    $info = $areaInfo[$area]
+    $index.Add("### $(if ($info) { $info.Title } else { $area })")
+    $index.Add('')
+    if ($info) { $index.Add($info.Description); $index.Add('') }
+    $index.Add('| Command | Synopsis |')
+    $index.Add('|---|---|')
+    foreach ($help in @($helps | Where-Object { $areaOf[$_.Title] -eq $area })) {
+        $index.Add("| [$($help.Title)]($($help.Title).md) | $($help.Synopsis -replace '\|', '\|') |")
+    }
+    $index.Add('')
 }
+while ($index[-1] -eq '') { $index.RemoveAt($index.Count - 1) }
 [System.IO.File]::WriteAllText((Join-Path $DocsPath "$moduleName.md"), ($index -join "`n") + "`n", [System.Text.UTF8Encoding]::new($false))
 Write-Host "    $moduleName.md"

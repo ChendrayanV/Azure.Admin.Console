@@ -1,0 +1,206 @@
+function Write-AACHtmlReport {
+    <#
+    .SYNOPSIS
+        Writes a single, self-contained, interactive HTML report - the
+        -HtmlPath export of Get-AACAdvisorRecommendation, Get-AACFirewallRule,
+        Show-AACResource and Show-AACCost.
+    .DESCRIPTION
+        One file with no external scripts, styles or fonts (src\Core\Private\
+        DataReport.html with the data embedded as JSON), so it opens offline,
+        from an e-mail or a pipeline artifact. Each command describes its
+        report; the page makes it interactive:
+
+          -Tile     @{ Value; Label; Tone; Table; Filters = @{ Column = 'Value' } }
+                    Tone is good, bad, warn, info, violet or neutral. With
+                    Table (and Filters), clicking the tile filters that table.
+          -Chart    @{ Title; Kind ('bar', the default, or 'donut': each item's
+                    share, the total in the middle - CenterLabel under it);
+                    Items = @(@{ Label; Value; Display; Tone; Filter });
+                       Format = 'N0'|'N2'; Suffix; Table; Column; BaseFilters;
+                       Wide }
+                    Horizontal bars; with Table and Column, clicking a bar
+                    filters the table to Column = the bar's Filter (or Label),
+                    plus BaseFilters (@{ Column = 'Value' }) if given.
+          -Table    @{ Id; Title; Note; Noun; File; Rows; Columns; Sort =
+                       @{ Key; Desc }; GroupBy = @('Column', ...); Group;
+                       Filters = @{ Column = 'Value' } (what it opens with);
+                       PageSize; Section }
+                    Section: tables with one are drawn under its heading
+                    (in the order sections first appear) and listed in a
+                    Contents block above the tables - for reports with many.
+                    Columns: @{ Key; Label; Type; Facet; Hidden; Tones;
+                    Format; Sum; CurrencyKey; IdKey; Href; Text; Soon }.
+                    Types: text (default), wide (long text, clamped), mono,
+                    number, money, score (0-100 as a percentage: 70+
+                    green, 40-69 amber, under 40 red), path ('a → b → c': steps
+                    as chips joined by arrows), date (Soon: red within 90 days, orange
+                    within 180), datetime (date and time, local), badge (Tones = @{ Value = 'bad' }), link
+                    (https only), resource (the name with Azure portal and
+                    copy-ID buttons from the IdKey column, ResourceId by
+                    default). Facet columns get a filter drop-down; Sum
+                    columns are totalled for the rows shown and per group.
+          -Notice   @{ Tone; Text } lines under the tiles.
+          -Tab      @(@{ Name; Badge; Tone; Note }) turns the sections into
+                    tabs: Overview (tiles, notices, charts, tree) first, then
+                    one per section in this order (sections not listed after
+                    them), each with its Badge (a count, coloured by Tone)
+                    and Note above its tables. The tab shown is in the URL
+                    (#tab=Name); a tile or chart that filters a table opens
+                    its tab. Printed, every tab is.
+          -OverviewTab  the first tab's name ('Overview' unless given).
+          -Tree     @{ Title; OpenTo = 's'; Root = node } a collapsible,
+                    searchable hierarchy above the tables. Node: @{ l = 't'|
+                    'm'|'s'|'g'|'r'|'d' (tenant, management group,
+                    subscription, resource group, resource, deleted
+                    resources); n = name; d = detail;
+                    c = @(@(count, 'noun'), ...); f = @{ table; filters }
+                    (clicking the name filters that table); k = children;
+                    x = flagged (e.g. an empty resource group); p = a 0-100
+                    score, drawn as a coloured pill; h, m, lo = high,
+                    medium and low findings, as red, amber and blue pills;
+                    co = a cost, drawn as a green pill (amber with cx), with
+                    ct as its tooltip; pl = @(@(text, tone, tooltip), ...)
+                    pills of any kind }. Children
+                    are drawn when a node is opened, so big trees stay fast.
+                    For a hierarchy of something else: Levels = @{ code =
+                    @(label, tone) }, Order = @(codes, top first), Buttons =
+                    @(@(label, code), ...) ('Open to <label>') and
+                    Placeholder (the search box's hint); Top = $true draws
+                    it above the charts.
+
+        Every table can be searched, filtered, sorted (click a header),
+        grouped (with subtotals) and downloaded as CSV - the rows shown, all
+        of them. Light and dark themes follow the browser, with a switch.
+        Rows are shown 200 at a time, so large tables stay fast.
+    #>
+    [CmdletBinding()]
+    [OutputType([System.IO.FileInfo])]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Path,
+
+        [Parameter(Mandatory)]
+        [string] $Title,
+
+        [string] $Subtitle,
+
+        [System.Collections.IDictionary] $Fact,
+
+        [object[]] $Tile = @(),
+
+        [object[]] $Chart = @(),
+
+        [object[]] $Table = @(),
+
+        [object[]] $Notice = @(),
+
+        [System.Collections.IDictionary] $Tree,
+
+        # Workbook-style heat maps: @{ Title; Note; RowHeader; Columns; Rows =
+        # @{ Label; Group; Filter; Cells = @(@{ Score; Count; Failed } or $null); Total };
+        # Table; RowKey; ColumnKey } - a cell filters Table to its row and column.
+        [object[]] $HeatMap = @(),
+
+        [object[]] $Tab = @(),
+
+        [string] $OverviewTab
+    )
+
+    $fullPath = $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+
+    # Keys in camelCase for the page; everything else passes through.
+    $camel = {
+        param([System.Collections.IDictionary] $Source)
+        $out = [ordered]@{}
+        foreach ($key in $Source.Keys) {
+            $name = [string]$key
+            $out[$name.Substring(0, 1).ToLowerInvariant() + $name.Substring(1)] = $Source[$key]
+        }
+        $out
+    }
+
+    $session = $script:AACSession
+    $facts = [System.Collections.Generic.List[object]]::new()
+    if ($session) {
+        $facts.Add([ordered]@{ k = 'Azure account'; v = [string]$session.Account })
+        $facts.Add([ordered]@{ k = 'Tenant'; v = [string]$session.TenantId })
+    }
+    if ($Fact) {
+        foreach ($key in $Fact.Keys) { $facts.Add([ordered]@{ k = [string]$key; v = [string]$Fact[$key] }) }
+    }
+    $facts.Add([ordered]@{ k = 'Computer'; v = "$([Environment]::MachineName) · PowerShell $($PSVersionTable.PSVersion)" })
+
+    $tables = foreach ($item in $Table) {
+        $t = & $camel $item
+        $t['columns'] = @(foreach ($column in @($item.Columns)) { & $camel $column })
+        # Rows: only the columns' properties, as plain values.
+        $keys = @($t['columns'] | ForEach-Object { $_['key'] })
+        $idKeys = @($t['columns'] | ForEach-Object { $_['idKey'], $_['href'], $_['currencyKey'] } | Where-Object { $_ })
+        $keys = @($keys + $idKeys + 'ResourceId' | Select-Object -Unique)
+        # Every cell of every row passes through here: read properties inline, a
+        # function call per cell is what made big reports slow.
+        $t['rows'] = @(foreach ($row in @($item.Rows)) {
+                $plain = [ordered]@{}
+                $isMap = $row -is [System.Collections.IDictionary]
+                if (-not $isMap) { $properties = $row.PSObject.Properties }
+                foreach ($key in $keys) {
+                    $value = if ($isMap) { $row[$key] } else { $p = $properties[$key]; if ($p) { $p.Value } }
+                    if ($value -is [datetime]) { $value = $value.ToString('o', [cultureinfo]::InvariantCulture) }
+                    elseif ($null -ne $value -and $value -isnot [string] -and $value -isnot [ValueType]) { $value = [string]$value }
+                    $plain[$key] = $value
+                }
+                $plain
+            })
+        if ($item.Contains('Sort')) { $t['sort'] = & $camel $item.Sort }
+        $t
+    }
+
+    $moduleInfo = $MyInvocation.MyCommand.Module
+    $model = [ordered]@{
+        title         = $Title
+        subtitle      = $Subtitle
+        generated     = [datetime]::UtcNow.ToString('o', [cultureinfo]::InvariantCulture)
+        account       = if ($session) { [string]$session.Account } else { '' }
+        tenantId      = if ($session) { [string]$session.TenantId } else { '' }
+        moduleVersion = if ($moduleInfo) { "v$($moduleInfo.Version)" } else { '' }
+        environment   = "PowerShell $($PSVersionTable.PSVersion)"
+        facts         = $facts.ToArray()
+        notices       = @(foreach ($item in $Notice) { & $camel $item })
+        tiles         = @(foreach ($item in $Tile) { & $camel $item })
+        charts        = @(foreach ($item in $Chart) {
+                $c = & $camel $item
+                $c['items'] = @(foreach ($bar in @($item.Items)) { & $camel $bar })
+                $c
+            })
+        tables        = @($tables)
+        heatmaps      = @(foreach ($item in $HeatMap) {
+                $h = & $camel $item
+                $h['rows'] = @(foreach ($row in @($item.Rows)) {
+                        $r = & $camel $row
+                        $r['cells'] = @(foreach ($c in @($row.Cells)) { if ($c) { & $camel $c } else { $null } })
+                        $r['total'] = if ($row.Contains('Total') -and $row.Total) { & $camel $row.Total } else { $null }
+                        $r
+                    })
+                $h
+            })
+    }
+    if ($Tab.Count) { $model['tabs'] = @(foreach ($item in $Tab) { & $camel $item }) }
+    if ($OverviewTab) { $model['overviewTab'] = $OverviewTab }
+    if ($Tree) {
+        $model['tree'] = [ordered]@{ title = $Tree.Title; openTo = $(if ($Tree.Contains('OpenTo')) { $Tree.OpenTo } else { 's' }); root = $Tree.Root }
+        foreach ($key in 'Levels', 'Order', 'Buttons', 'Placeholder', 'Top') { if ($Tree.Contains($key) -and $Tree[$key]) { $model['tree'][$key.ToLowerInvariant()] = $Tree[$key] } }
+    }
+
+    # EscapeHtml turns < > & ' into \u escapes, so no value can close the
+    # <script> element the data sits in.
+    $json = ConvertTo-Json -InputObject $model -Depth 40 -Compress -EscapeHandling EscapeHtml
+    $template = [System.IO.File]::ReadAllText((Join-Path -Path $script:AACModuleRoot -ChildPath 'src/Core/Private/DataReport.html'))
+    $html = $template.Replace('__AAC_TITLE__', [System.Net.WebUtility]::HtmlEncode($Title)).Replace('__AAC_DATA__', $json)
+
+    $folder = Split-Path -Path $fullPath -Parent
+    if ($folder -and -not (Test-Path -LiteralPath $folder)) {
+        New-Item -ItemType Directory -Path $folder -Force | Out-Null
+    }
+    [System.IO.File]::WriteAllText($fullPath, $html, [System.Text.UTF8Encoding]::new($false))
+    Get-Item -LiteralPath $fullPath
+}

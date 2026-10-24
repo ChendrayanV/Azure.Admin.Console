@@ -12,11 +12,11 @@
                 exported command, en-US\Azure.Admin.Console-help.xml (the
                 MAML help Get-Help shows), docs\about_*.md from
                 en-US\about_*.help.txt and the docs\ index. The
-                comment-based help in Public\*.ps1 is the one source -
+                comment-based help in src\<Area>\Public\*.ps1 is the source -
                 edit it, then rerun this task. Needs PlatyPS 1.0+ on the
                 build machine only (Install-PSResource
                 Microsoft.PowerShell.PlatyPS).
-      Test      Runs the unit tests in Tests\ (no Azure sign-in needed) and
+      Test      Runs the unit tests in Tests\<Area>\ (no Azure sign-in) and
                 stops the build if any fail. -TestResultPath also writes
                 JUnit XML for CI. Needs Pester 6.2+, which needs
                 PowerShell 7.4+ (Install-PSResource Pester -Version
@@ -24,7 +24,7 @@
       Build     Copies only what the module needs at run time into
                 out\Azure.Admin.Console, then validates the staged copy:
                 Test-ModuleManifest, every exported function has a
-                Public\*.ps1 file, a clean import in a fresh pwsh, and
+                src\<Area>\Public\*.ps1 file, a clean import in a fresh pwsh, and
                 PSScriptAnalyzer errors and warnings (if it is installed;
                 settings in PSScriptAnalyzerSettings.psd1). Tests\,
                 docs\ and this script are not packaged.
@@ -73,8 +73,7 @@ $packageItems = @(
     "$moduleName.psd1"
     "$moduleName.psm1"
     "$moduleName.Format.ps1xml"
-    'Public'
-    'Private'
+    'src'
     'PSRule'
     'lib'
     'en-US'
@@ -144,12 +143,16 @@ function Invoke-BuildTask {
     $manifest = Test-ModuleManifest -Path $stagedManifest
     Write-Host "    manifest OK: $($manifest.Name) $($manifest.Version)"
 
-    $publicFiles = @(Get-ChildItem -Path (Join-Path $stage 'Public') -Filter '*.ps1' | ForEach-Object BaseName)
+    # The child areas (src\<Area>), in their load order: Core first.
+    $areas = @(Get-ChildItem -LiteralPath (Join-Path $stage 'src') -Directory |
+            Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'area.psd1') } |
+            Sort-Object -Property @{ Expression = { [int](Import-PowerShellDataFile -LiteralPath (Join-Path $_.FullName 'area.psd1')).Order } }, Name)
+    $publicFiles = @(foreach ($area in $areas) { Get-ChildItem -Path (Join-Path $area.FullName 'Public') -Filter '*.ps1' -ErrorAction SilentlyContinue | ForEach-Object BaseName })
     $declared = @((Import-PowerShellDataFile $stagedManifest).FunctionsToExport)
     $missing = @($declared | Where-Object { $_ -notin $publicFiles })
     $undeclared = @($publicFiles | Where-Object { $_ -notin $declared })
     if ($missing -or $undeclared) {
-        throw "FunctionsToExport and Public\*.ps1 disagree. Missing files: $($missing -join ', '). Not in the manifest: $($undeclared -join ', ')."
+        throw "FunctionsToExport and src\<Area>\Public\*.ps1 disagree. Missing files: $($missing -join ', '). Not in the manifest: $($undeclared -join ', ')."
     }
     Write-Host "    exports OK: $($declared.Count) functions"
 
@@ -170,19 +173,23 @@ function Invoke-BuildTask {
     # One file for every function: the module loads 1.5-2 seconds faster than
     # from ~385 files dot-sourced one by one. The analyzer has checked the files
     # above; the loader (Azure.Admin.Console.psm1) prefers this file when it is
-    # there. Private\*.html (the report templates) stays.
+    # there. The report templates (src\<Area>\Private\*.html) stay.
     $bundle = [System.Text.StringBuilder]::new()
-    $null = $bundle.AppendLine("# Every function of $moduleName $($manifest.Version), in one file for a faster import - built by build.ps1 from Private\*.ps1 and Public\*.ps1.")
+    $null = $bundle.AppendLine("# Every function of $moduleName $($manifest.Version), in one file for a faster import - built by build.ps1 from src\<Area>\Private\*.ps1 and src\<Area>\Public\*.ps1, area by area.")
     $null = $bundle.AppendLine("`$publicFunctionNames = @($(($publicFiles | Sort-Object | ForEach-Object { "'$_'" }) -join ', '))")
-    foreach ($folder in 'Private', 'Public') {
-        foreach ($file in (Get-ChildItem -LiteralPath (Join-Path $stage $folder) -Filter '*.ps1' -File | Sort-Object -Property Name)) {
-            $null = $bundle.AppendLine().AppendLine("#region $folder\$($file.Name)").AppendLine([System.IO.File]::ReadAllText($file.FullName).TrimEnd()).AppendLine('#endregion')
+    foreach ($area in $areas) {
+        foreach ($folder in 'Private', 'Public') {
+            $folderPath = Join-Path $area.FullName $folder
+            if (-not (Test-Path -LiteralPath $folderPath)) { continue }
+            foreach ($file in (Get-ChildItem -LiteralPath $folderPath -Filter '*.ps1' -File | Sort-Object -Property Name)) {
+                $null = $bundle.AppendLine().AppendLine("#region src\$($area.Name)\$folder\$($file.Name)").AppendLine([System.IO.File]::ReadAllText($file.FullName).TrimEnd()).AppendLine('#endregion')
+            }
+            Get-ChildItem -LiteralPath $folderPath -Filter '*.ps1' -File | Remove-Item -Force
+            if (-not (Get-ChildItem -LiteralPath $folderPath -Force)) { Remove-Item -LiteralPath $folderPath -Force }
         }
     }
     [System.IO.File]::WriteAllText((Join-Path $stage "$moduleName.Functions.ps1"), $bundle.ToString(), [System.Text.UTF8Encoding]::new($true))
-    Get-ChildItem -LiteralPath (Join-Path $stage 'Private') -Filter '*.ps1' -File | Remove-Item -Force
-    Remove-Item -LiteralPath (Join-Path $stage 'Public') -Recurse -Force
-    Write-Host "    functions merged into $moduleName.Functions.ps1"
+    Write-Host "    functions of $($areas.Count) areas ($(($areas | ForEach-Object Name) -join ', ')) merged into $moduleName.Functions.ps1"
 
     $imported = & pwsh -NoProfile -Command "Import-Module '$stagedManifest' -ErrorAction Stop; (Get-Command -Module $moduleName).Count"
     if ($LASTEXITCODE -ne 0 -or [int]($imported | Select-Object -Last 1) -ne $declared.Count) {

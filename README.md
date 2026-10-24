@@ -216,11 +216,25 @@ bookmarks are how you jump to the one you want.
 
 ## Commands
 
+The commands are grouped by the module's areas - one module, one install, a child area for each platform (see [Development](#development)):
+
+### Core: sign-in, REST and reports
+
+Signing in to Azure, the REST helpers every command uses (Resource Manager, Resource Graph, Microsoft Graph), the console views and the CSV, HTML and PDF reports.
+
+| Command                                                                                          | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`Connect-AAC`](docs/Connect-AAC.md)                                                             | Signs in with a browser (OAuth 2.0 + PKCE, localhost redirect) - or a device code (`-DeviceCode`), a service principal's secret or certificate (`-ClientSecret`, `-CertificatePath`, `-CertificateThumbprint`), or a managed identity (`-Identity`, e.g. in Azure Automation). Uses the Azure CLI's pre-consented public client ID unless you pass `-ClientId`.                                                                                                                                                                                                                                                                                   |
+| [`Disconnect-AAC`](docs/Disconnect-AAC.md)                                                       | Forgets the sign-in. It was only ever in memory.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| [`Show-AACJson`](docs/Show-AACJson.md)                                                           | JSON - or any object, as JSON - indented and syntax-coloured in a panel: ARM templates, REST responses, resources, this module's objects.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+
+### Azure
+
+Commands for an Azure estate - subscriptions and management groups: inventory, cost, policy, governance, networking, security, identity in Azure (RBAC, managed identities), health, assessments, Terraform and deployment.
+
 | Command                                                                                          | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`Deploy-AACStorageAccount`](docs/Deploy-AACStorageAccount.md)                                   | Creates or updates a storage account - containers, file shares, queues, tables, lifecycle rules, private endpoints, diagnostic settings, role assignments, a lock and blobs - idempotently with the Azure REST APIs, no ARM, Bicep or Terraform template. AVM's parameter names and defaults; a plan (create, update, can't change in place, drift); gates: the name, Azure Policy (`checkPolicyRestrictions` on every write's exact body) and PSRule for Azure; then apply and verify. The only command that writes.                                                                                                                             |
-| [`Connect-AAC`](docs/Connect-AAC.md)                                                             | Signs in with a browser (OAuth 2.0 + PKCE, localhost redirect) - or a device code (`-DeviceCode`), a service principal's secret or certificate (`-ClientSecret`, `-CertificatePath`, `-CertificateThumbprint`), or a managed identity (`-Identity`, e.g. in Azure Automation). Uses the Azure CLI's pre-consented public client ID unless you pass `-ClientId`.                                                                                                                                                                                                                                                                                   |
-| [`Disconnect-AAC`](docs/Disconnect-AAC.md)                                                       | Forgets the sign-in. It was only ever in memory.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | [`Get-AACAdvisorRecommendation`](docs/Get-AACAdvisorRecommendation.md)                           | A consolidated, flattened view of Azure Advisor: a console view at the prompt, objects down a pipeline, CSV and/or PDF exports.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | [`Get-AACFirewallRule`](docs/Get-AACFirewallRule.md)                                             | Every Azure Firewall Policy rule: a console view at the prompt (Allow in green, Deny in red), objects down a pipeline, CSV and/or PDF exports.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | [`Show-AACResource`](docs/Show-AACResource.md)                                                   | A colourful bar chart of your resources by type, location, resource group or subscription.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
@@ -235,19 +249,16 @@ bookmarks are how you jump to the one you want.
 | [`Get-AACAssignedPolicy`](docs/Get-AACAssignedPolicy.md)                                         | Every Azure Policy assignment and its parameters - the default, assigned and effective value of each - with the resource types the policy applies to (its rule's type conditions, parameters resolved), one row per assignment and parameter. Assignments inherited from management groups included. A console view, objects, and CSV and interactive HTML reports.                                                                                                                                                                                                                                                                               |
 | [`Invoke-AACPolicyAssessment`](docs/Invoke-AACPolicyAssessment.md)                               | Azure Policy assessed as a whole, in the spirit of AzPolicyLens: compliance (each resource counted at its worst state) overall and by subscription, management group, assignment, policy and category; exemptions and their expiry; initiatives and definitions; the managed identities' roles; what to improve (direct assignments, DoNotEnforce, remediation without an identity or role, deprecated policies, overlapping assignments, stale exemptions, unassigned custom definitions, unused groups). Platform and Application audiences. A console view, objects, and CSV, PDF and interactive HTML reports with the management group tree. |
 | [`Invoke-AACDefenderAssessment`](docs/Invoke-AACDefenderAssessment.md)                           | Microsoft Defender for Cloud assessed across subscriptions: every recommendation (unhealthy, healthy and not applicable resources, risk level), attack paths step by step, security alerts with MITRE tactics and remediation, the inventory with each resource's plan coverage, vulnerabilities (CVEs), secure score controls, Defender plans with extensions, regulatory compliance, and environment settings (contacts, notifications, integrations, connectors, just-in-time) - with findings on how Defender is set up. A console view, an object, CSV and a tabbed HTML report in the portal's order. |
-| [`Invoke-AACM365Assessment`](docs/Invoke-AACM365Assessment.md)                                   | Microsoft 365 tenant discovery and security posture from the Microsoft Graph REST API with one token: Entra ID (settings, Conditional Access, admin roles, MFA registration, authentication methods), Microsoft 365 (domains, Secure Score, SharePoint and OneDrive sharing, audit logging) and Intune (enrollment restrictions, compliance, endpoint security, stale and unmanaged devices) - with zero-trust findings. A console view, an object, CSV and a tabbed HTML report. |
 | [`Get-AACPolicyState`](docs/Get-AACPolicyState.md)                                               | Azure Policy compliance for every resource - one row per resource and policy, with initiative, assignment, effect and when it was evaluated - by management group, subscription or resource group, with compliance per assignment, policy, subscription and resource group. A console view, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                                                                   |
 | [`Get-AACNetworkSecurityGroup`](docs/Get-AACNetworkSecurityGroup.md)                             | A detailed assessment of network security groups: associations, every rule, flow logs and diagnostic settings, and findings by severity (open to the internet, shadowed rules, subnet and NIC conflicts, logging gaps). A console view, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                                                                                                                       |
 | [`Get-AACStorageAccountContainerSize`](docs/Get-AACStorageAccountContainerSize.md)               | How much is stored in every blob container of your storage accounts: blobs, bytes, access tiers (Hot, Cool, Cold, Archive), snapshots, versions and deleted blobs, the newest change and the largest blobs - read in parallel, a page of 5,000 blobs at a time. Entra ID or a short-lived account SAS. A console view with every account and container as a tree, objects, and CSV and interactive HTML reports.                                                                                                                                                                                                                                  |
 | [`Get-AACTerraformPlan`](docs/Get-AACTerraformPlan.md)                                           | A Terraform plan in JSON (`terraform show -json`), flattened: what will be created, updated, replaced, deleted, read, imported and moved - and why - down to each attribute's before and after value, with the outputs and what changed outside Terraform. Sensitive values are never shown. Offline: no sign-in. A console view, objects, and CSV and interactive HTML reports.                                                                                                                                                                                                                                                                  |
 | [`Export-AACTerraform`](docs/Export-AACTerraform.md)                                             | Existing resources as Terraform - a resource group, resources by ID or piped, or a Resource Graph query - through the Azure Export for Terraform API (a long-running operation, polled with progress): a folder ready for terraform init and plan, with import blocks. What azurerm can't export is listed, and `-FallbackToAzApi` exports it with azapi; `-Plan` runs terraform plan to prove the export. A console view, objects, and CSV, HTML and PDF reports.                                                                                                                                                                                |
 | [`Get-AACDiagnosticSetting`](docs/Get-AACDiagnosticSetting.md)                                   | Every resource's diagnostic settings, flattened, and the resources whose logs don't reach a Log Analytics workspace: each one's status (exported, partial, not to a workspace, no setting), what's missing and why, and misconfigurations (deleted workspaces, nothing enabled, logs sent twice, another region, unexpected workspace, retired retention). Storage services and subscription activity logs included. A console view, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                          |
-| [`Get-AACEntraGroupMembership`](docs/Get-AACEntraGroupMembership.md)                             | Entra ID groups and everyone in them - direct and through nested groups - one row per group and member, with type, source, guests and disabled accounts. A console view with each group's members flattened, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                                                                                                                                                  |
 | [`Show-AACNetworkTopology`](docs/Show-AACNetworkTopology.md)                                     | The network topology of the tenant, management groups, subscriptions or regions, opened in your browser: hubs at the centre of their spokes, or every network inside its tenant, management group, subscription, region and resource group; peerings, gateways, Virtual WAN, firewalls and appliances, private endpoints to their PaaS, routes to their next hop; roles and findings. Saves as PNG, JPEG or SVG.                                                                                                                                                                                                                                  |
 | [`Show-AACResourceMap`](docs/Show-AACResourceMap.md)                                             | A map of one or more resource groups, opened in your browser: the resources with their Azure icons, in subscription, resource group, VNet and subnet boxes, with their connections, dependencies and network paths. Saves as PNG or JPEG.                                                                                                                                                                                                                                                                                                                                                                                                         |
 | [`Show-AACCost`](docs/Show-AACCost.md)                                                           | Subscription costs: month to date by subscription and by service, and a monthly trend, as charts and a table.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | [`Show-AACDashboard`](docs/Show-AACDashboard.md)                                                 | The estate on one screen: one status and an Estate score at the top; health, security, policy, governance (limits, privileged access, unused resources, tags), Advisor and savings, resources by region and type, 14 days of changes and who made them, and with `-IncludeCost` the spend; then what to do next, ranked, with the command that goes deeper. `-HtmlPath`/`-PdfPath` for a report with a tab per section, `-Watch` for a screen on the wall. |
-| [`Show-AACJson`](docs/Show-AACJson.md)                                                           | JSON - or any object, as JSON - indented and syntax-coloured in a panel: ARM templates, REST responses, resources, this module's objects.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | [`Get-AACCostAnomaly`](docs/Get-AACCostAnomaly.md)                                               | Spend anomalies before the invoice: spikes, drops, new spend, level shifts and steady rises by service, resource group, region or meter (robust median/MAD statistics), the resources behind each, a month-end forecast and a subscription benchmark.                                                                                                                                                                                                                                                                                                                                                                                             |
 | [`Get-AACAttackPath`](docs/Get-AACAttackPath.md)                                                 | Attack paths from the Internet, through managed identities, to what an attacker could control or read - with blast radius, risk and the fix; plus Defender for Clouds own paths.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | [`Get-AACAccessReview`](docs/Get-AACAccessReview.md)                                             | A least-privilege access review of Azure RBAC (permanent, PIM-activated, eligible), classic admins, Entra ID roles and Graph application permissions - unused, standing, guest, orphaned and over-broad access, with an attestation CSV.                                                                                                                                                                                                                                                                                                                                                                                                          |
@@ -291,6 +302,25 @@ bookmarks are how you jump to the one you want.
 | [`Get-AACResourceLock`](docs/Get-AACResourceLock.md)                                             | Every resource lock, and the critical resources (key vaults, storage, databases, vaults, networks, DNS zones...) no lock protects - with ReadOnly locks that break more than they protect flagged. |
 | [`Get-AACGovernanceChange`](docs/Get-AACGovernanceChange.md)                                     | Who changed policy and access in the last days: policy definitions, initiatives and assignments, custom roles and role assignments created or updated, with the author resolved and privileged grants flagged. |
 | [`Test-AACAlzPolicy`](docs/Test-AACAlzPolicy.md)                                                 | Your management groups' policy assignments against the Azure Landing Zones reference (a local copy of the ALZ Library): what each archetype assigns that is missing, different or present - and the library file to deploy the missing ones from. |
+
+### Microsoft 365 and Entra ID
+
+Commands for the Microsoft 365 and Entra ID tenant: the Microsoft 365 assessment, group membership, and what applications and managed identities may do.
+
+| Command                                                                                          | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`Invoke-AACM365Assessment`](docs/Invoke-AACM365Assessment.md)                                   | Microsoft 365 tenant discovery and security posture from the Microsoft Graph REST API with one token: Entra ID (settings, Conditional Access, admin roles, MFA registration, authentication methods), Microsoft 365 (domains, Secure Score, SharePoint and OneDrive sharing, audit logging) and Intune (enrollment restrictions, compliance, endpoint security, stale and unmanaged devices) - with zero-trust findings. A console view, an object, CSV and a tabbed HTML report. |
+| [`Get-AACEntraGroupMembership`](docs/Get-AACEntraGroupMembership.md)                             | Entra ID groups and everyone in them - direct and through nested groups - one row per group and member, with type, source, guests and disabled accounts. A console view with each group's members flattened, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                                                                                                                                                  |
+| [`Get-AACApplicationPermission`](docs/Get-AACApplicationPermission.md)                             | Every permission an enterprise application or managed identity holds - API (application) permissions, delegated consents, Entra directory roles with their scope (tenant, administrative unit, object; direct, through groups, PIM-eligible), Azure roles, owned objects and groups, and permissions requested but not granted - with findings for the privileged ones. By object ID, app ID, app registration ID, name or managed identity resource ID. A console view, objects, and CSV, HTML and PDF reports.|
+| [`New-AACApplicationPermission`](docs/New-AACApplicationPermission.md)                             | Lets an enterprise application or managed identity manage specific Entra groups only - not every group, as GroupMember.ReadWrite.All would: an administrative unit with the groups, a custom (or built-in) role with just the group actions, assigned on the unit. Plan, confirm, apply, verify; flags (and with `-RemoveTenantWidePermission` removes) tenant-wide Graph permissions that would override the scope.|
+
+### Azure DevOps
+
+Commands for Azure DevOps organizations: projects, pipelines and the tools they run, repositories, security posture and delivery metrics.
+
+| Command                                                                                          | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`Get-AACADOInventory`](docs/Get-AACADOInventory.md)                                             | One or more Azure DevOps organizations inventoried: projects, pipelines (YAML, or classic - flagged) with their last run and delivery metrics (success rate, duration, queue time, DORA deployment frequency and change failure rate), every task and CLI tool they use with versions - YAML, nested and cross-repository templates, and classic pipelines - and the security posture of service connections, variable groups, environments, branch policies and GitHub Advanced Security, with findings. A PAT or your Azure sign-in; `-IncludeAzure` links service connections to Azure roles. A console view, objects, and CSV, HTML and PDF reports.|
 
 Full help:
 
@@ -1613,6 +1643,185 @@ Invoke-AACCosmosDBAssessment -ResourceGroupName 'rg-data' -TimeRange 7d -HtmlPat
 It reads Resource Graph, Resource Manager and Azure Monitor metrics: Reader
 is enough. It reads no documents and no keys.
 
+## Application permission
+
+`Get-AACApplicationPermission` lists **everything an enterprise application or
+managed identity can do** - in one place, where the portal spreads it over the
+application's API permissions, Roles & admins, administrative units and each
+Azure scope's Access control:
+
+```powershell
+Get-AACApplicationPermission -Identity 'My-Enterprise-App'
+Get-AACApplicationPermission -Identity <app-id or object-id> -NoDisplay | Where-Object Kind -EQ 'Directory role'
+Get-AACApplicationPermission -Identity '/subscriptions/<id>/resourceGroups/rg-app/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-app'
+'app-one', 'app-two' | Get-AACApplicationPermission -HtmlPath .\AppPermissions.html -CsvPath .\AppPermissions.csv
+```
+
+- **Rows, by kind:** application permissions (each API's app roles -
+  tenant-wide), delegated permissions (consented for everyone, or one user),
+  directory roles with their scope (tenant, administrative unit with the
+  objects it covers, or one object; direct or through a role-assignable group),
+  PIM-eligible roles, Azure roles (direct or through a group; `-SkipAzure`
+  leaves them out), owned applications and groups, group memberships, and API
+  permissions the app registration asks for that were never granted.
+- **Findings:** privileged application permissions (`Directory.ReadWrite.All`,
+  `RoleManagement.ReadWrite.Directory`, `AppRoleAssignment.ReadWrite.All`,
+  `Mail.Send`...), privileged directory roles at tenant scope, Azure Owner or
+  User Access Administrator, Contributor on a subscription, privileged
+  delegated scopes consented for everyone, owning another application.
+- **Identity:** service principal object ID, application (client) ID, app
+  registration object ID, display name, or the Azure resource ID of a
+  user-assigned identity (or of a resource with a system-assigned one).
+  `-View Permission|Finding|Summary`.
+
+### Scoped group rights: New-AACApplicationPermission
+
+`New-AACApplicationPermission` lets an enterprise application (or managed
+identity) add and remove members in **specific groups only**. Microsoft Graph
+application permissions are tenant-wide - `GroupMember.ReadWrite.All` covers
+every group, and there is no "selected groups" version of it - so the same
+rights are given with Entra's own scoping instead:
+
+1. an **administrative unit** holding exactly the groups,
+2. a **directory role** with just the group actions (a custom role, created
+   or updated; or a built-in one, used as it is),
+3. that role **assigned to the application on the unit** - not the tenant.
+
+```powershell
+Connect-AAC
+New-AACApplicationPermission -ServicePrincipal 'My-Enterprise-App' -Group 'SG-Group-One', 'SG-Group-Two' -WhatIf   # the plan
+New-AACApplicationPermission -ServicePrincipal 'My-Enterprise-App' -Group 'SG-Group-One', 'SG-Group-Two' -RemoveTenantWidePermission
+New-AACApplicationPermission -ServicePrincipal 'func-myapp-prod' -Group 'SG-Group-One' -Access MemberRead
+New-AACApplicationPermission -ServicePrincipal 'My-Enterprise-App' -Group 'SG-Group-One' -AllowedResourceAction 'microsoft.directory/groups/standard/read', 'microsoft.directory/groups/members/read', 'microsoft.directory/groups/members/update' -RoleName 'Group Member ReadWrite (Scoped)'
+```
+
+- **Idempotent:** what exists is read and only what is missing is written;
+  the plan is shown and you are asked first (`-Force` or `-Confirm:$false`
+  for pipelines, `-WhatIf` for the plan only). After the apply everything is
+  read again; running the command again plans no changes.
+- **Access:** `-Access MemberReadWrite` (default - the rights of
+  `GroupMember.ReadWrite.All`), `MemberRead`, `MemberAndOwnerReadWrite`, or
+  your own group actions with `-AllowedResourceAction`. `-RoleName` names the
+  custom role, or picks a built-in one (`Groups Administrator`).
+- **Findings** - what would undo the scope or not work: a tenant-wide Graph
+  permission (`GroupMember.ReadWrite.All`, `Group.ReadWrite.All`,
+  `Directory.ReadWrite.All` - `-RemoveTenantWidePermission` removes it), the
+  same role at tenant scope, other objects in the unit, dynamic groups,
+  role-assignable groups.
+- `-RestrictedManagement` creates the unit with restricted management, so
+  tenant-wide group administrators can't change its groups either.
+- **Needs** Privileged Role Administrator (or Global Administrator) for the
+  sign-in, and Microsoft Entra ID P1. The application's code doesn't change;
+  its token may be cached for up to an hour (24 hours for a managed
+  identity) before the change takes effect.
+
+## Azure DevOps inventory
+
+`Get-AACADOInventory` inventories one or more Azure DevOps organizations -
+read-only, through the Azure DevOps REST API:
+
+```powershell
+$pat = Read-Host -Prompt 'Azure DevOps PAT' -AsSecureString
+Get-AACADOInventory -Organization contoso -PersonalAccessToken $pat                       # every project
+Get-AACADOInventory -Organization contoso -PersonalAccessToken $pat -HtmlPath .\ADO.html -PdfPath .\ADO.pdf -CsvPath .\ADO.csv
+Get-AACADOInventory -Organization contoso -PersonalAccessToken $pat -View Task -NoDisplay | Where-Object Kind -EQ 'CLI'
+Get-AACADOInventory -Organization contoso -PersonalAccessToken $pat -View ServiceConnection -NoDisplay | Where-Object OpenToAllPipelines
+Get-AACADOInventory -Organization contoso -Project Payments -PersonalAccessToken $pat -YamlPath .\pipelines -Skip Security, Metrics
+Get-AACADOInventory -DiscoverOrganization -UseAzureSignIn -IncludeAzure -HtmlPath .\ADO.html   # with Connect-AAC: every organization, no PAT
+```
+
+- **Pipelines:** every build pipeline - **YAML**, or **classic** (built in
+  the designer, with no YAML file: flagged) - and every classic release
+  pipeline, with its last run, the repository's last push, the service
+  connections, variable groups and environments it uses, and the Azure
+  subscriptions it reaches.
+- **How tools are found:** one catalogue of about 150 tools - each with its
+  category, what it does and the regular expression that finds it - is matched
+  against **every file a pipeline runs**:
+  - its YAML and the templates it includes - local, or from another Azure
+    Repos repository (`template@repo` through `resources: repositories`),
+    nested to `-TemplateDepth` (3) - with comments, `displayName:` and
+    `template:` lines left out;
+  - the **script files** it calls (`filePath:` / `scriptPath:` inputs,
+    `./deploy.sh`, `pwsh -File build.ps1`...) and the scripts those call, from
+    the pipeline's repository (`-MaxScriptFiles`, 25 a pipeline);
+  - the **package.json scripts** `npm run` / `yarn` / `pnpm` run (with their
+    `pre`/`post` scripts) and the **Makefile targets** `make` runs;
+  - a classic pipeline's tasks (mapped from task IDs to names);
+  - **container images** (`ghcr.io/fluxcd/flux-cli:v2.3.0` is Flux, version
+    v2.3.0).
+- **Categories:** Lint, Build, Test, Security, Deploy, Publish, **GitOps**
+  (Flux, Argo CD, Kustomize) and Tooling (az, git, jq, Node.js...). The
+  findings - no linting, no tests, no security scanning - read them, for YAML
+  and classic pipelines alike.
+- **Report tabs for tools:**
+  - **Tools** - one row per tool: category, pipelines, projects, the versions
+    seen (an installer task such as `UseNode@1`, an image tag, or "agent
+    default") and how it was found;
+  - **Coverage** - per pipeline, Yes / No for each stage;
+  - **Evidence** - every match: pipeline, tool, version, how it was found
+    (task, inline script, script file, package.json, Makefile, image, classic
+    task), file, line and the line itself, with credentials masked;
+  - **Unrecognised** - commands scripts run that no rule knows, most-run
+    first (a tool missing from the catalogue shows here), and the templates
+    and script files that couldn't be read, with the reason (a path built from
+    a variable, a GitHub repository...);
+  - **Tasks** (`-View Task`) - every task with its major version and what it
+    does, packages installed at a version (`npm install -g x@1.2`,
+    `Install-Module -RequiredVersion`...), shells, containers, hosted images
+    and pools.
+- **Tools of your own:** `-ToolRule @(@{ Category = 'Deploy'; Tool = 'Acme
+  Deployer'; Pattern = 'acme-deployer\s+push'; Purpose = 'Pushes a release' })`,
+  or a team file with `-ToolRulePath .\rules.psd1`
+  (`@{ Rules = @( @{ ... }, ... ) }`, or a JSON list).
+- **Security posture:** service connections open to every pipeline, signing
+  in with a client secret instead of workload identity federation, or
+  unused; variable groups with secrets kept outside Key Vault, secret-looking
+  variables not marked secret (names only - never values), or open to every
+  pipeline; production environments with no approval, environments with no
+  checks or open to every pipeline; default branches with no required
+  reviewers or build validation; **GitHub Advanced Security for Azure
+  DevOps** per repository (on, off) with its active alerts by type and
+  severity.
+- **Delivery metrics** over `-MetricDays` (30): each pipeline's runs, success
+  rate (cancelled runs left out), average duration and queue time, runs a
+  week; each environment's deployments, deployments a week and **change
+  failure rate** (DORA).
+- **Several organizations:** `-Organization contoso, fabrikam`, or
+  `-DiscoverOrganization` for every organization your sign-in belongs to.
+  Rows carry an Organization column.
+- **Disabled repositories** are left out, with the pipelines that build
+  them (the report says how many); their YAML is never read.
+  `-IncludeDisabledRepository` lists them, each pipeline with a finding.
+- **Progress:** each stage of the read, and the analysis, shows the
+  projects done, the time left and the project being read.
+- **Offline review:** `-YamlPath .\pipelines` saves every pipeline's YAML,
+  the templates it includes, and each classic pipeline's steps (as JSON) -
+  ready to review or diff.
+- **Azure link:** `-IncludeAzure` (after `Connect-AAC`) follows each Azure
+  service connection to its service principal and the Azure roles it holds,
+  and flags pipeline identities that are Owner (or can grant access) or
+  Contributor on a whole subscription.
+- **Findings** also cover classic, stale, failing and disabled pipelines,
+  deprecated or older task versions, unpinned container images, retired
+  hosted images, a value that looks like a secret written into the YAML (its
+  key and line - never the value), unreliable pipelines and long queues, and
+  idle repositories.
+- **Signing in:** `-PersonalAccessToken` (a SecureString; read scopes:
+  Build, Code, Project and Team, Release, Service Connections, Variable
+  Groups, Environment, Advanced Security), the `AZURE_DEVOPS_EXT_PAT`
+  environment variable, or `-UseAzureSignIn` - your `Connect-AAC` sign-in,
+  for organizations connected to your tenant. The token goes only to Azure
+  DevOps and is never written anywhere.
+- YAML in GitHub or another non-Azure Repos repository can't be read through
+  Azure DevOps: the pipeline says so. `-Skip Yaml, Security, Metrics,
+  AdvancedSecurity` leaves parts out, to read faster.
+
+`-View` returns (and writes to `-CsvPath`) Pipeline, Project, Repository,
+Task, Tool, Evidence, Coverage, Unrecognised, ServiceConnection, VariableGroup,
+Environment or Finding rows;
+`-HtmlPath` and `-PdfPath` write a report with a tab for each.
+
 ## Terraform export
 
 `Export-AACTerraform` turns resources you already have into Terraform,
@@ -2462,21 +2671,38 @@ Microsoft.PowerShell`) and run it as `pwsh`.
 
 ```text
 Azure.Admin.Console/
-  Azure.Admin.Console.psd1   Module manifest
-  Azure.Admin.Console.psm1   Loads lib\Spectre.Console.dll, then Private\ and Public\
-  Public/                    Exported commands, one per file, with comment-based help
-  Private/                   Internal helpers (REST, Resource Graph, PKCE, PDF, console views, progress)
+  Azure.Admin.Console.psd1   Module manifest (every exported command, from every area)
+  Azure.Admin.Console.psm1   The parent: loads lib\Spectre.Console.dll, then each area of src\ - Core first
+  src/                       The child areas, each with area.psd1 (what it is), Public\ and Private\
+    Core/                    Connect-AAC and what every area builds on: HTTP, tokens, Resource Manager,
+                             Resource Graph and Microsoft Graph helpers, progress, console views, CSV/HTML/PDF reports
+    Azure/                   Commands for subscriptions and management groups
+    M365/                    Commands for the Microsoft 365 and Entra ID tenant
+    DevOps/                  Commands for Azure DevOps organizations
   PSRule/                    PSRuleRunner.ps1 (runs PSRule in its own pwsh) and Rules\ (the AAC.* rules and their help)
   Parked/                    Invoke-AACPester and its estate check, set aside (not loaded or packaged)
   lib/                       Vendored Spectre.Console and PDFsharp/MigraDoc (MIT)
   en-US/                     about_ help topic and the MAML help Get-Help shows (built by PlatyPS)
-  docs/                      Markdown help, one page per command (built by PlatyPS)
+  docs/                      Markdown help, one page per command; the index groups them by area (built by PlatyPS)
   tools/                     Build-Help.ps1: builds docs\ and the MAML with PlatyPS (not packaged)
-  Tests/                     Unit tests, no Azure needed (not packaged)
+  Tests/                     Unit tests by area - Core\, Azure\, M365\, DevOps\ - and Fixtures\ (no Azure needed, not packaged)
   .github/workflows/         CI and release pipelines
-  build.ps1                  Docs, tests, packaging and publishing (the package merges Private\ and Public\ into one file, for a faster import)
+  build.ps1                  Docs, tests, packaging and publishing (the package merges every area into one file, for a faster import)
   CHANGELOG.md, LICENSE
 ```
+
+### Areas
+
+The module is one parent with child areas. Each area is a folder under `src\`
+with an `area.psd1` (its name, title, description and load order), its
+commands in `Public\` - one per file, named after the command - and its
+helpers in `Private\`. A helper two areas need lives in `src\Core`; a test
+(`Tests\Core\Module.Tests.ps1`) fails if one area calls another area's
+functions, or Core calls into an area. Adding a command is a file in its
+area's `Public\` and its name in the manifest's `FunctionsToExport`;
+adding an area is a folder with its `area.psd1`. Every command is still in
+the one module: `Import-Module Azure.Admin.Console` loads all of them, and
+their names don't depend on the area.
 
 ### Testing
 
@@ -2486,10 +2712,10 @@ The tests run on **Pester 6.2 or later** (below 7), which needs PowerShell
 ```powershell
 Install-PSResource -Name Pester -Version '[6.2.0,7.0)' -Scope CurrentUser
 ./build.ps1 -Task Test                                         # every test
-Invoke-Pester -Path ./Tests/Cost.Tests.ps1 -Output Detailed    # one file
+Invoke-Pester -Path ./Tests/Azure/Cost.Tests.ps1 -Output Detailed    # one file
 ```
 
-The unit tests in `Tests\` cover every command, with no Azure account needed.
+The unit tests in `Tests\<Area>\` cover every command, with no Azure account needed.
 Each one mocks the point where the module leaves the machine and runs
 everything on this side for real:
 
@@ -2540,7 +2766,7 @@ The console views are checked by swapping the Spectre console for one that
 writes to a text buffer, then looking for what should be drawn. For a new
 command, copy the nearest test file and change its mocks.
 
-The comment-based help in each `Public\*.ps1` file is the single source of
+The comment-based help in each `src\<Area>\Public\*.ps1` file is the single source of
 command help. The Docs task builds two things from it with
 [Microsoft.PowerShell.PlatyPS](https://github.com/PowerShell/platyPS) 1.0:
 
@@ -2561,7 +2787,9 @@ Install-PSResource Microsoft.PowerShell.PlatyPS -Scope CurrentUser   # once, to 
 
 The Build task copies only the runtime files into `out\Azure.Admin.Console`.
 It then checks the staged copy: the manifest is valid, the exports match
-`Public\`, a clean import succeeds, and PSScriptAnalyzer reports no errors.
+the areas' `Public\` folders, a clean import succeeds, and PSScriptAnalyzer
+reports no errors. The package merges every area's functions into one file, area by
+area (Core first), for a faster import.
 
 ### CI
 
@@ -2580,8 +2808,8 @@ It then checks the staged copy: the manifest is valid, the exports match
 2. Commit, then push a tag that matches the version:
 
    ```powershell
-   git tag -a v0.14.6-preview1 -m "Azure.Admin.Console v0.14.6-preview1"
-   git push origin v0.14.6-preview1
+   git tag -a v0.14.7 -m "Azure.Admin.Console v0.14.7"
+   git push origin v0.14.7
    ```
 
 **Pre-releases.** A `Prerelease` value in the manifest's `PSData` (for
