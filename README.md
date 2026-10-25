@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/readme/profile-flip.svg" width="200" alt="Azure.Admin.Console: a profile picture that flips to Azure, Reports and Lens icons">
+<img src="assets/readme/profile-flip.svg" width="200" alt="Azure.Admin.Console: a profile picture that flips to Azure, Reports, Lens, M365, Audit, Entra and Logs icons">
 
 # Azure.Admin.Console
 
@@ -120,9 +120,9 @@ Invoke-Pester -Path ./Tests/Azure/Cost.Tests.ps1 -Output Detailed   # one test f
 
 With thanks to the people whose work and ideas shaped this module:
 
-| | | GitHub |
-|---|---|---|
-| <img src="https://github.com/shashi-create.png?size=80" width="40" height="40" alt="Shashi Shetty" style="border-radius:50%"> | **Shashi Shetty** | [![GitHub](https://img.shields.io/badge/GitHub-shashi--create-181717?logo=github)](https://github.com/shashi-create) |
+| GitHub |
+|:---:|
+| <img src="https://github.com/shashi-create.png?size=80" width="40" height="40" alt="Shashi Shetty"> **Shashi Shetty** [![GitHub](https://img.shields.io/badge/GitHub-shashi--create-181717?logo=github)](https://github.com/shashi-create) |
 
 Built on [Spectre.Console](https://spectreconsole.net), [PDFsharp and MigraDoc](https://www.pdfsharp.com) and [PSRule for Azure](https://azure.github.io/PSRule.Rules.Azure/).
 
