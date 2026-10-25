@@ -20,7 +20,8 @@ function ConvertFrom-AACPipelineYaml {
         Returns @{ Steps (@{ Kind - Task or Script; Name; Major; DisplayName;
         Enabled; Inputs; Script; Shell; Line }); Templates (@{ Path; Alias });
         Repositories (@{ Alias; Type; Name; Ref }); Images (vmImage);
-        Containers; Pools; Groups; Environments; Connections }.
+        Containers; Pools; Groups; Environments; Connections; Variables (the
+        names the YAML defines - never their values) }.
     #>
     [CmdletBinding()]
     [OutputType([hashtable])]
@@ -126,6 +127,26 @@ function ConvertFrom-AACPipelineYaml {
         $i = [Math]::Max($i + 1, $j)
     }
 
+    # The variables it defines - names only, never values: the mapping form (variables: then name: value)
+    # and the list form (- name: x), at pipeline, stage or job level; groups and templates are listed apart.
+    $variableNames = [System.Collections.Generic.List[string]]::new()
+    for ($v = 0; $v -lt $lines.Count; $v++) {
+        if ($lines[$v] -notmatch '^\s*variables:\s*$') { continue }
+        $base = $indent[$v]
+        $child = -1
+        for ($w = $v + 1; $w -lt $lines.Count; $w++) {
+            if ($indent[$w] -lt 0) { continue }
+            if ($indent[$w] -le $base) { break }
+            if ($child -lt 0) { $child = $indent[$w] }
+            $item = [regex]::Match($lines[$w], '^\s*-\s*name:\s*[''"]?([\w.-]+)')
+            if ($item.Success) { if (-not $variableNames.Contains($item.Groups[1].Value)) { $variableNames.Add($item.Groups[1].Value) }; continue }
+            $pair = [regex]::Match($lines[$w], '^\s*([\w.-]+)\s*:')
+            if ($pair.Success -and $indent[$w] -eq $child -and $lines[$w].TrimStart() -notmatch '^-' -and $pair.Groups[1].Value -notin 'name', 'value', 'group', 'template', 'readonly') {
+                if (-not $variableNames.Contains($pair.Groups[1].Value)) { $variableNames.Add($pair.Groups[1].Value) }
+            }
+        }
+    }
+
     # What the pipeline refers to.
     $all = $lines -join "`n"
     $templates = @([regex]::Matches($all, '(?m)\btemplate:\s*[''"]?([^''"\s]+)') | ForEach-Object {
@@ -152,5 +173,6 @@ function ConvertFrom-AACPipelineYaml {
         Groups       = @([regex]::Matches($all, '(?m)^\s*-\s*group:\s*[''"]?([^''"\n]+?)[''"]?\s*$') | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique)
         Environments = @($environments | Select-Object -Unique)
         Connections  = @($connections | Select-Object -Unique)
+        Variables    = $variableNames.ToArray()
     }
 }

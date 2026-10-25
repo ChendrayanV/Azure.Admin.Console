@@ -78,7 +78,7 @@ Describe 'Azure Admin Console - Get-AACADOInventory' {
         $ci.Templates | Should -Be 'templates/lint.yml, steps/scan.yml@shared, common/gitleaks.yml@shared-templates'
         @($script:asked | Where-Object { $_ -like '*/repositories/shared-templates/items?path=%2Fcommon%2Fgitleaks.yml*' }).Count | Should -Be 1 -Because '../common/gitleaks.yml is relative to the template that includes it'
         $cd = $rows | Where-Object Pipeline -EQ 'payments-cd'
-        "$($cd.Build) | $($cd.Test) | $($cd.Security) | $($cd.Deploy) | $($cd.Tasks)" | Should -Be 'MSBuild, npm | VSTest |  | Azure App Service, Helm | 4'
+        "$($cd.Build) | $($cd.Test) | $($cd.Security) | $($cd.Deploy) | $($cd.Tasks)" | Should -Be 'MSBuild, npm | VSTest |  | Azure App Service, Helm | 5'
         $infra = Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -NoDisplay | Where-Object Pipeline -EQ 'infra'
         "$($infra.Build) | $($infra.Security) | $($infra.Deploy) | $($infra.GitOps) | $($infra.Lint) | $($infra.Images)" | Should -Be 'Terraform | Checkov | Terraform apply, Environments (approvals) | Flux | yamllint | ubuntu-20.04'
         $tools = @(Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -View Tool -NoDisplay)
@@ -200,6 +200,23 @@ Describe 'Azure Admin Console - Get-AACADOInventory' {
         @($script:asked | Where-Object { $_ -match 'path=%2F(scripts|package\.json|Makefile)' }).Count | Should -Be 0
     }
 
+    It 'lists who to contact per project - Project Administrators, team admins, team members - and leaves them out with -Skip Members' {
+        $people = @(Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -View Member -NoDisplay)
+        @($people | ForEach-Object { "$($_.Project) | $($_.Name) | $($_.Kind) | $($_.Roles) | $($_.Teams)" }) | Should -Be @(
+            'Payments | Alex Contoso | User | Project Administrator; Team admin; Team member | Payments Team (admin), Web Team'
+            'Payments | Contoso Ops | Group | Project Administrator | '
+            'Payments | Sam Contoso | User | Team admin | Web Team (admin)'
+            'Payments | Kim Contoso | User | Team member | Payments Team'
+        )
+        $payments = Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -View Project -NoDisplay | Where-Object Project -EQ 'Payments'
+        "$($payments.Administrators) $($payments.Teams) $($payments.Members) | $($payments.Contacts)" | Should -Be '2 2 4 | Alex Contoso <alex@contoso.com>; Contoso Ops; Sam Contoso <sam@contoso.com>'
+        $text = (& $script:capture { Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -NoPaging }).Text
+        $text | Should -BeLike "*who to contact couldn't be read for every project*" -Because 'Legacy''s people answer 404'
+        $script:asked.Clear()
+        @(Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -Skip Members -View Member -NoDisplay).Count | Should -Be 0
+        @($script:asked | Where-Object { $_ -match '/teams|/_apis/identities' }).Count | Should -Be 0
+    }
+
     It 'reads the security posture: service connections, variable groups, environments, branch policies and Advanced Security' {
         $connections = @(Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -View ServiceConnection -NoDisplay)
         @($connections | ForEach-Object { "$($_.Connection) | $($_.Scheme) | $($_.OpenToAllPipelines) | $($_.AuthorizedPipelines) | $($_.UsedBy)" }) | Should -Be @(
@@ -259,6 +276,81 @@ Describe 'Azure Admin Console - Get-AACADOInventory' {
         ([datetime]::UtcNow - [datetime]::Parse($since, [cultureinfo]::InvariantCulture, 'AdjustToUniversal')).TotalDays | Should -BeGreaterThan 6.9
     }
 
+    It 'reads every branch with its role and age, and names each repository''s branching strategy' {
+        $branches = @(Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -View Branch -NoDisplay | Where-Object Repository -EQ 'payments')
+        @($branches | ForEach-Object { "$($_.Branch) | $($_.Kind) | $($_.Stale) | $($_.Ahead)/$($_.Behind) | $($_.Policies)" }) | Should -Be @(
+            'main | Default | False | 0/0 | Minimum number of reviewers, Build'
+            'develop | Develop | False | 3/0 | '
+            'release/1.0 | Release | False | 0/4 | '
+            'feature/old-idea | Feature | True | 1/90 | '
+            'users/kim/spike | Personal | True | 2/70 | '
+        )
+        $branches[0].PSObject.TypeNames | Should -Contain 'AAC.DevOpsBranch'
+        $repos = @(Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -View Repository -NoDisplay)
+        @($repos | ForEach-Object { "$($_.Repository) | $($_.Strategy) | $($_.Branches) | $($_.StaleBranches) | $($_.Tags) | $($_.OpenPullRequests) | $($_.Lfs)" }) | Should -Be @(
+            'payments | GitFlow | 5 | 2 | 2 | 1 | True'
+            'payments-docs | Single branch | 1 | 0 |  |  | False'
+            'infra | Trunk-based / GitHub flow (short-lived branches) | 2 | 0 |  |  | False'
+        )
+        ($repos | Where-Object Repository -EQ 'payments').AdvsecSettings | Should -Be 'advSecEnabled=True'
+        $findings = @(Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -View Finding -NoDisplay | ForEach-Object { "$($_.Area) | $($_.Item) | $($_.Finding)" })
+        $findings | Should -Contain 'Repository | payments (repository) | Release branches without a policy'
+        $findings | Should -Contain 'Migration | payments (repository) | Uses Git LFS'
+    }
+
+    It 'lists every branch policy in words, with its GitHub equivalent' {
+        $policies = @(Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -View BranchPolicy -NoDisplay)
+        @($policies | ForEach-Object { "$($_.Repository) | $($_.Branch) | $($_.Policy) | $($_.Enabled) | $($_.Settings) | $($_.GitHub)" }) | Should -Be @(
+            "payments | main | Minimum number of reviewers | True | at least 2; creator's vote counts: False; reset on new pushes: False; downvotes allowed: False | Ruleset: required approving reviews"
+            'All repositories | main | Build | True | pipeline payments-ci; queued automatically | Ruleset: required status check (a workflow)'
+            "payments-docs | main | Minimum number of reviewers | False | at least 1; creator's vote counts: False; reset on new pushes: False; downvotes allowed: False | Ruleset: required approving reviews"
+        )
+    }
+
+    It 'lists variables by name - pipeline settings, YAML and variable groups - never their values' {
+        $variables = @(Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -View Variable -NoDisplay)
+        $have = @($variables | ForEach-Object { "$($_.Scope) | $($_.Owner) | $($_.Variable) | $($_.Secret)" })
+        foreach ($expected in 'Pipeline settings | payments-cd | NpmToken | True', 'Pipeline settings | payments-cd | BuildConfiguration | False', 'Variable group | payments-secrets | ApiToken | False', 'Variable group (Key Vault) | kv-linked | SqlPassword | True') { $have | Should -Contain $expected }
+        @($variables | Where-Object Scope -EQ 'YAML').Count | Should -BeGreaterThan 0
+        ($variables | ForEach-Object { $_.PSObject.Properties.Value }) -join ' ' | Should -Not -Match 'tok-123-visible-value|westeurope'
+        $cd = Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -NoDisplay | Where-Object Pipeline -EQ 'payments-cd'
+        "$($cd.Variables) | $($cd.SecretVariables) | $($cd.ExtensionTasks) | $($cd.Pools)" | Should -Be '2 | 1 | replacetokens | onprem-linux'
+    }
+
+    It 'assesses DORA per project from production deployments - environments and classic release stages' {
+        $dora = @(Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -View Dora -NoDisplay)
+        @($dora.Project) | Should -Be @('Payments', 'Platform')
+        $payments = $dora | Where-Object Project -EQ 'Payments'
+        "$($payments.Scope) | $($payments.Deployments) | $($payments.Frequency) | $($payments.LeadTimeHours) $($payments.LeadTime) | $($payments.ChangeFailureRate) $($payments.ChangeFailure) | $($payments.TimeToRestoreHours) $($payments.TimeToRestore) | $($payments.Overall)" | Should -Be 'Production | 3 | Medium | 7.2 Elite | 33.3 Low | 12 High | Low'
+        ($dora | Where-Object Project -EQ 'Platform').ChangeFailureRate | Should -Be 25
+        $payments.PSObject.TypeNames | Should -Contain 'AAC.DevOpsDora'
+    }
+
+    It 'gathers what the move to GitHub needs - feeds, test plans, pools, extensions - with a summary and a map' {
+        $feeds = @(Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -View Feed -NoDisplay)
+        @($feeds | ForEach-Object { "$($_.Project) | $($_.Feed) | $($_.Packages) | $($_.Protocols) | $($_.GitHubPackages)" }) | Should -Be @('Payments | payments-feed | 3 | Npm 2, PyPi 1 | Not for pypi', '(organization) | shared | 1 | NuGet 1 | Supported')
+        @(Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -View TestPlan -NoDisplay).TestPlan | Should -Be 'Payments regression'
+        $pools = @(Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -View AgentPool -NoDisplay)
+        @($pools | ForEach-Object { "$($_.Pool) | $($_.Hosted) | $($_.Agents) | $($_.Online) | $($_.Pipelines)" }) | Should -Be @('Azure Pipelines | True |  |  | 0', 'onprem-linux | False | 2 | 1 | 1')
+        $extensions = @(Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -View Extension -NoDisplay)
+        @($extensions | ForEach-Object { "$($_.Extension) | $($_.Pipelines) | $($_.Disabled)" }) | Should -Be @('Replace Tokens | 1 | False', 'Unused widget | 0 | True') -Because 'built-in extensions have nothing to move'
+        $payments = Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -View Migration -NoDisplay | Where-Object Project -EQ 'Payments'
+        "$($payments.ClassicPipelines) | $($payments.MarketplaceTasks) | $($payments.SecretVariables) | $($payments.TestPlans) | $($payments.Wikis) | $($payments.ServiceHooks) | $($payments.Effort) | $($payments.Complexity)" | Should -Be '2 | 1 | 3 | 1 | 1 | 1 | 19 | High'
+        $payments.AdvancedSecurity | Should -Be "enableOnCreate=True"
+        $map = @(Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -View MigrationMap -NoDisplay)
+        ($map | Where-Object AzureDevOps -EQ 'Git repositories').Count | Should -Be 3
+        $findings = @(Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -View Finding -NoDisplay | ForEach-Object { "$($_.Area) | $($_.Item) | $($_.Finding)" })
+        $findings | Should -Contain "Migration | Payments (artifacts) | Packages GitHub Packages can't hold"
+        $findings | Should -Contain 'Migration | Payments (test plans) | Test plans to keep or move'
+    }
+
+    It 'leaves out branches and the migration data with -Skip Branches, Migration' {
+        $script:asked.Clear()
+        $null = Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -Skip Branches, Migration -NoDisplay
+        @($script:asked | Where-Object { $_ -match 'stats/branches|/refs\?|pullrequests|gitattributes|packaging|testplan|wiki/wikis|distributedtask/pools|hooks/subscriptions|extensionmanagement' }).Count | Should -Be 0
+        @(Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -Skip Branches -View Repository -NoDisplay).Strategy | Should -Be @('Not read', 'Not read', 'Not read')
+    }
+
     It 'leaves parts out with -Skip, and still reads the rest' {
         $script:asked.Clear()
         $rows = @(Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -Skip Security, Metrics, AdvancedSecurity -NoDisplay)
@@ -291,7 +383,7 @@ Describe 'Azure Admin Console - Get-AACADOInventory' {
         $original = $script:ado.Answers["$($script:ado.Organization)/11111111-aaaa-0000-0000-000000000001/_apis/git/repositories/aaaaaaaa-1111-0000-0000-000000000001/items|azure-pipelines.yml"].Body.content
         [System.IO.File]::ReadAllText((Join-Path $folder 'contoso/Payments/payments-ci (#1).yml')) | Should -BeExactly $original
         $classic = Get-Content -LiteralPath (Join-Path $folder 'contoso/Payments/payments-cd (#2).classic.json') -Raw | ConvertFrom-Json
-        @($classic.process.phases[0].steps).Count | Should -Be 4
+        @($classic.process.phases[0].steps).Count | Should -Be 5
         $classic.variableGroups | Should -Be 'payments-secrets'
     }
 
@@ -355,7 +447,10 @@ Describe 'Azure Admin Console - Get-AACADOInventory' {
         $null = & $script:capture { Get-AACADOInventory -Organization contoso -PersonalAccessToken $script:pat -View Repository -CsvPath $csv -HtmlPath $html }
         @(Import-Csv -LiteralPath $csv).Repository | Should -Be @('payments', 'payments-docs', 'infra')
         $model = [regex]::Match((Get-Content -LiteralPath $html -Raw), '<script id="aac-data" type="application/json">(.*?)</script>', 'Singleline').Groups[1].Value | ConvertFrom-Json
-        @($model.tables.id) | Should -Be @('projects', 'pipelines', 'tasks', 'repositories', 'connections', 'groups', 'environments', 'tools', 'coverage', 'evidence', 'unrecognised', 'findings')
+        @($model.tables.id) | Should -Be @('projects', 'members', 'pipelines', 'tasks', 'repositories', 'connections', 'groups', 'environments', 'branches', 'policies', 'variables', 'dora', 'feeds', 'testplans', 'pools', 'extensions', 'migration', 'migrationmap', 'tools', 'coverage', 'evidence', 'unrecognised', 'findings')
+        # The project selector: every project, the Overview row as its card, the People rows as its contacts.
+        "$($model.scope.key) | $($model.scope.card) | $($model.scope.contacts) | $(@($model.scope.values) -join ', ')" | Should -Be 'Project | projects | members | Legacy, Payments, Platform'
+        @($model.tables | Where-Object { @($_.columns.key) -notcontains 'Project' } | ForEach-Object id) | Should -Be @('pools', 'extensions', 'migrationmap', 'tools', 'unrecognised') -Because 'only the organization''s own lists are not by project'
         (Get-Content -LiteralPath $html -Raw) | Should -Not -Match 'fake-pat-value|SuperSecret|tok-123-visible-value'
     }
 
@@ -380,7 +475,7 @@ Describe 'Azure Admin Console - Azure DevOps inventory progress' {
         @($script:progress | ForEach-Object Step | Select-Object -Unique) | Should -Be @(1, 2, 3, 4, 5, 6, 7, 8) -Because 'projects, pipelines, details, alerts, two levels of templates, two of script files'
         $script:progress[0].Text | Should -Be 'Projects and task catalogue - estimating'
         $pipelines = @($script:progress | Where-Object Step -EQ 2)
-        $pipelines[-1].Text | Should -BeLike 'Pipelines, repositories, security, runs - 3/3 projects - * - *'
+        $pipelines[-1].Text | Should -BeLike 'Pipelines, repositories, security, runs - 3/3 projects - *'
         $pipelines[-1].Done | Should -Be $pipelines[-1].Total
         @($pipelines.Text | Where-Object { $_ -match ' - (Payments|Platform|Legacy)$' }).Count | Should -BeGreaterThan 0
     }

@@ -32,6 +32,16 @@ function ConvertTo-AACDevOpsInventory {
         rate, average duration and queue time per pipeline; deployments,
         deployments a week and change failure rate per environment.
 
+        Branching: each branch's role (from its name), age, ahead/behind and
+        policies; each repository's strategy; every branch policy in words
+        with its GitHub equivalent. DORA per project (and for the
+        organization, in Stats.Dora): deployment frequency, lead time (run
+        queued to deployed), change failure rate and time to restore, from
+        production environments and classic release stages, banded Elite to
+        Low. The move to GitHub: variables by name, feeds and packages, test
+        plans, agent pools, extensions, a summary per project with effort
+        points, and a map of where each kind of thing goes.
+
         -AzureLink (from Get-AACADOInventory -IncludeAzure) maps a service
         principal's application ID to its Azure role assignments.
 
@@ -58,6 +68,9 @@ function ConvertTo-AACDevOpsInventory {
         [int] $StaleDays = 90,
 
         [int] $InactiveDays = 180,
+
+        # A branch with no commit in this many days (not the default one) is stale.
+        [int] $StaleBranchDays = 90,
 
         # Application ID (lower case) -> @{ DisplayName; Roles = @(@{ Role; Scope }) }.
         [hashtable] $AzureLink = @{},
@@ -91,6 +104,106 @@ function ConvertTo-AACDevOpsInventory {
     $secretName = '(password|passwd|secret|token|apikey|api_key|connectionstring|accesskey|privatekey|clientsecret)$|^(password|secret|token)'
     $grantRoles = @('Owner', 'User Access Administrator', 'Role Based Access Control Administrator')
     $shellNames = @{ pwsh = 'PowerShell 7 (pwsh)'; powershell = 'Windows PowerShell 5.1'; bash = 'Bash'; cmd = 'cmd'; az = 'Azure CLI shell'; script = 'Shell (bash on Linux and macOS, cmd on Windows)' }
+    $productionName = '(^|[-_. ])(prod|production|prd|live)([-_. ]|$)'
+    # Advanced Security is on when any of its enablement flags is (the names changed with the Secret Protection / Code Security split).
+    $advsecOn = { param($Body) [bool]@('advSecEnabled', 'advSecIsEnabled', 'secretProtectionEnabled', 'codeSecurityEnabled' | Where-Object { [string](Get-AACMember -InputObject $Body -Path $_) -eq 'True' }).Count }
+    # A settings object as 'name=value' text: its flags and short values - not IDs, links or nested objects.
+    $settingsText = {
+        param($Body)
+        if ($Body -isnot [System.Collections.IDictionary]) { return '' }
+        (@(foreach ($settingName in $Body.Keys) {
+                    $settingValue = $Body[$settingName]
+                    if ([string]$settingName -match 'id$|url|_links|descriptor|^scope$' -or $null -eq $settingValue -or $settingValue -is [System.Collections.IDictionary] -or ($settingValue -is [System.Collections.IList])) { continue }
+                    "$settingName=$settingValue"
+                })) -join '; '
+    }
+    # A branch's role, from its name - what the branching strategy is read from.
+    $branchKind = {
+        param([string] $Name, [string] $Default)
+        if ($Name -eq $Default) { 'Default' }
+        elseif ($Name -match '^(develop|development|dev)$') { 'Develop' }
+        elseif ($Name -match '^(release|releases|rel)[/-]') { 'Release' }
+        elseif ($Name -match '^hotfix(es)?[/-]') { 'Hotfix' }
+        elseif ($Name -match '^(feature|features|feat)[/-]') { 'Feature' }
+        elseif ($Name -match '^(bugfix|bug|fix|fixes)[/-]') { 'Bugfix' }
+        elseif ($Name -match '^users?/|@') { 'Personal' }
+        elseif ($Name -match '^(main|master|trunk)$') { 'Mainline' }
+        else { 'Other' }
+    }
+    # The DORA performance bands (State of DevOps 2023, rounded): frequency in deployments a day, lead time
+    # and time to restore in hours, change failure rate in percent.
+    $doraLevel = {
+        param([string] $Metric, $Value)
+        if ($null -eq $Value) { return '' }
+        switch ($Metric) {
+            'Frequency' { if ($Value -ge 1) { 'Elite' } elseif ($Value -ge (1 / 7)) { 'High' } elseif ($Value -ge (1 / 30)) { 'Medium' } else { 'Low' } }
+            'Lead' { if ($Value -lt 24) { 'Elite' } elseif ($Value -lt 168) { 'High' } elseif ($Value -lt 720) { 'Medium' } else { 'Low' } }
+            'Failure' { if ($Value -le 5) { 'Elite' } elseif ($Value -le 10) { 'High' } elseif ($Value -le 15) { 'Medium' } else { 'Low' } }
+            'Restore' { if ($Value -lt 1) { 'Elite' } elseif ($Value -lt 24) { 'High' } elseif ($Value -lt 168) { 'Medium' } else { 'Low' } }
+        }
+    }
+    $levelOrder = @('Elite', 'High', 'Medium', 'Low')
+    $median = { param([object[]] $Numbers) $n = @($Numbers | Where-Object { $null -ne $_ } | Sort-Object); if (-not $n.Count) { return $null }; if ($n.Count % 2) { $n[[int][Math]::Floor($n.Count / 2)] } else { ($n[$n.Count / 2 - 1] + $n[$n.Count / 2]) / 2 } }
+    # Each failed deployment to the time the same environment next deployed successfully: hours to restore.
+    $restoreHours = {
+        param([object[]] $Records)
+        foreach ($group in @($Records | Where-Object { $_.Finish } | Group-Object -Property Environment)) {
+            $ordered = @($group.Group | Sort-Object -Property Finish)
+            # The last deployment has nothing after it (and strict mode won't index past the end).
+            for ($i = 0; $i -lt $ordered.Count - 1; $i++) {
+                # A run of failures is one outage, timed from its first failure.
+                if ($ordered[$i].Result -ne 'failed' -or ($i -gt 0 -and $ordered[$i - 1].Result -eq 'failed')) { continue }
+                $next = @($ordered[($i + 1)..($ordered.Count - 1)] | Where-Object { $_.Result -eq 'succeeded' }) | Select-Object -First 1
+                if ($next) { ($next.Finish - $ordered[$i].Finish).TotalHours }
+            }
+        }
+    }
+    # Branch policies: what each does in words, and what it becomes on GitHub.
+    $policyGitHub = @{
+        'Minimum number of reviewers' = 'Ruleset: required approving reviews'; 'Build' = 'Ruleset: required status check (a workflow)'
+        'Required reviewers' = 'CODEOWNERS and required code-owner review'; 'Comment requirements' = 'Ruleset: require conversation resolution'
+        'Work item linking' = 'No equivalent (a pull request check, or the Azure Boards app)'; 'Require a merge strategy' = 'Allowed merge methods (repository or ruleset)'
+        'Status' = 'Ruleset: required status check'; 'File size restriction' = 'Push ruleset: maximum file size'
+        'Path Length restriction' = 'Push ruleset: maximum file path length'; 'Reserved names restriction' = 'Push ruleset: restricted file paths'
+        'File name restriction' = 'Push ruleset: restricted file paths or extensions'
+    }
+    $policySummary = {
+        param([string] $Type, $Settings, [hashtable] $PipelineNames)
+        $at = { param([string] $Path) Get-AACMember -InputObject $Settings -Path $Path }
+        switch ($Type) {
+            'Minimum number of reviewers' { "at least $(& $at 'minimumApproverCount'); creator's vote counts: $([string](& $at 'creatorVoteCounts') -eq 'True'); reset on new pushes: $([string](& $at 'resetOnSourcePush') -eq 'True'); downvotes allowed: $([string](& $at 'allowDownvotes') -eq 'True')" }
+            'Build' {
+                $bid = [string](& $at 'buildDefinitionId')
+                $minutes = [string](& $at 'validDuration')
+                (@("pipeline $(if ($PipelineNames.ContainsKey($bid)) { $PipelineNames[$bid] } else { "#$bid" })"
+                        $(if ($minutes -and $minutes -ne '0') { "valid for $minutes min" })
+                        $(if ([string](& $at 'manualQueueOnly') -eq 'True') { 'queued by hand' } else { 'queued automatically' })) | Where-Object { $_ }) -join '; '
+            }
+            'Required reviewers' { "$(@(& $at 'requiredReviewerIds').Count) reviewer(s)$(if (& $at 'filenamePatterns') { " for $(@(& $at 'filenamePatterns') -join ', ')" })" }
+            'Require a merge strategy' { 'allowed: ' + (@(@{ allowSquash = 'squash'; allowNoFastForward = 'merge (no fast-forward)'; allowRebase = 'rebase'; allowRebaseMerge = 'rebase and merge' }.GetEnumerator() | Where-Object { [string](& $at $_.Key) -eq 'True' } | ForEach-Object { $_.Value } | Sort-Object) -join ', ') }
+            'Status' { "status $(& $at 'statusGenre')/$(& $at 'statusName')" }
+            'File size restriction' { "files up to $([Math]::Round([double](& $at 'maximumGitBlobSizeInBytes') / 1MB, 1)) MB" }
+            default { & $settingsText $Settings }
+        }
+    }
+    # An Azure Artifacts feed with what is in it, and whether GitHub Packages can take it (npm, NuGet, Maven - not PyPI,
+    # Universal Packages or Cargo).
+    $feedRow = {
+        param($Feed, $PackagesAnswer, [string] $ProjectLabel, [string] $Link)
+        $packagesRead = [bool]($PackagesAnswer -and -not $PackagesAnswer['Error'])
+        $packageList = @(& $itemsOf $PackagesAnswer)
+        $protocols = @($packageList | ForEach-Object { ([string]$_['protocolType']).ToLowerInvariant() } | Select-Object -Unique)
+        $unsupported = @($protocols | Where-Object { $_ -notin 'npm', 'nuget', 'maven' })
+        [pscustomobject][ordered]@{
+            PSTypeName     = 'AAC.DevOpsFeed'; Organization = $orgName; Project = $ProjectLabel; Feed = [string]$Feed['name']
+            Packages       = $(if ($packagesRead) { $packageList.Count } else { $null })
+            Protocols      = (@($packageList | Group-Object -Property { [string]$_['protocolType'] } | Sort-Object -Property Name | ForEach-Object { "$($_.Name) $($_.Count)" })) -join ', '
+            Upstreams      = (@(@($Feed['upstreamSources']) | Where-Object { $_ } | ForEach-Object { [string]$_['name'] })) -join ', '
+            GitHubPackages = $(if (-not $packagesRead) { 'Not read' } elseif (-not $packageList.Count) { 'Nothing to move' } elseif ($unsupported.Count) { "Not for $($unsupported -join ', ')" } else { 'Supported' })
+            Unsupported    = @($packageList | Where-Object { ([string]$_['protocolType']).ToLowerInvariant() -in $unsupported }).Count
+            Url            = $Link
+        }
+    }
 
     # The catalogue's regular expressions, built once: [regex]::IsMatch with a pattern string keeps only
     # 15 in its cache, and there are well over a hundred rules - each would be parsed again every time.
@@ -276,7 +389,8 @@ function ConvertTo-AACDevOpsInventory {
     $taskById = @{}; $taskByName = @{}; $latestMajor = @{}
     foreach ($t in @($Read.Tasks)) {
         if (-not $t) { continue }
-        $info = @{ Name = [string]$t['name']; Friendly = [string]$t['friendlyName']; Description = [string]$t['description']; Category = [string]$t['category']; Deprecated = [string]$t['deprecated'] -eq 'True'; Major = [int](& $member $t 'version.major') }
+        # Contribution: set for a task an extension installed (marketplace) - built-in tasks have none.
+        $info = @{ Name = [string]$t['name']; Friendly = [string]$t['friendlyName']; Description = [string]$t['description']; Category = [string]$t['category']; Deprecated = [string]$t['deprecated'] -eq 'True'; Major = [int](& $member $t 'version.major'); Author = [string]$t['author']; Contribution = [string]$t['contributionIdentifier'] }
         $taskId = ([string]$t['id']).ToLowerInvariant()
         $nameKey = $info.Name.ToLowerInvariant()
         $taskById["$taskId|$($info.Major)"] = $info
@@ -292,11 +406,29 @@ function ConvertTo-AACDevOpsInventory {
     $connectionRows = [System.Collections.Generic.List[object]]::new()
     $groupRows = [System.Collections.Generic.List[object]]::new()
     $environmentRows = [System.Collections.Generic.List[object]]::new()
+    $memberRows = [System.Collections.Generic.List[object]]::new()
+    # The first reason the people of a project couldn't be read (a token without Identity or Project and Team read).
+    $membersError = ''
     $toolUse = @{}
     $evidenceRows = [System.Collections.Generic.List[object]]::new()
     $coverageRows = [System.Collections.Generic.List[object]]::new()
     $unreadRows = [System.Collections.Generic.List[object]]::new()
     $unknownUse = @{}
+    # Branching, the move to GitHub, and DORA.
+    $branchRows = [System.Collections.Generic.List[object]]::new()
+    $policyRows = [System.Collections.Generic.List[object]]::new()
+    $variableRows = [System.Collections.Generic.List[object]]::new()
+    $doraRows = [System.Collections.Generic.List[object]]::new()
+    $feedRows = [System.Collections.Generic.List[object]]::new()
+    $testPlanRows = [System.Collections.Generic.List[object]]::new()
+    $migrationRows = [System.Collections.Generic.List[object]]::new()
+    # Every deployment of the organization (for its DORA tiles), and the pipelines that use each pool and extension.
+    $orgDeployments = [System.Collections.Generic.List[object]]::new()
+    $poolUse = @{}
+    $extensionUse = @{}
+    $useIn = { param([hashtable] $Table, [string] $Key, [string] $Who) if (-not $Key) { return }; $k = $Key.ToLowerInvariant(); if (-not $Table.ContainsKey($k)) { $Table[$k] = [System.Collections.Generic.HashSet[string]]::new() }; $null = $Table[$k].Add($Who) }
+    $hookList = @(& $itemsOf $(if ($Read.Contains('Hooks')) { $Read.Hooks }))
+    $readOf = { param([string] $Name, [string] $Key) if ($Read.Contains($Name) -and $Read[$Name] -is [System.Collections.IDictionary] -and $Read[$Name].Contains($Key)) { $Read[$Name][$Key] } else { $null } }
 
     foreach ($p in @($Read.Projects | Sort-Object -Property { [string]$_['name'] })) {
         $projectId = [string]$p['id']
@@ -329,6 +461,10 @@ function ConvertTo-AACDevOpsInventory {
         $policyAnswer = $Read.Policies[$projectId]
         $policiesRead = [bool]($policyAnswer -and -not $policyAnswer['Error'])
         $policies = @(& $itemsOf $policyAnswer | Where-Object { [string]$_['isEnabled'] -eq 'True' -and [string]$_['isDeleted'] -ne 'True' -and [string]$_['isBlocking'] -eq 'True' })
+        # Every policy (on or off, blocking or not) for the Branch policies tab; build policies name their pipeline.
+        $allPolicies = @(& $itemsOf $policyAnswer | Where-Object { [string]$_['isDeleted'] -ne 'True' })
+        $pipelineNames = @{}
+        foreach ($d in (& $itemsOf $Read.Definitions[$projectId])) { $pipelineNames[[string]$d['id']] = [string]$d['name'] }
         $repoById = @{}
         foreach ($r in (& $itemsOf $Read.Repositories[$projectId])) {
             $rid = [string]$r['id']
@@ -341,7 +477,13 @@ function ConvertTo-AACDevOpsInventory {
                 })
             $reviewers = @($covering | Where-Object { [string](& $member $_ 'type.displayName') -eq 'Minimum number of reviewers' } | ForEach-Object { [int](& $member $_ 'settings.minimumApproverCount') } | Sort-Object -Descending) | Select-Object -First 1
             $advsec = $Read.AdvancedSecurity["$projectId|$rid"]
-            $advsecState = if (-not $advsec -or -not $advsec.Enablement -or $advsec.Enablement['Error']) { 'Unknown' } elseif ([string](& $member $advsec.Enablement['Body'] 'advSecEnabled') -eq 'True') { 'On' } else { 'Off' }
+            $advsecBody = if ($advsec -and $advsec.Enablement -and -not $advsec.Enablement['Error']) { $advsec.Enablement['Body'] } else { $null }
+            $advsecState = if (-not $advsecBody) { 'Unknown' } elseif (& $advsecOn $advsecBody) { 'On' } else { 'Off' }
+            # Branches (with their last commit), tags, open pull requests and Git LFS - for the branching strategy and the move to GitHub.
+            $branchAnswer = if ($Read.Contains('Branches') -and $Read.Branches.ContainsKey($rid)) { $Read.Branches[$rid] } else { $null }
+            $tagAnswer = if ($Read.Contains('Tags') -and $Read.Tags.ContainsKey($rid)) { $Read.Tags[$rid] } else { $null }
+            $prAnswer = if ($Read.Contains('PullRequests') -and $Read.PullRequests.ContainsKey($rid)) { $Read.PullRequests[$rid] } else { $null }
+            $attrAnswer = if ($Read.Contains('GitAttributes') -and $Read.GitAttributes.ContainsKey($rid)) { $Read.GitAttributes[$rid] } else { $null }
             $alerts = @(if ($advsec -and $advsec.Alerts) { & $itemsOf $advsec.Alerts })
             $count = { param([string] $Field, [string] $Expected) @($alerts | Where-Object { [string]$_[$Field] -eq $Expected }).Count }
             $repoById[$rid] = @{
@@ -356,6 +498,13 @@ function ConvertTo-AACDevOpsInventory {
                 BuildValidation  = $(if ($policiesRead) { [bool]@($covering | Where-Object { [string](& $member $_ 'type.displayName') -eq 'Build' }).Count } else { $null })
                 Policies         = $(if ($policiesRead) { (@($covering | ForEach-Object { [string](& $member $_ 'type.displayName') } | Select-Object -Unique) -join ', ') } else { '' })
                 AdvancedSecurity = $advsecState
+                AdvsecSettings   = $(if ($advsecBody) { & $settingsText $advsecBody } else { '' })
+                PushProtection   = $(if (-not $advsecBody) { $null } else { [bool]@($advsecBody.Keys | Where-Object { [string]$_ -match 'push|block' -and [string]$advsecBody[$_] -eq 'True' }).Count })
+                BranchStats      = @(& $itemsOf $branchAnswer)
+                BranchesRead     = [bool]($branchAnswer -and -not $branchAnswer['Error'])
+                Tags             = $(if ($tagAnswer -and -not $tagAnswer['Error']) { @(& $itemsOf $tagAnswer).Count } else { $null })
+                OpenPullRequests = $(if ($prAnswer -and -not $prAnswer['Error']) { @(& $itemsOf $prAnswer).Count } else { $null })
+                Lfs              = $(if (-not $attrAnswer) { $null } elseif ($attrAnswer['Error']) { $false } else { [string](& $member $attrAnswer['Body'] 'content') -match 'filter=lfs' })
                 CriticalAlerts   = & $count 'severity' 'critical'
                 HighAlerts       = & $count 'severity' 'high'
                 MediumAlerts     = & $count 'severity' 'medium'
@@ -370,7 +519,10 @@ function ConvertTo-AACDevOpsInventory {
         $buildAnswer = $Read.Builds[$projectId]
         $metricsRead = [bool]($buildAnswer -and -not $buildAnswer['Error'])
         $runsByDefinition = @{}
+        # Runs by ID: a deployment record names the run that deployed (owner.id), whose queue time starts its lead time.
+        $buildById = @{}
         foreach ($b in (& $itemsOf $buildAnswer)) {
+            $buildById[[string]$b['id']] = $b
             $did = [string](& $member $b 'definition.id')
             if (-not $runsByDefinition.ContainsKey($did)) { $runsByDefinition[$did] = [System.Collections.Generic.List[object]]::new() }
             $runsByDefinition[$did].Add($b)
@@ -466,6 +618,44 @@ function ConvertTo-AACDevOpsInventory {
             foreach ($c in $refs.Connections) { & $use $usedConnections $c $name }
             foreach ($g in $refs.Groups) { & $use $usedGroups $g $name }
             foreach ($env in $refs.Environments) { & $use $usedEnvironments $env $name }
+
+            # --- Variables (names only), marketplace tasks and pools: what the move to GitHub has to carry ------------
+            $pipelineVariables = [System.Collections.Generic.List[string]]::new()
+            $secretVariables = 0
+            $definitionVariables = & $member $d 'variables'
+            if ($definitionVariables -is [System.Collections.IDictionary]) {
+                foreach ($variableName in $definitionVariables.Keys) {
+                    $isSecret = [string](& $member $definitionVariables[$variableName] 'isSecret') -eq 'True'
+                    if ($isSecret) { $secretVariables++ }
+                    $pipelineVariables.Add([string]$variableName)
+                    $variableRows.Add([pscustomobject][ordered]@{
+                            PSTypeName = 'AAC.DevOpsVariable'; Organization = $orgName; Project = $projectName; Scope = 'Pipeline settings'; Owner = $name; Variable = [string]$variableName
+                            Secret = $isSecret; Settable = [string](& $member $definitionVariables[$variableName] 'allowOverride') -eq 'True'
+                            GitHub = $(if ($isSecret) { 'Repository or environment secret (secrets.NAME)' } else { 'Repository or environment variable (vars.NAME)' })
+                        })
+                }
+            }
+            foreach ($src in $sources) {
+                foreach ($variableName in @($src.Parsed['Variables'])) {
+                    if (-not $variableName -or $pipelineVariables.Contains([string]$variableName)) { continue }
+                    $pipelineVariables.Add([string]$variableName)
+                    $variableRows.Add([pscustomobject][ordered]@{
+                            PSTypeName = 'AAC.DevOpsVariable'; Organization = $orgName; Project = $projectName; Scope = 'YAML'; Owner = "$name ($($src.Label))"; Variable = [string]$variableName
+                            Secret = $false; Settable = $false; GitHub = 'env: in the workflow (or vars.NAME if shared)'
+                        })
+                }
+            }
+            $extensionTasks = [System.Collections.Generic.List[string]]::new()
+            foreach ($s in @($steps | Where-Object { $_.Kind -eq 'Task' })) {
+                $nameKey = ([string]$s.Name).ToLowerInvariant()
+                $info = if ($taskByName.ContainsKey("$nameKey|$($s.Major)")) { $taskByName["$nameKey|$($s.Major)"] } elseif ($taskByName.ContainsKey($nameKey)) { $taskByName[$nameKey] } else { $null }
+                if (-not $info -or -not $info.Contribution) { continue }
+                if (-not $extensionTasks.Contains($info.Name)) { $extensionTasks.Add($info.Name) }
+                # publisher.extension.contribution: the first two parts name the extension.
+                & $useIn $extensionUse ((@($info.Contribution -split '\.') | Select-Object -First 2) -join '.') "$projectName / $name"
+            }
+            $poolNames = @(@($refs.Pools) + @([string](& $member $d 'queue.pool.name'), [string](& $member $d 'queue.name')) | Where-Object { $_ } | Select-Object -Unique -First 3)
+            foreach ($poolName in $poolNames) { & $useIn $poolUse $poolName "$projectName / $name" }
 
             # --- Tasks and tools, with versions and what they do --------------------------------------------------
             # One row for each distinct use: two identical steps in a file (or one CLI in two scripts) are one row.
@@ -626,6 +816,10 @@ function ConvertTo-AACDevOpsInventory {
                     Connections    = $refs.Connections -join ', '
                     VariableGroups = $refs.Groups -join ', '
                     Environments   = $refs.Environments -join ', '
+                    Pools          = $poolNames -join ', '
+                    Variables      = $pipelineVariables.Count
+                    SecretVariables = $secretVariables
+                    ExtensionTasks = $extensionTasks -join ', '
                     AzureTargets   = ''
                     Findings       = $findings.Count - $before
                     Url            = "$projectUrl/_build?definitionId=$id"
@@ -653,7 +847,8 @@ function ConvertTo-AACDevOpsInventory {
                     Repository = ''; RepositoryType = ''; DefaultBranch = ''; State = ''; LastRun = $lastRelease; LastResult = $(if ($lastRelease) { [string](& $member $rd 'lastRelease.name') } else { 'Never released' })
                     LastRunBy = [string](& $member $rd 'lastRelease.createdBy.displayName'); LastRunBranch = ''; DaysSinceRun = $releaseDays; LastPush = $null; LastPushBy = ''; DaysSincePush = $null
                     Runs = $null; SuccessRate = $null; AvgDurationMin = $null; AvgQueueMin = $null; RunsPerWeek = $null
-                    Lint = ''; Build = ''; Test = ''; Security = ''; Deploy = ''; Publish = ''; GitOps = ''; Tasks = 0; Templates = ''; Images = ''; Containers = ''; Connections = ''; VariableGroups = ''; Environments = ''; AzureTargets = ''
+                    Lint = ''; Build = ''; Test = ''; Security = ''; Deploy = ''; Publish = ''; GitOps = ''; Tasks = 0; Templates = ''; Images = ''; Containers = ''; Connections = ''; VariableGroups = ''; Environments = ''
+                    Pools = ''; Variables = $null; SecretVariables = $null; ExtensionTasks = ''; AzureTargets = ''
                     Findings = $findings.Count - $before; Url = "$projectUrl/_release?definitionId=$id"
                 })
         }
@@ -743,9 +938,25 @@ function ConvertTo-AACDevOpsInventory {
                     Findings           = $findings.Count - $before
                     Url                = "$projectUrl/_library?itemType=VariableGroups&view=VariableGroupView&variableGroupId=$($g['id'])"
                 })
+            foreach ($variableName in $names) {
+                $isSecret = $type -eq 'AzureKeyVault' -or [string](& $member $vars[$variableName] 'isSecret') -eq 'True'
+                $variableRows.Add([pscustomobject][ordered]@{
+                        PSTypeName = 'AAC.DevOpsVariable'; Organization = $orgName; Project = $projectName; Scope = $(if ($type -eq 'AzureKeyVault') { 'Variable group (Key Vault)' } else { 'Variable group' }); Owner = $gname; Variable = [string]$variableName
+                        Secret = $isSecret; Settable = $false
+                        GitHub = $(if ($type -eq 'AzureKeyVault') { 'Keep in Key Vault: azure/login (OIDC), then read it in the workflow' } elseif ($isSecret) { 'Organization or environment secret' } else { 'Organization or environment variable' })
+                    })
+            }
         }
 
         # --- Environments: checks, and deployments (DORA) --------------------------------------------------------------
+        # Each deployment: where, how it ended, when, and its lead time - from the run being queued to the deployment
+        # finishing (the commit's own time isn't read, so this is the pipeline part of the lead time).
+        $projectDeployments = [System.Collections.Generic.List[object]]::new()
+        $deploymentOf = {
+            param([string] $Where, [bool] $IsProduction, [string] $Outcome, $Finished, $Started)
+            $normalised = switch -Regex ($Outcome) { '^(succeeded|succeededWithIssues|partiallySucceeded)$' { 'succeeded' } '^(failed|rejected)$' { 'failed' } default { $Outcome.ToLowerInvariant() } }
+            [pscustomobject]@{ Environment = $Where; Production = $IsProduction; Result = $normalised; Finish = $Finished; LeadHours = $(if ($Finished -and $Started -and $Finished -ge $Started) { ($Finished - $Started).TotalHours } else { $null }) }
+        }
         foreach ($env in @($environments | Sort-Object -Property { [string]$_['name'] })) {
             $envId = [string]$env['id']
             $envName = [string]$env['name']
@@ -759,7 +970,11 @@ function ConvertTo-AACDevOpsInventory {
             $ok = @($records | Where-Object { [string]$_['result'] -eq 'succeeded' }).Count
             $failed = @($records | Where-Object { [string]$_['result'] -eq 'failed' }).Count
             $lastDeploy = @($records | ForEach-Object { & $when $_['finishTime'] } | Where-Object { $_ } | Sort-Object -Descending) | Select-Object -First 1
-            $production = $envName -match '(^|[-_. ])(prod|production|prd|live)([-_. ]|$)'
+            $production = $envName -match $productionName
+            foreach ($record in $records) {
+                $run = $buildById[[string](& $member $record 'owner.id')]
+                $projectDeployments.Add((& $deploymentOf $envName $production ([string]$record['result']) (& $when $record['finishTime']) $(if ($run) { & $when $run['queueTime'] } else { $null })))
+            }
             $label = "$envName (environment)"
             $before = $findings.Count
             if ($checkAnswer -and -not $checkAnswer['Error']) {
@@ -789,6 +1004,68 @@ function ConvertTo-AACDevOpsInventory {
                 })
         }
 
+        # Classic release deployments count too (their lead time starts when the deployment was queued).
+        $releaseDeploymentAnswer = & $readOf 'ReleaseDeployments' $projectId
+        foreach ($rdep in (& $itemsOf $releaseDeploymentAnswer)) {
+            $finished = & $when $rdep['completedOn']
+            if (-not $finished -or $finished -lt $since) { continue }
+            $stage = [string](& $member $rdep 'releaseEnvironment.name')
+            $projectDeployments.Add((& $deploymentOf $stage ($stage -match $productionName) ([string]$rdep['deploymentStatus']) $finished (& $when $rdep['queuedOn'])))
+        }
+
+        # --- DORA: the four keys over -MetricDays, from production deployments when there are any ------------------
+        $doraSource = @($projectDeployments | Where-Object { $_.Production -and $_.Result -in 'succeeded', 'failed' })
+        $doraScope = 'Production'
+        if (-not $doraSource.Count) { $doraSource = @($projectDeployments | Where-Object { $_.Result -in 'succeeded', 'failed' }); $doraScope = 'All environments' }
+        if ($doraSource.Count) {
+            foreach ($dep in $doraSource) { $orgDeployments.Add(([pscustomobject]@{ Project = $projectName; Environment = "$projectName/$($dep.Environment)"; Result = $dep.Result; Finish = $dep.Finish; LeadHours = $dep.LeadHours })) }
+            $okDeployments = @($doraSource | Where-Object { $_.Result -eq 'succeeded' })
+            $perDay = $okDeployments.Count / $metricDays
+            $leadHours = & $median @($okDeployments | ForEach-Object { $_.LeadHours })
+            $failureRate = 100.0 * @($doraSource | Where-Object { $_.Result -eq 'failed' }).Count / $doraSource.Count
+            $restore = & $median @(& $restoreHours $doraSource)
+            $levels = @((& $doraLevel 'Frequency' $perDay), (& $doraLevel 'Lead' $leadHours), (& $doraLevel 'Failure' $failureRate), (& $doraLevel 'Restore' $restore) | Where-Object { $_ })
+            $doraRows.Add([pscustomobject][ordered]@{
+                    PSTypeName          = 'AAC.DevOpsDora'
+                    Organization        = $orgName
+                    Project             = $projectName
+                    Scope               = $doraScope
+                    Deployments         = $doraSource.Count
+                    DeploymentsPerWeek  = & $round ($okDeployments.Count / $weeks)
+                    Frequency           = & $doraLevel 'Frequency' $perDay
+                    LeadTimeHours       = & $round $leadHours
+                    LeadTime            = & $doraLevel 'Lead' $leadHours
+                    ChangeFailureRate   = & $round $failureRate
+                    ChangeFailure       = & $doraLevel 'Failure' $failureRate
+                    TimeToRestoreHours  = & $round $restore
+                    TimeToRestore       = & $doraLevel 'Restore' $restore
+                    # The weakest key sets the overall level: a team is only as fast as its slowest key.
+                    Overall             = $(@($levelOrder | Where-Object { $_ -in $levels }) | Select-Object -Last 1)
+                })
+        }
+
+        # --- Branch policies: every one, in words, with its GitHub equivalent ------------------------------------------
+        foreach ($policy in $allPolicies) {
+            $policyType = [string](& $member $policy 'type.displayName')
+            $policySettings = & $member $policy 'settings'
+            foreach ($scopeItem in @(@(& $member $policy 'settings.scope') | Where-Object { $_ })) {
+                $scopeRepo = [string]$scopeItem['repositoryId']
+                $refName = [string]$scopeItem['refName']
+                $policyRows.Add([pscustomobject][ordered]@{
+                        PSTypeName   = 'AAC.DevOpsBranchPolicy'
+                        Organization = $orgName
+                        Project      = $projectName
+                        Repository   = $(if (-not $scopeRepo) { 'All repositories' } elseif ($repoById.ContainsKey($scopeRepo)) { $repoById[$scopeRepo].Name } else { $scopeRepo })
+                        Branch       = $(if (-not $refName) { 'All branches' } elseif ([string]$scopeItem['matchKind'] -eq 'Prefix') { ($refName -replace '^refs/heads/', '') + '*' } else { $refName -replace '^refs/heads/', '' })
+                        Policy       = $policyType
+                        Enabled      = [string]$policy['isEnabled'] -eq 'True'
+                        Blocking     = [string]$policy['isBlocking'] -eq 'True'
+                        Settings     = [string](& $policySummary $policyType $policySettings $pipelineNames)
+                        GitHub       = $(if ($policyGitHub.ContainsKey($policyType)) { $policyGitHub[$policyType] } else { 'Check by hand' })
+                    })
+            }
+        }
+
         # --- Repositories ----------------------------------------------------------------------------------------------
         foreach ($rid in @($repoById.Keys | Sort-Object -Property { $repoById[$_].Name })) {
             $r = $repoById[$rid]
@@ -796,6 +1073,56 @@ function ConvertTo-AACDevOpsInventory {
             $days = if ($r.Push) { & $daysSince $r.Push.Date } else { $null }
             $label = "$($r.Name) (repository)"
             $before = $findings.Count
+
+            # --- Branches: role, last commit, ahead/behind the default, policies - and the strategy they add up to -----
+            $branchesHere = [System.Collections.Generic.List[object]]::new()
+            foreach ($bs in $r.BranchStats) {
+                $branchName = [string]$bs['name']
+                $commitDate = & $when (& $member $bs 'commit.committer.date')
+                if (-not $commitDate) { $commitDate = & $when (& $member $bs 'commit.author.date') }
+                $branchDays = & $daysSince $commitDate
+                $isDefault = $branchName -eq $r.DefaultBranch
+                $ref = "refs/heads/$branchName"
+                $onBranch = @($allPolicies | Where-Object { [string]$_['isEnabled'] -eq 'True' } | Where-Object {
+                        @(@(& $member $_ 'settings.scope') | Where-Object { $_ -and (-not $_['repositoryId'] -or [string]$_['repositoryId'] -eq $rid) -and (-not $_['refName'] -or ([string]$_['matchKind'] -ne 'Prefix' -and [string]$_['refName'] -eq $ref) -or ([string]$_['matchKind'] -eq 'Prefix' -and $ref.StartsWith([string]$_['refName']))) }).Count
+                    } | ForEach-Object { [string](& $member $_ 'type.displayName') } | Select-Object -Unique)
+                $branchRow = [pscustomobject][ordered]@{
+                    PSTypeName      = 'AAC.DevOpsBranch'
+                    Organization    = $orgName
+                    Project         = $projectName
+                    Repository      = $r.Name
+                    Branch          = $branchName
+                    Kind            = & $branchKind $branchName $r.DefaultBranch
+                    IsDefault       = $isDefault
+                    LastCommit      = $commitDate
+                    Author          = [string](& $member $bs 'commit.author.name')
+                    DaysSinceCommit = $branchDays
+                    Ahead           = $(if ($isDefault) { 0 } else { [int]$bs['aheadCount'] })
+                    Behind          = $(if ($isDefault) { 0 } else { [int]$bs['behindCount'] })
+                    Stale           = -not $isDefault -and $null -ne $branchDays -and $branchDays -gt $StaleBranchDays
+                    Policies        = $onBranch -join ', '
+                }
+                $branchesHere.Add($branchRow)
+                $branchRows.Add($branchRow)
+            }
+            $others = @($branchesHere | Where-Object { -not $_.IsDefault })
+            $staleBranches = @($others | Where-Object { $_.Stale }).Count
+            $kinds = @($branchesHere | ForEach-Object { $_.Kind })
+            $strategy = if (-not $r.BranchesRead) { 'Not read' }
+            elseif ($branchesHere.Count -le 1) { 'Single branch' }
+            elseif ('Develop' -in $kinds -and ('Release' -in $kinds -or 'Hotfix' -in $kinds)) { 'GitFlow' }
+            elseif ('Develop' -in $kinds) { 'GitFlow-like (a develop branch)' }
+            elseif ('Release' -in $kinds) { 'Trunk-based with release branches' }
+            elseif ($others.Count -and $staleBranches / $others.Count -ge 0.5) { 'Feature branching (long-lived branches)' }
+            else { 'Trunk-based / GitHub flow (short-lived branches)' }
+            $releaseUnprotected = @($branchesHere | Where-Object { $_.Kind -eq 'Release' -and -not $_.Stale -and -not $_.Policies })
+            if (-not $r.Disabled) {
+                if ($staleBranches -ge 20) { & $find 'Low' $label 'Many stale branches' "$staleBranches branches with no commit in $StaleBranchDays days." 'Delete merged and abandoned branches before the move - they are migrated (and kept) otherwise.' 'Repository' }
+                if ($releaseUnprotected.Count) { & $find 'Low' $label 'Release branches without a policy' "$(@($releaseUnprotected | Select-Object -First 5 | ForEach-Object { $_.Branch }) -join ', ')$(if ($releaseUnprotected.Count -gt 5) { ', ...' }) take changes with no review." 'Add a branch policy on release/* (reviewers and build validation), as on the default branch.' 'Repository' }
+                if ($null -ne $r.SizeMB -and $r.SizeMB -ge 1024) { & $find 'Medium' $label 'Large repository' "$($r.SizeMB) MB - GitHub recommends repositories under 1 GB (and blocks files over 100 MB)." 'Clean the history (git filter-repo) or move large files to Git LFS before migrating.' 'Migration' }
+                if ($r.Lfs) { & $find 'Info' $label 'Uses Git LFS' 'Its .gitattributes stores files in Git LFS.' 'LFS objects aren''t moved by GitHub Enterprise Importer: push them separately (git lfs push --all) and check the LFS storage quota.' 'Migration' }
+                if ($r.DefaultBranch -eq 'master') { & $find 'Info' $label 'Default branch is master' 'GitHub''s default for new repositories is main.' 'Optional: rename it to main during the move (pipelines and policies that name master must follow).' 'Migration' }
+            }
             if (-not $r.Disabled) {
                 if ($null -ne $days -and $days -gt $InactiveDays) { & $find 'Low' $label "No push in $InactiveDays days" "Last push $days days ago." 'Archive (disable) it if it is no longer worked on.' 'Repository' }
                 if (-not $r.Pipelines -and $r.Push) { & $find 'Info' $label 'Repository with no pipeline' 'No build pipeline builds this repository.' 'Add a pipeline - even a lint and scan one - or archive the repository.' 'Repository' }
@@ -828,10 +1155,144 @@ function ConvertTo-AACDevOpsInventory {
                     DependencyAlerts = $r.DependencyAlerts
                     SecretAlerts     = $r.SecretAlerts
                     SizeMB           = $r.SizeMB
+                    Branches         = $(if ($r.BranchesRead) { $branchesHere.Count } else { $null })
+                    StaleBranches    = $(if ($r.BranchesRead) { $staleBranches } else { $null })
+                    Strategy         = $strategy
+                    Tags             = $r.Tags
+                    OpenPullRequests = $r.OpenPullRequests
+                    Lfs              = $r.Lfs
+                    PushProtection   = $r.PushProtection
+                    AdvsecSettings   = $r.AdvsecSettings
                     Findings         = $findings.Count - $before
                     Url              = $r.Url
                 })
         }
+
+        # --- People: who to contact - the Project Administrators, the team admins, the team members -----------------
+        # One entry per person (a generic Dictionary: names from the directory can't shadow its own members).
+        $people = [System.Collections.Generic.Dictionary[string, hashtable]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        $personOf = {
+            param([string] $Key, [string] $Name, [string] $Email, [string] $Kind)
+            if (-not $people.ContainsKey($Key)) { $people[$Key] = @{ Name = $Name; Email = $Email; Kind = $Kind; Roles = [System.Collections.Generic.List[string]]::new(); Teams = [System.Collections.Generic.List[string]]::new(); Rank = 9; Admin = $false; TeamAdmin = $false } }
+            $people[$Key]
+        }
+        $addRole = { param([hashtable] $Who, [string] $Role, [int] $Rank) if (-not $Who.Roles.Contains($Role)) { $Who.Roles.Add($Role) }; if ($Rank -lt $Who.Rank) { $Who.Rank = $Rank } }
+        foreach ($answer in @(if ($Read.Contains('AdminMembers') -and $Read.AdminMembers.ContainsKey($projectId)) { $Read.AdminMembers[$projectId] })) {
+            if (-not $answer) { continue }
+            if ($answer['Error'] -and -not $membersError) { $membersError = [string]$answer['Error'] }
+            foreach ($identity in (& $itemsOf $answer)) {
+                $name = [string]$(if ($identity['customDisplayName']) { $identity['customDisplayName'] } else { $identity['providerDisplayName'] })
+                $email = [string](& $member $identity 'properties.Mail.$value')
+                if (-not $email) { $email = [string](& $member $identity 'properties.Account.$value') }
+                $who = & $personOf $(if ($email) { $email } else { [string]$identity['id'] }) $name $email $(if ([string]$identity['isContainer'] -eq 'True') { 'Group' } else { 'User' })
+                & $addRole $who 'Project Administrator' 0
+                $who.Admin = $true
+            }
+        }
+        $teamAnswer = if ($Read.Contains('Teams')) { $Read.Teams[$projectId] } else { $null }
+        if ($teamAnswer -and $teamAnswer['Error'] -and -not $membersError) { $membersError = [string]$teamAnswer['Error'] }
+        $adminAnswer = if ($Read.Contains('Admins')) { $Read.Admins[$projectId] } else { $null }
+        if ($adminAnswer -and $adminAnswer['Error'] -and -not $membersError) { $membersError = [string]$adminAnswer['Error'] }
+        $teamList = @(& $itemsOf $teamAnswer)
+        foreach ($team in $teamList) {
+            $teamName = [string]$team['name']
+            $answer = if ($Read.TeamMembers.ContainsKey("$projectId|$($team['id'])")) { $Read.TeamMembers["$projectId|$($team['id'])"] } else { $null }
+            foreach ($m in (& $itemsOf $answer)) {
+                $identity = $m['identity']
+                if (-not $identity) { continue }
+                $email = [string]$identity['uniqueName']
+                $who = & $personOf $(if ($email) { $email } else { [string]$identity['id'] }) ([string]$identity['displayName']) $email $(if ([string]$identity['isContainer'] -eq 'True') { 'Group' } else { 'User' })
+                $isAdmin = [string]$m['isTeamAdmin'] -eq 'True'
+                & $addRole $who $(if ($isAdmin) { 'Team admin' } else { 'Team member' }) $(if ($isAdmin) { 1 } else { 2 })
+                if ($isAdmin) { $who.TeamAdmin = $true }
+                $label = if ($isAdmin) { "$teamName (admin)" } else { $teamName }
+                if (-not $who.Teams.Contains($label)) { $who.Teams.Add($label) }
+            }
+        }
+        $sortedPeople = @($people.Values | Sort-Object -Property @{ Expression = { $_.Rank } }, @{ Expression = { $_.Kind -ne 'User' } }, @{ Expression = { $_.Name } })
+        foreach ($who in $sortedPeople) {
+            $memberRows.Add([pscustomobject][ordered]@{
+                    PSTypeName = 'AAC.DevOpsMember'; Organization = $orgName; Project = $projectName; Name = $who.Name; Email = $who.Email; Kind = $who.Kind
+                    Roles = $who.Roles -join '; '; Teams = $who.Teams -join ', '; ProjectAdministrator = $who.Admin; TeamAdmin = $who.TeamAdmin
+                })
+        }
+        # The project's first contacts: its administrators (people before groups), then its team admins.
+        $contacts = @($sortedPeople | Where-Object { $_.Admin -or $_.TeamAdmin } | Select-Object -First 6 | ForEach-Object { if ($_.Kind -eq 'User' -and $_.Email -and $_.Email -ne $_.Name) { "$($_.Name) <$($_.Email)>" } else { $_.Name } })
+        $contactsMore = @($sortedPeople | Where-Object { $_.Admin -or $_.TeamAdmin }).Count - $contacts.Count
+
+        # --- Artifacts, test plans, wikis, service hooks, Advanced Security defaults: the rest of the move to GitHub --
+        $feedsAnswer = & $readOf 'Feeds' $projectId
+        $projectFeeds = @(foreach ($feed in (& $itemsOf $feedsAnswer)) {
+                $row = & $feedRow $feed (& $readOf 'Packages' "$projectId/$($feed['id'])") $projectName "$projectUrl/_artifacts/feed/$([System.Uri]::EscapeDataString([string]$feed['name']))"
+                $feedRows.Add($row)
+                $row
+            })
+        $testPlansAnswer = & $readOf 'TestPlans' $projectId
+        $projectPlans = @(foreach ($plan in (& $itemsOf $testPlansAnswer)) {
+                $row = [pscustomobject][ordered]@{
+                    PSTypeName = 'AAC.DevOpsTestPlan'; Organization = $orgName; Project = $projectName; TestPlan = [string]$plan['name']; Id = [int]$plan['id']
+                    State = [string]$plan['state']; AreaPath = [string]$plan['areaPath']; Iteration = [string]$plan['iteration']; Owner = [string](& $member $plan 'owner.displayName')
+                    Updated = & $when $plan['updatedDate']
+                    GitHub = 'No GitHub equivalent: keep Azure Test Plans (Basic + Test Plans licence), or move to a test management tool'
+                    Url = "$projectUrl/_testPlans/define?planId=$($plan['id'])"
+                }
+                $testPlanRows.Add($row)
+                $row
+            })
+        $wikiList = @(& $itemsOf (& $readOf 'Wikis' $projectId))
+        $projectHooks = @($hookList | Where-Object { [string](& $member $_ 'publisherInputs.projectId') -eq $projectId })
+        $advsecProjectAnswer = & $readOf 'AdvancedSecurityProject' $projectId
+        $advsecProjectBody = if ($advsecProjectAnswer -and -not $advsecProjectAnswer['Error']) { $advsecProjectAnswer['Body'] } else { $null }
+        $unsupportedFeeds = @($projectFeeds | Where-Object { $_.Unsupported })
+        if ($unsupportedFeeds.Count) { & $find 'Medium' "$projectName (artifacts)" 'Packages GitHub Packages can''t hold' "$(@($unsupportedFeeds | ForEach-Object { "$($_.Feed): $($_.GitHubPackages -replace '^Not for ', '')" }) -join '; ')." 'Keep those feeds in Azure Artifacts, or move them to another registry (JFrog, a cloud registry), before switching off Azure DevOps.' 'Migration' }
+        if ($projectPlans.Count) { & $find 'Info' "$projectName (test plans)" 'Test plans to keep or move' "$($projectPlans.Count) test plan(s) - GitHub has no test case management." 'Keep Azure Test Plans running beside GitHub, or export the plans to a test management tool.' 'Migration' }
+
+        # --- Migration summary: what moves easily, what needs work, and roughly how much ----------------------------
+        $projectRepos = @($repositoryRows | Where-Object { $_.Project -eq $projectName })
+        $classicBuilds = @($mine | Where-Object { $_.Kind -eq 'Classic build' }).Count
+        $classicReleases = @($mine | Where-Object { $_.Kind -eq 'Classic release' }).Count
+        $marketplaceTasks = @($mine | ForEach-Object { $_.ExtensionTasks -split ', ' } | Where-Object { $_ } | Select-Object -Unique)
+        $secretCount = @($variableRows | Where-Object { $_.Project -eq $projectName -and $_.Secret }).Count
+        $approvalEnvironments = @($environmentRows | Where-Object { $_.Project -eq $projectName -and $_.Approval }).Count
+        $secretConnections = @($connectionRows | Where-Object { $_.Project -eq $projectName -and $_.Scheme -in 'ServicePrincipal', 'UsernamePassword', 'PublishProfile', 'Token' }).Count
+        $largeRepos = @($projectRepos | Where-Object { $null -ne $_.SizeMB -and $_.SizeMB -ge 1024 }).Count
+        $lfsRepos = @($projectRepos | Where-Object { $_.Lfs }).Count
+        $effort = 2 * $classicBuilds + 3 * $classicReleases + 2 * $marketplaceTasks.Count + $(if ($projectPlans.Count) { 3 } else { 0 }) + 3 * $unsupportedFeeds.Count + 3 * $largeRepos + $lfsRepos + [int][Math]::Ceiling($secretCount / 10) + $approvalEnvironments + $secretConnections + $(if ($wikiList.Count) { 1 } else { 0 })
+        $notes = @(
+            $(if ($classicBuilds + $classicReleases) { "$($classicBuilds + $classicReleases) classic pipeline(s) to rewrite as workflows (GitHub Actions Importer helps)" })
+            $(if ($marketplaceTasks.Count) { "marketplace tasks to replace with actions: $(@($marketplaceTasks | Select-Object -First 5) -join ', ')" })
+            $(if ($secretCount) { "$secretCount secret variable(s) to re-create - values can't be exported" })
+            $(if ($secretConnections) { "$secretConnections service connection(s) with stored credentials - use OIDC (azure/login) instead" })
+            $(if ($approvalEnvironments) { "$approvalEnvironments environment(s) with approvals - set up protection rules on GitHub environments" })
+            $(if ($unsupportedFeeds.Count) { 'feeds with packages GitHub Packages can''t hold' })
+            $(if ($projectPlans.Count) { 'test plans have no GitHub equivalent' })
+            $(if ($largeRepos + $lfsRepos) { 'large or LFS repositories need extra steps' })
+        ) | Where-Object { $_ }
+        $migrationRows.Add([pscustomobject][ordered]@{
+                PSTypeName           = 'AAC.DevOpsMigration'
+                Organization         = $orgName
+                Project              = $projectName
+                Repositories         = $projectRepos.Count
+                RepositoriesMB       = & $round (& $sumOf $projectRepos 'SizeMB')
+                LfsRepositories      = $lfsRepos
+                YamlPipelines        = @($mine | Where-Object { $_.Kind -eq 'YAML' }).Count
+                ClassicPipelines     = $classicBuilds + $classicReleases
+                MarketplaceTasks     = $marketplaceTasks.Count
+                Variables            = @($variableRows | Where-Object { $_.Project -eq $projectName }).Count
+                SecretVariables      = $secretCount
+                ServiceConnections   = $endpoints.Count
+                Environments         = $environments.Count
+                Feeds                = $projectFeeds.Count
+                Packages             = & $sumOf $projectFeeds 'Packages'
+                TestPlans            = $(if ($testPlansAnswer -and -not $testPlansAnswer['Error']) { $projectPlans.Count } else { $null })
+                Wikis                = $wikiList.Count
+                ServiceHooks         = $projectHooks.Count
+                OpenPullRequests     = & $sumOf $projectRepos 'OpenPullRequests'
+                AdvancedSecurity     = $(if ($advsecProjectBody) { & $settingsText $advsecProjectBody } else { '' })
+                Effort               = $effort
+                Complexity           = $(if ($effort -lt 5) { 'Low' } elseif ($effort -lt 15) { 'Medium' } else { 'High' })
+                Notes                = $notes -join '; '
+            })
 
         $projectPushes = @($repoById.Values | Where-Object { $_.Push -and $_.Push.Date } | ForEach-Object { $_.Push.Date } | Sort-Object -Descending)
         $projectRows.Add([pscustomobject][ordered]@{
@@ -853,9 +1314,79 @@ function ConvertTo-AACDevOpsInventory {
                 State              = [string]$p['state']
                 LastUpdate         = & $when $p['lastUpdateTime']
                 Findings           = $findings.Count - $projectFindingsFrom
+                Administrators     = @($sortedPeople | Where-Object { $_.Admin }).Count
+                Teams              = $teamList.Count
+                Members            = $sortedPeople.Count
+                Contacts           = ($contacts -join '; ') + $(if ($contactsMore -gt 0) { "; and $contactsMore more" } else { '' })
                 Id                 = $projectId
                 Url                = $projectUrl
             })
+    }
+
+    # --- The organization's own: feeds outside a project, agent pools, extensions --------------------------------------
+    foreach ($feed in (& $itemsOf $(if ($Read.Contains('OrganizationFeeds')) { $Read.OrganizationFeeds }))) {
+        $feedRows.Add((& $feedRow $feed (& $readOf 'Packages' "org/$($feed['id'])") '(organization)' "$org/_artifacts/feed/$([System.Uri]::EscapeDataString([string]$feed['name']))"))
+    }
+    $poolRows = @(foreach ($pool in (& $itemsOf $(if ($Read.Contains('Pools')) { $Read.Pools }))) {
+            $hosted = [string]$pool['isHosted'] -eq 'True'
+            $agentAnswer = & $readOf 'Agents' ([string]$pool['id'])
+            $agentList = @(& $itemsOf $agentAnswer)
+            $users = $poolUse[([string]$pool['name']).ToLowerInvariant()]
+            [pscustomobject][ordered]@{
+                PSTypeName = 'AAC.DevOpsAgentPool'; Organization = $orgName; Pool = [string]$pool['name']; Hosted = $hosted; Type = [string]$pool['poolType']
+                Agents = $(if ($hosted) { $null } elseif ($agentAnswer -and -not $agentAnswer['Error']) { $agentList.Count } else { $null })
+                Online = $(if ($hosted -or -not $agentList.Count) { $null } else { @($agentList | Where-Object { [string]$_['status'] -eq 'online' }).Count })
+                Pipelines = $(if ($users) { $users.Count } else { 0 })
+                GitHub = $(if ($hosted) { 'GitHub-hosted runners' } elseif ($agentList.Count) { 'Self-hosted runners (or larger GitHub-hosted runners, with private networking if they reach private resources)' } else { 'Nothing to move' })
+            }
+        })
+    $extensionRows = @(@(foreach ($ext in (& $itemsOf $(if ($Read.Contains('Extensions')) { $Read.Extensions }))) {
+            # Built-in (Microsoft's, installed with every organization) extensions have nothing to move.
+            if ([string]$ext['flags'] -match 'builtIn|system' -or [string]$ext['publisherId'] -eq 'ms') { continue }
+            $extKey = "$($ext['publisherId']).$($ext['extensionId'])"
+            $users = $extensionUse[$extKey.ToLowerInvariant()]
+            [pscustomobject][ordered]@{
+                PSTypeName = 'AAC.DevOpsExtension'; Organization = $orgName; Extension = [string]$ext['extensionName']; Publisher = [string]$ext['publisherName']; Id = $extKey; Version = [string]$ext['version']
+                Disabled = [string](& $member $ext 'installState.flags') -match 'disabled'
+                Pipelines = $(if ($users) { $users.Count } else { 0 })
+                UsedBy = $(if ($users) { (@($users) | Sort-Object | Select-Object -First 5) -join ', ' } else { '' })
+                GitHub = $(if ($users) { 'Find a GitHub Action (or a script) for each of its tasks' } else { 'Not used by a pipeline - nothing to move' })
+            }
+        }) | Sort-Object -Property @{ Expression = { $_.Pipelines }; Descending = $true }, Extension)
+    # Where each Azure DevOps thing lands on GitHub, with how many there are.
+    $mapRow = { param([string] $Thing, $Count, [string] $GitHub, [string] $Tool, [string] $Note) [pscustomobject][ordered]@{ PSTypeName = 'AAC.DevOpsMigrationMap'; Organization = $orgName; AzureDevOps = $Thing; Count = $Count; GitHub = $GitHub; HowToMove = $Tool; Note = $Note } }
+    $mapRows = @(
+        & $mapRow 'Git repositories' $repositoryRows.Count 'Repositories' 'GitHub Enterprise Importer (gh ado2gh)' 'History, branches, tags; pull requests and their comments come too.'
+        & $mapRow 'Branch policies' $policyRows.Count 'Rulesets (and CODEOWNERS)' 'gh ado2gh migrates some; recreate the rest' 'See the Branch policies tab for each one''s GitHub equivalent.'
+        & $mapRow 'YAML pipelines' @($pipelines | Where-Object { $_.Kind -eq 'YAML' }).Count 'GitHub Actions workflows' 'GitHub Actions Importer (gh actions-importer)' 'Templates become reusable workflows or composite actions.'
+        & $mapRow 'Classic pipelines' @($pipelines | Where-Object { $_.Kind -ne 'YAML' }).Count 'GitHub Actions workflows' 'GitHub Actions Importer (it reads classic too)' 'Classic releases: stages become jobs with environments.'
+        & $mapRow 'Variables' @($variableRows | Where-Object { -not $_.Secret }).Count 'Variables (repository, environment, organization)' 'Re-create (gh variable set)' ''
+        & $mapRow 'Secret variables' @($variableRows | Where-Object { $_.Secret }).Count 'Secrets (repository, environment, organization)' 'Re-create (gh secret set) - values can''t be exported' 'Key Vault groups: read the vault from the workflow instead.'
+        & $mapRow 'Service connections' $connectionRows.Count 'OIDC federated credentials, secrets' 'Re-create' 'Azure: a federated credential for the repository plus azure/login.'
+        & $mapRow 'Environments' $environmentRows.Count 'Environments with protection rules' 'Re-create' 'Approvals become required reviewers; branch control becomes deployment branch rules.'
+        & $mapRow 'Agent pools' @($poolRows | Where-Object { -not $_.Hosted }).Count 'Self-hosted runners (runner groups)' 'Install the runner' ''
+        & $mapRow 'Artifacts feeds' $feedRows.Count 'GitHub Packages (npm, NuGet, Maven, containers)' 'Re-publish packages' 'PyPI, Universal Packages and Cargo have no GitHub Packages registry.'
+        & $mapRow 'Marketplace extensions' @($extensionRows | Where-Object { $_.Pipelines }).Count 'GitHub Actions (Marketplace)' 'Find an equivalent' ''
+        & $mapRow 'Test plans' $testPlanRows.Count 'None' 'Keep Azure Test Plans, or a test management tool' ''
+        & $mapRow 'Advanced Security' @($repositoryRows | Where-Object { $_.AdvancedSecurity -eq 'On' }).Count 'GitHub Advanced Security (Secret Protection, Code Security)' 'Turn it on per repository (or by policy)' 'Alerts are not moved: they are found again on the first scans.'
+        & $mapRow 'Boards and wikis' $null 'Azure Boards (with the GitHub app) or Issues and Projects; wikis' 'Keep Boards linked (AB#123), or migrate with a tool' 'Not counted by this report.'
+    )
+    # The organization's DORA: every project's deployments together.
+    $orgDora = @{}
+    if ($orgDeployments.Count) {
+        $okAll = @($orgDeployments | Where-Object { $_.Result -eq 'succeeded' })
+        $perDayAll = $okAll.Count / $metricDays
+        $leadAll = & $median @($okAll | ForEach-Object { $_.LeadHours })
+        $failureAll = 100.0 * @($orgDeployments | Where-Object { $_.Result -eq 'failed' }).Count / $orgDeployments.Count
+        $restoreAll = & $median @(& $restoreHours $orgDeployments.ToArray())
+        $levelsAll = @((& $doraLevel 'Frequency' $perDayAll), (& $doraLevel 'Lead' $leadAll), (& $doraLevel 'Failure' $failureAll), (& $doraLevel 'Restore' $restoreAll) | Where-Object { $_ })
+        $orgDora = @{
+            DeploymentsPerWeek = & $round ($okAll.Count / $weeks); Frequency = & $doraLevel 'Frequency' $perDayAll
+            LeadTimeHours = & $round $leadAll; LeadTime = & $doraLevel 'Lead' $leadAll
+            ChangeFailureRate = & $round $failureAll; ChangeFailure = & $doraLevel 'Failure' $failureAll
+            TimeToRestoreHours = & $round $restoreAll; TimeToRestore = & $doraLevel 'Restore' $restoreAll
+            Overall = $(@($levelOrder | Where-Object { $_ -in $levelsAll }) | Select-Object -Last 1)
+        }
     }
 
     $rank = @{ High = 0; Medium = 1; Low = 2; Info = 3 }
@@ -883,6 +1414,18 @@ function ConvertTo-AACDevOpsInventory {
         ServiceConnections = $connectionRows.ToArray()
         VariableGroups     = $groupRows.ToArray()
         Environments       = $environmentRows.ToArray()
+        Members            = $memberRows.ToArray()
+        MembersError       = $membersError
+        Branches           = $branchRows.ToArray()
+        BranchPolicies     = $policyRows.ToArray()
+        Variables          = $variableRows.ToArray()
+        Dora               = $doraRows.ToArray()
+        Feeds              = $feedRows.ToArray()
+        TestPlans          = $testPlanRows.ToArray()
+        AgentPools         = $poolRows
+        Extensions         = $extensionRows
+        Migration          = $migrationRows.ToArray()
+        MigrationMap       = $mapRows
         Tools              = $tools
         Evidence           = $evidenceRows.ToArray()
         Coverage           = $coverageRows.ToArray()
@@ -904,10 +1447,20 @@ function ConvertTo-AACDevOpsInventory {
             Deployments       = & $sumOf $environmentRows 'Deployments'
             FailedDeployments = & $sumOf $environmentRows 'Failed'
             High              = @($findings | Where-Object { $_.Severity -eq 'High' }).Count
+            Members           = $memberRows.Count
             Unrecognised      = @($unknownRows).Count
             NotRead           = @($unread).Count
             DisabledRepositories = $disabledRepositories
             DisabledPipelines = $disabledPipelines
+            Branches          = $branchRows.Count
+            StaleBranches     = @($branchRows | Where-Object { $_.Stale }).Count
+            BranchPolicies    = $policyRows.Count
+            SecretVariables   = @($variableRows | Where-Object { $_.Secret }).Count
+            Packages          = & $sumOf $feedRows 'Packages'
+            TestPlans         = $testPlanRows.Count
+            MigrationEffort   = & $sumOf $migrationRows 'Effort'
+            HighComplexity    = @($migrationRows | Where-Object { $_.Complexity -eq 'High' }).Count
+            Dora              = $orgDora
         }
     }
 }

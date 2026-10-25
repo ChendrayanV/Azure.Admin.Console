@@ -110,6 +110,27 @@ button.tile:hover { border-color: var(--accent); transform: translateY(-1px); }
 .heat-legend span.sw { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: middle; margin-right: 4px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 12px; margin-top: 16px; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 16px; min-width: 0; }
+.scope { margin-top: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 16px; }
+.scope-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.scope-bar label { font-weight: 650; }
+.scope-bar select { font: inherit; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); max-width: 100%; }
+.scope-bar select.on { border-color: var(--accent); background: var(--accent-soft); }
+.scope .hint { color: var(--muted); font-size: 12.5px; }
+.scope-card .tool-btn { margin-top: 8px; }
+.scope-card { margin-top: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.scope-card h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; font-weight: 650; }
+.scope-card dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: 13px; }
+.scope-card dt { color: var(--muted); }
+.scope-card dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.scope-links { display: flex; flex-wrap: wrap; gap: 6px; }
+.scope-links button { font: inherit; font-size: 12.5px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); cursor: pointer; }
+.scope-links button b { margin-left: 6px; }
+.scope-links button.zero { color: var(--faint); }
+.scope-people { width: 100%; border-collapse: collapse; font-size: 13px; }
+.scope-people td, .scope-people th { text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+.scope-people th { color: var(--muted); font-weight: 600; }
+.scope-note { display: none; }
+.scoped .scope-note { display: inline; }
 .card.wide { grid-column: 1 / -1; }
 .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; font-weight: 650; }
 .hbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; align-items: center; padding: 5px 6px; margin: 0 -6px; border-radius: 8px; border: 0; background: none; width: calc(100% + 12px); text-align: left; }
@@ -330,6 +351,7 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
 </header>
 <main class="wrap">
   <nav class="tabbar" id="tabbar" role="tablist" aria-label="Report sections" hidden></nav>
+  <section class="scope" id="scope" hidden></section>
   <section class="tiles" id="tiles"></section>
   <div id="notices"></div>
   <section class="grid" id="charts"></section>
@@ -644,6 +666,9 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
     var state = { q: '', facets: {}, sort: T.sort ? { key: T.sort.key, desc: !!T.sort.desc } : null, group: T.group || '', shown: pageSize, closed: {} };
     // Filters the table opens with (e.g. only failures); Reset clears them.
     for (var fk in (T.filters || {})) state.facets[fk] = String(T.filters[fk]);
+    // The report-wide scope (a project, say): a filter of its own, which Reset leaves alone.
+    var scopeKey = D.scope && cols.some(function (c) { return c.key === D.scope.key; }) ? D.scope.key : null, scopeValue = '';
+    function scopeOf(r) { var v = r[scopeKey]; return v === null || v === undefined ? '' : String(v); }
     // Collapsed by default: the header (chevron, title, row count) opens and
     // closes the table; a tile, chart or tree click on it opens it.
     var section = el('section', 'tbl collapsed'); section.id = 'table-' + T.id;
@@ -655,6 +680,7 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
     head.appendChild(el('h2', null, T.title));
     head.appendChild(el('span', 'tcount', rows.length.toLocaleString() + ' ' + (T.noun || 'rows')));
     if (T.note) head.appendChild(el('span', 'note', T.note));
+    if (D.scope && !scopeKey) head.appendChild(el('span', 'note scope-note', 'Not by ' + String(D.scope.label).toLowerCase() + ': every row'));
     section.appendChild(head);
     var body = el('div', 'tbl-body'); body.id = 'body-' + T.id; section.appendChild(body);
     function setOpen(open) {
@@ -739,6 +765,7 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
     function filtered() {
       var terms = state.q ? state.q.split(/\s+/).filter(Boolean) : [];
       var list = rows.filter(function (r) {
+        if (scopeValue && scopeOf(r) !== scopeValue) return false;
         for (var k in state.facets) { var v = r[k]; v = v === null || v === undefined || v === '' ? '(none)' : String(v); if (v !== state.facets[k]) return false; }
         for (var i = 0; i < terms.length; i++) if (r._hay.indexOf(terms[i]) < 0) return false;
         return true;
@@ -902,8 +929,11 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
       toast(list.length.toLocaleString() + ' rows downloaded');
     }
     function setFilters(f) { state.facets = {}; state.q = ''; for (var k in f) state.facets[k] = String(f[k]); state.shown = pageSize; render(); }
+    function setScope(v) { scopeValue = scopeKey ? (v || '') : ''; section.classList.toggle('scoped', !!v); state.shown = pageSize; render(); }
+    // How many rows the scope value has here - or null for a table that isn't by scope.
+    function countIn(v) { return scopeKey ? rows.filter(function (r) { return scopeOf(r) === v; }).length : null; }
     render();
-    return { section: section, setFilters: setFilters, setOpen: setOpen };
+    return { section: section, setFilters: setFilters, setOpen: setOpen, setScope: setScope, countIn: countIn };
   }
 
   // --- A hierarchy (tenant > management groups > subscriptions > ...) --------------------------
@@ -1099,6 +1129,81 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
     window.addEventListener('resize', measure); measure();
     var m = /^#tab=(.+)$/.exec(location.hash);
     show(m ? decodeURIComponent(m[1]) : OV, false);
+  })();
+
+  // --- The report-wide scope (a project, say): one choice filters every table by it -------------
+  (function () {
+    var S = D.scope;
+    if (!S || !(S.values || []).length) return;
+    var box = $('scope'); box.hidden = false;
+    var noun = String(S.label).toLowerCase();
+    var bar = el('div', 'scope-bar');
+    var label = el('label', null, S.label); label.htmlFor = 'scope-select';
+    var select = el('select'); select.id = 'scope-select';
+    var all = el('option', null, 'All (' + S.values.length.toLocaleString() + ')'); all.value = ''; select.appendChild(all);
+    S.values.forEach(function (v) { var o = el('option', null, v); o.value = v; select.appendChild(o); });
+    bar.appendChild(label); bar.appendChild(select);
+    bar.appendChild(el('span', 'hint', S.note || ('Choose one to see only its rows in every table, and who to contact. Tiles and charts show every ' + noun + '.')));
+    box.appendChild(bar);
+    var card = el('div', 'scope-card'); card.hidden = true; box.appendChild(card);
+    function spec(id) { return (D.tables || []).filter(function (t) { return t.id === id; })[0]; }
+    function same(r, v) { var x = r[S.key]; return (x === null || x === undefined ? '' : String(x)) === v; }
+    function facts(v) {
+      var T = spec(S.card); if (!T) return;
+      var row = (T.rows || []).filter(function (r) { return same(r, v); })[0]; if (!row) return;
+      var c = el('div', 'card'); c.appendChild(el('h3', null, v));
+      var dl = el('dl');
+      T.columns.forEach(function (col) {
+        if (col.key === S.key) return;
+        var value = drawerValue(col, row); if (!value) return;
+        dl.appendChild(el('dt', null, col.label)); var dd = el('dd'); dd.appendChild(value); dl.appendChild(dd);
+      });
+      c.appendChild(dl); card.appendChild(c);
+    }
+    function people(v) {
+      var T = spec(S.contacts); if (!T) return;
+      var list = (T.rows || []).filter(function (r) { return same(r, v); });
+      var c = el('div', 'card'); c.appendChild(el('h3', null, 'Who to contact (' + list.length.toLocaleString() + ')'));
+      if (!list.length) { c.appendChild(el('div', 'hint', 'Nobody was read for this ' + noun + '.')); card.appendChild(c); return; }
+      // The contacts table's console columns (its main ones), the scope column left out.
+      var cols = T.columns.filter(function (col) { return col.console && col.key !== S.key && col.key !== 'Organization'; });
+      if (!cols.length) cols = T.columns.filter(function (col) { return col.key !== S.key; }).slice(0, 4);
+      var t = el('table', 'scope-people'), hr = el('tr');
+      cols.forEach(function (col) { hr.appendChild(el('th', null, col.label)); });
+      t.appendChild(hr);
+      list.slice(0, 25).forEach(function (r) {
+        var tr = el('tr');
+        cols.forEach(function (col) { var td = el('td'), value = drawerValue(col, r); if (value) td.appendChild(value); tr.appendChild(td); });
+        t.appendChild(tr);
+      });
+      c.appendChild(t);
+      if (list.length > 25) {
+        var more = el('button', 'tool-btn', 'All ' + list.length.toLocaleString() + ' in ' + T.title); more.type = 'button';
+        more.addEventListener('click', function () { focusTable(T.id); });
+        c.appendChild(more);
+      }
+      card.appendChild(c);
+    }
+    function links(v) {
+      var c = el('div', 'card'); c.appendChild(el('h3', null, 'In this report'));
+      var box2 = el('div', 'scope-links');
+      (D.tables || []).forEach(function (T) {
+        var n = tables[T.id] ? tables[T.id].countIn(v) : null;
+        if (n === null || T.id === S.card) return;
+        var b = el('button', n ? null : 'zero', T.title); b.type = 'button'; b.appendChild(el('b', null, n.toLocaleString()));
+        b.addEventListener('click', function () { focusTable(T.id); });
+        box2.appendChild(b);
+      });
+      c.appendChild(box2); card.appendChild(c);
+    }
+    function apply(v) {
+      select.value = v; select.classList.toggle('on', !!v);
+      Object.keys(tables).forEach(function (id) { tables[id].setScope(v); });
+      card.textContent = ''; card.hidden = !v;
+      if (!v) return;
+      facts(v); people(v); links(v);
+    }
+    select.addEventListener('change', function () { apply(select.value); });
   })();
 
   window.addEventListener('beforeprint', function () { document.querySelectorAll('.clamp').forEach(function (c) { c.classList.add('open'); }); });

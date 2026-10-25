@@ -36,7 +36,19 @@ function Read-AACDevOpsInventory {
              script, the Makefile where make runs a target - at most
              -MaxScriptFiles a pipeline; a path built from a variable can't
              be followed and is reported
-        -Skip leaves out Yaml, Security, Metrics or AdvancedSecurity. A
+        With Members (rounds 2 and 3): each project's teams and their
+        members (team admins marked), and its Project Administrators group
+        and their identities (vssps: users, or groups nested in it).
+        With Branches (round 3): each repository's branches (last commit,
+        ahead and behind the default branch) and tags.
+        With Metrics, also the classic releases' deployments (DORA).
+        With Migration - what moving to GitHub needs: the organization's
+        feeds (and each project's) with their packages, agent pools (the
+        self-hosted ones' agents), service hooks and installed extensions;
+        each project's wikis and test plans; each repository's open pull
+        requests and .gitattributes (Git LFS); with AdvancedSecurity, each
+        project's Advanced Security settings.
+        -Skip leaves out Yaml, Security, Metrics, AdvancedSecurity, Members, Branches or Migration. A
         request that fails is kept with its error and the rest carry on.
     #>
     [CmdletBinding()]
@@ -52,7 +64,7 @@ function Read-AACDevOpsInventory {
 
         [int[]] $PipelineId,
 
-        [ValidateSet('Yaml', 'Security', 'Metrics', 'AdvancedSecurity')]
+        [ValidateSet('Yaml', 'Security', 'Metrics', 'AdvancedSecurity', 'Members', 'Branches', 'Migration')]
         [string[]] $Skip = @(),
 
         [ValidateRange(1, 365)]
@@ -82,7 +94,14 @@ function Read-AACDevOpsInventory {
     # Classic releases live on vsrm.dev.azure.com (or <org>.vsrm.visualstudio.com); Advanced Security on advsec.dev.azure.com.
     $releaseHost = if ($org -match '^https://dev\.azure\.com/') { $org -replace '^https://dev\.azure\.com/', 'https://vsrm.dev.azure.com/' } else { $org -replace '^https://([^.]+)\.visualstudio\.com', 'https://$1.vsrm.visualstudio.com' }
     $advsecHost = "https://advsec.dev.azure.com/$orgName"
-    $want = @{ Yaml = $Skip -notcontains 'Yaml'; Security = $Skip -notcontains 'Security'; Metrics = $Skip -notcontains 'Metrics'; AdvancedSecurity = $Skip -notcontains 'AdvancedSecurity' }
+    # Identities (who the Project Administrators are) live on vssps.dev.azure.com (or <org>.vssps.visualstudio.com).
+    $identityHost = if ($org -match '^https://dev\.azure\.com/') { "https://vssps.dev.azure.com/$orgName" } else { $org -replace '^https://([^.]+)\.visualstudio\.com', 'https://$1.vssps.visualstudio.com' }
+    # Azure Artifacts feeds and installed extensions have hosts of their own too.
+    $feedsHost = if ($org -match '^https://dev\.azure\.com/') { "https://feeds.dev.azure.com/$orgName" } else { $org -replace '^https://([^.]+)\.visualstudio\.com', 'https://$1.feeds.visualstudio.com' }
+    $extensionHost = if ($org -match '^https://dev\.azure\.com/') { "https://extmgmt.dev.azure.com/$orgName" } else { $org -replace '^https://([^.]+)\.visualstudio\.com', 'https://$1.extmgmt.visualstudio.com' }
+    $want = @{ Yaml = $Skip -notcontains 'Yaml'; Security = $Skip -notcontains 'Security'; Metrics = $Skip -notcontains 'Metrics'; AdvancedSecurity = $Skip -notcontains 'AdvancedSecurity'; Members = $Skip -notcontains 'Members'; Branches = $Skip -notcontains 'Branches'; Migration = $Skip -notcontains 'Migration' }
+    # Advanced Security is on when any of its enablement flags is (the names changed with the Secret Protection / Code Security split).
+    $advsecOn = { param($Body) [bool]@('advSecEnabled', 'advSecIsEnabled', 'secretProtectionEnabled', 'codeSecurityEnabled' | Where-Object { [string](Get-AACMember -InputObject $Body -Path $_) -eq 'True' }).Count }
     # Progress: the scriptblock below runs inside Invoke-AACArmParallel, whose
     # own variables ($done, $total, $job...) would hide ours - so every name it
     # uses is prefixed 'progress'.
@@ -91,7 +110,10 @@ function Read-AACDevOpsInventory {
     $progressProject = {
         # The project a request is for: the path segment before /_apis/ - an ID, or a (template's) project name.
         param([string] $Target)
-        $progressSegment = [System.Uri]::UnescapeDataString([regex]::Match($Target, '/([^/]+)/_apis/').Groups[1].Value)
+        # (The teams calls name it after /_apis/projects/ instead.)
+        $progressMatch = [regex]::Match($Target, '/_apis/projects/([^/?]+)/')
+        if (-not $progressMatch.Success) { $progressMatch = [regex]::Match($Target, '/([^/]+)/_apis/') }
+        $progressSegment = [System.Uri]::UnescapeDataString($progressMatch.Groups[1].Value)
         if ($progressState.Names.ContainsKey($progressSegment)) { $progressState.Names[$progressSegment] } else { '' }
     }
     $progressLeft = {
@@ -132,12 +154,21 @@ function Read-AACDevOpsInventory {
     # 0 and 1. The task catalogue, and the projects.
     & $stage 'Projects and task catalogue'
     $first = [ordered]@{ projects = "$org/_apis/projects?$api"; tasks = "$org/_apis/distributedtask/tasks?$api" }
+    if ($want.Migration) {
+        # The organization's own: feeds not in a project, agent pools, service hooks, installed extensions.
+        $first.orgFeeds = "$feedsHost/_apis/packaging/feeds?$api"
+        $first.pools = "$org/_apis/distributedtask/pools?$api"
+        $first.hooks = "$org/_apis/hooks/subscriptions?$api"
+        $first.extensions = "$extensionHost/_apis/extensionmanagement/installedextensions?api-version=7.1-preview.1"
+    }
     $answers = & $run $first
     $answer = $answers[$first.projects]
     if (-not $answer -or $answer['Error']) {
         throw "Azure Admin Console couldn't read the projects of $org - $(if ($answer) { $answer['Error'] } else { 'no answer' }). Check the organization's name, and that the token can read projects (Project and Team: Read)."
     }
     $tasks = @(& $itemsOf $answers[$first.tasks])
+    $organizationAnswers = @{}
+    foreach ($name in 'orgFeeds', 'pools', 'hooks', 'extensions') { $organizationAnswers[$name] = if ($first.Contains($name)) { $answers[$first[$name]] } else { $null } }
     $projects = @(& $itemsOf $answer)
     $wanted = @($Project | Where-Object { $_ })
     if ($wanted.Count) {
@@ -161,10 +192,23 @@ function Read-AACDevOpsInventory {
         $id = [string]$p['id']
         foreach ($part in $parts.Keys) { $second["$id|$part"] = "$org/$id/$($parts[$part])" }
         if (-not $PipelineId) { $second["$id|releases"] = "$releaseHost/$id/_apis/release/definitions?`$expand=lastRelease&$api" }
+        # Classic releases' deployments of the last -MetricDays, for DORA (YAML ones come from the environments).
+        if ($want.Metrics -and -not $PipelineId) { $second["$id|releaseDeployments"] = "$releaseHost/$id/_apis/release/deployments?minStartedTime=$since&queryOrder=descending&`$top=500&$api" }
+        if ($want.Migration) {
+            $second["$id|wikis"] = "$org/$id/_apis/wiki/wikis?$api"
+            $second["$id|testPlans"] = "$org/$id/_apis/testplan/plans?$api"
+            $second["$id|feeds"] = "$feedsHost/$id/_apis/packaging/feeds?$api"
+            if ($want.AdvancedSecurity) { $second["$id|advsecProject"] = "$advsecHost/$id/_apis/management/enablement?api-version=7.2-preview.1" }
+        }
+        if ($want.Members) {
+            # Who to contact: the project's teams, and its Project Administrators group with its members' descriptors.
+            $second["$id|teams"] = "$org/_apis/projects/$id/teams?`$top=500&$api"
+            $second["$id|admins"] = "$identityHost/_apis/identities?searchFilter=General&filterValue=$(& $enc "[$($p['name'])]\Project Administrators")&queryMembership=Direct&$api"
+        }
     }
     $answers = & $run $second
     $byProject = @{}
-    foreach ($name in @($parts.Keys) + 'releases') { $byProject[$name] = @{} }
+    foreach ($name in @($parts.Keys) + 'releases' + 'teams' + 'admins' + 'releaseDeployments' + 'wikis' + 'testPlans' + 'feeds' + 'advsecProject') { $byProject[$name] = @{} }
     foreach ($key in $second.Keys) {
         $id, $what = $key -split '\|', 2
         $byProject[$what][$id] = $answers[$second[$key]]
@@ -187,6 +231,16 @@ function Read-AACDevOpsInventory {
         foreach ($r in (& $itemsOf $byProject.repositories[$id])) {
             if ([string]$r['isDisabled'] -eq 'True') { $disabled[[string]$r['id']] = $true; continue }
             $third["push|$($r['id'])"] = "$org/$id/_apis/git/repositories/$($r['id'])/pushes?`$top=1&$api"
+            if ($want.Branches) {
+                # Every branch with its last commit and how far it is ahead of and behind the default branch; the tags.
+                $third["branches|$($r['id'])"] = "$org/$id/_apis/git/repositories/$($r['id'])/stats/branches?$api"
+                $third["tags|$($r['id'])"] = "$org/$id/_apis/git/repositories/$($r['id'])/refs?filter=tags/&$api"
+            }
+            if ($want.Migration) {
+                $third["prs|$($r['id'])"] = "$org/$id/_apis/git/repositories/$($r['id'])/pullrequests?searchCriteria.status=active&`$top=1000&$api"
+                # .gitattributes says whether the repository uses Git LFS (404 when there is none).
+                $third["attrs|$($r['id'])"] = "$org/$id/_apis/git/repositories/$($r['id'])/items?path=$(& $enc '/.gitattributes')&includeContent=true&`$format=json&$api"
+            }
             if ($want.AdvancedSecurity) { $third["advsec|$id|$($r['id'])"] = "$advsecHost/$id/_apis/management/repositories/$($r['id'])/enablement?api-version=7.2-preview.1" }
         }
         foreach ($d in (& $itemsOf $byProject.definitions[$id])) {
@@ -212,9 +266,28 @@ function Read-AACDevOpsInventory {
                 if ($want.Metrics) { $third["deploy|$id|$($env['id'])"] = "$org/$id/_apis/distributedtask/environments/$($env['id'])/environmentdeploymentrecords?top=500&api-version=7.1-preview.1" }
             }
         }
+        if ($want.Members) {
+            foreach ($t in (& $itemsOf $byProject.teams[$id])) { $third["team|$id|$($t['id'])"] = "$org/_apis/projects/$id/teams/$($t['id'])/members?`$top=1000&$api" }
+            # The administrators group's members, by their descriptors - 40 to a request, so the URL stays short.
+            $adminGroup = @(& $itemsOf $byProject.admins[$id]) | Select-Object -First 1
+            $descriptors = @(if ($adminGroup) { @($adminGroup['members']) | Where-Object { $_ } })
+            for ($i = 0; $i -lt $descriptors.Count; $i += 40) {
+                $chunk = @($descriptors | Select-Object -Skip $i -First 40)
+                $third["adm|$id|$i"] = "$identityHost/_apis/identities?descriptors=$(& $enc ($chunk -join ','))&queryMembership=None&$api"
+            }
+        }
+        if ($want.Migration) {
+            foreach ($feed in (& $itemsOf $byProject.feeds[$id])) { $third["pkgs|$id/$($feed['id'])"] = "$feedsHost/$id/_apis/packaging/Feeds/$($feed['id'])/packages?`$top=1000&$api" }
+        }
+    }
+    if ($want.Migration) {
+        # The organization's feeds' packages, and the agents of its self-hosted pools.
+        foreach ($feed in (& $itemsOf $organizationAnswers.orgFeeds)) { $third["pkgs|org/$($feed['id'])"] = "$feedsHost/_apis/packaging/Feeds/$($feed['id'])/packages?`$top=1000&$api" }
+        foreach ($pool in (& $itemsOf $organizationAnswers.pools)) { if ([string]$pool['isHosted'] -ne 'True') { $third["agents|$($pool['id'])"] = "$org/_apis/distributedtask/pools/$($pool['id'])/agents?$api" } }
     }
     $answers = & $run $third
-    $pushes = @{}; $permissions = @{}; $checks = @{}; $deployments = @{}; $advancedSecurity = @{}
+    $pushes = @{}; $permissions = @{}; $checks = @{}; $deployments = @{}; $advancedSecurity = @{}; $teamMembers = @{}; $adminMembers = @{}
+    $branches = @{}; $tags = @{}; $pullRequests = @{}; $gitAttributes = @{}; $packages = @{}; $agents = @{}
     foreach ($key in $third.Keys) {
         $kind, $rest = $key -split '\|', 2
         $a = $answers[$third[$key]]
@@ -224,6 +297,18 @@ function Read-AACDevOpsInventory {
             'checks' { $checks[$rest] = $a }
             'deploy' { $deployments[$rest] = $a }
             'advsec' { $advancedSecurity[$rest] = @{ Enablement = $a; Alerts = $null } }
+            'team' { $teamMembers[$rest] = $a }
+            'branches' { $branches[$rest] = $a }
+            'tags' { $tags[$rest] = $a }
+            'prs' { $pullRequests[$rest] = $a }
+            'attrs' { $gitAttributes[$rest] = $a }
+            'pkgs' { $packages[$rest] = $a }
+            'agents' { $agents[$rest] = $a }
+            'adm' {
+                $projectOfAdmins = ($rest -split '\|', 2)[0]
+                if (-not $adminMembers.ContainsKey($projectOfAdmins)) { $adminMembers[$projectOfAdmins] = [System.Collections.Generic.List[object]]::new() }
+                $adminMembers[$projectOfAdmins].Add($a)
+            }
             'yaml' {
                 $entry = $yaml[$rest]
                 if (-not $a -or $a['Error']) { $entry.Error = "The YAML couldn't be read: $(if ($a) { $a['Error'] } else { 'no answer' })" }
@@ -236,7 +321,7 @@ function Read-AACDevOpsInventory {
     $fourth = [ordered]@{}
     foreach ($key in $advancedSecurity.Keys) {
         $e = $advancedSecurity[$key].Enablement
-        if ($e -and -not $e['Error'] -and [string](Get-AACMember -InputObject $e['Body'] -Path 'advSecEnabled') -eq 'True') {
+        if ($e -and -not $e['Error'] -and (& $advsecOn $e['Body'])) {
             $projectId, $repoId = $key -split '\|', 2
             $fourth[$key] = "$advsecHost/$projectId/_apis/alert/repositories/$repoId/alerts?criteria.states=active&top=1000&api-version=7.2-preview.1"
         }
@@ -423,5 +508,10 @@ function Read-AACDevOpsInventory {
         Endpoints = $byProject['endpoints']; Groups = $byProject['groups']; Environments = $byProject['environments']; Policies = $byProject['policies']; Builds = $byProject['builds']
         Pushes = $pushes; Permissions = $permissions; Checks = $checks; Deployments = $deployments; AdvancedSecurity = $advancedSecurity
         Yaml = $yaml; TemplateContent = $templateContent; ScriptContent = $scriptContent; Skip = $Skip; MetricDays = $MetricDays
+        Teams = $byProject['teams']; Admins = $byProject['admins']; TeamMembers = $teamMembers; AdminMembers = $adminMembers
+        Branches = $branches; Tags = $tags; PullRequests = $pullRequests; GitAttributes = $gitAttributes
+        ReleaseDeployments = $byProject['releaseDeployments']; Wikis = $byProject['wikis']; TestPlans = $byProject['testPlans']; Feeds = $byProject['feeds']; AdvancedSecurityProject = $byProject['advsecProject']
+        OrganizationFeeds = $organizationAnswers.orgFeeds; Pools = $organizationAnswers.pools; Hooks = $organizationAnswers.hooks; Extensions = $organizationAnswers.extensions
+        Packages = $packages; Agents = $agents
     }
 }

@@ -4615,6 +4615,29 @@ rate (cancelled runs left out), average duration and queue time,
 runs a week; each environment's deployments, deployments a week,
 and change failure rate (DORA).
 
+Branching: every branch with its role (from its name - develop,
+release/*, hotfix/*, feature/*...), last commit, ahead and behind the
+default branch, stale after -StaleBranchDays, and the policies on it;
+each repository's strategy (GitFlow, trunk-based with release
+branches, trunk-based / GitHub flow, feature branching, single
+branch). Every branch policy, on or off, with its settings in words
+and its GitHub equivalent (rulesets, CODEOWNERS).
+
+DORA, per project and for the organization: deployment frequency,
+lead time (run queued to deployed), change failure rate and time to
+restore, from production environments and classic release stages
+(every environment when a project has no production one), each
+banded Elite, High, Medium or Low; overall is the weakest.
+
+Moving to GitHub: variables by name (pipeline settings, YAML,
+variable groups - secret or not, never values), Azure Artifacts feeds
+and their packages (and whether GitHub Packages can hold them), test
+plans, wikis, service hooks, open pull requests, Git LFS, agent pools
+and agents, marketplace extensions and the tasks pipelines use from
+them, Advanced Security settings per repository and project; a
+summary per project with rough effort points and a map of where each
+kind of thing lands on GitHub and the tool that moves it.
+
 -IncludeAzure (with Connect-AAC) follows each Azure service
 connection to its service principal and the Azure roles it holds,
 and flags pipeline identities that are Owner (or can grant access),
@@ -4624,7 +4647,8 @@ Signing in, in this order:
   -PersonalAccessToken   a PAT with read scopes: Build, Code,
                          Project and Team, Release, Service
                          Connections, Variable Groups, Environment,
-                         Advanced Security
+                         Advanced Security, Packaging, Test
+                         Management, Wiki, Agent Pools, Extensions
   AZURE_DEVOPS_EXT_PAT   the same, from the environment (the
                          variable the Azure DevOps CLI reads)
   -UseAzureSignIn        your Connect-AAC sign-in (Microsoft Entra
@@ -4708,6 +4732,14 @@ The token is sent only to Azure DevOps and never written anywhere.</maml:para>
           </dev:type>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="9" aliases="none">
+          <maml:name>StaleBranchDays</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">int</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Int32</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="10" aliases="none">
           <maml:name>ToolRule</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">Object[]</command:parameterValue>
@@ -4715,7 +4747,7 @@ The token is sent only to Azure DevOps and never written anywhere.</maml:para>
             <maml:name>System.Object[]</maml:name>
           </dev:type>
         </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="10" aliases="none">
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="11" aliases="none">
           <maml:name>ToolRulePath</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
@@ -4723,7 +4755,7 @@ The token is sent only to Azure DevOps and never written anywhere.</maml:para>
             <maml:name>System.String</maml:name>
           </dev:type>
         </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="11" aliases="none">
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="12" aliases="none">
           <maml:name>MaxScriptFiles</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">int</command:parameterValue>
@@ -4731,7 +4763,7 @@ The token is sent only to Azure DevOps and never written anywhere.</maml:para>
             <maml:name>System.Int32</maml:name>
           </dev:type>
         </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="12" aliases="none">
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="13" aliases="none">
           <maml:name>YamlPath</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
@@ -4739,7 +4771,7 @@ The token is sent only to Azure DevOps and never written anywhere.</maml:para>
             <maml:name>System.String</maml:name>
           </dev:type>
         </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="13" aliases="none">
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="14" aliases="none">
           <maml:name>View</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
@@ -4747,7 +4779,7 @@ The token is sent only to Azure DevOps and never written anywhere.</maml:para>
             <maml:name>System.String</maml:name>
           </dev:type>
         </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="14" aliases="none">
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="15" aliases="none">
           <maml:name>ThrottleLimit</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">int</command:parameterValue>
@@ -4755,7 +4787,7 @@ The token is sent only to Azure DevOps and never written anywhere.</maml:para>
             <maml:name>System.Int32</maml:name>
           </dev:type>
         </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="15" aliases="none">
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="16" aliases="none">
           <maml:name>CsvPath</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
@@ -4763,7 +4795,7 @@ The token is sent only to Azure DevOps and never written anywhere.</maml:para>
             <maml:name>System.String</maml:name>
           </dev:type>
         </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="16" aliases="none">
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="17" aliases="none">
           <maml:name>HtmlPath</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
@@ -4771,7 +4803,7 @@ The token is sent only to Azure DevOps and never written anywhere.</maml:para>
             <maml:name>System.String</maml:name>
           </dev:type>
         </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="17" aliases="none">
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="18" aliases="none">
           <maml:name>PdfPath</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
@@ -4779,7 +4811,7 @@ The token is sent only to Azure DevOps and never written anywhere.</maml:para>
             <maml:name>System.String</maml:name>
           </dev:type>
         </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="18" aliases="none">
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="19" aliases="none">
           <maml:name>Title</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
@@ -4846,7 +4878,7 @@ The token is sent only to Azure DevOps and never written anywhere.</maml:para>
       </command:syntaxItem>
     </command:syntax>
     <command:parameters>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="15" aliases="none">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="16" aliases="none">
         <maml:name>CsvPath</maml:name>
         <maml:description>
           <maml:para>Write the -View rows to this CSV file.</maml:para>
@@ -4867,7 +4899,7 @@ with -UseAzureSignIn, or a PAT for all accessible organizations).</maml:para>
         </dev:type>
         <dev:defaultValue>False</dev:defaultValue>
       </command:parameter>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="16" aliases="none">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="17" aliases="none">
         <maml:name>HtmlPath</maml:name>
         <maml:description>
           <maml:para>Write an interactive HTML report.</maml:para>
@@ -4913,7 +4945,7 @@ many; a disabled repository's YAML is never read.</maml:para>
         </dev:type>
         <dev:defaultValue>False</dev:defaultValue>
       </command:parameter>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="11" aliases="none">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="12" aliases="none">
         <maml:name>MaxScriptFiles</maml:name>
         <maml:description>
           <maml:para>At most this many script files, package.json and Makefiles are read
@@ -4978,7 +5010,7 @@ given; 1 to 365).</maml:para>
         </dev:type>
         <dev:defaultValue>False</dev:defaultValue>
       </command:parameter>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="17" aliases="none">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="18" aliases="none">
         <maml:name>PdfPath</maml:name>
         <maml:description>
           <maml:para>Write a PDF report.</maml:para>
@@ -5025,7 +5057,10 @@ are per project. Classic releases are then left out.</maml:para>
           <maml:para>Leave parts out, to read faster: Yaml (no YAML files or templates),
 Security (no service connections, variable groups, environments or
 branch policies), Metrics (no run history or deployments),
-AdvancedSecurity.</maml:para>
+AdvancedSecurity, Members (no Project Administrators or teams - who
+to contact), Branches (no branches, tags or branching strategy),
+Migration (no feeds, test plans, wikis, pull requests, agent pools,
+service hooks or extensions - the move-to-GitHub data).</maml:para>
         </maml:description>
         <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
         <dev:type>
@@ -5042,6 +5077,18 @@ AdvancedSecurity.</maml:para>
           <maml:name>System.Management.Automation.SwitchParameter</maml:name>
         </dev:type>
         <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="9" aliases="none">
+        <maml:name>StaleBranchDays</maml:name>
+        <maml:description>
+          <maml:para>A branch (not the default one) with no commit in this many days is
+stale (90 if not given).</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Int32</maml:name>
+        </dev:type>
+        <dev:defaultValue>90</dev:defaultValue>
       </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="7" aliases="none">
         <maml:name>StaleDays</maml:name>
@@ -5066,7 +5113,7 @@ none).</maml:para>
         </dev:type>
         <dev:defaultValue>3</dev:defaultValue>
       </command:parameter>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="14" aliases="none">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="15" aliases="none">
         <maml:name>ThrottleLimit</maml:name>
         <maml:description>
           <maml:para>How many requests run at once (1 to 32; 8 by default).</maml:para>
@@ -5077,7 +5124,7 @@ none).</maml:para>
         </dev:type>
         <dev:defaultValue>8</dev:defaultValue>
       </command:parameter>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="18" aliases="none">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="19" aliases="none">
         <maml:name>Title</maml:name>
         <maml:description>
           <maml:para>The reports' title.</maml:para>
@@ -5088,7 +5135,7 @@ none).</maml:para>
         </dev:type>
         <dev:defaultValue>'Azure DevOps inventory'</dev:defaultValue>
       </command:parameter>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="9" aliases="none">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="10" aliases="none">
         <maml:name>ToolRule</maml:name>
         <maml:description>
           <maml:para>Tools of your own to look for: @(@{ Category = 'Security'; Tool =
@@ -5102,7 +5149,7 @@ tool does.</maml:para>
           <maml:name>System.Object[]</maml:name>
         </dev:type>
       </command:parameter>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="10" aliases="none">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="11" aliases="none">
         <maml:name>ToolRulePath</maml:name>
         <maml:description>
           <maml:para>A .psd1 or .json file of rules in the -ToolRule shape - a list of
@@ -5124,12 +5171,14 @@ in a file. Added to -ToolRule.</maml:para>
         </dev:type>
         <dev:defaultValue>False</dev:defaultValue>
       </command:parameter>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="13" aliases="none">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="14" aliases="none">
         <maml:name>View</maml:name>
         <maml:description>
           <maml:para>What is returned and written to -CsvPath: Pipeline (default),
-Project, Repository, Task, Tool, ServiceConnection, VariableGroup,
-Environment or Finding.</maml:para>
+Project, Repository, Task, Tool, Evidence, Coverage, Unrecognised,
+ServiceConnection, VariableGroup, Environment, Member (who to contact),
+Branch, BranchPolicy, Variable, Dora, Feed, TestPlan, AgentPool,
+Extension, Migration, MigrationMap or Finding.</maml:para>
         </maml:description>
         <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
         <dev:type>
@@ -5137,7 +5186,7 @@ Environment or Finding.</maml:para>
         </dev:type>
         <dev:defaultValue>'Pipeline'</dev:defaultValue>
       </command:parameter>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="12" aliases="none">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="13" aliases="none">
         <maml:name>YamlPath</maml:name>
         <maml:description>
           <maml:para>Save every pipeline's YAML (and the templates it includes), and each
@@ -5154,7 +5203,7 @@ review and diffs.</maml:para>
     <command:returnValues>
       <command:returnValue>
         <dev:type>
-          <maml:name>AAC.DevOpsPipeline, AAC.DevOpsProject, AAC.DevOpsRepository, AAC.DevOpsTask, AAC.DevOpsToolUsage, AAC.DevOpsServiceConnection, AAC.DevOpsVariableGroup, AAC.DevOpsEnvironment or AAC.DevOpsFinding, by -View (piped onward, or with -PassThru or -NoDisplay)</maml:name>
+          <maml:name>AAC.DevOpsPipeline, AAC.DevOpsProject, AAC.DevOpsRepository, AAC.DevOpsTask, AAC.DevOpsToolUsage, AAC.DevOpsServiceConnection, AAC.DevOpsVariableGroup, AAC.DevOpsEnvironment, AAC.DevOpsMember, AAC.DevOpsToolEvidence, AAC.DevOpsCoverage, AAC.DevOpsUnrecognised, AAC.DevOpsBranch, AAC.DevOpsBranchPolicy, AAC.DevOpsVariable, AAC.DevOpsDora, AAC.DevOpsFeed, AAC.DevOpsTestPlan, AAC.DevOpsAgentPool, AAC.DevOpsExtension, AAC.DevOpsMigration, AAC.DevOpsMigrationMap or AAC.DevOpsFinding, by -View (piped onward, or with -PassThru or -NoDisplay)</maml:name>
         </dev:type>
         <maml:description>
           <maml:para />
@@ -5211,6 +5260,14 @@ Get-AACADOInventory -DiscoverOrganization -UseAzureSignIn -IncludeAzure -HtmlPat
       </command:example>
       <command:example>
         <maml:title>--------- Example 6 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Get-AACADOInventory -Organization contoso -PersonalAccessToken $pat -View Migration -NoDisplay | Sort-Object -Property Effort -Descending</dev:code>
+        <dev:remarks>
+          <maml:para>Projects by how much work the move to GitHub is.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 7 ---------</maml:title>
         <maml:introduction></maml:introduction>
         <dev:code>Get-AACADOInventory -Organization contoso -Project Payments -PersonalAccessToken $pat -YamlPath .\pipelines -Skip Security, Metrics</dev:code>
         <dev:remarks>

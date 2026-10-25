@@ -68,6 +68,29 @@ function Get-AACADOInventory {
         runs a week; each environment's deployments, deployments a week,
         and change failure rate (DORA).
 
+        Branching: every branch with its role (from its name - develop,
+        release/*, hotfix/*, feature/*...), last commit, ahead and behind the
+        default branch, stale after -StaleBranchDays, and the policies on it;
+        each repository's strategy (GitFlow, trunk-based with release
+        branches, trunk-based / GitHub flow, feature branching, single
+        branch). Every branch policy, on or off, with its settings in words
+        and its GitHub equivalent (rulesets, CODEOWNERS).
+
+        DORA, per project and for the organization: deployment frequency,
+        lead time (run queued to deployed), change failure rate and time to
+        restore, from production environments and classic release stages
+        (every environment when a project has no production one), each
+        banded Elite, High, Medium or Low; overall is the weakest.
+
+        Moving to GitHub: variables by name (pipeline settings, YAML,
+        variable groups - secret or not, never values), Azure Artifacts feeds
+        and their packages (and whether GitHub Packages can hold them), test
+        plans, wikis, service hooks, open pull requests, Git LFS, agent pools
+        and agents, marketplace extensions and the tasks pipelines use from
+        them, Advanced Security settings per repository and project; a
+        summary per project with rough effort points and a map of where each
+        kind of thing lands on GitHub and the tool that moves it.
+
         -IncludeAzure (with Connect-AAC) follows each Azure service
         connection to its service principal and the Azure roles it holds,
         and flags pipeline identities that are Owner (or can grant access),
@@ -77,7 +100,8 @@ function Get-AACADOInventory {
           -PersonalAccessToken   a PAT with read scopes: Build, Code,
                                  Project and Team, Release, Service
                                  Connections, Variable Groups, Environment,
-                                 Advanced Security
+                                 Advanced Security, Packaging, Test
+                                 Management, Wiki, Agent Pools, Extensions
           AZURE_DEVOPS_EXT_PAT   the same, from the environment (the
                                  variable the Azure DevOps CLI reads)
           -UseAzureSignIn        your Connect-AAC sign-in (Microsoft Entra
@@ -103,7 +127,10 @@ function Get-AACADOInventory {
         Leave parts out, to read faster: Yaml (no YAML files or templates),
         Security (no service connections, variable groups, environments or
         branch policies), Metrics (no run history or deployments),
-        AdvancedSecurity.
+        AdvancedSecurity, Members (no Project Administrators or teams - who
+        to contact), Branches (no branches, tags or branching strategy),
+        Migration (no feeds, test plans, wikis, pull requests, agent pools,
+        service hooks or extensions - the move-to-GitHub data).
     .PARAMETER SkipYaml
         The same as -Skip Yaml.
     .PARAMETER MetricDays
@@ -117,6 +144,9 @@ function Get-AACADOInventory {
     .PARAMETER InactiveDays
         A repository with no push in this many days is flagged (180 if not
         given).
+    .PARAMETER StaleBranchDays
+        A branch (not the default one) with no commit in this many days is
+        stale (90 if not given).
     .PARAMETER ToolRule
         Tools of your own to look for: @(@{ Category = 'Security'; Tool =
         'Acme Scan'; Pattern = 'acme-scan' }). Category is Lint, Build, Test,
@@ -144,8 +174,10 @@ function Get-AACADOInventory {
         review and diffs.
     .PARAMETER View
         What is returned and written to -CsvPath: Pipeline (default),
-        Project, Repository, Task, Tool, ServiceConnection, VariableGroup,
-        Environment or Finding.
+        Project, Repository, Task, Tool, Evidence, Coverage, Unrecognised,
+        ServiceConnection, VariableGroup, Environment, Member (who to contact),
+        Branch, BranchPolicy, Variable, Dora, Feed, TestPlan, AgentPool,
+        Extension, Migration, MigrationMap or Finding.
     .PARAMETER ThrottleLimit
         How many requests run at once (1 to 32; 8 by default).
     .PARAMETER CsvPath
@@ -180,13 +212,16 @@ function Get-AACADOInventory {
         Get-AACADOInventory -DiscoverOrganization -UseAzureSignIn -IncludeAzure -HtmlPath .\ADO.html
         Every organization you belong to, with each Azure service connection's roles in Azure.
     .EXAMPLE
+        Get-AACADOInventory -Organization contoso -PersonalAccessToken $pat -View Migration -NoDisplay | Sort-Object -Property Effort -Descending
+        Projects by how much work the move to GitHub is.
+    .EXAMPLE
         Get-AACADOInventory -Organization contoso -Project Payments -PersonalAccessToken $pat -YamlPath .\pipelines -Skip Security, Metrics
         Save the project's pipelines and templates to a folder, to review or diff offline.
     .OUTPUTS
-        AAC.DevOpsPipeline, AAC.DevOpsProject, AAC.DevOpsRepository, AAC.DevOpsTask, AAC.DevOpsToolUsage, AAC.DevOpsServiceConnection, AAC.DevOpsVariableGroup, AAC.DevOpsEnvironment or AAC.DevOpsFinding, by -View (piped onward, or with -PassThru or -NoDisplay)
+        AAC.DevOpsPipeline, AAC.DevOpsProject, AAC.DevOpsRepository, AAC.DevOpsTask, AAC.DevOpsToolUsage, AAC.DevOpsServiceConnection, AAC.DevOpsVariableGroup, AAC.DevOpsEnvironment, AAC.DevOpsMember, AAC.DevOpsToolEvidence, AAC.DevOpsCoverage, AAC.DevOpsUnrecognised, AAC.DevOpsBranch, AAC.DevOpsBranchPolicy, AAC.DevOpsVariable, AAC.DevOpsDora, AAC.DevOpsFeed, AAC.DevOpsTestPlan, AAC.DevOpsAgentPool, AAC.DevOpsExtension, AAC.DevOpsMigration, AAC.DevOpsMigrationMap or AAC.DevOpsFinding, by -View (piped onward, or with -PassThru or -NoDisplay)
     #>
     [CmdletBinding()]
-    [OutputType('AAC.DevOpsPipeline', 'AAC.DevOpsProject', 'AAC.DevOpsRepository', 'AAC.DevOpsTask', 'AAC.DevOpsToolUsage', 'AAC.DevOpsServiceConnection', 'AAC.DevOpsVariableGroup', 'AAC.DevOpsEnvironment', 'AAC.DevOpsFinding')]
+    [OutputType('AAC.DevOpsPipeline', 'AAC.DevOpsProject', 'AAC.DevOpsRepository', 'AAC.DevOpsTask', 'AAC.DevOpsToolUsage', 'AAC.DevOpsServiceConnection', 'AAC.DevOpsVariableGroup', 'AAC.DevOpsEnvironment', 'AAC.DevOpsMember', 'AAC.DevOpsToolEvidence', 'AAC.DevOpsCoverage', 'AAC.DevOpsUnrecognised', 'AAC.DevOpsBranch', 'AAC.DevOpsBranchPolicy', 'AAC.DevOpsVariable', 'AAC.DevOpsDora', 'AAC.DevOpsFeed', 'AAC.DevOpsTestPlan', 'AAC.DevOpsAgentPool', 'AAC.DevOpsExtension', 'AAC.DevOpsMigration', 'AAC.DevOpsMigrationMap', 'AAC.DevOpsFinding')]
     param(
         [string[]] $Organization,
 
@@ -202,7 +237,7 @@ function Get-AACADOInventory {
 
         [switch] $UseAzureSignIn,
 
-        [ValidateSet('Yaml', 'Security', 'Metrics', 'AdvancedSecurity')]
+        [ValidateSet('Yaml', 'Security', 'Metrics', 'AdvancedSecurity', 'Members', 'Branches', 'Migration')]
         [string[]] $Skip = @(),
 
         [switch] $SkipYaml,
@@ -219,6 +254,9 @@ function Get-AACADOInventory {
         [ValidateRange(1, 3650)]
         [int] $InactiveDays = 180,
 
+        [ValidateRange(1, 3650)]
+        [int] $StaleBranchDays = 90,
+
         [object[]] $ToolRule,
 
         [string] $ToolRulePath,
@@ -232,7 +270,7 @@ function Get-AACADOInventory {
 
         [string] $YamlPath,
 
-        [ValidateSet('Pipeline', 'Project', 'Repository', 'Task', 'Tool', 'Evidence', 'Coverage', 'Unrecognised', 'ServiceConnection', 'VariableGroup', 'Environment', 'Finding')]
+        [ValidateSet('Pipeline', 'Project', 'Repository', 'Task', 'Tool', 'Evidence', 'Coverage', 'Unrecognised', 'ServiceConnection', 'VariableGroup', 'Environment', 'Member', 'Branch', 'BranchPolicy', 'Variable', 'Dora', 'Feed', 'TestPlan', 'AgentPool', 'Extension', 'Migration', 'MigrationMap', 'Finding')]
         [string] $View = 'Pipeline',
 
         [ValidateRange(1, 32)]
@@ -401,12 +439,13 @@ function Get-AACADOInventory {
         }
 
         # One organization's rows after another; the totals added up.
-        $result = @{ Projects = @(); Pipelines = @(); Tasks = @(); Repositories = @(); ServiceConnections = @(); VariableGroups = @(); Environments = @(); Tools = @(); Evidence = @(); Coverage = @(); Unrecognised = @(); Findings = @(); Stats = @{} }
+        $result = @{ Projects = @(); Pipelines = @(); Tasks = @(); Repositories = @(); ServiceConnections = @(); VariableGroups = @(); Environments = @(); Members = @(); Branches = @(); BranchPolicies = @(); Variables = @(); Dora = @(); Feeds = @(); TestPlans = @(); AgentPools = @(); Extensions = @(); Migration = @(); MigrationMap = @(); Tools = @(); Evidence = @(); Coverage = @(); Unrecognised = @(); Findings = @(); Stats = @{} }
+        $doraByOrg = [System.Collections.Generic.List[hashtable]]::new()
         foreach ($read in $reads) {
             # Working through thousands of pipelines takes a while too: a line of its own, with the time left.
             # (Names prefixed 'ado': the script block runs inside the converter, whose variables would hide ours.)
             $adoAnalysis = @{ Id = "analyse|$($read.Organization)"; Started = [datetime]::UtcNow; Done = 0; Prefix = $(if ($reads.Count -gt 1) { "$($read.OrganizationName): " } else { '' }) }
-            $one = ConvertTo-AACDevOpsInventory -Read $read -ToolRule $rules -CliRule $cliRules -StaleDays $StaleDays -InactiveDays $InactiveDays -AzureLink $azureLink -IncludeDisabledRepository:$IncludeDisabledRepository -OnProgress {
+            $one = ConvertTo-AACDevOpsInventory -Read $read -ToolRule $rules -CliRule $cliRules -StaleDays $StaleDays -InactiveDays $InactiveDays -StaleBranchDays $StaleBranchDays -AzureLink $azureLink -IncludeDisabledRepository:$IncludeDisabledRepository -OnProgress {
                 param($ProjectName, $Done, $Total)
                 $adoElapsed = ([datetime]::UtcNow - $adoAnalysis.Started).TotalSeconds
                 $adoFraction = $Done / [Math]::Max(1, $Total)
@@ -415,12 +454,16 @@ function Get-AACADOInventory {
                 $adoAnalysis.Done = $Done
             }
             Update-AACProgress -Id $adoAnalysis.Id -Complete -Description ('{0}Analysed {1:N0} pipeline(s)' -f $adoAnalysis.Prefix, $adoAnalysis.Done)
+            if ($one.MembersError) { $notices.Add("$($read.OrganizationName): who to contact couldn't be read for every project: $($one.MembersError) - give the token Identity (Read) and Project and Team (Read), or -Skip Members.") }
             if ($one.Stats.DisabledRepositories -or $one.Stats.DisabledPipelines) { $notices.Add("$($read.OrganizationName): left out $($one.Stats.DisabledRepositories) disabled repository(ies) and the $($one.Stats.DisabledPipelines) pipeline(s) that build them - -IncludeDisabledRepository lists them.") }
             foreach ($k in @($result.Keys | Where-Object { $_ -ne 'Stats' })) { $result[$k] += @($one[$k]) }
-            foreach ($k in $one.Stats.Keys) { $result.Stats[$k] = $(if ($result.Stats.ContainsKey($k)) { $result.Stats[$k] } else { 0 }) + $one.Stats[$k] }
+            # The DORA keys are levels and medians - they don't add up across organizations: kept per organization.
+            $doraByOrg.Add(@{ Organization = $read.OrganizationName; Dora = $one.Stats.Dora })
+            foreach ($k in @($one.Stats.Keys | Where-Object { $_ -ne 'Dora' })) { $result.Stats[$k] = $(if ($result.Stats.ContainsKey($k)) { $result.Stats[$k] } else { 0 }) + $one.Stats[$k] }
         }
         $rank = @{ High = 0; Medium = 1; Low = 2; Info = 3 }
         $result.Findings = @($result.Findings | Sort-Object -Property @{ Expression = { $rank[$_.Severity] } }, Organization, Project, Item, Finding)
+        $result.Stats.Dora = $(if ($doraByOrg.Count -eq 1) { $doraByOrg[0].Dora } else { @{} })
         @{ Result = $result; Notices = $notices.ToArray(); Organizations = @($reads | ForEach-Object { $_.Organization }) }
     }
     $authorization = $null
@@ -442,8 +485,16 @@ function Get-AACADOInventory {
     $openColumnLink = @{ Key = 'Url'; Label = 'Open'; Type = 'link'; Text = 'Open' }
     $orgLabel = (@($state.Organizations) | ForEach-Object { $_ -replace '^https://(dev\.azure\.com/)?', '' }) -join ', '
     $deployRate = if ($s.Deployments) { '{0:N1}%' -f (100.0 * $s.FailedDeployments / $s.Deployments) } else { '-' }
+    $dora = if ($s.Dora -is [hashtable]) { $s.Dora } else { @{} }
+    $doraTones = @{ Elite = 'good'; High = 'info'; Medium = 'warn'; Low = 'bad' }
+    $doraTone = if ($dora['Overall']) { $doraTones[$dora['Overall']] } else { 'neutral' }
+    $complexityTones = @{ Low = 'good'; Medium = 'warn'; High = 'bad' }
+    $doraText = if ($dora['Overall']) { "Organization: $($dora['Overall']) - $($dora['DeploymentsPerWeek']) deployments a week ($($dora['Frequency'])), lead time $($dora['LeadTimeHours']) h ($($dora['LeadTime'])), change failure $($dora['ChangeFailureRate'])% ($($dora['ChangeFailure'])), time to restore $(if ($null -ne $dora['TimeToRestoreHours']) { "$($dora['TimeToRestoreHours']) h ($($dora['TimeToRestore']))" } else { 'no failure to restore' }). " } else { '' }
     $report = @{
         Subtitle = "Azure DevOps - $orgLabel"
+        # The HTML report's project selector: every table with a Project column filtered to the one chosen,
+        # the project's facts from the Overview table and its people from the People table.
+        Scope    = @{ Key = 'Project'; Label = 'Project'; Values = @($r.Projects | ForEach-Object { $_.Project } | Sort-Object -Unique); Card = 'projects'; Contacts = 'members' }
         Facts    = [ordered]@{ Organizations = $orgLabel; Projects = $(if ($Project) { $Project -join ', ' } else { 'all' }); 'Signed in with' = $authentication; 'Metrics over' = "$MetricDays days"; Generated = "$([datetime]::UtcNow.ToString('yyyy-MM-dd HH:mm', [cultureinfo]::InvariantCulture)) UTC" }
         Status   = $(if ($s.High) { 'Failed' } elseif (@($r.Findings | Where-Object { $_.Severity -ne 'Info' }).Count) { 'Warning' } else { 'Success' })
         Headline = "$($s.Projects) project(s), $($s.Pipelines) pipeline(s): $($s.Yaml) YAML, $($s.ClassicBuild) classic build and $($s.ClassicRelease) classic release; $($s.WithScanning) of $($s.YamlRead) pipeline(s) read scan for security; $($s.OpenResources) resource(s) open to every pipeline; $($s.NeverRun) never run, $($s.Stale) not run in $StaleDays days, $($s.Failed) failing"
@@ -455,6 +506,8 @@ function Get-AACADOInventory {
             @{ Value = '{0:N0}' -f $s.OpenResources; Label = 'open to every pipeline'; Tone = $(if ($s.OpenResources) { 'bad' } else { 'good' }); Table = 'findings'; Filters = @{ Finding = 'Open to every pipeline' } }
             @{ Value = '{0:N0}' -f $s.Deployments; Label = "deployments in $MetricDays days"; Tone = 'info'; Table = 'environments' }
             @{ Value = $deployRate; Label = 'change failure rate'; Tone = $(if ($s.FailedDeployments) { 'warn' } else { 'good' }); Table = 'environments' }
+            @{ Value = $(if ($dora['Overall']) { $dora['Overall'] } else { '-' }); Label = 'DORA level'; Tone = $doraTone; Table = 'dora' }
+            @{ Value = '{0:N0}' -f $s.HighComplexity; Label = 'projects hard to move to GitHub'; Tone = $(if ($s.HighComplexity) { 'warn' } else { 'good' }); Table = 'migration'; Filters = @{ Complexity = 'High' } }
             @{ Value = '{0:N0}' -f $s.High; Label = 'high findings'; Tone = $(if ($s.High) { 'bad' } else { 'good' }); Table = 'findings'; Filters = @{ Severity = 'High' } }
         )
         Notices  = @($state.Notices | ForEach-Object { @{ Status = 'Warning'; Text = $_ } })
@@ -462,17 +515,26 @@ function Get-AACADOInventory {
             @{ Title = 'Pipelines by kind'; Kind = 'donut'; CenterLabel = 'pipelines'; Items = @(foreach ($k in 'YAML', 'Classic build', 'Classic release') { $n = @($r.Pipelines | Where-Object { $_.Kind -eq $k }).Count; if ($n) { @{ Label = $k; Value = $n; Tone = $kindTones[$k]; Filter = $k } } }); Table = 'pipelines'; Column = 'Kind' }
             @{ Title = 'Findings by area'; Kind = 'donut'; CenterLabel = 'findings'; Items = @($r.Findings | Group-Object -Property Area | ForEach-Object { @{ Label = $_.Name; Value = $_.Count; Filter = $_.Name } }); Table = 'findings'; Column = 'Area' }
             @{ Title = 'Security tools'; Items = @($r.Tools | Where-Object { $_.Category -eq 'Security' } | Select-Object -First 12 | ForEach-Object { @{ Label = $_.Tool; Value = $_.Pipelines; Filter = $_.Tool } }); Table = 'tools'; Column = 'Tool'; Tone = 'good'; Console = $true }
-            @{ Title = 'Most-used command-line tools'; Items = @($r.Tasks | Where-Object { $_.Kind -eq 'CLI' } | Group-Object -Property Name | Sort-Object -Property Count -Descending | Select-Object -First 12 | ForEach-Object { @{ Label = $_.Name; Value = $_.Count; Filter = $_.Name } }); Table = 'tasks'; Column = 'Name'; Tone = 'info' }
+            @{ Title = 'Most-used tools (pipelines)'; Items = @($r.Tools | Sort-Object -Property @{ Expression = { $_.Pipelines }; Descending = $true } | Select-Object -First 12 | ForEach-Object { @{ Label = $_.Tool; Value = $_.Pipelines; Filter = $_.Tool } }); Table = 'evidence'; Column = 'Tool'; Tone = 'info' }
             @{ Title = 'Pipelines using each kind of tool'; Items = @(foreach ($c in 'Lint', 'Build', 'Test', 'Security', 'Deploy', 'Publish', 'GitOps') { @{ Label = $c; Value = @($r.Pipelines | Where-Object { $_.$c }).Count; Filter = $c } }); Table = 'tools'; Column = 'Category'; Tone = 'info' }
         )
         Tabs     = @(
-            @{ Name = 'Overview'; Badge = $s.Projects; Tone = 'info'; Note = 'Each project: its pipelines by kind, how many scan for security, its repositories and security resources, the last run and the last push.' }
+            @{ Name = 'Overview'; Badge = $s.Projects; Tone = 'info'; Note = 'Each project: its pipelines by kind, how many scan for security, its repositories and security resources, the last run and the last push, and who to contact. Choose a project above to see only its rows in every tab.' }
+            @{ Name = 'People'; Badge = @($r.Members).Count; Tone = 'violet'; Note = 'Who to contact in each project: its Project Administrators (users, or groups in that group), its team admins and team members - one row per person, with their roles and teams.' }
             @{ Name = 'Pipelines'; Badge = $s.Pipelines; Tone = $(if ($s.ClassicBuild) { 'warn' } else { 'good' }); Note = "Every pipeline - YAML, classic build or classic release - with its last run, its delivery metrics over $MetricDays days, the tools found in its steps, and what it connects to." }
             @{ Name = 'Tasks'; Badge = @($r.Tasks).Count; Tone = 'info'; Note = 'Every task (with its version and what it does), command-line tool (with the version an installer task or the script sets), package, container, agent image and pool - YAML and classic.' }
             @{ Name = 'Repositories'; Badge = $s.Repositories; Tone = 'violet'; Note = 'Every Git repository: its last push, the branch policies on its default branch, and GitHub Advanced Security with its active alerts.' }
+            @{ Name = 'Branches'; Badge = $s.Branches; Tone = $(if ($s.StaleBranches) { 'warn' } else { 'violet' }); Note = "Every branch of every repository: its role (from its name), last commit, how far ahead and behind the default branch, stale after $StaleBranchDays days, and the policies on it. The Repositories tab names each repository's branching strategy." }
+            @{ Name = 'Branch policies'; Badge = $s.BranchPolicies; Tone = 'violet'; Note = 'Every branch policy - on or off, blocking or optional - with the branch (or prefix) it covers, its settings in words, and what it becomes on GitHub.' }
             @{ Name = 'Service connections'; Badge = @($r.ServiceConnections).Count; Tone = $(if (@($r.ServiceConnections | Where-Object { $_.OpenToAllPipelines }).Count) { 'bad' } else { 'good' }); Note = 'Who may use each service connection, how it signs in, which pipelines use it, and (with -IncludeAzure) its roles in Azure.' }
             @{ Name = 'Variable groups'; Badge = @($r.VariableGroups).Count; Tone = 'info'; Note = 'Each variable group: Key Vault or Azure DevOps, its secrets (names only), who may use it.' }
             @{ Name = 'Environments'; Badge = @($r.Environments).Count; Tone = 'info'; Note = "Each environment: its checks and approvals, who may deploy, and its deployments over $MetricDays days with the change failure rate." }
+            @{ Name = 'Variables'; Badge = @($r.Variables).Count; Tone = 'info'; Note = 'Every variable by name - pipeline settings, YAML and variable groups - secret or not, and where it goes on GitHub. Values are never read; secrets must be re-created by hand.' }
+            @{ Name = 'DORA'; Badge = @($r.Dora).Count; Tone = $doraTone; Note = "$($doraText)The four DORA keys per project over $MetricDays days, from production deployments (environments named prod, production, prd or live) or, when a project has none, every environment: deployment frequency, lead time (run queued to deployed), change failure rate and time to restore (a failure to the next success) - each with its band (Elite, High, Medium, Low); overall is the weakest." }
+            @{ Name = 'Artifacts'; Badge = @($r.Feeds).Count; Tone = $(if (@($r.Feeds | Where-Object { $_.Unsupported }).Count) { 'warn' } else { 'info' }); Note = 'Each Azure Artifacts feed: its packages by type, upstream sources, and whether GitHub Packages can hold them (npm, NuGet, Maven - not PyPI, Universal Packages or Cargo).' }
+            @{ Name = 'Test plans'; Badge = @($r.TestPlans).Count; Tone = $(if (@($r.TestPlans).Count) { 'warn' } else { 'good' }); Note = 'Each test plan - GitHub has no test case management, so these stay in Azure Test Plans or move to another tool.' }
+            @{ Name = 'Agents and extensions'; Badge = @($r.AgentPools).Count + @($r.Extensions).Count; Tone = 'info'; Note = 'Agent pools (self-hosted agents become self-hosted runners) and the marketplace extensions installed, with the pipelines whose tasks come from them.' }
+            @{ Name = 'Migration'; Badge = @($r.Migration).Count; Tone = $(if ($s.HighComplexity) { 'warn' } else { 'good' }); Note = 'Moving to GitHub: per project, what there is to move and a rough effort (classic pipelines, marketplace tasks, secrets, feeds, test plans, large or LFS repositories weigh most) - then where each kind of thing lands on GitHub and the tool that moves it.' }
             @{ Name = 'Tools'; Badge = @($r.Tools).Count; Tone = 'info'; Note = 'Each tool by category: how many pipelines and projects use it, the versions seen and how it was found.' }
             @{ Name = 'Coverage'; Badge = @($r.Coverage).Count; Tone = 'info'; Note = 'Which stages each build pipeline has: lint, build, test, security, deploy, publish, GitOps.' }
             @{ Name = 'Evidence'; Badge = @($r.Evidence).Count; Tone = 'neutral'; Note = 'Every tool found, with the file and line it was found on - credentials masked.' }
@@ -496,8 +558,25 @@ function Get-AACADOInventory {
                     @{ Key = 'LastRun'; Label = 'Last run'; Type = 'datetime'; Console = $true; Pdf = $true }
                     @{ Key = 'LastPush'; Label = 'Last push'; Type = 'datetime'; Console = $true; Pdf = $true }
                     $findingsColumn
+                    @{ Key = 'Contacts'; Label = 'Contacts'; Type = 'wide'; Pdf = $true }
+                    @{ Key = 'Administrators'; Label = 'Project administrators'; Type = 'number' }
+                    @{ Key = 'Teams'; Label = 'Teams'; Type = 'number' }
+                    @{ Key = 'Members'; Label = 'People'; Type = 'number'; Sum = $true }
                     @{ Key = 'Visibility'; Label = 'Visibility'; Facet = $true }
                     $openColumnLink
+                ) }
+            @{ Id = 'members'; Title = 'People'; Section = 'People'; Rows = @($r.Members); Noun = 'people'; GroupBy = @('Project', 'Kind'); ConsoleLimit = 25
+                Empty = 'Nobody read (or -Skip Members).'; EmptyStatus = 'Info'
+                Columns = @(
+                    $orgColumn
+                    @{ Key = 'Project'; Label = 'Project'; Facet = $true; Pdf = $true }
+                    @{ Key = 'Name'; Label = 'Name'; Console = $true; Pdf = $true }
+                    @{ Key = 'Email'; Label = 'Email or account'; Type = 'mono'; Console = $true; Pdf = $true }
+                    @{ Key = 'Roles'; Label = 'Roles'; Console = $true; Pdf = $true }
+                    @{ Key = 'Teams'; Label = 'Teams'; Type = 'wide'; Console = $true }
+                    @{ Key = 'Kind'; Label = 'Kind'; Facet = $true }
+                    @{ Key = 'ProjectAdministrator'; Label = 'Project administrator'; Facet = $true }
+                    @{ Key = 'TeamAdmin'; Label = 'Team admin'; Facet = $true }
                 ) }
             @{ Id = 'pipelines'; Title = 'Pipelines'; Section = 'Pipelines'; Rows = $pipelines; Noun = 'pipelines'; GroupBy = @('Project', 'Kind', 'LastResult'); ConsoleLimit = 25
                 Empty = 'No pipelines.'; EmptyStatus = 'Info'
@@ -520,6 +599,10 @@ function Get-AACADOInventory {
                     @{ Key = 'AzureTargets'; Label = 'Azure targets'; Type = 'wide' }
                     @{ Key = 'Environments'; Label = 'Environments' }
                     @{ Key = 'VariableGroups'; Label = 'Variable groups' }
+                    @{ Key = 'Variables'; Label = 'Variables'; Type = 'number' }
+                    @{ Key = 'SecretVariables'; Label = 'Secret variables'; Type = 'number'; Sum = $true }
+                    @{ Key = 'ExtensionTasks'; Label = 'Marketplace tasks'; Type = 'wide' }
+                    @{ Key = 'Pools'; Label = 'Agent pools' }
                     @{ Key = 'YamlFile'; Label = 'YAML file'; Type = 'mono' }
                     @{ Key = 'Yaml'; Label = 'YAML read'; Facet = $true }
                     @{ Key = 'Templates'; Label = 'Templates'; Type = 'wide' }
@@ -571,6 +654,14 @@ function Get-AACADOInventory {
                     @{ Key = 'DependencyAlerts'; Label = 'Dependency alerts'; Type = 'number'; Sum = $true }
                     @{ Key = 'SecretAlerts'; Label = 'Secret alerts'; Type = 'number'; Sum = $true }
                     @{ Key = 'Policies'; Label = 'Branch policies'; Type = 'wide' }
+                    @{ Key = 'Strategy'; Label = 'Branching strategy'; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Branches'; Label = 'Branches'; Type = 'number'; Sum = $true }
+                    @{ Key = 'StaleBranches'; Label = 'Stale branches'; Type = 'number'; Sum = $true }
+                    @{ Key = 'Tags'; Label = 'Tags'; Type = 'number' }
+                    @{ Key = 'OpenPullRequests'; Label = 'Open pull requests'; Type = 'number'; Sum = $true }
+                    @{ Key = 'Lfs'; Label = 'Git LFS'; Facet = $true }
+                    @{ Key = 'PushProtection'; Label = 'Push protection'; Facet = $true }
+                    @{ Key = 'AdvsecSettings'; Label = 'Advanced Security settings'; Type = 'wide' }
                     @{ Key = 'LastPush'; Label = 'Last push'; Type = 'datetime' }
                     @{ Key = 'LastPushBy'; Label = 'Pushed by' }
                     @{ Key = 'DefaultBranch'; Label = 'Default branch' }
@@ -633,6 +724,145 @@ function Get-AACADOInventory {
                     @{ Key = 'UsedBy'; Label = 'Pipelines'; Type = 'wide' }
                     $findingsColumn
                     $openColumnLink
+                ) }
+            @{ Id = 'branches'; Title = 'Branches'; Section = 'Branches'; Rows = @($r.Branches | Sort-Object -Property Organization, Project, Repository, @{ Expression = { -not $_.IsDefault } }, Branch); Noun = 'branches'; GroupBy = @('Repository', 'Kind', 'Stale'); ConsoleLimit = 25
+                Empty = 'No branches read (or -Skip Branches).'; EmptyStatus = 'Info'
+                Columns = @(
+                    $orgColumn
+                    @{ Key = 'Project'; Label = 'Project'; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Repository'; Label = 'Repository'; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Branch'; Label = 'Branch'; Type = 'mono'; Console = $true; Pdf = $true }
+                    @{ Key = 'Kind'; Label = 'Kind'; Type = 'badge'; Tones = @{ Default = 'good'; Mainline = 'good'; Develop = 'info'; Release = 'violet'; Hotfix = 'warn'; Feature = 'neutral'; Bugfix = 'neutral'; Personal = 'neutral'; Other = 'neutral' }; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'DaysSinceCommit'; Label = 'Last commit, days'; Type = 'number'; Console = $true; Pdf = $true }
+                    @{ Key = 'Ahead'; Label = 'Ahead'; Type = 'number'; Console = $true }
+                    @{ Key = 'Behind'; Label = 'Behind'; Type = 'number'; Console = $true }
+                    @{ Key = 'Stale'; Label = 'Stale'; Type = 'badge'; Tones = $yesBad; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Policies'; Label = 'Policies'; Type = 'wide'; Pdf = $true }
+                    @{ Key = 'Author'; Label = 'Last author' }
+                    @{ Key = 'LastCommit'; Label = 'Last commit'; Type = 'datetime' }
+                ) }
+            @{ Id = 'policies'; Title = 'Branch policies'; Section = 'Branch policies'; Rows = @($r.BranchPolicies | Sort-Object -Property Organization, Project, Repository, Branch, Policy); Noun = 'policies'; GroupBy = @('Policy', 'Repository'); ConsoleLimit = 25
+                Empty = 'No branch policies (or -Skip Security).'; EmptyStatus = 'Info'
+                Columns = @(
+                    $orgColumn
+                    @{ Key = 'Project'; Label = 'Project'; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Repository'; Label = 'Repository'; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Branch'; Label = 'Branch'; Type = 'mono'; Console = $true; Pdf = $true }
+                    @{ Key = 'Policy'; Label = 'Policy'; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Enabled'; Label = 'Enabled'; Type = 'badge'; Tones = @{ True = 'good'; False = 'neutral' }; Facet = $true; Console = $true }
+                    @{ Key = 'Blocking'; Label = 'Required'; Type = 'badge'; Tones = @{ True = 'good'; False = 'neutral' }; Facet = $true; Console = $true }
+                    @{ Key = 'Settings'; Label = 'Settings'; Type = 'wide'; Console = $true; Pdf = $true }
+                    @{ Key = 'GitHub'; Label = 'On GitHub'; Type = 'wide'; Pdf = $true }
+                ) }
+            @{ Id = 'variables'; Title = 'Variables'; Section = 'Variables'; Rows = @($r.Variables | Sort-Object -Property Organization, Project, Scope, Owner, Variable); Noun = 'variables'; GroupBy = @('Scope', 'Owner', 'Secret'); ConsoleLimit = 25
+                Empty = 'No variables.'; EmptyStatus = 'Info'
+                Columns = @(
+                    $orgColumn
+                    @{ Key = 'Project'; Label = 'Project'; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Scope'; Label = 'Defined in'; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Owner'; Label = 'Pipeline or group'; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Variable'; Label = 'Variable'; Type = 'mono'; Console = $true; Pdf = $true }
+                    @{ Key = 'Secret'; Label = 'Secret'; Type = 'badge'; Tones = @{ True = 'warn'; False = 'neutral' }; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Settable'; Label = 'Settable at queue time'; Facet = $true }
+                    @{ Key = 'GitHub'; Label = 'On GitHub'; Type = 'wide' }
+                ) }
+            @{ Id = 'dora'; Title = 'DORA'; Section = 'DORA'; Rows = @($r.Dora | Sort-Object -Property Organization, Project); Noun = 'projects'; GroupBy = @('Overall'); ConsoleLimit = 20
+                Empty = "No deployments to an environment (or a classic release stage) in $MetricDays days - or -Skip Metrics."; EmptyStatus = 'Info'
+                Columns = @(
+                    $orgColumn
+                    @{ Key = 'Project'; Label = 'Project'; Type = 'resource'; Console = $true; Pdf = $true }
+                    @{ Key = 'Overall'; Label = 'Overall'; Type = 'badge'; Tones = $doraTones; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'DeploymentsPerWeek'; Label = 'Deployments a week'; Type = 'number'; Format = 'N1'; Console = $true; Pdf = $true }
+                    @{ Key = 'Frequency'; Label = 'Frequency'; Type = 'badge'; Tones = $doraTones; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'LeadTimeHours'; Label = 'Lead time, h'; Type = 'number'; Format = 'N1'; Console = $true; Pdf = $true }
+                    @{ Key = 'LeadTime'; Label = 'Lead time'; Type = 'badge'; Tones = $doraTones; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'ChangeFailureRate'; Label = 'Change failure %'; Type = 'number'; Format = 'N1'; Console = $true; Pdf = $true }
+                    @{ Key = 'ChangeFailure'; Label = 'Change failure'; Type = 'badge'; Tones = $doraTones; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'TimeToRestoreHours'; Label = 'Time to restore, h'; Type = 'number'; Format = 'N1'; Console = $true; Pdf = $true }
+                    @{ Key = 'TimeToRestore'; Label = 'Time to restore'; Type = 'badge'; Tones = $doraTones; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Deployments'; Label = 'Deployments'; Type = 'number'; Sum = $true }
+                    @{ Key = 'Scope'; Label = 'From'; Facet = $true }
+                ) }
+            @{ Id = 'feeds'; Title = 'Artifacts feeds'; Section = 'Artifacts'; Rows = @($r.Feeds | Sort-Object -Property Organization, Project, Feed); Noun = 'feeds'; GroupBy = @('GitHubPackages'); ConsoleLimit = 20
+                Empty = 'No Azure Artifacts feeds (or -Skip Migration).'; EmptyStatus = 'Info'
+                Columns = @(
+                    $orgColumn
+                    @{ Key = 'Project'; Label = 'Project'; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Feed'; Label = 'Feed'; Type = 'resource'; Console = $true; Pdf = $true }
+                    @{ Key = 'Packages'; Label = 'Packages'; Type = 'number'; Sum = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Protocols'; Label = 'By type'; Console = $true; Pdf = $true }
+                    @{ Key = 'GitHubPackages'; Label = 'GitHub Packages'; Type = 'badge'; Tones = @{ Supported = 'good'; 'Nothing to move' = 'neutral'; 'Not read' = 'neutral' }; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Upstreams'; Label = 'Upstream sources'; Type = 'wide' }
+                    $openColumnLink
+                ) }
+            @{ Id = 'testplans'; Title = 'Test plans'; Section = 'Test plans'; Rows = @($r.TestPlans | Sort-Object -Property Organization, Project, TestPlan); Noun = 'test plans'; GroupBy = @('Project', 'State'); ConsoleLimit = 20
+                Empty = 'No test plans (or -Skip Migration).'; EmptyStatus = 'Success'
+                Columns = @(
+                    $orgColumn
+                    @{ Key = 'Project'; Label = 'Project'; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'TestPlan'; Label = 'Test plan'; Type = 'resource'; Console = $true; Pdf = $true }
+                    @{ Key = 'State'; Label = 'State'; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Owner'; Label = 'Owner'; Console = $true; Pdf = $true }
+                    @{ Key = 'AreaPath'; Label = 'Area'; Type = 'path' }
+                    @{ Key = 'Iteration'; Label = 'Iteration'; Type = 'path' }
+                    @{ Key = 'Updated'; Label = 'Updated'; Type = 'datetime'; Console = $true }
+                    $openColumnLink
+                ) }
+            @{ Id = 'pools'; Title = 'Agent pools'; Section = 'Agents and extensions'; Rows = @($r.AgentPools | Sort-Object -Property Organization, Hosted, Pool); Noun = 'agent pools'; GroupBy = @('Hosted'); ConsoleLimit = 20
+                Empty = 'No agent pools read (or -Skip Migration).'; EmptyStatus = 'Info'
+                Columns = @(
+                    $orgColumn
+                    @{ Key = 'Pool'; Label = 'Pool'; Console = $true; Pdf = $true }
+                    @{ Key = 'Hosted'; Label = 'Microsoft-hosted'; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Agents'; Label = 'Agents'; Type = 'number'; Sum = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Online'; Label = 'Online'; Type = 'number'; Sum = $true; Console = $true }
+                    @{ Key = 'Pipelines'; Label = 'Pipelines'; Type = 'number'; Console = $true; Pdf = $true }
+                    @{ Key = 'GitHub'; Label = 'On GitHub'; Type = 'wide' }
+                ) }
+            @{ Id = 'extensions'; Title = 'Marketplace extensions'; Section = 'Agents and extensions'; Rows = @($r.Extensions); Noun = 'extensions'; ConsoleLimit = 20
+                Empty = 'No marketplace extensions installed (or -Skip Migration).'; EmptyStatus = 'Info'
+                Columns = @(
+                    $orgColumn
+                    @{ Key = 'Extension'; Label = 'Extension'; Console = $true; Pdf = $true }
+                    @{ Key = 'Publisher'; Label = 'Publisher'; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Version'; Label = 'Version'; Type = 'mono' }
+                    @{ Key = 'Pipelines'; Label = 'Pipelines'; Type = 'number'; Console = $true; Pdf = $true }
+                    @{ Key = 'UsedBy'; Label = 'Used by'; Type = 'wide'; Console = $true }
+                    @{ Key = 'Disabled'; Label = 'Disabled'; Facet = $true }
+                    @{ Key = 'GitHub'; Label = 'On GitHub'; Type = 'wide' }
+                ) }
+            @{ Id = 'migration'; Title = 'Migration to GitHub'; Section = 'Migration'; Rows = @($r.Migration | Sort-Object -Property @{ Expression = { $_.Effort }; Descending = $true }, Project); Noun = 'projects'; GroupBy = @('Complexity'); ConsoleLimit = 20
+                Columns = @(
+                    $orgColumn
+                    @{ Key = 'Project'; Label = 'Project'; Type = 'resource'; Console = $true; Pdf = $true }
+                    @{ Key = 'Complexity'; Label = 'Complexity'; Type = 'badge'; Tones = $complexityTones; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Effort'; Label = 'Effort points'; Type = 'number'; Sum = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Repositories'; Label = 'Repositories'; Type = 'number'; Sum = $true; Console = $true }
+                    @{ Key = 'RepositoriesMB'; Label = 'MB'; Type = 'number'; Format = 'N1'; Sum = $true }
+                    @{ Key = 'YamlPipelines'; Label = 'YAML'; Type = 'number'; Sum = $true; Console = $true }
+                    @{ Key = 'ClassicPipelines'; Label = 'Classic'; Type = 'number'; Sum = $true; Console = $true }
+                    @{ Key = 'MarketplaceTasks'; Label = 'Marketplace tasks'; Type = 'number'; Sum = $true }
+                    @{ Key = 'SecretVariables'; Label = 'Secrets'; Type = 'number'; Sum = $true; Console = $true }
+                    @{ Key = 'Variables'; Label = 'Variables'; Type = 'number'; Sum = $true }
+                    @{ Key = 'ServiceConnections'; Label = 'Connections'; Type = 'number'; Sum = $true }
+                    @{ Key = 'Environments'; Label = 'Environments'; Type = 'number'; Sum = $true }
+                    @{ Key = 'Feeds'; Label = 'Feeds'; Type = 'number'; Sum = $true }
+                    @{ Key = 'Packages'; Label = 'Packages'; Type = 'number'; Sum = $true }
+                    @{ Key = 'TestPlans'; Label = 'Test plans'; Type = 'number'; Sum = $true }
+                    @{ Key = 'Wikis'; Label = 'Wikis'; Type = 'number' }
+                    @{ Key = 'ServiceHooks'; Label = 'Service hooks'; Type = 'number' }
+                    @{ Key = 'OpenPullRequests'; Label = 'Open pull requests'; Type = 'number'; Sum = $true }
+                    @{ Key = 'LfsRepositories'; Label = 'LFS repositories'; Type = 'number' }
+                    @{ Key = 'AdvancedSecurity'; Label = 'Advanced Security defaults'; Type = 'wide' }
+                    @{ Key = 'Notes'; Label = 'What needs work'; Type = 'wide'; Pdf = $true }
+                ) }
+            @{ Id = 'migrationmap'; Title = 'Where everything goes'; Section = 'Migration'; Rows = @($r.MigrationMap | Group-Object -Property AzureDevOps | ForEach-Object { $first = $_.Group[0]; [pscustomobject][ordered]@{ PSTypeName = 'AAC.DevOpsMigrationMap'; Organization = (@($_.Group | ForEach-Object { $_.Organization }) | Select-Object -Unique) -join ', '; AzureDevOps = $_.Name; Count = $(if ($null -eq $first.Count) { $null } else { (@($_.Group | ForEach-Object { [int]$_.Count }) | Measure-Object -Sum).Sum }); GitHub = $first.GitHub; HowToMove = $first.HowToMove; Note = $first.Note } }); Noun = 'kinds'; ConsoleLimit = 20
+                Columns = @(
+                    @{ Key = 'AzureDevOps'; Label = 'Azure DevOps'; Console = $true; Pdf = $true }
+                    @{ Key = 'Count'; Label = 'Count'; Type = 'number'; Console = $true; Pdf = $true }
+                    @{ Key = 'GitHub'; Label = 'GitHub'; Type = 'wide'; Console = $true; Pdf = $true }
+                    @{ Key = 'HowToMove'; Label = 'How to move'; Type = 'wide'; Console = $true; Pdf = $true }
+                    @{ Key = 'Note'; Label = 'Note'; Type = 'wide' }
                 ) }
             @{ Id = 'tools'; Title = 'Tools'; Section = 'Tools'; Rows = @($r.Tools); Noun = 'tools'; GroupBy = @('Category'); ConsoleLimit = 30
                 Empty = 'No tools found - no steps were read.'; EmptyStatus = 'Info'
@@ -697,7 +927,7 @@ function Get-AACADOInventory {
                     @{ Key = 'Recommendation'; Label = 'What to do'; Type = 'wide'; Pdf = $true }
                 ) }
         )
-        Hint     = '-View Tool, Evidence, Coverage, Unrecognised, Task or Finding returns those rows; -ToolRulePath adds tools of your own; -Skip Security, Metrics is faster; -YamlPath saves the YAML; -IncludeAzure adds Azure roles; -HtmlPath, -PdfPath or -CsvPath for a report.'
+        Hint     = '-View Tool, Evidence, Coverage, Unrecognised, Task, Branch, Dora, Migration or Finding returns those rows; -ToolRulePath adds tools of your own; -Skip Security, Metrics is faster; -YamlPath saves the YAML; -IncludeAzure adds Azure roles; -HtmlPath, -PdfPath or -CsvPath for a report.'
     }
     $rows = @(switch ($View) {
             'Project' { $r.Projects }
@@ -710,6 +940,17 @@ function Get-AACADOInventory {
             'ServiceConnection' { $r.ServiceConnections }
             'VariableGroup' { $r.VariableGroups }
             'Environment' { $r.Environments }
+            'Member' { $r.Members }
+            'Branch' { $r.Branches }
+            'BranchPolicy' { $r.BranchPolicies }
+            'Variable' { $r.Variables }
+            'Dora' { $r.Dora }
+            'Feed' { $r.Feeds }
+            'TestPlan' { $r.TestPlans }
+            'AgentPool' { $r.AgentPools }
+            'Extension' { $r.Extensions }
+            'Migration' { $r.Migration }
+            'MigrationMap' { $r.MigrationMap }
             'Finding' { $r.Findings }
             default { $pipelines }
         })

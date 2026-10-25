@@ -48,6 +48,13 @@ function Write-AACHtmlReport {
                     (#tab=Name); a tile or chart that filters a table opens
                     its tab. Printed, every tab is.
           -OverviewTab  the first tab's name ('Overview' unless given).
+          -Scope    @{ Key = 'Project'; Label; Values = @(...); Card = 'table
+                    id'; Contacts = 'table id'; Note } a selector at the top
+                    of the page: choosing a value filters every table with
+                    the Key column to it (the others say they aren't
+                    filtered) and shows a card - the Card table's row for
+                    it, the Contacts table's rows, and each table's count
+                    with a link to it. Tiles and charts stay report-wide.
           -Tree     @{ Title; OpenTo = 's'; Root = node } a collapsible,
                     searchable hierarchy above the tables. Node: @{ l = 't'|
                     'm'|'s'|'g'|'r'|'d' (tenant, management group,
@@ -103,7 +110,12 @@ function Write-AACHtmlReport {
 
         [object[]] $Tab = @(),
 
-        [string] $OverviewTab
+        [string] $OverviewTab,
+
+        # A report-wide selector: @{ Key; Label; Values; Card; Contacts; Note } - choosing a value
+        # filters every table that has the Key column, and shows a card: the Card table's row for
+        # it (its facts), the Contacts table's rows for it, and each table's count with a link.
+        [System.Collections.IDictionary] $Scope
     )
 
     $fullPath = $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
@@ -186,6 +198,12 @@ function Write-AACHtmlReport {
     }
     if ($Tab.Count) { $model['tabs'] = @(foreach ($item in $Tab) { & $camel $item }) }
     if ($OverviewTab) { $model['overviewTab'] = $OverviewTab }
+    if ($Scope -and $Scope['Key'] -and @($Scope['Values']).Count) {
+        $model['scope'] = [ordered]@{
+            key = [string]$Scope['Key']; label = $(if ($Scope['Label']) { [string]$Scope['Label'] } else { [string]$Scope['Key'] })
+            values = @($Scope['Values'] | ForEach-Object { [string]$_ }); card = [string]$Scope['Card']; contacts = [string]$Scope['Contacts']; note = [string]$Scope['Note']
+        }
+    }
     if ($Tree) {
         $model['tree'] = [ordered]@{ title = $Tree.Title; openTo = $(if ($Tree.Contains('OpenTo')) { $Tree.OpenTo } else { 's' }); root = $Tree.Root }
         foreach ($key in 'Levels', 'Order', 'Buttons', 'Placeholder', 'Top') { if ($Tree.Contains($key) -and $Tree[$key]) { $model['tree'][$key.ToLowerInvariant()] = $Tree[$key] } }

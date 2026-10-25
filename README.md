@@ -320,7 +320,7 @@ Commands for Azure DevOps organizations: projects, pipelines and the tools they 
 
 | Command                                                                                          | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`Get-AACADOInventory`](docs/Get-AACADOInventory.md)                                             | One or more Azure DevOps organizations inventoried: projects, pipelines (YAML, or classic - flagged) with their last run and delivery metrics (success rate, duration, queue time, DORA deployment frequency and change failure rate), every task and CLI tool they use with versions - YAML, nested and cross-repository templates, and classic pipelines - and the security posture of service connections, variable groups, environments, branch policies and GitHub Advanced Security, with findings. A PAT or your Azure sign-in; `-IncludeAzure` links service connections to Azure roles. A console view, objects, and CSV, HTML and PDF reports.|
+| [`Get-AACADOInventory`](docs/Get-AACADOInventory.md)                                             | One or more Azure DevOps organizations inventoried: projects, pipelines (YAML, or classic - flagged) with their last run and delivery metrics (success rate, duration, queue time, DORA deployment frequency and change failure rate), every task and CLI tool they use with versions - YAML, nested and cross-repository templates, and classic pipelines - and the security posture of service connections, variable groups, environments, branch policies and GitHub Advanced Security, with findings; branching strategy, a DORA assessment and everything a move to GitHub needs (variables, artifacts, test plans, agent pools, extensions). A PAT or your Azure sign-in; `-IncludeAzure` links service connections to Azure roles. A console view, objects, and CSV, HTML and PDF reports.|
 
 Full help:
 
@@ -1787,6 +1787,48 @@ Get-AACADOInventory -DiscoverOrganization -UseAzureSignIn -IncludeAzure -HtmlPat
   rate (cancelled runs left out), average duration and queue time, runs a
   week; each environment's deployments, deployments a week and **change
   failure rate** (DORA).
+- **Who to contact** (`-View Member`, the People tab): each project's
+  **Project Administrators** (people, or groups in that group), its **team
+  admins** and **team members** - one row per person with their roles and
+  teams - and on each project row the first contacts (administrators, then
+  team admins) with their e-mail. `-Skip Members` leaves them out.
+- **Branching** (`-View Branch`, `-View BranchPolicy`): every branch with its
+  role from its name (default, develop, release/\*, hotfix/\*, feature/\*,
+  personal), last commit, ahead and behind the default branch, stale after
+  `-StaleBranchDays` (90) and the policies on it; each repository's
+  **branching strategy** - GitFlow, trunk-based with release branches,
+  trunk-based / GitHub flow, feature branching or single branch - with its
+  tags, open pull requests and Git LFS. Every **branch policy**, on or off,
+  with its settings in words and its GitHub equivalent (rulesets, CODEOWNERS).
+  `-Skip Branches` leaves the branches out.
+- **DORA** (`-View Dora`, the DORA tab): per project and for the
+  organization, the four keys over `-MetricDays` - deployment frequency, lead
+  time (run queued to deployed), change failure rate and time to restore (a
+  failed deployment to the next success) - from production environments and
+  classic release stages (every environment when a project has none), each
+  banded **Elite, High, Medium or Low**; overall is the weakest.
+- **Moving to GitHub** (the Variables, Artifacts, Test plans, Agents and
+  extensions and Migration tabs): every **variable** by name - pipeline
+  settings, YAML and variable groups, secret or not, never values - with where
+  it goes on GitHub; **Azure Artifacts** feeds and their packages, and whether
+  GitHub Packages can hold them (npm, NuGet, Maven - not PyPI, Universal
+  Packages or Cargo); **test plans** (no GitHub equivalent); agent pools and
+  their agents; marketplace **extensions** and the pipelines whose tasks come
+  from them; **Advanced Security settings** per repository and project;
+  wikis and service hooks. `-View Migration` sums it up per project with rough
+  effort points (classic pipelines, marketplace tasks, secrets, feeds, test
+  plans, large or LFS repositories weigh most) and a complexity; `-View
+  MigrationMap` says where each kind of thing lands on GitHub and the tool
+  that moves it (GitHub Enterprise Importer, GitHub Actions Importer...).
+  `-Skip Migration` leaves this data out; the PAT needs Packaging, Test
+  Management, Wiki, Agent Pools and Extensions (Read).
+- **One project at a time, in the HTML report:** a **Project** selector at the
+  top filters every tab to the project chosen - its pipelines, tasks, tools'
+  evidence, coverage, repositories, service connections, variable groups,
+  environments and findings - and shows a card with the project's facts, who
+  to contact, and how many rows each table has for it, each a link. Tiles and
+  charts stay organization-wide; the tool matrix and the unrecognised list
+  say they aren't by project.
 - **Several organizations:** `-Organization contoso, fabrikam`, or
   `-DiscoverOrganization` for every organization your sign-in belongs to.
   Rows carry an Organization column.
@@ -1809,17 +1851,17 @@ Get-AACADOInventory -DiscoverOrganization -UseAzureSignIn -IncludeAzure -HtmlPat
   idle repositories.
 - **Signing in:** `-PersonalAccessToken` (a SecureString; read scopes:
   Build, Code, Project and Team, Release, Service Connections, Variable
-  Groups, Environment, Advanced Security), the `AZURE_DEVOPS_EXT_PAT`
+  Groups, Environment, Advanced Security, Identity), the `AZURE_DEVOPS_EXT_PAT`
   environment variable, or `-UseAzureSignIn` - your `Connect-AAC` sign-in,
   for organizations connected to your tenant. The token goes only to Azure
   DevOps and is never written anywhere.
 - YAML in GitHub or another non-Azure Repos repository can't be read through
   Azure DevOps: the pipeline says so. `-Skip Yaml, Security, Metrics,
-  AdvancedSecurity` leaves parts out, to read faster.
+  AdvancedSecurity, Members` leaves parts out, to read faster.
 
 `-View` returns (and writes to `-CsvPath`) Pipeline, Project, Repository,
 Task, Tool, Evidence, Coverage, Unrecognised, ServiceConnection, VariableGroup,
-Environment or Finding rows;
+Environment, Member or Finding rows;
 `-HtmlPath` and `-PdfPath` write a report with a tab for each.
 
 ## Terraform export

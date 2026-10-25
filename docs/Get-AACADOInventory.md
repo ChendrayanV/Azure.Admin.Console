@@ -21,11 +21,12 @@ Inventories one or more Azure DevOps organizations - projects, pipelines (YAML, 
 ```
 Get-AACADOInventory [[-Organization] <string[]>] [[-Project] <string[]>] [[-PipelineId] <int[]>]
  [[-PersonalAccessToken] <securestring>] [[-Skip] <string[]>] [[-MetricDays] <int>]
- [[-TemplateDepth] <int>] [[-StaleDays] <int>] [[-InactiveDays] <int>] [[-ToolRule] <Object[]>]
- [[-ToolRulePath] <string>] [[-MaxScriptFiles] <int>] [[-YamlPath] <string>] [[-View] <string>]
- [[-ThrottleLimit] <int>] [[-CsvPath] <string>] [[-HtmlPath] <string>] [[-PdfPath] <string>]
- [[-Title] <string>] [-DiscoverOrganization] [-UseAzureSignIn] [-SkipYaml] [-IncludeAzure]
- [-IncludeDisabledRepository] [-PassThru] [-NoDisplay] [-NoPaging]
+ [[-TemplateDepth] <int>] [[-StaleDays] <int>] [[-InactiveDays] <int>] [[-StaleBranchDays] <int>]
+ [[-ToolRule] <Object[]>] [[-ToolRulePath] <string>] [[-MaxScriptFiles] <int>]
+ [[-YamlPath] <string>] [[-View] <string>] [[-ThrottleLimit] <int>] [[-CsvPath] <string>]
+ [[-HtmlPath] <string>] [[-PdfPath] <string>] [[-Title] <string>] [-DiscoverOrganization]
+ [-UseAzureSignIn] [-SkipYaml] [-IncludeAzure] [-IncludeDisabledRepository] [-PassThru] [-NoDisplay]
+ [-NoPaging]
 ```
 
 ## ALIASES
@@ -96,6 +97,29 @@ rate (cancelled runs left out), average duration and queue time,
 runs a week; each environment's deployments, deployments a week,
 and change failure rate (DORA).
 
+Branching: every branch with its role (from its name - develop,
+release/\*, hotfix/\*, feature/\*...), last commit, ahead and behind the
+default branch, stale after -StaleBranchDays, and the policies on it;
+each repository's strategy (GitFlow, trunk-based with release
+branches, trunk-based / GitHub flow, feature branching, single
+branch). Every branch policy, on or off, with its settings in words
+and its GitHub equivalent (rulesets, CODEOWNERS).
+
+DORA, per project and for the organization: deployment frequency,
+lead time (run queued to deployed), change failure rate and time to
+restore, from production environments and classic release stages
+(every environment when a project has no production one), each
+banded Elite, High, Medium or Low; overall is the weakest.
+
+Moving to GitHub: variables by name (pipeline settings, YAML,
+variable groups - secret or not, never values), Azure Artifacts feeds
+and their packages (and whether GitHub Packages can hold them), test
+plans, wikis, service hooks, open pull requests, Git LFS, agent pools
+and agents, marketplace extensions and the tasks pipelines use from
+them, Advanced Security settings per repository and project; a
+summary per project with rough effort points and a map of where each
+kind of thing lands on GitHub and the tool that moves it.
+
 -IncludeAzure (with Connect-AAC) follows each Azure service
 connection to its service principal and the Azure roles it holds,
 and flags pipeline identities that are Owner (or can grant access),
@@ -107,7 +131,8 @@ Signing in, in this order:
   -PersonalAccessToken   a PAT with read scopes: Build, Code,
                          Project and Team, Release, Service
                          Connections, Variable Groups, Environment,
-                         Advanced Security
+                         Advanced Security, Packaging, Test
+                         Management, Wiki, Agent Pools, Extensions
   AZURE_DEVOPS_EXT_PAT   the same, from the environment (the
                          variable the Azure DevOps CLI reads)
   -UseAzureSignIn        your Connect-AAC sign-in (Microsoft Entra
@@ -164,6 +189,14 @@ Every organization you belong to, with each Azure service connection's roles in 
 ### Example 6
 
 ```powershell
+Get-AACADOInventory -Organization contoso -PersonalAccessToken $pat -View Migration -NoDisplay | Sort-Object -Property Effort -Descending
+```
+
+Projects by how much work the move to GitHub is.
+
+### Example 7
+
+```powershell
 Get-AACADOInventory -Organization contoso -Project Payments -PersonalAccessToken $pat -YamlPath .\pipelines -Skip Security, Metrics
 ```
 
@@ -182,7 +215,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 15
+  Position: 16
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -225,7 +258,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 16
+  Position: 17
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -315,7 +348,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 11
+  Position: 12
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -443,7 +476,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 17
+  Position: 18
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -524,7 +557,10 @@ HelpMessage: ''
 Leave parts out, to read faster: Yaml (no YAML files or templates),
 Security (no service connections, variable groups, environments or
 branch policies), Metrics (no run history or deployments),
-AdvancedSecurity.
+AdvancedSecurity, Members (no Project Administrators or teams - who
+to contact), Branches (no branches, tags or branching strategy),
+Migration (no feeds, test plans, wikis, pull requests, agent pools,
+service hooks or extensions - the move-to-GitHub data).
 
 ```yaml
 Type: System.String[]
@@ -555,6 +591,28 @@ Aliases: []
 ParameterSets:
 - Name: (All)
   Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -StaleBranchDays
+
+A branch (not the default one) with no commit in this many days is
+stale (90 if not given).
+
+```yaml
+Type: System.Int32
+DefaultValue: 90
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 9
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -618,7 +676,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 14
+  Position: 15
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -639,7 +697,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 18
+  Position: 19
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -664,7 +722,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 9
+  Position: 10
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -687,7 +745,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 10
+  Position: 11
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -721,8 +779,10 @@ HelpMessage: ''
 ### -View
 
 What is returned and written to -CsvPath: Pipeline (default),
-Project, Repository, Task, Tool, ServiceConnection, VariableGroup,
-Environment or Finding.
+Project, Repository, Task, Tool, Evidence, Coverage, Unrecognised,
+ServiceConnection, VariableGroup, Environment, Member (who to contact),
+Branch, BranchPolicy, Variable, Dora, Feed, TestPlan, AgentPool,
+Extension, Migration, MigrationMap or Finding.
 
 ```yaml
 Type: System.String
@@ -731,7 +791,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 13
+  Position: 14
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -754,7 +814,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 12
+  Position: 13
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -775,7 +835,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## OUTPUTS
 
-### AAC.DevOpsPipeline, AAC.DevOpsProject, AAC.DevOpsRepository, AAC.DevOpsTask, AAC.DevOpsToolUsage, AAC.DevOpsServiceConnection, AAC.DevOpsVariableGroup, AAC.DevOpsEnvironment or AAC.DevOpsFinding, by -View (piped onward, or with -PassThru or -NoDisplay)
+### AAC.DevOpsPipeline, AAC.DevOpsProject, AAC.DevOpsRepository, AAC.DevOpsTask, AAC.DevOpsToolUsage, AAC.DevOpsServiceConnection, AAC.DevOpsVariableGroup, AAC.DevOpsEnvironment, AAC.DevOpsMember, AAC.DevOpsToolEvidence, AAC.DevOpsCoverage, AAC.DevOpsUnrecognised, AAC.DevOpsBranch, AAC.DevOpsBranchPolicy, AAC.DevOpsVariable, AAC.DevOpsDora, AAC.DevOpsFeed, AAC.DevOpsTestPlan, AAC.DevOpsAgentPool, AAC.DevOpsExtension, AAC.DevOpsMigration, AAC.DevOpsMigrationMap or AAC.DevOpsFinding, by -View (piped onward, or with -PassThru or -NoDisplay)
 
 ## NOTES
 

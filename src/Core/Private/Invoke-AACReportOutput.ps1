@@ -60,6 +60,7 @@ function Invoke-AACReportOutput {
                 if ($Report.Contains('Tabs') -and $Report.Tabs) { $html.Tab = @($Report.Tabs); $html.OverviewTab = 'Summary' }
                 if ($Report.Contains('Tree') -and $Report.Tree) { $html.Tree = $Report.Tree }
                 if ($Report.Contains('HeatMaps') -and $Report.HeatMaps) { $html.HeatMap = @($Report.HeatMaps) }
+                if ($Report.Contains('Scope') -and $Report.Scope) { $html.Scope = $Report.Scope }
                 Write-AACHtmlReport @html
             }
         }

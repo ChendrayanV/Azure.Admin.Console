@@ -160,6 +160,16 @@ jobs:
                 @{ displayName = 'Tools'; enabled = $true; task = @{ id = 'b0000000-0000-0000-0000-00000000000e'; versionSpec = '2.*' }; inputs = @{ script = "npm install -g typescript@5.4.5`nhelm upgrade web ./chart" } }
             ) })
     $classicCd.variableGroups = @(@{ id = 1; name = 'payments-secrets' })
+    # A marketplace task (from an installed extension), a self-hosted pool, and variables in the pipeline's settings.
+    $classicCd.process.phases[0].steps += @{ displayName = 'Replace tokens'; enabled = $true; task = @{ id = 'c0000000-0000-0000-0000-000000000001'; versionSpec = '6.*' }; inputs = @{ targetFiles = '**/*.config' } }
+    $classicCd.queue = @{ name = 'onprem-linux'; pool = @{ name = 'onprem-linux' } }
+    $classicCd.variables = @{ BuildConfiguration = @{ value = 'Release'; allowOverride = $true }; NpmToken = @{ isSecret = $true; value = $null } }
+    $marketTask = & $task 'c0000000-0000-0000-0000-000000000001' 'replacetokens' 6 'Replace tokens in files' 'Utility'
+    $marketTask.contributionIdentifier = 'fabrikam.replacetokens.replacetokens-task'
+    $marketTask.author = 'Fabrikam Tools'
+    $feeds = 'https://feeds.dev.azure.com/contoso'
+    $vsrm = 'https://vsrm.dev.azure.com/contoso'
+    $branch = { param([string] $Name, [double] $Days, [int] $Ahead = 0, [int] $Behind = 0) @{ name = $Name; aheadCount = $Ahead; behindCount = $Behind; commit = @{ author = @{ name = 'Alex Contoso'; date = (& $ago $Days) }; committer = @{ date = (& $ago $Days) } } } }
 
     $answers = @{
         "$org/_apis/projects"                                              = & $list @(@{ id = $p1; name = 'Payments'; state = 'wellFormed'; visibility = 'private'; lastUpdateTime = (& $ago 1) }, @{ id = $p2; name = 'Platform'; state = 'wellFormed'; visibility = 'private'; lastUpdateTime = (& $ago 5) }, @{ id = $p3; name = 'Legacy'; state = 'wellFormed'; visibility = 'private'; lastUpdateTime = (& $ago 900) })
@@ -175,6 +185,7 @@ jobs:
             (& $task 'b0000000-0000-0000-0000-00000000000c' 'VSTest' 2 'Run unit and functional tests (Selenium, Appium, Coded UI test, etc.)' 'Test')
             (& $task 'b0000000-0000-0000-0000-00000000000d' 'AzureRmWebAppDeployment' 3 'Deploy to Azure App Service (use AzureRmWebAppDeployment@4)' 'Deploy' $true)
             (& $task 'b0000000-0000-0000-0000-00000000000e' 'CmdLine' 2 'Run a command line script using Bash on Linux and macOS and cmd.exe on Windows' 'Utility')
+            $marketTask
         )
         # --- Payments ------------------------------------------------------------------------------------------
         "$org/$p1/_apis/build/definitions"                                 = & $list @(
@@ -228,6 +239,23 @@ jobs:
             @{ alertId = 2; alertType = 'dependency'; severity = 'critical'; state = 'active'; title = 'Newtonsoft.Json' }
             @{ alertId = 3; alertType = 'code'; severity = 'medium'; state = 'active'; title = 'SQL injection' }
         )
+        # Branches (GitFlow on payments; one branch on payments-docs), tags, pull requests, Git LFS.
+        "$org/$p1/_apis/git/repositories/$r1/stats/branches"               = & $list @((& $branch 'main' 1), (& $branch 'develop' 2 3 0), (& $branch 'release/1.0' 10 0 4), (& $branch 'feature/old-idea' 200 1 90), (& $branch 'users/kim/spike' 150 2 70))
+        "$org/$p1/_apis/git/repositories/$r2/stats/branches"               = & $list @((& $branch 'main' 400))
+        "$org/$p1/_apis/git/repositories/$r1/refs"                         = & $list @(@{ name = 'refs/tags/v1.0' }, @{ name = 'refs/tags/v1.1' })
+        "$org/$p1/_apis/git/repositories/$r1/pullrequests"                 = & $list @(@{ pullRequestId = 7; title = 'Add refunds' })
+        "$org/$p1/_apis/git/repositories/$r1/items|/.gitattributes"        = & $file '/.gitattributes' '*.psd filter=lfs diff=lfs merge=lfs -text'
+        # Classic release deployments to Production, a wiki, a test plan, a feed with npm and PyPI packages.
+        "$vsrm/$p1/_apis/release/deployments"                              = & $list @(
+            @{ id = 1; deploymentStatus = 'succeeded'; releaseEnvironment = @{ name = 'Production' }; queuedOn = (& $ago 4.5); completedOn = (& $ago 4) }
+            @{ id = 2; deploymentStatus = 'failed'; releaseEnvironment = @{ name = 'Production' }; queuedOn = (& $ago 8.5); completedOn = (& $ago 8) }
+            @{ id = 3; deploymentStatus = 'succeeded'; releaseEnvironment = @{ name = 'Production' }; queuedOn = (& $ago 7.6); completedOn = (& $ago 7.5) }
+        )
+        "$org/$p1/_apis/wiki/wikis"                                        = & $list @(@{ id = 'w1'; name = 'Payments.wiki'; type = 'projectWiki' })
+        "$org/$p1/_apis/testplan/plans"                                    = & $list @(@{ id = 31; name = 'Payments regression'; state = 'Active'; areaPath = 'Payments'; iteration = 'Payments\Sprint 9'; owner = @{ displayName = 'Kim Contoso' }; updatedDate = (& $ago 3) })
+        "$feeds/$p1/_apis/packaging/feeds"                                 = & $list @(@{ id = 'f1'; name = 'payments-feed'; upstreamSources = @(@{ name = 'npmjs' }) })
+        "$feeds/$p1/_apis/packaging/Feeds/f1/packages"                     = & $list @(@{ name = 'payments-ui'; protocolType = 'Npm' }, @{ name = 'payments-sdk'; protocolType = 'Npm' }, @{ name = 'payments-tools'; protocolType = 'PyPi' })
+        "$advsec/$p1/_apis/management/enablement"                          = & $one @{ enableOnCreate = $true; projectId = $p1 }
         # --- Platform ------------------------------------------------------------------------------------------
         "$org/$p2/_apis/build/definitions"                                 = & $list @(
             (& $definition 3 'infra' 2 'infra/pipeline.yml' (& $repo $r3 'infra') $null)
@@ -245,13 +273,14 @@ jobs:
         "$org/$p2/_apis/pipelines/pipelinePermissions/environment/21"      = & $permission $false @(3)
         "$org/$p2/_apis/pipelines/checks/configurations|21"                = & $list @()
         "$org/$p2/_apis/distributedtask/environments/21/environmentdeploymentrecords" = & $list @(
-            @{ id = 1; result = 'succeeded'; queueTime = (& $ago 2); finishTime = (& $ago 2) }
+            @{ id = 1; result = 'succeeded'; queueTime = (& $ago 2); finishTime = (& $ago 2); owner = @{ id = 304 } }
             @{ id = 2; result = 'failed'; queueTime = (& $ago 9); finishTime = (& $ago 9) }
             @{ id = 3; result = 'succeeded'; queueTime = (& $ago 16); finishTime = (& $ago 16) }
             @{ id = 4; result = 'succeeded'; queueTime = (& $ago 23); finishTime = (& $ago 23) }
             @{ id = 5; result = 'failed'; queueTime = (& $ago 60); finishTime = (& $ago 60) }
         )
         "$org/$p2/_apis/policy/configurations"                             = & $list @()
+        "$org/$p2/_apis/git/repositories/$r3/stats/branches"               = & $list @((& $branch 'main' 5), (& $branch 'feature/flux-upgrade' 3 2 0))
         "$org/$p2/_apis/build/builds"                                      = & $list @((& $run 4 'partiallySucceeded' 3))
         # --- Legacy --------------------------------------------------------------------------------------------
         "$org/$p3/_apis/build/definitions"                                 = & $list @()
@@ -262,6 +291,34 @@ jobs:
         "$org/$p3/_apis/distributedtask/environments"                      = & $list @()
         "$org/$p3/_apis/policy/configurations"                             = & $list @()
         "$org/$p3/_apis/build/builds"                                      = & $list @()
+        # --- People: Payments' teams and Project Administrators (Platform has none; Legacy can't be read) -----------
+        "$org/_apis/projects/$p1/teams"                                    = & $list @(@{ id = 'team-1'; name = 'Payments Team' }, @{ id = 'team-2'; name = 'Web Team' })
+        "$org/_apis/projects/$p1/teams/team-1/members"                     = & $list @(
+            @{ isTeamAdmin = $true; identity = @{ id = 'u-alex'; displayName = 'Alex Contoso'; uniqueName = 'alex@contoso.com' } }
+            @{ identity = @{ id = 'u-kim'; displayName = 'Kim Contoso'; uniqueName = 'kim@contoso.com' } }
+        )
+        "$org/_apis/projects/$p1/teams/team-2/members"                     = & $list @(
+            @{ isTeamAdmin = $true; identity = @{ id = 'u-sam'; displayName = 'Sam Contoso'; uniqueName = 'sam@contoso.com' } }
+            @{ identity = @{ id = 'u-alex'; displayName = 'Alex Contoso'; uniqueName = 'alex@contoso.com' } }
+        )
+        'https://vssps.dev.azure.com/contoso/_apis/identities|filter=[Payments]\Project Administrators' = & $list @(@{ id = 'g-admins'; providerDisplayName = '[Payments]\Project Administrators'; isContainer = $true; members = @('d-alex', 'd-ops') })
+        'https://vssps.dev.azure.com/contoso/_apis/identities|descriptors=d-alex,d-ops' = & $list @(
+            @{ id = 'i-alex'; providerDisplayName = 'Alex Contoso'; isContainer = $false; properties = @{ Mail = @{ '$value' = 'alex@contoso.com' }; Account = @{ '$value' = 'alex@contoso.com' } } }
+            @{ id = 'i-ops'; providerDisplayName = 'Contoso Ops'; isContainer = $true; properties = @{ Account = @{ '$value' = '[contoso]\Contoso Ops' } } }
+        )
+        "$org/_apis/projects/$p2/teams"                                    = & $list @()
+        'https://vssps.dev.azure.com/contoso/_apis/identities|filter=[Platform]\Project Administrators' = & $list @()
+        # --- The organization's own: a feed, agent pools, service hooks, extensions ---------------------------------
+        "$feeds/_apis/packaging/feeds"                                     = & $list @(@{ id = 'f0'; name = 'shared' })
+        "$feeds/_apis/packaging/Feeds/f0/packages"                         = & $list @(@{ name = 'Contoso.Common'; protocolType = 'NuGet' })
+        "$org/_apis/distributedtask/pools"                                 = & $list @(@{ id = 1; name = 'Azure Pipelines'; isHosted = $true; poolType = 'automation' }, @{ id = 7; name = 'onprem-linux'; isHosted = $false; poolType = 'automation' })
+        "$org/_apis/distributedtask/pools/7/agents"                        = & $list @(@{ id = 1; name = 'agent-1'; status = 'online'; enabled = $true }, @{ id = 2; name = 'agent-2'; status = 'offline'; enabled = $true })
+        "$org/_apis/hooks/subscriptions"                                   = & $list @(@{ id = 'h1'; publisherId = 'tfs'; eventType = 'git.push'; consumerId = 'teams'; publisherInputs = @{ projectId = $p1 } })
+        'https://extmgmt.dev.azure.com/contoso/_apis/extensionmanagement/installedextensions' = & $list @(
+            @{ publisherId = 'fabrikam'; publisherName = 'Fabrikam Tools'; extensionId = 'replacetokens'; extensionName = 'Replace Tokens'; version = '6.0.0'; flags = 'none'; installState = @{ flags = 'none' } }
+            @{ publisherId = 'ms'; publisherName = 'Microsoft'; extensionId = 'vss-code-search'; extensionName = 'Code Search'; version = '1.0'; flags = 'builtIn'; installState = @{ flags = 'none' } }
+            @{ publisherId = 'acme'; publisherName = 'Acme'; extensionId = 'unused-widget'; extensionName = 'Unused widget'; version = '0.1'; flags = 'none'; installState = @{ flags = 'disabled' } }
+        )
         # --- Discovery, and a second organization ------------------------------------------------------------------
         'https://app.vssps.visualstudio.com/_apis/profile/profiles/me'     = & $one @{ id = 'member-1'; displayName = 'Alex Contoso' }
         'https://app.vssps.visualstudio.com/_apis/accounts'                = & $list @(@{ accountName = 'contoso' }, @{ accountName = 'fabrikam' })
@@ -282,6 +339,11 @@ function Get-AACContosoDevOpsAnswer {
         $path = "$path|$file"
     }
     elseif ($path -like '*/checks/configurations') { $path = "$path|$(([regex]::Match($Uri, '[?&]resourceId=([^&]+)')).Groups[1].Value)" }
+    elseif ($path -like '*/_apis/identities') {
+        # Identities by search (filterValue) or by descriptors.
+        $by = [regex]::Match($Uri, '[?&](filterValue|descriptors)=([^&]+)')
+        $path = "$path|$(@{ filterValue = 'filter'; descriptors = 'descriptors' }[$by.Groups[1].Value])=$([System.Uri]::UnescapeDataString($by.Groups[2].Value))"
+    }
     if ($Data.Answers.Contains($path)) { return $Data.Answers[$path] }
     @{ Status = 404; Body = $null; Items = $null; Error = 'TF401174: The item could not be found.' }
 }
