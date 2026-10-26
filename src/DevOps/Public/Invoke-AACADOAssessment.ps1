@@ -1,13 +1,14 @@
-function Get-AACADOInventory {
+function Invoke-AACADOAssessment {
     <#
     .EXTERNALHELP Azure.Admin.Console-help.xml
     .SYNOPSIS
-        Inventories one or more Azure DevOps organizations - projects,
+        Assesses one or more Azure DevOps organizations - projects,
         pipelines (YAML, or classic with no YAML file - flagged) with their
         last run and delivery metrics, every task and tool they use (with
         versions), repositories, service connections, variable groups and
-        environments with their security posture - as a Spectre.Console
-        view, objects, and CSV, HTML and PDF reports.
+        environments with their security posture, the software bill of
+        materials (SBOM) each pipeline produces, DORA and the move to GitHub
+        - as a Spectre.Console view, objects, and CSV, HTML and PDF reports.
     .DESCRIPTION
         Read-only, through the Azure DevOps REST API - nothing is changed.
         For each organization (-Organization, or -DiscoverOrganization) and
@@ -62,6 +63,22 @@ function Get-AACADOInventory {
         to every pipeline; default branches with no required reviewers or
         build validation; Advanced Security off, exposed secrets, critical
         and high alerts; idle repositories.
+
+        SBOM (software bill of materials): which build pipelines generate
+        one - the Microsoft SBOM Tool (sbom-tool generate, the Manifest
+        Generator task, GenerateSBOM=true in .NET projects), 1ES Pipeline
+        Templates, Syft, CycloneDX, Trivy or Docker - and which validate one
+        (sbom-tool validate); then, from each one's latest successful run,
+        the SBOM it published (the _manifest/spdx_2.2 or spdx_3.0
+        manifest.spdx.json, or any SPDX or CycloneDX JSON file in its
+        artifacts): format, the tool that made it, components and files,
+        completeness against the NTIA minimum elements (name, version,
+        supplier, package URL), licences by kind (permissive, weak or strong
+        copyleft, unknown), and every component with its version, ecosystem,
+        supplier and licence. Findings: pipelines that deploy or publish with
+        no SBOM, an SBOM generated but not published, incomplete SBOMs,
+        strong copyleft licences, SBOMs never validated. -Skip Sbom leaves
+        the artifacts unread (the generators are still found in the steps).
 
         Delivery metrics over -MetricDays: each pipeline's runs, success
         rate (cancelled runs left out), average duration and queue time,
@@ -130,7 +147,9 @@ function Get-AACADOInventory {
         AdvancedSecurity, Members (no Project Administrators or teams - who
         to contact), Branches (no branches, tags or branching strategy),
         Migration (no feeds, test plans, wikis, pull requests, agent pools,
-        service hooks or extensions - the move-to-GitHub data).
+        service hooks or extensions - the move-to-GitHub data), Sbom (no
+        SBOMs read from the runs' artifacts - the generators are still found
+        in the steps).
     .PARAMETER SkipYaml
         The same as -Skip Yaml.
     .PARAMETER MetricDays
@@ -150,7 +169,7 @@ function Get-AACADOInventory {
     .PARAMETER ToolRule
         Tools of your own to look for: @(@{ Category = 'Security'; Tool =
         'Acme Scan'; Pattern = 'acme-scan' }). Category is Lint, Build, Test,
-        Security, Deploy, Publish, GitOps or Tooling; Pattern a regular
+        Security, Deploy, Publish, GitOps, SBOM or Tooling; Pattern a regular
         expression, matched ignoring case; Purpose (optional) says what the
         tool does.
     .PARAMETER ToolRulePath
@@ -177,7 +196,9 @@ function Get-AACADOInventory {
         Project, Repository, Task, Tool, Evidence, Coverage, Unrecognised,
         ServiceConnection, VariableGroup, Environment, Member (who to contact),
         Branch, BranchPolicy, Variable, Dora, Feed, TestPlan, AgentPool,
-        Extension, Migration, MigrationMap or Finding.
+        Extension, Migration, MigrationMap, Sbom (each build pipeline's
+        SBOM), SbomComponent (every component of every SBOM read),
+        SbomLicense or Finding.
     .PARAMETER ThrottleLimit
         How many requests run at once (1 to 32; 8 by default).
     .PARAMETER CsvPath
@@ -196,32 +217,35 @@ function Get-AACADOInventory {
         Show the whole view at once.
     .EXAMPLE
         $pat = Read-Host -Prompt 'Azure DevOps PAT' -AsSecureString
-        Get-AACADOInventory -Organization contoso -PersonalAccessToken $pat
+        Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $pat
         Every project, pipeline and repository of the organization, with its tools, security posture and findings.
     .EXAMPLE
-        Get-AACADOInventory -Organization contoso -PersonalAccessToken $pat -HtmlPath .\ADO.html -PdfPath .\ADO.pdf -CsvPath .\ADO.csv
+        Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $pat -HtmlPath .\ADO.html -PdfPath .\ADO.pdf -CsvPath .\ADO.csv
         The same as reports.
     .EXAMPLE
-        Get-AACADOInventory -Organization contoso -PersonalAccessToken $pat -View Task -NoDisplay | Where-Object Kind -EQ 'CLI' | Group-Object -Property Name, Version
+        Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $pat -View Task -NoDisplay | Where-Object Kind -EQ 'CLI' | Group-Object -Property Name, Version
         Every command-line tool the pipelines run, and the versions they set.
     .EXAMPLE
-        Get-AACADOInventory -Organization contoso -PersonalAccessToken $pat -View ServiceConnection -NoDisplay | Where-Object OpenToAllPipelines
+        Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $pat -View ServiceConnection -NoDisplay | Where-Object OpenToAllPipelines
         Service connections any pipeline can use.
     .EXAMPLE
         Connect-AAC
-        Get-AACADOInventory -DiscoverOrganization -UseAzureSignIn -IncludeAzure -HtmlPath .\ADO.html
+        Invoke-AACADOAssessment -DiscoverOrganization -UseAzureSignIn -IncludeAzure -HtmlPath .\ADO.html
         Every organization you belong to, with each Azure service connection's roles in Azure.
     .EXAMPLE
-        Get-AACADOInventory -Organization contoso -PersonalAccessToken $pat -View Migration -NoDisplay | Sort-Object -Property Effort -Descending
+        Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $pat -View Migration -NoDisplay | Sort-Object -Property Effort -Descending
         Projects by how much work the move to GitHub is.
     .EXAMPLE
-        Get-AACADOInventory -Organization contoso -Project Payments -PersonalAccessToken $pat -YamlPath .\pipelines -Skip Security, Metrics
+        Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $pat -View SbomComponent -NoDisplay | Where-Object { $_.Component -eq 'log4j-core' -and $_.Version -like '2.1*' }
+        Every pipeline whose latest SBOM ships a given component and version - the first question when a new vulnerability is announced.
+    .EXAMPLE
+        Invoke-AACADOAssessment -Organization contoso -Project Payments -PersonalAccessToken $pat -YamlPath .\pipelines -Skip Security, Metrics
         Save the project's pipelines and templates to a folder, to review or diff offline.
     .OUTPUTS
-        AAC.DevOpsPipeline, AAC.DevOpsProject, AAC.DevOpsRepository, AAC.DevOpsTask, AAC.DevOpsToolUsage, AAC.DevOpsServiceConnection, AAC.DevOpsVariableGroup, AAC.DevOpsEnvironment, AAC.DevOpsMember, AAC.DevOpsToolEvidence, AAC.DevOpsCoverage, AAC.DevOpsUnrecognised, AAC.DevOpsBranch, AAC.DevOpsBranchPolicy, AAC.DevOpsVariable, AAC.DevOpsDora, AAC.DevOpsFeed, AAC.DevOpsTestPlan, AAC.DevOpsAgentPool, AAC.DevOpsExtension, AAC.DevOpsMigration, AAC.DevOpsMigrationMap or AAC.DevOpsFinding, by -View (piped onward, or with -PassThru or -NoDisplay)
+        AAC.DevOpsPipeline, AAC.DevOpsProject, AAC.DevOpsRepository, AAC.DevOpsTask, AAC.DevOpsToolUsage, AAC.DevOpsServiceConnection, AAC.DevOpsVariableGroup, AAC.DevOpsEnvironment, AAC.DevOpsMember, AAC.DevOpsToolEvidence, AAC.DevOpsCoverage, AAC.DevOpsUnrecognised, AAC.DevOpsBranch, AAC.DevOpsBranchPolicy, AAC.DevOpsVariable, AAC.DevOpsDora, AAC.DevOpsFeed, AAC.DevOpsTestPlan, AAC.DevOpsAgentPool, AAC.DevOpsExtension, AAC.DevOpsMigration, AAC.DevOpsMigrationMap, AAC.DevOpsSbom, AAC.DevOpsSbomComponent, AAC.DevOpsSbomLicense or AAC.DevOpsFinding, by -View (piped onward, or with -PassThru or -NoDisplay)
     #>
     [CmdletBinding()]
-    [OutputType('AAC.DevOpsPipeline', 'AAC.DevOpsProject', 'AAC.DevOpsRepository', 'AAC.DevOpsTask', 'AAC.DevOpsToolUsage', 'AAC.DevOpsServiceConnection', 'AAC.DevOpsVariableGroup', 'AAC.DevOpsEnvironment', 'AAC.DevOpsMember', 'AAC.DevOpsToolEvidence', 'AAC.DevOpsCoverage', 'AAC.DevOpsUnrecognised', 'AAC.DevOpsBranch', 'AAC.DevOpsBranchPolicy', 'AAC.DevOpsVariable', 'AAC.DevOpsDora', 'AAC.DevOpsFeed', 'AAC.DevOpsTestPlan', 'AAC.DevOpsAgentPool', 'AAC.DevOpsExtension', 'AAC.DevOpsMigration', 'AAC.DevOpsMigrationMap', 'AAC.DevOpsFinding')]
+    [OutputType('AAC.DevOpsPipeline', 'AAC.DevOpsProject', 'AAC.DevOpsRepository', 'AAC.DevOpsTask', 'AAC.DevOpsToolUsage', 'AAC.DevOpsServiceConnection', 'AAC.DevOpsVariableGroup', 'AAC.DevOpsEnvironment', 'AAC.DevOpsMember', 'AAC.DevOpsToolEvidence', 'AAC.DevOpsCoverage', 'AAC.DevOpsUnrecognised', 'AAC.DevOpsBranch', 'AAC.DevOpsBranchPolicy', 'AAC.DevOpsVariable', 'AAC.DevOpsDora', 'AAC.DevOpsFeed', 'AAC.DevOpsTestPlan', 'AAC.DevOpsAgentPool', 'AAC.DevOpsExtension', 'AAC.DevOpsMigration', 'AAC.DevOpsMigrationMap', 'AAC.DevOpsSbom', 'AAC.DevOpsSbomComponent', 'AAC.DevOpsSbomLicense', 'AAC.DevOpsFinding')]
     param(
         [string[]] $Organization,
 
@@ -237,7 +261,7 @@ function Get-AACADOInventory {
 
         [switch] $UseAzureSignIn,
 
-        [ValidateSet('Yaml', 'Security', 'Metrics', 'AdvancedSecurity', 'Members', 'Branches', 'Migration')]
+        [ValidateSet('Yaml', 'Security', 'Metrics', 'AdvancedSecurity', 'Members', 'Branches', 'Migration', 'Sbom')]
         [string[]] $Skip = @(),
 
         [switch] $SkipYaml,
@@ -270,7 +294,7 @@ function Get-AACADOInventory {
 
         [string] $YamlPath,
 
-        [ValidateSet('Pipeline', 'Project', 'Repository', 'Task', 'Tool', 'Evidence', 'Coverage', 'Unrecognised', 'ServiceConnection', 'VariableGroup', 'Environment', 'Member', 'Branch', 'BranchPolicy', 'Variable', 'Dora', 'Feed', 'TestPlan', 'AgentPool', 'Extension', 'Migration', 'MigrationMap', 'Finding')]
+        [ValidateSet('Pipeline', 'Project', 'Repository', 'Task', 'Tool', 'Evidence', 'Coverage', 'Unrecognised', 'ServiceConnection', 'VariableGroup', 'Environment', 'Member', 'Branch', 'BranchPolicy', 'Variable', 'Dora', 'Feed', 'TestPlan', 'AgentPool', 'Extension', 'Migration', 'MigrationMap', 'Sbom', 'SbomComponent', 'SbomLicense', 'Finding')]
         [string] $View = 'Pipeline',
 
         [ValidateRange(1, 32)]
@@ -282,7 +306,7 @@ function Get-AACADOInventory {
 
         [string] $PdfPath,
 
-        [string] $Title = 'Azure DevOps inventory',
+        [string] $Title = 'Azure DevOps assessment',
 
         [switch] $PassThru,
 
@@ -349,8 +373,8 @@ function Get-AACADOInventory {
         $category = & $field $custom 'Category'
         $tool = & $field $custom 'Tool'
         $pattern = & $field $custom 'Pattern'
-        if ($category -notin 'Lint', 'Build', 'Test', 'Security', 'Deploy', 'Publish', 'GitOps', 'Tooling' -or -not $tool -or -not $pattern) {
-            throw "Azure Admin Console can't use the -ToolRule entry for '$tool': give Category (Lint, Build, Test, Security, Deploy, Publish, GitOps or Tooling), Tool and Pattern."
+        if ($category -notin 'Lint', 'Build', 'Test', 'Security', 'Deploy', 'Publish', 'GitOps', 'SBOM', 'Tooling' -or -not $tool -or -not $pattern) {
+            throw "Azure Admin Console can't use the -ToolRule entry for '$tool': give Category (Lint, Build, Test, Security, Deploy, Publish, GitOps, SBOM or Tooling), Tool and Pattern."
         }
         try { $null = [regex]::new($pattern) } catch { throw "Azure Admin Console can't use the -ToolRule pattern for '$tool': $($_.Exception.Message)" }
         $rules += [pscustomobject]@{ Category = $category; Tool = $tool; Pattern = $pattern; Purpose = $(& $field $custom 'Purpose'); VersionOf = $tool }
@@ -358,7 +382,7 @@ function Get-AACADOInventory {
     $cliRules = Get-AACDevOpsCliRule
     $yamlFolder = & $resolve $YamlPath
 
-    if ($interactive) { Write-AACRule -Title 'Azure Admin Console :: Azure DevOps inventory' -Color 'dodgerblue1' }
+    if ($interactive) { Write-AACRule -Title 'Azure Admin Console :: Azure DevOps assessment' -Color 'dodgerblue1' }
     $state = Invoke-AACProgress -ScriptBlock {
         $notices = [System.Collections.Generic.List[string]]::new()
         if ($DiscoverOrganization) {
@@ -394,7 +418,7 @@ function Get-AACADOInventory {
             $adoProgress = @{ Org = $orgUrl; Prefix = $(if ($orgUrls.Count -gt 1) { "$($orgUrl -replace '^https://(dev\.azure\.com/)?', ''): " } else { '' }); Current = ''; Stage = ''; Done = @{} }
             $adoFinishStage = { if ($adoProgress.Current) { Update-AACProgress -Id $adoProgress.Current -Complete -Description "$($adoProgress.Prefix)$($adoProgress.Stage) - done" } }
             try {
-                $read = Read-AACDevOpsInventory -OrganizationUrl $orgUrl -Authorization $authorization -Project $Project -PipelineId $PipelineId -Skip $parts -MetricDays $MetricDays -TemplateDepth $TemplateDepth -MaxScriptFiles $MaxScriptFiles -ThrottleLimit $ThrottleLimit -OnProgress {
+                $read = Read-AACDevOpsInventory -OrganizationUrl $orgUrl -Authorization $authorization -Project $Project -PipelineId $PipelineId -Skip @($parts | Where-Object { $_ -ne 'Sbom' }) -MetricDays $MetricDays -TemplateDepth $TemplateDepth -MaxScriptFiles $MaxScriptFiles -ThrottleLimit $ThrottleLimit -OnProgress {
                     param($Step, $Text, $Done, $Total)
                     $adoLine = "$($adoProgress.Org)|$Step"
                     if ($adoProgress.Current -ne $adoLine) { & $adoFinishStage; $adoProgress.Current = $adoLine; $adoProgress.Done[$adoLine] = 0 }
@@ -439,7 +463,7 @@ function Get-AACADOInventory {
         }
 
         # One organization's rows after another; the totals added up.
-        $result = @{ Projects = @(); Pipelines = @(); Tasks = @(); Repositories = @(); ServiceConnections = @(); VariableGroups = @(); Environments = @(); Members = @(); Branches = @(); BranchPolicies = @(); Variables = @(); Dora = @(); Feeds = @(); TestPlans = @(); AgentPools = @(); Extensions = @(); Migration = @(); MigrationMap = @(); Tools = @(); Evidence = @(); Coverage = @(); Unrecognised = @(); Findings = @(); Stats = @{} }
+        $result = @{ Projects = @(); Pipelines = @(); Tasks = @(); Repositories = @(); ServiceConnections = @(); VariableGroups = @(); Environments = @(); Members = @(); Branches = @(); BranchPolicies = @(); Variables = @(); Dora = @(); Feeds = @(); TestPlans = @(); AgentPools = @(); Extensions = @(); Migration = @(); MigrationMap = @(); Tools = @(); Evidence = @(); Coverage = @(); Unrecognised = @(); SbomPipelines = @(); SbomComponents = @(); SbomLicenses = @(); Findings = @(); Stats = @{} }
         $doraByOrg = [System.Collections.Generic.List[hashtable]]::new()
         foreach ($read in $reads) {
             # Working through thousands of pipelines takes a while too: a line of its own, with the time left.
@@ -456,6 +480,38 @@ function Get-AACADOInventory {
             Update-AACProgress -Id $adoAnalysis.Id -Complete -Description ('{0}Analysed {1:N0} pipeline(s)' -f $adoAnalysis.Prefix, $adoAnalysis.Done)
             if ($one.MembersError) { $notices.Add("$($read.OrganizationName): who to contact couldn't be read for every project: $($one.MembersError) - give the token Identity (Read) and Project and Team (Read), or -Skip Members.") }
             if ($one.Stats.DisabledRepositories -or $one.Stats.DisabledPipelines) { $notices.Add("$($read.OrganizationName): left out $($one.Stats.DisabledRepositories) disabled repository(ies) and the $($one.Stats.DisabledPipelines) pipeline(s) that build them - -IncludeDisabledRepository lists them.") }
+
+            # SBOM: for the pipelines that generate one, the SBOM their latest successful run published.
+            $sbomEvidence = @($one.Evidence | Where-Object { $_.Category -eq 'SBOM' })
+            $sbomDocuments = @{}
+            if ($parts -notcontains 'Sbom') {
+                $projectIds = @{}
+                foreach ($pr in @($read.Projects)) { $projectIds[[string]$pr['name']] = [string]$pr['id'] }
+                $sbomTargets = @($sbomEvidence | Where-Object { $_.Tool -ne 'Microsoft SBOM Tool (validate)' -and $projectIds.Contains([string]$_.Project) } | ForEach-Object { "$($_.Project)|$($_.PipelineId)" } | Select-Object -Unique | ForEach-Object {
+                        $projectName, $definitionId = $_ -split '\|', 2
+                        @{ Key = $_; ProjectId = $projectIds[$projectName]; PipelineId = $definitionId }
+                    })
+                if ($sbomTargets.Count) {
+                    # (Names prefixed 'ado': the script block runs inside the reader, whose variables would hide ours.)
+                    $adoSbom = @{ Prefix = $adoAnalysis.Prefix; Done = @{} }
+                    $sbomDocuments = Read-AACDevOpsSbom -OrganizationUrl $read.Organization -Authorization $authorization -Target $sbomTargets -ThrottleLimit $ThrottleLimit -OnProgress {
+                        param($Step, $Text, $Done, $Total)
+                        $adoLine = "$($read.Organization)|$Step"
+                        if (-not $adoSbom.Done.ContainsKey($adoLine)) { $adoSbom.Done[$adoLine] = 0 }
+                        Update-AACProgress -Id $adoLine -Description "$($adoSbom.Prefix)$Text" -Total $Total -Increment ($Done - $adoSbom.Done[$adoLine])
+                        $adoSbom.Done[$adoLine] = $Done
+                        if ($Done -ge $Total) { Update-AACProgress -Id $adoLine -Complete }
+                    }
+                    $unread = @($sbomDocuments.Values | Where-Object { $_.Status -eq 'Not read' -and $_.Detail })
+                    if ($unread.Count) { $notices.Add("$($read.OrganizationName): the SBOM of $($unread.Count) pipeline(s) couldn't be read: $($unread[0].Detail) - give the token Build (Read).") }
+                }
+            }
+            $sbom = ConvertTo-AACDevOpsSbom -Pipeline @($one.Pipelines) -Evidence $sbomEvidence -Sbom $sbomDocuments -SbomRead:($parts -notcontains 'Sbom')
+            $one.SbomPipelines = $sbom.Pipelines
+            $one.SbomComponents = $sbom.Components
+            $one.SbomLicenses = $sbom.Licenses
+            $one.Findings = @($one.Findings) + @($sbom.Findings)
+            foreach ($k in $sbom.Stats.Keys) { $one.Stats[$k] = $sbom.Stats[$k] }
             foreach ($k in @($result.Keys | Where-Object { $_ -ne 'Stats' })) { $result[$k] += @($one[$k]) }
             # The DORA keys are levels and medians - they don't add up across organizations: kept per organization.
             $doraByOrg.Add(@{ Organization = $read.OrganizationName; Dora = $one.Stats.Dora })
@@ -476,9 +532,11 @@ function Get-AACADOInventory {
     $yesBad = @{ True = 'bad'; False = 'good' }
     $kindTones = @{ YAML = 'good'; 'Classic build' = 'warn'; 'Classic release' = 'warn' }
     $resultTones = @{ succeeded = 'good'; failed = 'bad'; partiallySucceeded = 'warn'; canceled = 'neutral'; 'Never run' = 'neutral'; 'Never released' = 'neutral' }
-    $categoryTones = @{ Security = 'good'; Test = 'info'; Lint = 'violet'; Build = 'neutral'; Deploy = 'warn'; Publish = 'neutral'; GitOps = 'info'; Tooling = 'neutral' }
+    $categoryTones = @{ Security = 'good'; Test = 'info'; Lint = 'violet'; Build = 'neutral'; Deploy = 'warn'; Publish = 'neutral'; GitOps = 'info'; SBOM = 'good'; Tooling = 'neutral' }
     $pipelines = @($r.Pipelines | Sort-Object -Property Organization, Project, @{ Expression = { @('YAML', 'Classic build', 'Classic release').IndexOf($_.Kind) } }, Pipeline)
-    $toolColumns = foreach ($c in 'Lint', 'Build', 'Test', 'Security', 'Deploy', 'Publish', 'GitOps') { @{ Key = $c; Label = $c; Type = 'wide'; Console = $c -in 'Security', 'Test'; Pdf = $c -in 'Security', 'Test', 'Build' } }
+    $sbomTones = @{ 'SBOM published' = 'good'; 'Generated, not published' = 'warn'; 'Generated, not read' = 'neutral'; 'No SBOM' = 'bad'; 'Steps not read' = 'neutral' }
+    $licenseTones = @{ Permissive = 'good'; 'Weak copyleft' = 'info'; 'Strong copyleft' = 'warn'; Unknown = 'neutral' }
+    $toolColumns = foreach ($c in 'Lint', 'Build', 'Test', 'Security', 'Deploy', 'Publish', 'GitOps', 'Sbom') { @{ Key = $c; Label = $(if ($c -eq 'Sbom') { 'SBOM' } else { $c }); Type = 'wide'; Console = $c -in 'Security', 'Test'; Pdf = $c -in 'Security', 'Test', 'Build' } }
     $orgColumn = @{ Key = 'Organization'; Label = 'Organization'; Facet = $true; Console = $multi; Pdf = $multi }
     $openColumn = @{ Key = 'OpenToAllPipelines'; Label = 'Open to all pipelines'; Type = 'badge'; Tones = $yesBad; Facet = $true; Console = $true; Pdf = $true }
     $findingsColumn = @{ Key = 'Findings'; Label = 'Findings'; Type = 'number'; Sum = $true; Console = $true }
@@ -507,6 +565,7 @@ function Get-AACADOInventory {
             @{ Value = '{0:N0}' -f $s.Deployments; Label = "deployments in $MetricDays days"; Tone = 'info'; Table = 'environments' }
             @{ Value = $deployRate; Label = 'change failure rate'; Tone = $(if ($s.FailedDeployments) { 'warn' } else { 'good' }); Table = 'environments' }
             @{ Value = $(if ($dora['Overall']) { $dora['Overall'] } else { '-' }); Label = 'DORA level'; Tone = $doraTone; Table = 'dora' }
+            @{ Value = $(if ($s.SbomShipping) { '{0:N0}%' -f (100 * ($s.SbomShipping - $s.SbomShippingWithout) / $s.SbomShipping) } else { '-' }); Label = 'shipping pipelines with an SBOM'; Tone = $(if ($s.SbomShippingWithout) { 'warn' } else { 'good' }); Table = 'sbom'; Filters = @{ Ships = 'Yes' } }
             @{ Value = '{0:N0}' -f $s.HighComplexity; Label = 'projects hard to move to GitHub'; Tone = $(if ($s.HighComplexity) { 'warn' } else { 'good' }); Table = 'migration'; Filters = @{ Complexity = 'High' } }
             @{ Value = '{0:N0}' -f $s.High; Label = 'high findings'; Tone = $(if ($s.High) { 'bad' } else { 'good' }); Table = 'findings'; Filters = @{ Severity = 'High' } }
         )
@@ -516,7 +575,8 @@ function Get-AACADOInventory {
             @{ Title = 'Findings by area'; Kind = 'donut'; CenterLabel = 'findings'; Items = @($r.Findings | Group-Object -Property Area | ForEach-Object { @{ Label = $_.Name; Value = $_.Count; Filter = $_.Name } }); Table = 'findings'; Column = 'Area' }
             @{ Title = 'Security tools'; Items = @($r.Tools | Where-Object { $_.Category -eq 'Security' } | Select-Object -First 12 | ForEach-Object { @{ Label = $_.Tool; Value = $_.Pipelines; Filter = $_.Tool } }); Table = 'tools'; Column = 'Tool'; Tone = 'good'; Console = $true }
             @{ Title = 'Most-used tools (pipelines)'; Items = @($r.Tools | Sort-Object -Property @{ Expression = { $_.Pipelines }; Descending = $true } | Select-Object -First 12 | ForEach-Object { @{ Label = $_.Tool; Value = $_.Pipelines; Filter = $_.Tool } }); Table = 'evidence'; Column = 'Tool'; Tone = 'info' }
-            @{ Title = 'Pipelines using each kind of tool'; Items = @(foreach ($c in 'Lint', 'Build', 'Test', 'Security', 'Deploy', 'Publish', 'GitOps') { @{ Label = $c; Value = @($r.Pipelines | Where-Object { $_.$c }).Count; Filter = $c } }); Table = 'tools'; Column = 'Category'; Tone = 'info' }
+            @{ Title = 'Pipelines using each kind of tool'; Items = @(foreach ($c in 'Lint', 'Build', 'Test', 'Security', 'Deploy', 'Publish', 'GitOps', 'Sbom') { $category = if ($c -eq 'Sbom') { 'SBOM' } else { $c }; @{ Label = $category; Value = @($r.Pipelines | Where-Object { $_.$c }).Count; Filter = $category } }); Table = 'tools'; Column = 'Category'; Tone = 'info' }
+            @{ Title = 'Build pipelines by SBOM'; Kind = 'donut'; CenterLabel = 'pipelines'; Items = @(foreach ($k in 'SBOM published', 'Generated, not published', 'Generated, not read', 'No SBOM', 'Steps not read') { $n = @($r.SbomPipelines | Where-Object { $_.Status -eq $k }).Count; if ($n) { @{ Label = $k; Value = $n; Tone = $sbomTones[$k]; Filter = $k } } }); Table = 'sbom'; Column = 'Status' }
         )
         Tabs     = @(
             @{ Name = 'Overview'; Badge = $s.Projects; Tone = 'info'; Note = 'Each project: its pipelines by kind, how many scan for security, its repositories and security resources, the last run and the last push, and who to contact. Choose a project above to see only its rows in every tab.' }
@@ -524,6 +584,7 @@ function Get-AACADOInventory {
             @{ Name = 'Pipelines'; Badge = $s.Pipelines; Tone = $(if ($s.ClassicBuild) { 'warn' } else { 'good' }); Note = "Every pipeline - YAML, classic build or classic release - with its last run, its delivery metrics over $MetricDays days, the tools found in its steps, and what it connects to." }
             @{ Name = 'Tasks'; Badge = @($r.Tasks).Count; Tone = 'info'; Note = 'Every task (with its version and what it does), command-line tool (with the version an installer task or the script sets), package, container, agent image and pool - YAML and classic.' }
             @{ Name = 'Repositories'; Badge = $s.Repositories; Tone = 'violet'; Note = 'Every Git repository: its last push, the branch policies on its default branch, and GitHub Advanced Security with its active alerts.' }
+            @{ Name = 'SBOM'; Badge = $s.SbomShippingWithout; Tone = $(if ($s.SbomShippingWithout) { 'warn' } else { 'good' }); Note = 'The software bill of materials each build pipeline produces: the generator found in its steps (the Microsoft SBOM Tool, 1ES templates, Syft, CycloneDX...), the SBOM its latest successful run published - format, components, completeness against the NTIA minimum elements, licences - and every component, so a newly announced vulnerable package can be traced to the pipelines that ship it.' }
             @{ Name = 'Branches'; Badge = $s.Branches; Tone = $(if ($s.StaleBranches) { 'warn' } else { 'violet' }); Note = "Every branch of every repository: its role (from its name), last commit, how far ahead and behind the default branch, stale after $StaleBranchDays days, and the policies on it. The Repositories tab names each repository's branching strategy." }
             @{ Name = 'Branch policies'; Badge = $s.BranchPolicies; Tone = 'violet'; Note = 'Every branch policy - on or off, blocking or optional - with the branch (or prefix) it covers, its settings in words, and what it becomes on GitHub.' }
             @{ Name = 'Service connections'; Badge = @($r.ServiceConnections).Count; Tone = $(if (@($r.ServiceConnections | Where-Object { $_.OpenToAllPipelines }).Count) { 'bad' } else { 'good' }); Note = 'Who may use each service connection, how it signs in, which pipelines use it, and (with -IncludeAzure) its roles in Azure.' }
@@ -536,7 +597,7 @@ function Get-AACADOInventory {
             @{ Name = 'Agents and extensions'; Badge = @($r.AgentPools).Count + @($r.Extensions).Count; Tone = 'info'; Note = 'Agent pools (self-hosted agents become self-hosted runners) and the marketplace extensions installed, with the pipelines whose tasks come from them.' }
             @{ Name = 'Migration'; Badge = @($r.Migration).Count; Tone = $(if ($s.HighComplexity) { 'warn' } else { 'good' }); Note = 'Moving to GitHub: per project, what there is to move and a rough effort (classic pipelines, marketplace tasks, secrets, feeds, test plans, large or LFS repositories weigh most) - then where each kind of thing lands on GitHub and the tool that moves it.' }
             @{ Name = 'Tools'; Badge = @($r.Tools).Count; Tone = 'info'; Note = 'Each tool by category: how many pipelines and projects use it, the versions seen and how it was found.' }
-            @{ Name = 'Coverage'; Badge = @($r.Coverage).Count; Tone = 'info'; Note = 'Which stages each build pipeline has: lint, build, test, security, deploy, publish, GitOps.' }
+            @{ Name = 'Coverage'; Badge = @($r.Coverage).Count; Tone = 'info'; Note = 'Which stages each build pipeline has: lint, build, test, security, deploy, publish, GitOps, SBOM.' }
             @{ Name = 'Evidence'; Badge = @($r.Evidence).Count; Tone = 'neutral'; Note = 'Every tool found, with the file and line it was found on - credentials masked.' }
             @{ Name = 'Unrecognised'; Badge = @($r.Unrecognised).Count; Tone = $(if (@($r.Unrecognised).Count) { 'warn' } else { 'good' }); Note = 'Commands scripts run that no rule knows (add them with -ToolRule or -ToolRulePath), and templates and files that couldn''t be read.' }
             @{ Name = 'Findings'; Badge = @($r.Findings).Count; Tone = $(if ($s.High) { 'bad' } else { 'warn' }); Note = 'What to fix, worst first.' }
@@ -783,6 +844,53 @@ function Get-AACADOInventory {
                     @{ Key = 'Deployments'; Label = 'Deployments'; Type = 'number'; Sum = $true }
                     @{ Key = 'Scope'; Label = 'From'; Facet = $true }
                 ) }
+            @{ Id = 'sbom'; Title = 'SBOM by pipeline'; Section = 'SBOM'; Rows = @($r.SbomPipelines | Sort-Object -Property Organization, Project, Pipeline); Noun = 'build pipelines'; GroupBy = @('Status', 'Ships', 'Project'); ConsoleLimit = 25
+                Empty = 'No build pipeline.'; EmptyStatus = 'Info'
+                Hover = @('Generator', 'Validated', 'Detail', 'Run', 'RunFinished', 'Artifact', 'File', 'CreatedBy', 'Created', 'Files', 'Relationships'); HoverTitle = 'Pipeline'
+                Columns = @(
+                    $orgColumn
+                    @{ Key = 'Project'; Label = 'Project'; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Pipeline'; Label = 'Pipeline'; Type = 'resource'; Console = $true; Pdf = $true }
+                    @{ Key = 'Kind'; Label = 'Kind'; Type = 'badge'; Tones = $kindTones; Facet = $true }
+                    @{ Key = 'Ships'; Label = 'Deploys or publishes'; Type = 'badge'; Tones = @{ Yes = 'info'; No = 'neutral' }; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Status'; Label = 'SBOM'; Type = 'badge'; Tones = $sbomTones; Facet = $true; Console = $true; Pdf = $true; Tip = 'Detail' }
+                    @{ Key = 'Generator'; Label = 'Generator'; Type = 'wide'; Console = $true; Pdf = $true }
+                    @{ Key = 'Validated'; Label = 'Validated'; Type = 'badge'; Tones = @{ Yes = 'good'; No = 'neutral' }; Facet = $true }
+                    @{ Key = 'Format'; Label = 'Format'; Facet = $true; Pdf = $true }
+                    @{ Key = 'Run'; Label = 'Run' }
+                    @{ Key = 'Components'; Label = 'Components'; Type = 'number'; Sum = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Completeness'; Label = 'Complete (%)'; Type = 'number'; Format = 'N1'; Console = $true; Pdf = $true }
+                    @{ Key = 'UnknownLicenses'; Label = 'Unknown licence'; Type = 'number'; Sum = $true }
+                    @{ Key = 'Copyleft'; Label = 'Strong copyleft'; Type = 'number'; Sum = $true; Pdf = $true }
+                    @{ Key = 'CreatedBy'; Label = 'Made by' }
+                    $openColumnLink
+                ) }
+            @{ Id = 'sbomcomponents'; Title = 'SBOM components'; Section = 'SBOM'; Rows = @($r.SbomComponents | Sort-Object -Property Component, Version, Project, Pipeline); Noun = 'components'; GroupBy = @('Ecosystem', 'LicenseKind', 'Component'); ConsoleLimit = 25
+                Empty = 'No SBOM was read: none was published by a latest successful run, or -Skip Sbom.'; EmptyStatus = 'Info'
+                Hover = @('Purl', 'Supplier', 'License', 'Pipeline'); HoverTitle = 'Component'
+                Columns = @(
+                    $orgColumn
+                    @{ Key = 'Component'; Label = 'Component'; Console = $true; Pdf = $true }
+                    @{ Key = 'Version'; Label = 'Version'; Console = $true; Pdf = $true }
+                    @{ Key = 'Ecosystem'; Label = 'Ecosystem'; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'License'; Label = 'Licence'; Type = 'wide'; Console = $true; Pdf = $true }
+                    @{ Key = 'LicenseKind'; Label = 'Licence kind'; Type = 'badge'; Tones = $licenseTones; Facet = $true; Console = $true }
+                    @{ Key = 'Supplier'; Label = 'Supplier' }
+                    @{ Key = 'Complete'; Label = 'Complete'; Type = 'badge'; Tones = @{ True = 'good'; False = 'warn' }; Facet = $true }
+                    @{ Key = 'Project'; Label = 'Project'; Facet = $true; Console = $true }
+                    @{ Key = 'Pipeline'; Label = 'Pipeline'; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Purl'; Label = 'Package URL'; Type = 'mono' }
+                ) }
+            @{ Id = 'sbomlicenses'; Title = 'SBOM licences'; Section = 'SBOM'; Rows = @($r.SbomLicenses); Noun = 'licences'; GroupBy = @('Kind'); ConsoleLimit = 20
+                Empty = 'No SBOM was read.'; EmptyStatus = 'Info'
+                Columns = @(
+                    $orgColumn
+                    @{ Key = 'Project'; Label = 'Project'; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'License'; Label = 'Licence'; Type = 'wide'; Console = $true; Pdf = $true }
+                    @{ Key = 'Kind'; Label = 'Kind'; Type = 'badge'; Tones = $licenseTones; Facet = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Components'; Label = 'Components'; Type = 'number'; Sum = $true; Console = $true; Pdf = $true }
+                    @{ Key = 'Pipelines'; Label = 'Pipelines'; Type = 'number'; Console = $true; Pdf = $true }
+                ) }
             @{ Id = 'feeds'; Title = 'Artifacts feeds'; Section = 'Artifacts'; Rows = @($r.Feeds | Sort-Object -Property Organization, Project, Feed); Noun = 'feeds'; GroupBy = @('GitHubPackages'); ConsoleLimit = 20
                 Empty = 'No Azure Artifacts feeds (or -Skip Migration).'; EmptyStatus = 'Info'
                 Columns = @(
@@ -885,7 +993,7 @@ function Get-AACADOInventory {
                     @{ Key = 'Project'; Label = 'Project'; Facet = $true; Console = $true; Pdf = $true }
                     @{ Key = 'Pipeline'; Label = 'Pipeline'; Type = 'resource'; Console = $true; Pdf = $true }
                     @{ Key = 'Kind'; Label = 'Kind'; Facet = $true }
-                ) + @(foreach ($c in 'Lint', 'Build', 'Test', 'Security', 'Deploy', 'Publish', 'GitOps') { @{ Key = $c; Label = $c; Type = 'badge'; Tones = @{ Yes = 'good'; No = $(if ($c -in 'Security', 'Test', 'Lint') { 'bad' } else { 'neutral' }); 'Not read' = 'neutral' }; Facet = $true; Console = $true; Pdf = $true } }) + @(
+                ) + @(foreach ($c in 'Lint', 'Build', 'Test', 'Security', 'Deploy', 'Publish', 'GitOps', 'SBOM') { @{ Key = $c; Label = $c; Type = 'badge'; Tones = @{ Yes = 'good'; No = $(if ($c -in 'Security', 'Test', 'Lint') { 'bad' } else { 'neutral' }); 'Not read' = 'neutral' }; Facet = $true; Console = $true; Pdf = $true } }) + @(
                     @{ Key = 'Tools'; Label = 'Tools'; Type = 'number' }
                 ) }
             @{ Id = 'evidence'; Title = 'Evidence'; Section = 'Evidence'; Rows = @($r.Evidence); Noun = 'matches'; GroupBy = @('Tool', 'Found', 'Pipeline'); ConsoleLimit = 30
@@ -927,7 +1035,7 @@ function Get-AACADOInventory {
                     @{ Key = 'Recommendation'; Label = 'What to do'; Type = 'wide'; Pdf = $true }
                 ) }
         )
-        Hint     = '-View Tool, Evidence, Coverage, Unrecognised, Task, Branch, Dora, Migration or Finding returns those rows; -ToolRulePath adds tools of your own; -Skip Security, Metrics is faster; -YamlPath saves the YAML; -IncludeAzure adds Azure roles; -HtmlPath, -PdfPath or -CsvPath for a report.'
+        Hint     = '-View Tool, Evidence, Coverage, Unrecognised, Task, Branch, Dora, Migration, Sbom, SbomComponent or Finding returns those rows; -ToolRulePath adds tools of your own; -Skip Security, Metrics is faster; -YamlPath saves the YAML; -IncludeAzure adds Azure roles; -HtmlPath, -PdfPath or -CsvPath for a report.'
     }
     $rows = @(switch ($View) {
             'Project' { $r.Projects }
@@ -951,6 +1059,9 @@ function Get-AACADOInventory {
             'Extension' { $r.Extensions }
             'Migration' { $r.Migration }
             'MigrationMap' { $r.MigrationMap }
+            'Sbom' { $r.SbomPipelines }
+            'SbomComponent' { $r.SbomComponents }
+            'SbomLicense' { $r.SbomLicenses }
             'Finding' { $r.Findings }
             default { $pipelines }
         })

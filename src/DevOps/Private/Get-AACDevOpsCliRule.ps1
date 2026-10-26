@@ -1,7 +1,7 @@
 function Get-AACDevOpsCliRule {
     <#
     .SYNOPSIS
-        How Get-AACADOInventory finds a tool's version: the installer tasks
+        How Invoke-AACADOAssessment finds a tool's version: the installer tasks
         that set it, and the commands that install a package at a version.
     .DESCRIPTION
         The tools themselves are in the tool catalogue (Get-AACDevOpsToolRule);

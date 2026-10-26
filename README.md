@@ -37,14 +37,15 @@ Plain REST. No Az or Microsoft.Graph modules. Read-only by default.
 
 ## What's inside
 
-76 commands. Every one gives a **console view**, **objects**, and **CSV, HTML and PDF** reports.
+78 commands. Every one gives a **console view**, **objects**, and **CSV, HTML and PDF** reports.
 
 | Area | Commands |
 |---|---|
-| **Assess** | `Invoke-AACAssessment` · `Invoke-AACWafAssessment` · `Invoke-AACGovernanceAssessment` · `Invoke-AACPSRule` · `Test-AACGoLiveReadiness` · `Invoke-AACAksAssessment` and 11 more |
+| **Assess** | `Invoke-AACAssessment` · `Invoke-AACWafAssessment` · `Invoke-AACGovernanceAssessment` · `Invoke-AACPSRule` · `Test-AACGoLiveReadiness` · `Invoke-AACAksAssessment` · `Invoke-AACFunctionAppAssessment` and 11 more |
 | **See** | `Show-AACDashboard` · `Get-AACInventory` · `Show-AACResourceMap` · `Show-AACNetworkTopology` · `Get-AACDependencyGraph` |
 | **Cost** | `Show-AACCost` · `Get-AACCostAnomaly` · `Get-AACUnusedResource` · `Get-AACResourceUtilization` · `Get-AACAdvisorRecommendation` |
 | **Secure** | `Get-AACSecurityPosture` · `Get-AACAttackPath` · `Get-AACAccessReview` · `Get-AACNetworkSecurityGroup` · `Get-AACLegacyAuthentication` |
+| **Plan IPs** | `Get-AACIPAMReport` - your address plan, every IP address, overlaps and the next free ranges |
 | **Govern** | `Get-AACPolicyState` · `Get-AACComplianceGap` · `Get-AACConfigurationDrift` · `Get-AACResourceLock` · `Test-AACAzureLimit` |
 | **Operate** | `Get-AACResourceHealth` · `Get-AACChangeHistory` · `Get-AACResourceError` · `Invoke-AACHealthCheck` · `Get-AACFailoverReadiness` |
 | **Microsoft 365** | `Invoke-AACM365Assessment` · `Get-AACEntraGroupMembership` · `Get-AACApplicationPermission` · `New-AACApplicationPermission` |

@@ -1,24 +1,27 @@
 function Write-AACAssessmentHtml {
     <#
     .SYNOPSIS
-        Writes the Invoke-AACAssessment report as one interactive, tabbed
+        Writes the Invoke-AACTenantAssessment report as one interactive, tabbed
         HTML workbook.
     .DESCRIPTION
         Executive summary first: tiles (subscriptions, resource groups,
         resources, types, locations, failed policies, non-compliant
-        resources, critical and high recommendations, PSRule failures,
-        Advisor High, retirements, Defender High, outages, unattached
-        resources, untagged resources, cost - each opening its table),
-        charts (policies by status - Passed, Failed, Manual review ...;
-        non-compliant resources by resource group; recommendations by
-        severity and by category; PSRule rules by status; resources by
-        category, location, subscription and type; Advisor by category;
-        Defender by severity - a click filters the table behind it) and
-        the tenant's tree. Then a tab each: Policy compliance, Policy
-        inventory, PSRule results, Resource recommendations, Resources,
-        Inventory, Advisor, Security, Health and Cost - every table
-        searchable, filterable, groupable, with each row's details a click
-        away, and downloadable as CSV.
+        resources, critical and high recommendations, the Well-Architected
+        score, PSRule failures, Advisor High, retirements, Defender High,
+        outages, unattached resources, untagged resources, cost, the
+        estimated savings, cost-tag coverage, subscriptions without a
+        budget - each opening its table), charts (policies by status -
+        Passed, Failed, Manual review ...; non-compliant resources by
+        resource group; recommendations by severity and by category; the
+        Well-Architected pillars' scores; savings by FinOps lever; PSRule
+        rules by status; resources by category, location, subscription and
+        type; Advisor by category; Defender by severity - a click filters
+        the table behind it) and the tenant's tree. Then a tab each: Policy
+        compliance, Policy inventory, Well-Architected, PSRule results,
+        Resource recommendations, FinOps, Resources, Inventory, Advisor,
+        Security and Health - every table searchable, filterable,
+        groupable, with each row's details a click away, and downloadable
+        as CSV.
     #>
     [CmdletBinding()]
     [OutputType([System.IO.FileInfo])]
@@ -46,6 +49,14 @@ function Write-AACAssessmentHtml {
         Failed = 'bad'; Passed = 'good'; 'Manual review' = 'warn'; Exempt = 'info'; 'Not evaluated' = 'neutral'; Fail = 'bad'; Pass = 'good'; Error = 'warn'
         Important = 'warn'; Awareness = 'info'; Initiative = 'violet'; Policy = 'info'; Default = 'good'; DoNotEnforce = 'warn'
         Cost = 'good'; Security = 'bad'; Reliability = 'warn'; 'Operational excellence' = 'violet'; Performance = 'info'; Governance = 'neutral'
+        Initial = 'bad'; Developing = 'warn'; Established = 'info'; Optimised = 'good'; 'Not assessed' = 'neutral'; Gaps = 'warn'; Partly = 'warn'
+        'Non-compliant' = 'bad'; Compliant = 'good'
+        Waste = 'bad'; Rightsizing = 'warn'; Rate = 'good'; Licensing = 'info'; Usage = 'violet'; Modernise = 'neutral'
+        'Over budget' = 'bad'; 'Forecast over' = 'warn'; 'No budget' = 'warn'; 'No alerts' = 'warn'; 'On track' = 'good'; 'Not read' = 'neutral'
+        Permanent = 'bad'; 'Eligible (PIM)' = 'good'; 'Activated (PIM)' = 'good'; 'Time-bound' = 'info'; 'Active (PIM not read)' = 'neutral'; Expired = 'bad'; Expiring = 'warn'
+        'Open to all networks' = 'bad'; 'Public, restricted' = 'warn'; 'Private only' = 'good'; 'Zone-redundant' = 'good'; 'Geo-redundant (not zonal)' = 'info'; None = 'warn'; 'No zones in this region' = 'neutral'
+        Protected = 'good'; 'Not protected' = 'warn'; 'Built in' = 'good'; Replicated = 'good'; 'Missing updates' = 'bad'; 'Updates available' = 'info'; 'Up to date' = 'good'; 'Assessment stale' = 'warn'
+        Connected = 'good'; Disconnected = 'bad'; Retired = 'bad'; Retiring = 'warn'; Legacy = 'neutral'; Inherited = 'good'; CanNotDelete = 'good'; ReadOnly = 'info'; Owner = 'bad'; 'User Access Administrator' = 'bad'; Root = 'bad'; 'Management group' = 'warn'; Subscription = 'info'
     }
     $statusOrder = 'Failed', 'Manual review', 'Passed', 'Exempt', 'Not evaluated', 'Disabled', 'Error'
 
@@ -68,6 +79,17 @@ function Write-AACAssessmentHtml {
         elseif (& $find 'Policy compliance') { & $tile ('{0:N0}' -f $stats.PolicyNonCompliant) 'non-compliant policy states' $(if ($stats.PolicyNonCompliant) { 'warn' } else { 'good' }) 'Policy compliance' }
         if (& $find 'Non-compliant resources') { & $tile ('{0:N0}' -f $stats.NonCompliantResources) 'non-compliant resources' $(if ($stats.NonCompliantResources) { 'warn' } else { 'good' }) 'Non-compliant resources' }
         if (& $find 'Resource recommendations') { & $tile ('{0:N0}' -f $stats.RecommendationsUrgent) "critical or high of $('{0:N0}' -f $stats.Recommendations) recommendations" $(if ($stats.RecommendationsUrgent) { 'bad' } else { 'good' }) 'Resource recommendations' }
+        if ((& $find 'WAF pillars') -and $null -ne $stats['WafScore']) { & $tile ('{0:N0}/100' -f $stats.WafScore) "Well-Architected score ($('{0:N0}' -f $stats.WafHigh) high-severity gaps)" $(if ($stats.WafScore -ge 75) { 'good' } elseif ($stats.WafScore -ge 50) { 'warn' } else { 'bad' }) 'WAF pillars' }
+        if ($stats.Contains('AnnualSavings') -and $stats.AnnualSavings) { & $tile ('{0:N0} {1}' -f $stats.AnnualSavings, $stats.SavingsCurrency) "estimated annual savings ($('{0:N0}' -f $stats.SavingsOpportunities) opportunities)" 'good' 'Savings opportunities' }
+        elseif ($stats.Contains('SavingsOpportunities')) { & $tile ('{0:N0}' -f $stats.SavingsOpportunities) 'savings opportunities' $(if ($stats.SavingsOpportunities) { 'warn' } else { 'good' }) 'Savings opportunities' }
+        if ($stats.Contains('CostTagCoverage') -and $null -ne $stats.CostTagCoverage) { & $tile ('{0:N0}%' -f $stats.CostTagCoverage) 'of resources have a cost-allocation tag' $(if ($stats.CostTagCoverage -ge 90) { 'good' } elseif ($stats.CostTagCoverage -ge 60) { 'warn' } else { 'bad' }) 'Cost allocation' }
+        if ($stats.Contains('SubscriptionsWithoutBudget') -and $null -ne $stats.SubscriptionsWithoutBudget) { & $tile ('{0:N0}' -f $stats.SubscriptionsWithoutBudget) "subscriptions without a budget$(if ($stats.BudgetsOver) { " ($($stats.BudgetsOver) budget(s) over or forecast over)" })" $(if ($stats.SubscriptionsWithoutBudget -or $stats.BudgetsOver) { 'warn' } else { 'good' }) 'Budgets' }
+        if ((& $find 'Privileged access') -and $stats.Contains('PrivilegedStanding')) { & $tile ('{0:N0}' -f $stats.PrivilegedStanding) "standing privileged assignments ($('{0:N0}' -f $stats.PrivilegedGuests) to guests)" $(if ($stats.PrivilegedStanding -or $stats.PrivilegedGuests) { 'bad' } else { 'good' }) 'Privileged access' @{ Assignment = 'Permanent' } }
+        if ($stats.Contains('CredentialsExpiring')) { & $tile ('{0:N0}' -f $stats.CredentialsExpiring) 'credentials expired or expiring' $(if ($stats.CredentialsExpiring) { 'warn' } else { 'good' }) 'Expiring credentials' }
+        if ($stats.Contains('ManagementPortsOpen')) { & $tile ('{0:N0}' -f $stats.ManagementPortsOpen) 'rules opening SSH or RDP to the internet' $(if ($stats.ManagementPortsOpen) { 'bad' } else { 'good' }) 'Management ports open' }
+        if ($stats.Contains('SubscriptionsWithoutServiceHealth')) { & $tile ('{0:N0}' -f $stats.SubscriptionsWithoutServiceHealth) 'subscriptions with no Service Health alert' $(if ($stats.SubscriptionsWithoutServiceHealth) { 'warn' } else { 'good' }) 'Monitoring' }
+        if ($stats.Contains('MachinesMissingUpdates')) { & $tile ('{0:N0}' -f $stats.MachinesMissingUpdates) 'machines missing critical or security updates' $(if ($stats.MachinesMissingUpdates) { 'warn' } else { 'good' }) 'Patch compliance' @{ Status = 'Missing updates' } }
+        if ($stats.Contains('Topology')) { & $tile $stats.Topology "network topology ($('{0:N0}' -f $stats.NetworkOverlaps) overlap(s))" $(if ($stats.NetworkOverlaps) { 'warn' } else { 'info' }) 'Network topology' }
         if (& $find 'PSRule rules') { & $tile ('{0:N0}' -f $stats.PSRuleFailed) "PSRule failures ($('{0:N0}' -f $stats.PSRulePassed) passed)" $(if ($stats.PSRuleFailed) { 'warn' } else { 'good' }) 'PSRule results' }
         if (& $find 'Outages') { & $tile ('{0:N0}' -f $stats.Outages) 'Azure outages in 6 months' $(if ($stats.Outages) { 'warn' } else { 'good' }) 'Outages' }
         & $tile ('{0:N0}' -f $stats.Orphans) 'unattached or empty resources' $(if ($stats.Orphans) { 'warn' } else { 'good' }) ''
@@ -104,6 +126,14 @@ function Write-AACAssessmentHtml {
         $charts.Add(@{ Title = 'Recommendations by severity'; Kind = 'donut'; CenterLabel = 'recommendations'; Items = & $byValue $recommended 'Severity' @('Critical', 'High', 'Medium', 'Low'); Table = $recommended.Id; Column = 'Severity' })
         $charts.Add(@{ Title = 'Recommendations by category'; Items = & $byValue $recommended 'Category' @(); Table = $recommended.Id; Column = 'Category'; Tone = 'violet' })
     }
+    $pillars = & $find 'WAF pillars'
+    if ($pillars -and @($pillars.Rows | Where-Object { $null -ne $_.Score }).Count) {
+        $charts.Add(@{ Title = 'Well-Architected score by pillar'; Items = @($pillars.Rows | Where-Object { $null -ne $_.Score } | ForEach-Object { @{ Label = $_.Pillar; Value = $_.Score; Display = '{0:N0}/100' -f $_.Score; Filter = $_.Pillar; Tone = $(if ($_.Score -ge 75) { 'good' } elseif ($_.Score -ge 50) { 'warn' } else { 'bad' }) } }); Table = (& $idOf 'WAF findings'); Column = 'Pillar' })
+    }
+    $saving = & $find 'Savings opportunities'
+    if ($saving -and @($saving.Rows).Count) {
+        $charts.Add(@{ Title = 'Savings opportunities by FinOps lever'; Kind = 'donut'; CenterLabel = 'opportunities'; Items = & $byValue $saving 'Lever' @('Waste', 'Rightsizing', 'Rate', 'Licensing', 'Usage', 'Modernise'); Table = $saving.Id; Column = 'Lever' })
+    }
     $rules = & $find 'PSRule rules'
     if ($rules -and @($rules.Rows).Count) {
         $charts.Add(@{ Title = 'PSRule for Azure rules by status'; Kind = 'donut'; CenterLabel = 'rules'; Items = & $byValue $rules 'Status' $statusOrder; Table = $rules.Id; Column = 'Status' })
@@ -124,7 +154,7 @@ function Write-AACAssessmentHtml {
     }
 
     # Each sheet's tab: the governance ones first, the inventory's categories in one.
-    $tabOf = @{ Policy = 'Policy compliance'; 'Policy inventory' = 'Policy inventory'; PSRule = 'PSRule results'; Recommendations = 'Resource recommendations'; Overview = 'Resources'; Advisor = 'Advisor'; Security = 'Security'; Health = 'Health'; Cost = 'Cost' }
+    $tabOf = @{ 'Identity and access' = 'Identity and access'; Architecture = 'Architecture'; Operations = 'Operations'; 'Service delivery' = 'Service delivery'; Policy = 'Policy compliance'; 'Policy inventory' = 'Policy inventory'; 'Well-Architected' = 'Well-Architected'; PSRule = 'PSRule results'; Recommendations = 'Resource recommendations'; FinOps = 'FinOps'; Cost = 'FinOps'; Overview = 'Resources'; Advisor = 'Advisor'; Security = 'Security'; Health = 'Health' }
     $tables = foreach ($sheet in $sheets) {
         if (-not @($sheet.Rows).Count -and -not $sheet.Error) { continue }
         $count = @($sheet.Rows).Count
@@ -168,14 +198,19 @@ function Write-AACAssessmentHtml {
     $tabs = @(
         @{ Name = 'Policy compliance'; Badge = $(if (& $find 'Policies') { & $stat 'PoliciesFailed' } else { & $stat 'PolicyNonCompliant' }); Tone = 'bad'; Note = 'Azure Policy: compliance by initiative, by resource group and by standard, and each non-compliant resource - why, and how to fix it.' }
         @{ Name = 'Policy inventory'; Badge = & $rowCount 'Policy assignments'; Tone = 'neutral'; Note = 'The policy assignments in force on the scope, and every policy they apply: effect, resource types, controls and status.' }
+        @{ Name = 'Well-Architected'; Badge = & $stat 'WafHigh'; Tone = 'warn'; Note = 'The Azure Well-Architected Framework''s five pillars, scored by pillar, design principle and check, and each check a resource fails - with what to do. Invoke-AACWafAssessment reviews one workload in depth, with the team''s answers.' }
         @{ Name = 'PSRule results'; Badge = & $stat 'PSRuleFailed'; Tone = 'warn'; Note = 'PSRule for Azure: each rule run on the resources, and the resources that failed it.' }
         @{ Name = 'Resource recommendations'; Badge = & $stat 'RecommendationsUrgent'; Tone = 'bad'; Note = 'Everything to act on in one list - under-used, misconfigured and non-compliant resources - most severe first, with what to do.' }
+        @{ Name = 'FinOps'; Badge = & $stat 'SavingsOpportunities'; Tone = 'good'; Note = 'Where money can be saved (by lever), how much of the estate can be shown back to an owner, the budgets, reservations - and, with -IncludeCost, where the money goes.' }
+        @{ Name = 'Identity and access'; Badge = & $stat 'PrivilegedStanding'; Tone = 'bad'; Note = 'For IT security: who holds Owner and access-granting roles at the root, management groups and subscriptions (standing, time-bound or through PIM; guests and service principals), custom roles that allow everything, classic administrators, Defender plans, credentials about to expire, management ports open to the internet and PaaS services anyone can reach.' }
+        @{ Name = 'Architecture'; Badge = & $stat 'NetworkOverlaps'; Tone = 'warn'; Note = 'For architects: the landing zone (management groups, subscriptions at the root, policy coverage), regions and their pairs, the resilience of the critical resources (zones, backup, Site Recovery) and the network topology - hub and spoke or Virtual WAN, overlaps, private DNS.' }
+        @{ Name = 'Operations'; Badge = & $stat 'MachinesMissingUpdates'; Tone = 'warn'; Note = 'For administrators: diagnostic settings and workspaces, Service Health alerts and silent alert rules, patching and Arc servers, locks on production, the Activity Log and failed deployments, retired SKUs, naming and owner tags.' }
+        @{ Name = 'Service delivery'; Badge = & $stat 'GroupsWithoutOwner'; Tone = 'info'; Note = 'For service delivery managers: subscription offers and support plans, how much of the reservations and savings plans is used, quota headroom, the month-on-month cost trend and who owns each resource group.' }
         @{ Name = 'Resources'; Badge = & $stat 'Resources'; Tone = 'neutral'; Note = '' }
-        @{ Name = 'Inventory'; Badge = & $stat 'InventorySheets'; Tone = 'neutral'; Note = 'A sheet per resource type present, with the settings that matter for it.' }
+        @{ Name = 'Inventory'; Badge = & $stat 'InventorySheets'; Tone = 'neutral'; Note = 'A sheet per resource type present, with the settings that matter for it - and its policy compliance, Well-Architected gaps and Advisor recommendations.' }
         @{ Name = 'Advisor'; Badge = & $stat 'AdvisorHigh'; Tone = 'warn'; Note = '' }
         @{ Name = 'Security'; Badge = & $stat 'SecurityHigh'; Tone = 'bad'; Note = '' }
         @{ Name = 'Health'; Badge = & $stat 'Outages'; Tone = 'warn'; Note = '' }
-        @{ Name = 'Cost'; Badge = $null; Tone = 'neutral'; Note = '' }
     )
-    Write-AACHtmlReport -Path $Path -Title $Title -Subtitle 'Azure environment assessment: policy compliance and inventory, PSRule, recommendations, inventory, Advisor, security, health and cost' -Fact $Detail -Tile $tiles -Chart $charts.ToArray() -Table @($tables) -Notice $notices -Tree $tree -Tab $tabs -OverviewTab 'Executive summary'
+    Write-AACHtmlReport -Path $Path -Title $Title -Subtitle 'Azure tenant assessment: policy, Well-Architected, PSRule, recommendations, FinOps, identity and access, architecture, operations, service delivery, inventory, Advisor, security and health' -Fact $Detail -Tile $tiles -Chart $charts.ToArray() -Table @($tables) -Notice $notices -Tree $tree -Tab $tabs -OverviewTab 'Executive summary'
 }

@@ -1,7 +1,7 @@
 function Get-AACDevOpsToolRule {
     <#
     .SYNOPSIS
-        The tool catalogue of Get-AACADOInventory: every tool it recognises
+        The tool catalogue of Invoke-AACADOAssessment: every tool it recognises
         in a pipeline - its category, what it does, and the regular
         expression that finds it.
     .DESCRIPTION
@@ -13,6 +13,10 @@ function Get-AACDevOpsToolRule {
                                                          linting, no tests, no
                                                          security scanning -
                                                          read these)
+          SBOM                                           software bill of
+                                                         materials generators
+                                                         and validators (the
+                                                         SBOM tab reads these)
           GitOps                                         Flux, Argo CD,
                                                          Kustomize...
           Tooling                                        command-line tools
@@ -128,6 +132,17 @@ function Get-AACDevOpsToolRule {
         & $rule 'Security' 'Template Analyzer' 'TemplateAnalyzer' 'Scans ARM and Bicep templates'
         & $rule 'Security' 'Kubescape' '\bkubescape\b' 'Scans Kubernetes configuration'
         & $rule 'Security' 'Cosign' '\bcosign\s+(sign|verify)\b' 'Signs or verifies container images'
+        # --- SBOM: a software bill of materials for what the pipeline builds -----------------------------------------
+        # The Microsoft SBOM Tool (github.com/microsoft/sbom-tool) as a CLI, a .NET tool, the MSBuild targets
+        # or the Manifest Generator task; 1ES Pipeline Templates run it for every pipeline that extends them.
+        & $rule 'SBOM' 'Microsoft SBOM Tool' '\bsbom-tool(\.exe)?\b[^\n]*\bgenerate\b|Microsoft\.Sbom\.DotNetTool|ManifestGeneratorTask@|manifest-generator-task' 'Generates an SPDX SBOM of the build drop (Microsoft SBOM Tool)'
+        & $rule 'SBOM' 'Microsoft SBOM Tool (MSBuild)' 'Microsoft\.Sbom\.Targets|GenerateSBOM\s*[=>:]\s*["'']?true' 'Generates an SPDX SBOM as part of dotnet build or pack' 'Microsoft SBOM Tool'
+        & $rule 'SBOM' 'Microsoft SBOM Tool (validate)' '\bsbom-tool(\.exe)?\b[^\n]*\bvalidate\b' 'Checks a build drop against its SBOM - nothing added, changed or missing' 'Microsoft SBOM Tool'
+        & $rule 'SBOM' '1ES Pipeline Templates' '1ES\.(Official|Unofficial)\.PipelineTemplate|1ESPipelineTemplates' 'Microsoft 1ES templates: an SBOM for every build, unless sbom: enabled: false'
+        & $rule 'SBOM' 'Syft' '\bsyft\b' 'Generates an SBOM (SPDX or CycloneDX) of an image or a folder'
+        & $rule 'SBOM' 'CycloneDX' '\bcyclonedx\b|\bcdxgen\b' 'Generates a CycloneDX SBOM'
+        & $rule 'SBOM' 'Trivy (SBOM)' '\btrivy\b[^\n]*--format\s+(spdx|spdx-json|cyclonedx)\b' 'Generates an SBOM with Trivy' 'Trivy'
+        & $rule 'SBOM' 'Docker SBOM' 'docker\s+sbom\b|--sbom[=\s]+true|--attest\s+type=sbom' 'Generates or attests a container image''s SBOM' 'Docker'
         # --- Deploy ---------------------------------------------------------------------------------------------------
         & $rule 'Deploy' 'Azure App Service' 'AzureWebApp@|AzureRmWebAppDeployment@|AzureWebAppContainer@|az\s+webapp\s+(deploy|deployment)' 'Deploys to Azure App Service'
         & $rule 'Deploy' 'Azure Functions' 'AzureFunctionApp@|AzureFunctionAppContainer@|\bfunc\s+azure\s+functionapp\s+publish' 'Deploys Azure Functions'

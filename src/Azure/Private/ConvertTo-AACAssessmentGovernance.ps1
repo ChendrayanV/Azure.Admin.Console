@@ -1,7 +1,7 @@
 function ConvertTo-AACAssessmentGovernance {
     <#
     .SYNOPSIS
-        Builds Invoke-AACAssessment's governance sheets: policy compliance
+        Builds Invoke-AACTenantAssessment's governance sheets: policy compliance
         (by initiative, by resource group, by standard and control, and each
         non-compliant resource with why and how to fix it), the policy
         inventory, PSRule for Azure's results, and one list of every
@@ -21,8 +21,11 @@ function ConvertTo-AACAssessmentGovernance {
                              results (the failures and errors)
           Recommendations    Resource recommendations: Advisor, Defender for
                              Cloud, retirements, unattached and empty
-                             resources, policy non-compliance and PSRule's
-                             failures, each with a severity, a category
+                             resources, policy non-compliance, PSRule's
+                             failures, the Well-Architected findings (WAF
+                             findings, when -Sheet has it) and FinOps
+                             (Budgets and Cost allocation, when -Sheet has
+                             them), each with a severity, a category
                              (Cost, Security, Reliability, Operational
                              excellence, Performance, Governance) and what
                              to do
@@ -55,6 +58,10 @@ function ConvertTo-AACAssessmentGovernance {
         [switch] $PolicyRead,
 
         [switch] $PSRuleRead,
+
+        # More recommendations, already in this list's shape (ConvertTo-AACAssessmentInsight's findings).
+        [AllowEmptyCollection()]
+        [object[]] $Finding = @(),
 
         # The cap on the non-compliant resources read, to say when it was reached.
         [int] $PolicyResourceLimit = 5000,
@@ -364,11 +371,44 @@ function ConvertTo-AACAssessmentGovernance {
             & $add $severity (& $categoryOf ([string]$r.Pillar)) 'PSRule for Azure' $(if ($r.Title) { [string]$r.Title } else { [string]$r.RuleName }) $row ((@($r.Recommendation) | Where-Object { $_ }) -join ' ') ([string]$r.Link) ([string]$r.ResourceId)
         }
     }
+    # Well-Architected: its own checks only - the ones folded from Advisor and
+    # Defender are listed above already - and not a cost gap the inventory
+    # already reported on the same resource.
+    $wafFindings = & $findSheet 'WAF findings'
+    if ($wafFindings) {
+        $reported = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($r in $recommendations) { if ($r.Source -eq 'Inventory' -and $r.ResourceId) { [void]$reported.Add([string]$r.ResourceId) } }
+        foreach ($row in @($wafFindings.Rows | Where-Object { $_.Status -eq 'Fail' -and [string]$_.'Check ID' -notlike 'AD-*' -and [string]$_.'Check ID' -notlike 'DF-*' })) {
+            if ([string]$row.Pillar -eq 'Cost Optimization' -and $reported.Contains([string]$row.ResourceId)) { continue }
+            & $add ([string]$row.Severity) (& $categoryOf ([string]$row.Pillar)) 'Well-Architected' "$($row.'Check ID'): $($row.Check) - not met" $row ([string]$row.Recommendation) ([string]$row.Link) ''
+        }
+    }
+    # Identity and access, architecture, operations and service delivery.
+    foreach ($f in $Finding) { if ($f) { $recommendations.Add($f) } }
+    # FinOps: budgets that are over, or missing; subscriptions with much untagged cost.
+    $budgets = & $findSheet 'Budgets'
+    if ($budgets) {
+        $budgetLink = 'https://learn.microsoft.com/azure/cost-management-billing/costs/tutorial-acm-create-budgets'
+        foreach ($row in @($budgets.Rows)) {
+            switch ([string]$row.Status) {
+                'Over budget' { & $add 'High' 'Cost' 'FinOps' "Budget $($row.Budget) is spent: $($row.'Spent (%)')% of $($row.Amount) $($row.Currency)" $row 'Find what drove the spend (Cost by service, Top cost resources), then act on it or raise the budget with its owner.' $budgetLink '' }
+                'Forecast over' { & $add 'Medium' 'Cost' 'FinOps' "Budget $($row.Budget) is forecast to be overspent: $($row.'Forecast (%)')% of $($row.Amount) $($row.Currency)" $row 'Review the forecast with the budget''s owner before the period ends.' $budgetLink '' }
+                'No budget' { & $add 'Medium' 'Cost' 'FinOps' 'Subscription has no budget' $row 'Create a Cost Management budget with alerts (actual and forecast) to the subscription''s owner.' $budgetLink '' }
+                'No alerts' { & $add 'Low' 'Cost' 'FinOps' "Budget $($row.Budget) alerts no one" $row 'Add actual and forecast alert thresholds (for example 80% and 100%) with the owners as recipients.' $budgetLink '' }
+            }
+        }
+    }
+    $allocation = & $findSheet 'Cost allocation'
+    if ($allocation) {
+        foreach ($row in @($allocation.Rows | Where-Object { $null -ne $_.'Coverage (%)' -and $_.'Coverage (%)' -lt 80 -and $_.Without })) {
+            & $add 'Low' 'Cost' 'FinOps' "$($row.Without) of $($row.Resources) resources have no cost-allocation tag ($($row.'Coverage (%)')% covered)" $row 'Tag the resources (or inherit the tag from the resource group with Azure Policy''s ''Inherit a tag from the resource group'') so their cost can be shown back to an owner.' 'https://learn.microsoft.com/azure/cost-management-billing/costs/enable-tag-inheritance' ''
+        }
+    }
     $severityRank = @{ Critical = 0; High = 1; Medium = 2; Low = 3 }
     $recommendationRows = @($recommendations | Sort-Object -Property @{ Expression = { if ($severityRank.Contains($_.Severity)) { $severityRank[$_.Severity] } else { 4 } } }, Category, Recommendation, Resource)
     $sheets.Add((& $newSheet 'Recommendations' 'Resource recommendations' ([ordered]@{ 'Severity' = 'badge'; 'Category' = 'badge'; 'Source' = 'text'; 'Recommendation' = 'wide'; 'Resource' = 'resource'; 'Resource type' = 'mono'; 'Resource group' = 'text'; 'Subscription' = 'text'; 'Remediation' = 'wide'; 'Link' = 'link' }) `
                 $recommendationRows @('Severity', 'Category', 'Source', 'Recommendation', 'Resource') `
-                'Everything to act on, in one list: Azure Advisor, Defender for Cloud, retirements, unattached and empty resources, policy non-compliance and PSRule for Azure - most severe first.'))
+                'Everything to act on, in one list: Azure Advisor, Defender for Cloud, retirements, unattached and empty resources, policy non-compliance, PSRule for Azure, the Well-Architected checks and FinOps (budgets, cost allocation) - most severe first.'))
 
     $countOf = { param($Rows, [string] $Property, [string] $Value) @($Rows | Where-Object { $_.$Property -eq $Value }).Count }
     $stats = [ordered]@{

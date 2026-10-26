@@ -1,7 +1,7 @@
 function Read-AACDevOpsInventory {
     <#
     .SYNOPSIS
-        Reads what Get-AACADOInventory needs from one Azure DevOps
+        Reads what Invoke-AACADOAssessment needs from one Azure DevOps
         organization - projects, pipelines and their last run, classic
         releases, repositories and their last push, every YAML file and the
         templates it includes, the task catalogue, the security resources

@@ -1,7 +1,7 @@
 function ConvertTo-AACAssessment {
     <#
     .SYNOPSIS
-        Turns what Invoke-AACAssessment read into its sheets, overview and
+        Turns what Invoke-AACTenantAssessment read into its sheets, overview and
         organization - the model behind the CSV, HTML, PDF and diagrams.
     .DESCRIPTION
         No Azure calls. Inputs:
@@ -21,16 +21,26 @@ function ConvertTo-AACAssessment {
                                  -> items); Quota ('sub|location' -> items); Sku
                                  (location -> items) }
           -Cost                  Read-AACInventoryCost's result, or $null
+          -PolicyByResource      policy states summed per resource (with
+                                 -PolicyRead)
+          -WafResult             ConvertTo-AACWafAssessment's Results (with
+                                 -WafRead)
+          -PSRuleResult          Invoke-AACPSRuleEngine's results (with
+                                 -PSRuleRead)
 
         Each sheet: @{ Id; Category; Sheet; Columns (labels in order);
         Types (label -> number/date/text); Key; Rows (pscustomobjects with
         those labels, and ResourceId); Error; Kind ('Overview', 'Inventory',
         'Advisor', 'Security', 'Policy', 'Health', 'Cost') }.
 
-        Inventory sheets also get, after their own columns: Retirement (an
-        Advisor retirement notice for the resource), Advisor (its number of
-        recommendations), the cost (month to date, last month, currency)
-        with -Cost, and Tags with -IncludeTag.
+        Inventory sheets (and All resources) also get, after their own
+        columns: Retirement (an Advisor retirement notice for the
+        resource), Advisor (its number of recommendations), the policy
+        columns with -PolicyRead (Policy: Non-compliant, Compliant, Exempt
+        or Not evaluated; Non-compliant policies; Failing policies), WAF
+        gaps (the Well-Architected checks it fails) with -WafRead, PSRule
+        failures with -PSRuleRead, the cost (month to date, last month,
+        currency) with -Cost, and Tags with -IncludeTag.
 
         Returns @{ Sheets; Stats; Tree (for the HTML report);
         Organization (management groups, subscriptions, resource groups,
@@ -54,12 +64,17 @@ function ConvertTo-AACAssessment {
         [AllowEmptyCollection()] [object[]] $SupportTicket = @(),
         [hashtable] $Arm = @{},
         [hashtable] $Cost,
+        [AllowEmptyCollection()] [object[]] $PolicyByResource = @(),
+        [AllowEmptyCollection()] [object[]] $WafResult = @(),
+        [AllowEmptyCollection()] [object[]] $PSRuleResult = @(),
         [string] $TenantId = '',
         [string] $TenantName = '',
         [switch] $IncludeTag,
         [switch] $AdvisorRead,
         [switch] $SecurityRead,
         [switch] $PolicyRead,
+        [switch] $WafRead,
+        [switch] $PSRuleRead,
         [datetime] $Now = (Get-Date)
     )
 
@@ -195,6 +210,33 @@ function ConvertTo-AACAssessment {
         }
     }
 
+    # Policy compliance per resource, with the names of the policies it fails.
+    $policyNames = @{}
+    foreach ($row in $Policy) {
+        $definition = & $lower (& $value $row 'definitionId')
+        if ($definition -and (& $value $row 'policy')) { $policyNames[$definition] = [string](& $value $row 'policy') }
+    }
+    $policyOf = @{}
+    foreach ($row in $PolicyByResource) {
+        $id = & $lower (& $value $row 'resourceId')
+        if ($id) { $policyOf[$id] = $row }
+    }
+
+    # Well-Architected and PSRule failures per resource. Advisor and Defender
+    # have columns of their own, so the WAF checks folded from them aren't counted.
+    $wafGaps = @{}
+    foreach ($row in $WafResult) {
+        if ([string]$row.Status -ne 'Fail' -or [string]$row.CheckId -like 'AD-*' -or [string]$row.CheckId -like 'DF-*') { continue }
+        $id = & $lower $row.ResourceId
+        if ($id) { $wafGaps[$id] = 1 + $(if ($wafGaps.Contains($id)) { $wafGaps[$id] } else { 0 }) }
+    }
+    $psruleFails = @{}
+    foreach ($row in $PSRuleResult) {
+        if ([string]$row.Outcome -ne 'Fail') { continue }
+        $id = & $lower $row.ResourceId
+        if ($id) { $psruleFails[$id] = 1 + $(if ($psruleFails.Contains($id)) { $psruleFails[$id] } else { 0 }) }
+    }
+
     # The columns every inventory sheet adds after its own.
     $tagText = {
         param($Tags)
@@ -205,6 +247,16 @@ function ConvertTo-AACAssessment {
         $key = & $lower $Id
         $Out['Retirement'] = if ($retirements.Contains($key)) { $retirements[$key] -join '; ' } else { '' }
         if ($AdvisorRead) { $Out['Advisor'] = if ($advisorCount.Contains($key)) { [int]$advisorCount[$key] } else { 0 } }
+        if ($PolicyRead) {
+            $state = if ($policyOf.Contains($key)) { $policyOf[$key] } else { $null }
+            $failing = [int](& $value $state 'nonCompliant')
+            $Out['Policy'] = if (-not $state) { 'Not evaluated' } elseif ($failing) { 'Non-compliant' } elseif ([int](& $value $state 'compliant')) { 'Compliant' } elseif ([int](& $value $state 'exempt')) { 'Exempt' } else { 'Not evaluated' }
+            $Out['Non-compliant policies'] = $failing
+            $names = @(@(& $list (& $value $state 'failing')) | ForEach-Object { $definition = & $lower $_; if ($policyNames.Contains($definition)) { $policyNames[$definition] } else { & $leaf $definition } })
+            $Out['Failing policies'] = "$($names -join '; ')$(if ($failing -gt $names.Count -and $names.Count) { "; and $($failing - $names.Count) more" })"
+        }
+        if ($WafRead) { $Out['WAF gaps'] = if ($wafGaps.Contains($key)) { [int]$wafGaps[$key] } else { 0 } }
+        if ($PSRuleRead) { $Out['PSRule failures'] = if ($psruleFails.Contains($key)) { [int]$psruleFails[$key] } else { 0 } }
         if ($hasCost) {
             $entry = if ($costs.Contains($key)) { $costs[$key] } else { $null }
             $Out['Cost (month to date)'] = if ($entry) { & $round $entry.ThisMonth } else { $null }
@@ -216,6 +268,9 @@ function ConvertTo-AACAssessment {
     }
     $commonTypes = [ordered]@{ 'Retirement' = 'text' }
     if ($AdvisorRead) { $commonTypes['Advisor'] = 'number' }
+    if ($PolicyRead) { $commonTypes['Policy'] = 'badge'; $commonTypes['Non-compliant policies'] = 'number'; $commonTypes['Failing policies'] = 'wide' }
+    if ($WafRead) { $commonTypes['WAF gaps'] = 'number' }
+    if ($PSRuleRead) { $commonTypes['PSRule failures'] = 'number' }
     if ($hasCost) { $commonTypes['Cost (month to date)'] = 'money'; $commonTypes['Cost (last month)'] = 'money'; $commonTypes['Currency'] = 'text' }
     if ($IncludeTag) { $commonTypes['Tags'] = 'wide' }
 

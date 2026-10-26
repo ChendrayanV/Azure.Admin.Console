@@ -1,7 +1,7 @@
 function Get-AACAssessmentQuery {
     <#
     .SYNOPSIS
-        Builds the Resource Graph query of one Invoke-AACAssessment sheet
+        Builds the Resource Graph query of one Invoke-AACTenantAssessment sheet
         (Get-AACAssessmentCatalog) - or the scope filter every resource
         query shares.
     .DESCRIPTION

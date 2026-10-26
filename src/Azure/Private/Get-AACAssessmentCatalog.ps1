@@ -1,7 +1,7 @@
 function Get-AACAssessmentCatalog {
     <#
     .SYNOPSIS
-        The resource types Invoke-AACAssessment inventories, one sheet each:
+        The resource types Invoke-AACTenantAssessment inventories, one sheet each:
         what to read and which columns to show - in the spirit of Azure
         Resource Inventory's (ARI) inventory modules, as Resource Graph
         projections.
@@ -22,7 +22,7 @@ function Get-AACAssessmentCatalog {
           Key        the labels the PDF shows (it can't show them all)
 
         Every sheet also gets Subscription, Resource group, Name and
-        Location first, and - from Invoke-AACAssessment - Retirement, Advisor,
+        Location first, and - from Invoke-AACTenantAssessment - Retirement, Advisor,
         cost and tags columns after its own, and the resource ID.
 
         Column specs:
@@ -44,7 +44,7 @@ function Get-AACAssessmentCatalog {
           '@sum:path|a.b'      an array: the sum of each item's a.b    query)
           '@keys:path'         an object's keys, joined
           'x:name'             filled in after the query by
-                               Invoke-AACAssessment: vmCpu, vmMemory
+                               Invoke-AACTenantAssessment: vmCpu, vmMemory
                                (Compute SKUs), subnetUsable, subnetFree
     #>
     [CmdletBinding()]

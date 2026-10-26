@@ -1,25 +1,25 @@
 ---
 document type: cmdlet
 external help file: Azure.Admin.Console-help.xml
-HelpUri: https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACADOInventory.md
+HelpUri: https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Invoke-AACADOAssessment.md
 Locale: en-US
 Module Name: Azure.Admin.Console
 PlatyPS schema version: 2024-05-01
-title: Get-AACADOInventory
+title: Invoke-AACADOAssessment
 ---
 
-# Get-AACADOInventory
+# Invoke-AACADOAssessment
 
 ## SYNOPSIS
 
-Inventories one or more Azure DevOps organizations - projects, pipelines (YAML, or classic with no YAML file - flagged) with their last run and delivery metrics, every task and tool they use (with versions), repositories, service connections, variable groups and environments with their security posture - as a Spectre.Console view, objects, and CSV, HTML and PDF reports.
+Assesses one or more Azure DevOps organizations - projects, pipelines (YAML, or classic with no YAML file - flagged) with their last run and delivery metrics, every task and tool they use (with versions), repositories, service connections, variable groups and environments with their security posture, the software bill of materials (SBOM) each pipeline produces, DORA and the move to GitHub - as a Spectre.Console view, objects, and CSV, HTML and PDF reports.
 
 ## SYNTAX
 
 ### __AllParameterSets
 
 ```
-Get-AACADOInventory [[-Organization] <string[]>] [[-Project] <string[]>] [[-PipelineId] <int[]>]
+Invoke-AACADOAssessment [[-Organization] <string[]>] [[-Project] <string[]>] [[-PipelineId] <int[]>]
  [[-PersonalAccessToken] <securestring>] [[-Skip] <string[]>] [[-MetricDays] <int>]
  [[-TemplateDepth] <int>] [[-StaleDays] <int>] [[-InactiveDays] <int>] [[-StaleBranchDays] <int>]
  [[-ToolRule] <Object[]>] [[-ToolRulePath] <string>] [[-MaxScriptFiles] <int>]
@@ -92,6 +92,22 @@ to every pipeline; default branches with no required reviewers or
 build validation; Advanced Security off, exposed secrets, critical
 and high alerts; idle repositories.
 
+SBOM (software bill of materials): which build pipelines generate
+one - the Microsoft SBOM Tool (sbom-tool generate, the Manifest
+Generator task, GenerateSBOM=true in .NET projects), 1ES Pipeline
+Templates, Syft, CycloneDX, Trivy or Docker - and which validate one
+(sbom-tool validate); then, from each one's latest successful run,
+the SBOM it published (the _manifest/spdx_2.2 or spdx_3.0
+manifest.spdx.json, or any SPDX or CycloneDX JSON file in its
+artifacts): format, the tool that made it, components and files,
+completeness against the NTIA minimum elements (name, version,
+supplier, package URL), licences by kind (permissive, weak or strong
+copyleft, unknown), and every component with its version, ecosystem,
+supplier and licence. Findings: pipelines that deploy or publish with
+no SBOM, an SBOM generated but not published, incomplete SBOMs,
+strong copyleft licences, SBOMs never validated. -Skip Sbom leaves
+the artifacts unread (the generators are still found in the steps).
+
 Delivery metrics over -MetricDays: each pipeline's runs, success
 rate (cancelled runs left out), average duration and queue time,
 runs a week; each environment's deployments, deployments a week,
@@ -148,7 +164,7 @@ The token is sent only to Azure DevOps and never written anywhere.
 
 ```powershell
 $pat = Read-Host -Prompt 'Azure DevOps PAT' -AsSecureString
-Get-AACADOInventory -Organization contoso -PersonalAccessToken $pat
+Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $pat
 ```
 
 Every project, pipeline and repository of the organization, with its tools, security posture and findings.
@@ -156,7 +172,7 @@ Every project, pipeline and repository of the organization, with its tools, secu
 ### Example 2
 
 ```powershell
-Get-AACADOInventory -Organization contoso -PersonalAccessToken $pat -HtmlPath .\ADO.html -PdfPath .\ADO.pdf -CsvPath .\ADO.csv
+Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $pat -HtmlPath .\ADO.html -PdfPath .\ADO.pdf -CsvPath .\ADO.csv
 ```
 
 The same as reports.
@@ -164,7 +180,7 @@ The same as reports.
 ### Example 3
 
 ```powershell
-Get-AACADOInventory -Organization contoso -PersonalAccessToken $pat -View Task -NoDisplay | Where-Object Kind -EQ 'CLI' | Group-Object -Property Name, Version
+Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $pat -View Task -NoDisplay | Where-Object Kind -EQ 'CLI' | Group-Object -Property Name, Version
 ```
 
 Every command-line tool the pipelines run, and the versions they set.
@@ -172,7 +188,7 @@ Every command-line tool the pipelines run, and the versions they set.
 ### Example 4
 
 ```powershell
-Get-AACADOInventory -Organization contoso -PersonalAccessToken $pat -View ServiceConnection -NoDisplay | Where-Object OpenToAllPipelines
+Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $pat -View ServiceConnection -NoDisplay | Where-Object OpenToAllPipelines
 ```
 
 Service connections any pipeline can use.
@@ -181,7 +197,7 @@ Service connections any pipeline can use.
 
 ```powershell
 Connect-AAC
-Get-AACADOInventory -DiscoverOrganization -UseAzureSignIn -IncludeAzure -HtmlPath .\ADO.html
+Invoke-AACADOAssessment -DiscoverOrganization -UseAzureSignIn -IncludeAzure -HtmlPath .\ADO.html
 ```
 
 Every organization you belong to, with each Azure service connection's roles in Azure.
@@ -189,7 +205,7 @@ Every organization you belong to, with each Azure service connection's roles in 
 ### Example 6
 
 ```powershell
-Get-AACADOInventory -Organization contoso -PersonalAccessToken $pat -View Migration -NoDisplay | Sort-Object -Property Effort -Descending
+Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $pat -View Migration -NoDisplay | Sort-Object -Property Effort -Descending
 ```
 
 Projects by how much work the move to GitHub is.
@@ -197,7 +213,15 @@ Projects by how much work the move to GitHub is.
 ### Example 7
 
 ```powershell
-Get-AACADOInventory -Organization contoso -Project Payments -PersonalAccessToken $pat -YamlPath .\pipelines -Skip Security, Metrics
+Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $pat -View SbomComponent -NoDisplay | Where-Object { $_.Component -eq 'log4j-core' -and $_.Version -like '2.1*' }
+```
+
+Every pipeline whose latest SBOM ships a given component and version - the first question when a new vulnerability is announced.
+
+### Example 8
+
+```powershell
+Invoke-AACADOAssessment -Organization contoso -Project Payments -PersonalAccessToken $pat -YamlPath .\pipelines -Skip Security, Metrics
 ```
 
 Save the project's pipelines and templates to a folder, to review or diff offline.
@@ -560,7 +584,9 @@ branch policies), Metrics (no run history or deployments),
 AdvancedSecurity, Members (no Project Administrators or teams - who
 to contact), Branches (no branches, tags or branching strategy),
 Migration (no feeds, test plans, wikis, pull requests, agent pools,
-service hooks or extensions - the move-to-GitHub data).
+service hooks or extensions - the move-to-GitHub data), Sbom (no
+SBOMs read from the runs' artifacts - the generators are still found
+in the steps).
 
 ```yaml
 Type: System.String[]
@@ -692,7 +718,7 @@ The reports' title.
 
 ```yaml
 Type: System.String
-DefaultValue: "'Azure DevOps inventory'"
+DefaultValue: "'Azure DevOps assessment'"
 SupportsWildcards: false
 Aliases: []
 ParameterSets:
@@ -711,7 +737,7 @@ HelpMessage: ''
 
 Tools of your own to look for: @(@{ Category = 'Security'; Tool =
 'Acme Scan'; Pattern = 'acme-scan' }). Category is Lint, Build, Test,
-Security, Deploy, Publish, GitOps or Tooling; Pattern a regular
+Security, Deploy, Publish, GitOps, SBOM or Tooling; Pattern a regular
 expression, matched ignoring case; Purpose (optional) says what the
 tool does.
 
@@ -782,7 +808,9 @@ What is returned and written to -CsvPath: Pipeline (default),
 Project, Repository, Task, Tool, Evidence, Coverage, Unrecognised,
 ServiceConnection, VariableGroup, Environment, Member (who to contact),
 Branch, BranchPolicy, Variable, Dora, Feed, TestPlan, AgentPool,
-Extension, Migration, MigrationMap or Finding.
+Extension, Migration, MigrationMap, Sbom (each build pipeline's
+SBOM), SbomComponent (every component of every SBOM read),
+SbomLicense or Finding.
 
 ```yaml
 Type: System.String
@@ -835,11 +863,11 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## OUTPUTS
 
-### AAC.DevOpsPipeline, AAC.DevOpsProject, AAC.DevOpsRepository, AAC.DevOpsTask, AAC.DevOpsToolUsage, AAC.DevOpsServiceConnection, AAC.DevOpsVariableGroup, AAC.DevOpsEnvironment, AAC.DevOpsMember, AAC.DevOpsToolEvidence, AAC.DevOpsCoverage, AAC.DevOpsUnrecognised, AAC.DevOpsBranch, AAC.DevOpsBranchPolicy, AAC.DevOpsVariable, AAC.DevOpsDora, AAC.DevOpsFeed, AAC.DevOpsTestPlan, AAC.DevOpsAgentPool, AAC.DevOpsExtension, AAC.DevOpsMigration, AAC.DevOpsMigrationMap or AAC.DevOpsFinding, by -View (piped onward, or with -PassThru or -NoDisplay)
+### AAC.DevOpsPipeline, AAC.DevOpsProject, AAC.DevOpsRepository, AAC.DevOpsTask, AAC.DevOpsToolUsage, AAC.DevOpsServiceConnection, AAC.DevOpsVariableGroup, AAC.DevOpsEnvironment, AAC.DevOpsMember, AAC.DevOpsToolEvidence, AAC.DevOpsCoverage, AAC.DevOpsUnrecognised, AAC.DevOpsBranch, AAC.DevOpsBranchPolicy, AAC.DevOpsVariable, AAC.DevOpsDora, AAC.DevOpsFeed, AAC.DevOpsTestPlan, AAC.DevOpsAgentPool, AAC.DevOpsExtension, AAC.DevOpsMigration, AAC.DevOpsMigrationMap, AAC.DevOpsSbom, AAC.DevOpsSbomComponent, AAC.DevOpsSbomLicense or AAC.DevOpsFinding, by -View (piped onward, or with -PassThru or -NoDisplay)
 
 ## NOTES
 
 ## RELATED LINKS
 
-- [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACADOInventory.md)
+- [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Invoke-AACADOAssessment.md)
 - [about_Azure.Admin.Console](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md)

@@ -1,5 +1,5 @@
 <#
-    Unit tests for Invoke-AACAssessment: the resource catalog and its
+    Unit tests for Invoke-AACTenantAssessment: the resource catalog and its
     queries, the assessment of a made-up Contoso tenant
     (Fixtures\ContosoAssessment.ps1) - inventory sheets, overview, Advisor,
     retirements, Defender, Policy, outages, quotas, reservations, cost -
@@ -114,8 +114,9 @@ Describe 'Azure Admin Console - assessment catalog and queries' {
 
     It 'reads the estate, Advisor (retirements only with -SkipAdvisor), Defender, Policy and the diagram' {
         $estate = & $script:inModule { Get-AACAssessmentExtraQuery -Stage Estate -SecurityCenter }
-        @($estate.Keys) | Should -Be @('types', 'resources', 'groups', 'advisor', 'security', 'secureScores', 'policy', 'policyByGroup', 'policyResources', 'supportTickets')
+        @($estate.Keys) | Should -Be @('types', 'resources', 'groups', 'advisor', 'security', 'secureScores', 'policy', 'policyByGroup', 'policyByResource', 'policyResources', 'supportTickets')
         $estate.policy | Should -BeLike '*| summarize nonCompliant = countif(*| extend id = strcat(assignmentId, *'
+        $estate.policyByResource | Should -BeLike "*nonCompliant = dcountif(definitionId, state =~ 'NonCompliant')*failing = make_set_if(definitionId, state =~ 'NonCompliant', 5) by resourceId | extend id = resourceId"
         $estate.policyByGroup | Should -BeLike '*by resourceId, subscriptionId, resourceGroup | summarize resources = count(), nonCompliant = countif(nc > 0)*| extend id = *'
         $estate.policyResources | Should -BeLike "*complianceState) =~ 'NonCompliant'*reasonCode = tostring(properties.complianceReasonCode)*| take 5000*description = tostring(properties.description)*"
         @((& $script:inModule { Get-AACAssessmentExtraQuery -Stage Estate -SkipPolicy }).Keys) | Should -Not -Contain 'policyResources'
@@ -410,7 +411,7 @@ Describe 'Azure Admin Console - app-only sign-in' {
     }
 }
 
-Describe 'Azure Admin Console - Invoke-AACAssessment' {
+Describe 'Azure Admin Console - Invoke-AACTenantAssessment' {
     BeforeEach {
         $script:failSheet = ''
         $script:graphCalls = [System.Collections.Generic.List[object]]::new()
@@ -423,9 +424,9 @@ Describe 'Azure Admin Console - Invoke-AACAssessment' {
                 $rows[$key] = @(switch ($key) {
                         'subscriptions' { $script:f.Subscriptions } 'managementGroups' { $script:f.ManagementGroups } 'types' { $script:f.Types } 'resources' { $script:f.Resources }
                         'groups' { $script:f.Groups } 'advisor' { $script:f.Advisor } 'security' { $script:f.Security } 'secureScores' { $script:f.SecureScores } 'policy' { $script:f.Policy }
-                        'policyByGroup' { $script:f.PolicyByGroup } 'policyResources' { $script:f.PolicyResources }
+                        'policyByGroup' { $script:f.PolicyByGroup } 'policyByResource' { $script:f.PolicyByResource } 'policyResources' { $script:f.PolicyResources }
                         'supportTickets' { $script:f.SupportTickets } 'diagram' { $script:f.Diagram }
-                        default { if ($script:queryRows.Contains($key)) { $script:queryRows[$key] } }
+                        default { if ($script:f.Insight.Contains($key)) { $script:f.Insight[$key] } elseif ($script:queryRows.Contains($key)) { $script:queryRows[$key] } }
                     })
                 if ($key -eq $script:failSheet) { $rows[$key] = @(); $errors[$key] = 'Forbidden' }
             }
@@ -439,6 +440,12 @@ Describe 'Azure Admin Console - Invoke-AACAssessment' {
                 $items = switch -Regex ($target) {
                     'advisorScore' { $script:f.Arm.AdvisorScore[$sub] }
                     'reservationRecommendations' { $script:f.Arm.Reservation[$sub] }
+                    'Consumption/budgets' { $script:f.Arm.Budget[$sub] }
+                    'classicAdministrators' { $script:f.InsightArm.ClassicAdmin[$sub] }
+                    'role(Assignment|Eligibility)ScheduleInstances' { $kind = if ($Matches[1] -eq 'Assignment') { 'Active' } else { 'Eligible' }; $script:f.InsightArm[$kind][(($target -split '/providers/Microsoft\.Authorization/')[0]).ToLowerInvariant()] }
+                    '/locations\?api-version' { $script:f.InsightArm.Location }
+                    'Microsoft\.Capacity/reservations\?' { $script:f.InsightArm.Reservations }
+                    'eventtypes/management' { $script:f.InsightArm.Activity[$sub] }
                     'ResourceHealth/events' { $script:f.Arm.Outage[$sub] }
                     'Compute/skus' { $script:f.Arm.Sku['westeurope'] }
                     'locations/([^/]+)/usages' { $script:f.Arm.Quota["$sub|$($Matches[1])"] }
@@ -449,26 +456,29 @@ Describe 'Azure Admin Console - Invoke-AACAssessment' {
         }
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Read-AACInventoryCost -MockWith { $script:f.Cost }
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Read-AACAssignedPolicyData -MockWith { $script:f.PolicyData }
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Get-AACDirectoryObject -MockWith { @{ Objects = $script:f.Directory; Error = '' } }
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Read-AACGraphQuery -MockWith { @{ Data = @{ applications = $script:f.Applications }; Errors = @{} } }
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Read-AACKeyVaultObject -MockWith { @{ Items = $script:f.VaultItems; Access = @{} } }
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACCostBatch -MockWith { $answer = @{}; foreach ($s in $Scope) { $answer[$s] = @{ Rows = @($script:f.CostTrend[($s -replace '^/subscriptions/', '')]); Status = 'OK' } }; $answer }
         InModuleScope 'Azure.Admin.Console' { $script:AACSession = [pscustomobject]@{ Account = 'admin@contoso.com'; TenantId = 'tenant-1'; AccessToken = 'x'; ExpiresOn = (Get-Date).AddHours(1); RefreshToken = 'r'; ClientId = 'c'; Scope = @('s') } }
     }
     AfterEach { InModuleScope 'Azure.Admin.Console' { $script:AACSession = $null } }
 
     It 'assesses everything the account can see and writes every report' {
-        $outputs = @('Html', 'Csv', 'Diagram') + @(if ($script:canWritePdf) { 'Pdf' })
-        $result = (& $script:capture { Invoke-AACAssessment -ReportDir $TestDrive -ReportName 'Contoso' -Output $outputs -IncludeCost -QuotaUsage -SecurityCenter -NoDisplay }).Output[0]
-        $result.PSObject.TypeNames | Should -Contain 'AAC.Assessment'
+        $result = (& $script:capture { Invoke-AACTenantAssessment -HtmlPath (Join-Path $TestDrive 'out/Contoso.html') -CsvPath (Join-Path $TestDrive 'csv') -DiagramPath (Join-Path $TestDrive 'diagrams') -PdfPath $(if ($script:canWritePdf) { Join-Path $TestDrive 'Contoso.pdf' }) -IncludeCost -QuotaUsage -SecurityCenter -NoDisplay }).Output[0]
+        $result.PSObject.TypeNames | Should -Contain 'AAC.TenantAssessment'
         "$($result.Subscriptions) $($result.Resources) $($result.Retirements)" | Should -Be '2 10 1'
-        $result.ReportFolder | Should -BeLike "$TestDrive*Contoso-*"
+        @($result.Files | Where-Object Name -EQ 'Contoso.html').FullName | Should -Be (Join-Path $TestDrive 'out/Contoso.html') -Because 'each report goes where its own parameter says'
         $names = @($result.Files | ForEach-Object Name)
-        foreach ($name in 'Contoso.html', 'Contoso-Network.html', 'Contoso-Organization.html', 'Contoso-Resources.html', 'Virtual machines.csv', 'Advisor recommendations.csv', 'Quotas.csv') { $names | Should -Contain $name }
+        foreach ($name in 'Contoso.html', 'TenantAssessment-Network.html', 'TenantAssessment-Organization.html', 'TenantAssessment-Resources.html', 'Virtual machines.csv', 'Advisor recommendations.csv', 'Quotas.csv') { $names | Should -Contain $name }
         if ($script:canWritePdf) { $names | Should -Contain 'Contoso.pdf' }
         $result.Sheets['Virtual machines'][0].vCPUs | Should -Be 2
         @($result.Sheets['Outages']).Count | Should -Be 1
-        $html = Get-Content -LiteralPath (Join-Path $result.ReportFolder 'Contoso.html') -Raw
+        $html = Get-Content -LiteralPath (Join-Path $TestDrive 'out/Contoso.html') -Raw
         $model = [regex]::Match($html, '<script id="aac-data" type="application/json">(.*?)</script>', 'Singleline').Groups[1].Value | ConvertFrom-Json
-        @($model.tables | ForEach-Object section | Select-Object -Unique) | Should -Be @('Resources', 'Inventory', 'Security', 'Advisor', 'Policy compliance', 'Health', 'Cost', 'Policy inventory', 'Resource recommendations')
+        @($model.tables | ForEach-Object section | Select-Object -Unique) | Should -Be @('Resources', 'Inventory', 'Security', 'Advisor', 'Policy compliance', 'Health', 'FinOps', 'Well-Architected', 'Identity and access', 'Architecture', 'Operations', 'Service delivery', 'Policy inventory', 'Resource recommendations')
         $model.overviewTab | Should -Be 'Executive summary'
-        @($model.tabs.name)[0..3] | Should -Be @('Policy compliance', 'Policy inventory', 'PSRule results', 'Resource recommendations')
+        @($model.tabs.name)[0..5] | Should -Be @('Policy compliance', 'Policy inventory', 'Well-Architected', 'PSRule results', 'Resource recommendations', 'FinOps')
         ($model.tables | Where-Object id -EQ 'virtual-machines').title | Should -Be 'Compute: Virtual machines' -Because 'the inventory''s categories share a tab'
         $donut = $model.charts | Where-Object title -EQ 'Policies by compliance status'
         "$($donut.kind) $($donut.table) $($donut.column)" | Should -Be 'donut policies Status'
@@ -489,6 +499,127 @@ Describe 'Azure Admin Console - Invoke-AACAssessment' {
         @($script:graphCalls | Where-Object { $_.Keys -contains 'types' })[0].SubscriptionId.Count | Should -Be 0 -Because 'with no scope, every query covers everything the account can see'
     }
 
+    It 'gives each resource its policy compliance, by policy name, and its Well-Architected gaps' {
+        $result = (& $script:capture { Invoke-AACTenantAssessment -NoDisplay }).Output[0]
+        $vm = @($result.Sheets['Virtual machines']) | Where-Object Name -EQ 'vm-web-1'
+        "$($vm.Policy) | $($vm.'Non-compliant policies') | $($vm.'Failing policies')" | Should -Be 'Non-compliant | 1 | Allowed locations'
+        $all = @($result.Sheets['All resources'])
+        ($all | Where-Object Name -EQ 'stcontosoapp').Policy | Should -Be 'Compliant'
+        ($all | Where-Object Name -EQ 'logic-orders').Policy | Should -Be 'Not evaluated'
+        [int](@($all | ForEach-Object { $_.'WAF gaps' }) | Measure-Object -Sum).Sum | Should -BeGreaterThan 0
+    }
+
+    It 'scores the Well-Architected pillars and lists each gap among the recommendations - not Advisor''s or Defender''s twice' {
+        $result = (& $script:capture { Invoke-AACTenantAssessment -NoDisplay }).Output[0]
+        @($result.Sheets['WAF pillars'].Pillar | Sort-Object) | Should -Be @('Cost Optimization', 'Operational Excellence', 'Performance Efficiency', 'Reliability', 'Security')
+        $result.WafScore | Should -BeGreaterThan 0
+        $result.Stats.WafFindings | Should -Be @($result.Sheets['WAF findings']).Count
+        $fromWaf = @($result.Sheets['Resource recommendations'] | Where-Object Source -EQ 'Well-Architected')
+        $fromWaf.Count | Should -BeGreaterThan 0
+        @($fromWaf | Where-Object { $_.Recommendation -like 'AD-*' -or $_.Recommendation -like 'DF-*' }) | Should -BeNullOrEmpty
+        @($script:graphCalls | Where-Object { $_.Keys -contains 'extensions' }).Count | Should -Be 1 -Because 'the Well-Architected checks are one Resource Graph batch'
+    }
+
+    It 'finds the savings by FinOps lever, the cost-allocation gaps, the budgets and where the money goes' {
+        $result = (& $script:capture { Invoke-AACTenantAssessment -IncludeCost -NoDisplay }).Output[0]
+        $advisor = @($result.Sheets['Savings opportunities']) | Where-Object Source -EQ 'Azure Advisor'
+        "$($advisor.Lever) | $($advisor.'Est. annual savings') | $($advisor.Currency) | $($advisor.'Cost (last month)')" | Should -Be 'Rightsizing | 412.5 | EUR | 120.5'
+        @($result.Sheets['Budgets'] | ForEach-Object { "$($_.Subscription) $($_.Status)" }) | Should -Be @('sub-landingzone-app Forecast over', 'sub-connectivity No budget')
+        (@($result.Sheets['Budgets'])[0]).Alerts | Should -Be '80% Actual'
+        "$($result.Stats.SubscriptionsWithoutBudget) $($result.Stats.BudgetsOver) $($result.Stats.CostTagCoverage)" | Should -Be '1 1 0'
+        $finops = @($result.Sheets['Resource recommendations'] | Where-Object Source -EQ 'FinOps' | ForEach-Object Recommendation)
+        $finops | Should -Contain 'Subscription has no budget'
+        @($finops | Where-Object { $_ -like 'Budget budget-app is forecast*' }).Count | Should -Be 1
+        @($finops | Where-Object { $_ -like '*have no cost-allocation tag*' }).Count | Should -Be 2
+        $top = @($result.Sheets['Top cost resources'])[0]
+        "$($top.Name) $($top.'Cost (last month)')" | Should -Be 'vm-web-1 120.5'
+        @($result.Sheets['Cost by service']).Count | Should -Be 2
+        $tagged = (& $script:capture { Invoke-AACTenantAssessment -CostTag 'app' -NoDisplay }).Output[0]
+        $tagged.Stats.CostTagCoverage | Should -Be 20 -Because 'two of the ten resources carry the app tag'
+    }
+
+    It 'leaves the Well-Architected checks out with -SkipWaf, and turns on everything with -Full' {
+        $without = (& $script:capture { Invoke-AACTenantAssessment -SkipWaf -NoDisplay }).Output[0]
+        $without.Sheets.Contains('WAF pillars') | Should -BeFalse
+        $without.WafScore | Should -BeNullOrEmpty
+        @($without.Sheets['All resources'][0].PSObject.Properties.Name) | Should -Not -Contain 'WAF gaps'
+        @($without.Sheets['Savings opportunities'] | Where-Object Source -EQ 'Inventory' | ForEach-Object Resource | Sort-Object) | Should -Be @('disk-old', 'nic-orphan') -Because 'the waste then comes from the inventory'
+        @($script:graphCalls | Where-Object { $_.Keys -contains 'extensions' }).Count | Should -Be 0
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Get-Module -ParameterFilter { $Name -eq 'PSRule.Rules.Azure' } -MockWith { }
+        $full = (& $script:capture { Invoke-AACTenantAssessment -Full -NoDisplay }).Output[0]
+        foreach ($sheet in 'Security recommendations', 'Quotas', 'Top cost resources') { $full.Sheets.Contains($sheet) | Should -BeTrue -Because "-Full reads $sheet" }
+        @($full.Sheets['All resources'][0].PSObject.Properties.Name) | Should -Contain 'Cost (last month)'
+        $full.Notices | Should -Contain 'PSRule for Azure is not installed, so its rules were not run: Install-PSResource PSRule.Rules.Azure -Scope CurrentUser'
+    }
+
+    It 'shows IT security who holds privileged roles and how, custom roles, classic administrators, Defender plans, expiring credentials and open doors' {
+        $result = (& $script:capture { Invoke-AACTenantAssessment -NoDisplay }).Output[0]
+        @($result.Sheets['Privileged access'] | ForEach-Object { "$($_.Role) | $($_.Level) | $($_.Principal) | $($_.Guest) | $($_.Assignment)" } | Sort-Object) | Should -Be @(
+            'Owner | Management group | Pat Fabrikam | Yes | Permanent'
+            'Owner | Subscription | Alex Contoso | No | Permanent'
+            'Owner | Subscription | Sam Contoso | Unknown | Eligible (PIM)'
+            'User Access Administrator | Root | sp-deploy | No | Permanent'
+        ) -Because 'Reader is not privileged, and a custom role on a resource group is below the scopes that matter'
+        $security = @($result.Sheets['Resource recommendations'] | Where-Object Category -EQ 'Security' | ForEach-Object { "$($_.Severity) $($_.Recommendation)" })
+        foreach ($expected in 'High Guest with Owner on Landing zones*', 'High Service principal with User Access Administrator on Root*', 'Medium Standing (permanent) Owner on sub-landingzone-app*', 'High Custom role ''Contoso Super Admin'' allows every action*', 'Medium 1 classic administrator*', 'Medium Defender plans off for resources the subscription runs: VirtualMachines, KeyVaults', 'Medium Key Vault secret ''db-password'' has expired', 'Medium App registration ''orders-api''*', 'High RDP open to the internet*', 'Medium Reachable from any network*') {
+            @($security | Where-Object { $_ -like $expected }).Count | Should -Be 1 -Because "'$expected' is a finding"
+        }
+        @($result.Sheets['Expiring credentials'] | ForEach-Object { "$($_.Status) $($_.Kind) $($_.Name)" } | Sort-Object) | Should -Be @('Expired Key Vault secret db-password', 'Expiring App registration secret ci')
+        @($script:armUris | Where-Object { $_ -match 'roleEligibilityScheduleInstances\?api-version=2020-10-01&\$filter=atScope\(\)' }).Count | Should -Be 5 -Because 'PIM is asked at each subscription (2) and each management group above them (Tenant Root Group, Platform, Landing zones)'
+        $script:armUris.Clear()
+        $without = (& $script:capture { Invoke-AACTenantAssessment -SkipIdentity -SkipKeyVault -NoDisplay }).Output[0]
+        @($without.Sheets['Privileged access']).Count | Should -Be 0
+        @($script:armUris | Where-Object { $_ -match 'ScheduleInstances' }).Count | Should -Be 0
+        Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Read-AACKeyVaultObject -Times 1 -Exactly -Because 'only the first run lists the Key Vaults'
+    }
+
+    It 'shows architects the landing zone, regions, resilience and the network topology' {
+        $result = (& $script:capture { Invoke-AACTenantAssessment -NoDisplay }).Output[0]
+        @($result.Sheets['Landing zone'] | ForEach-Object { "$($_.'Management group') $($_.Depth) $($_.'Subscriptions (all below)') $($_.'Policies in force (here and above)')" } | Sort-Object) | Should -Be @('Landing zones 1 1 1', 'Platform 1 1 1', 'Sandbox 1 0 1', 'Tenant Root Group 0 2 1')
+        $region = @($result.Sheets['Regions'])[0]
+        "$($region.Region) $($region.'Availability zones') $($region.'Paired region') $($region.'Pair in use')" | Should -Be 'West Europe Yes northeurope No'
+        $vm = $result.Sheets['Resilience'] | Where-Object Resource -EQ 'vm-web-1'
+        "$($vm.Production) $($vm.Zones) $($vm.Backup) $($vm.'Site Recovery')" | Should -Be 'Yes None Not protected No'
+        $result.Stats.Topology | Should -Be 'Hub and spoke'
+        ($result.Sheets['Network topology'] | Where-Object Network -EQ 'vnet-hub-weu').'Overlaps with' | Should -Be 'vnet-spoke-app'
+        ($result.Sheets['Network topology'] | Where-Object Network -EQ 'vnet-spoke-app').Role | Should -Be 'Spoke'
+        $architecture = @($result.Sheets['Resource recommendations'] | ForEach-Object Recommendation)
+        foreach ($expected in 'Address space overlaps vnet-spoke-app (peered)', 'Private DNS zone privatelink.blob.core.windows.net exists 2 times', 'Production VM not backed up') { $architecture | Should -Contain $expected }
+    }
+
+    It 'shows administrators monitoring, patching, Arc, locks, the Activity Log, retired SKUs and naming' {
+        $result = (& $script:capture { Invoke-AACTenantAssessment -NoDisplay }).Output[0]
+        @($result.Sheets['Monitoring'] | ForEach-Object { "$($_.Subscription) $($_.'Service Health alerts') $($_.'Without action group')" } | Sort-Object) | Should -Be @('sub-connectivity 1 0', 'sub-landingzone-app 0 1')
+        @($result.Sheets['Alert rules without action group']).'Alert rule' | Should -Be 'cpu-high'
+        ($result.Sheets['Patch compliance'] | Where-Object Machine -EQ 'vm-web-1').Status | Should -Be 'Missing updates'
+        ($result.Sheets['Patch compliance'] | Where-Object Machine -EQ 'vm-web-2').Status | Should -Be 'Not assessed'
+        @($result.Sheets['Arc servers']).Status | Should -Be 'Disconnected'
+        ($result.Sheets['Production locks'] | Where-Object Name -EQ 'rg-hub').Lock | Should -Be 'None' -Because 'rg-hub is tagged env=prod and has no lock'
+        $activity = $result.Sheets['Activity'] | Where-Object Subscription -EQ 'sub-landingzone-app'
+        "$($activity.Changes) $($activity.Deletes) $($activity.'Failed deployments') $($activity.'Most changes by')" | Should -Be '3 1 1 alex@contoso.com (2)' -Because 'two events of one failed deployment are one deployment'
+        @($result.Sheets['Failed deployments']).Deployment | Should -Be 'web-release'
+        $retired = @($result.Sheets['Deprecated SKUs'])[0]
+        "$($retired.Resource) $($retired.Status) $($retired.Retires)" | Should -Be 'pip-web-2 Retired 2025-09-30'
+        $result.Stats.NamingCoverage | Should -Be 100
+        $script:armUris.Clear()
+        $null = & $script:capture { Invoke-AACTenantAssessment -ActivityDays 0 -NoDisplay }
+        @($script:armUris | Where-Object { $_ -like '*eventtypes/management*' }).Count | Should -Be 0
+    }
+
+    It 'shows service delivery managers offers, reservations, quota headroom, the cost trend and the ownership map' {
+        $result = (& $script:capture { Invoke-AACTenantAssessment -IncludeCost -QuotaUsage -NoDisplay }).Output[0]
+        @($result.Sheets['Subscription offers'].Offer | Select-Object -Unique) | Should -Be 'Enterprise Agreement'
+        $reservation = @($result.Sheets['Reservations'])[0]
+        "$($reservation.Name) $($reservation.'Used 30 days (%)') $($reservation.Renews)" | Should -Be 'ri-d2s-weu 55 False'
+        $headroom = @($result.Sheets['Quota headroom'])[0]
+        "$($headroom.Quota) $($headroom.'Used (%)') $($headroom.Headroom)" | Should -Be 'Standard DSv5 Family vCPUs 80 2'
+        ($result.Sheets['Cost trend'] | Where-Object Subscription -EQ 'sub-landingzone-app').'Change (%)' | Should -Be 100
+        $owners = $result.Sheets['Ownership map'] | Where-Object 'Resource group' -EQ 'rg-app'
+        "$($owners.Resources) $($owners.'Owner known') $($owners.'Subscription owners')" | Should -Be '7 No Alex Contoso'
+        $delivery = @($result.Sheets['Resource recommendations'] | ForEach-Object Recommendation)
+        foreach ($expected in 'Reservations ''ri-d2s-weu'' is 55% used (30 days)', 'Standard DSv5 Family vCPUs in westeurope: 80% used (8 of 10)') { $delivery | Should -Contain $expected }
+    }
+
     It 'runs PSRule for Azure with -PSRule, on the resource groups asked for - and says when it isn''t installed' {
         $script:engine = $null
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Get-Module -ParameterFilter { $Name -eq 'PSRule.Rules.Azure' } -MockWith { [pscustomobject]@{ Name = 'PSRule.Rules.Azure'; Version = [version]'1.40.0' } }
@@ -497,37 +628,37 @@ Describe 'Azure Admin Console - Invoke-AACAssessment' {
             $result = { param([string] $Group, [string] $Outcome) [pscustomobject]@{ Outcome = $Outcome; RuleName = 'Azure.VM.Standalone'; Title = 'Use availability zones'; Pillar = 'Reliability'; Severity = 'Critical'; ResourceName = "vm-$Group"; ResourceType = 'Microsoft.Compute/virtualMachines'; ResourceGroup = $Group; SubscriptionName = 'sub-landingzone-app'; Reason = 'Not zonal.'; Recommendation = 'Deploy across zones.'; Link = 'https://azure.github.io/PSRule.Rules.Azure/'; ResourceId = "/subscriptions/x/resourceGroups/$Group/providers/Microsoft.Compute/virtualMachines/vm-$Group" } }
             @{ Results = @((& $result 'rg-app' 'Fail'), (& $result 'rg-app' 'Pass'), (& $result 'rg-other' 'Fail')) }
         }
-        $result = (& $script:capture { Invoke-AACAssessment -ReportDir $TestDrive -Output Csv -PSRule -PSRuleBaseline 'Azure.Pillar.Reliability' -ResourceGroupName 'rg-app' -NoDisplay }).Output[0]
+        $result = (& $script:capture { Invoke-AACTenantAssessment -PSRule -PSRuleBaseline 'Azure.Pillar.Reliability' -ResourceGroupName 'rg-app' -NoDisplay }).Output[0]
         $script:engine.Baseline | Should -Be 'Azure.Pillar.Reliability'
         $script:engine.SubscriptionId.Count | Should -Be 2
         @($result.Sheets['PSRule results'].Resource) | Should -Be @('vm-rg-app')
         (@($result.Sheets['Resource recommendations']) | Where-Object Source -EQ 'PSRule for Azure').Severity | Should -Be 'Critical'
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Get-Module -ParameterFilter { $Name -eq 'PSRule.Rules.Azure' } -MockWith { }
-        $without = (& $script:capture { Invoke-AACAssessment -ReportDir $TestDrive -Output Csv -PSRule -NoDisplay }).Output[0]
+        $without = (& $script:capture { Invoke-AACTenantAssessment -PSRule -NoDisplay }).Output[0]
         $without.Notices | Should -Contain 'PSRule for Azure is not installed, so its rules were not run: Install-PSResource PSRule.Rules.Azure -Scope CurrentUser'
         $without.Sheets.Contains('PSRule results') | Should -BeFalse
     }
 
     It 'reads a sheet only for the resource types present, and only the categories asked for' {
-        $null = & $script:capture { Invoke-AACAssessment -ReportDir $TestDrive -Output Csv -Category Compute, Storage -NoDisplay }
+        $null = & $script:capture { Invoke-AACTenantAssessment -Category Compute, Storage -NoDisplay }
         $sheetCall = @($script:graphCalls | Where-Object { $_.Keys -contains 'Virtual machines' })[0]
         @($sheetCall.Keys | Sort-Object) | Should -Be @('Disks', 'Storage accounts', 'Virtual desktop session hosts', 'Virtual machines')
     }
 
     It 'scopes to subscriptions or management groups, and says what it can''t find' {
-        $output = (& $script:capture { Invoke-AACAssessment -SubscriptionId $script:f.HubSubscriptionId, '99999999-9999-9999-9999-999999999999' -ReportDir $TestDrive -Output Csv -NoDisplay -WarningVariable warned -WarningAction SilentlyContinue; $warned }).Output
+        $output = (& $script:capture { Invoke-AACTenantAssessment -SubscriptionId $script:f.HubSubscriptionId, '99999999-9999-9999-9999-999999999999' -NoDisplay -WarningVariable warned -WarningAction SilentlyContinue; $warned }).Output
         $output[0].Subscriptions | Should -Be 1
         "$($output[1..($output.Count - 1)])" | Should -BeLike '*99999999-9999-9999-9999-999999999999*left out*'
         @($script:graphCalls | Where-Object { $_.Keys -contains 'types' })[0].SubscriptionId | Should -Be @($script:f.HubSubscriptionId)
-        $byGroup = (& $script:capture { Invoke-AACAssessment -ManagementGroupId 'mg-landingzones' -ReportDir $TestDrive -Output Csv -NoDisplay }).Output[0]
+        $byGroup = (& $script:capture { Invoke-AACTenantAssessment -ManagementGroupId 'mg-landingzones' -NoDisplay }).Output[0]
         $byGroup.Subscriptions | Should -Be 1
-        { & $script:capture { Invoke-AACAssessment -ManagementGroupId 'mg-nope' -ReportDir $TestDrive -Output Csv -NoDisplay } } | Should -Throw '*under management group mg-nope*'
+        { & $script:capture { Invoke-AACTenantAssessment -ManagementGroupId 'mg-nope' -NoDisplay } } | Should -Throw '*under management group mg-nope*'
     }
 
     It 'asks the Azure APIs as told: none with -SkipApi, quotas with -QuotaUsage, no VM sizes with -SkipVMDetail' {
-        $null = & $script:capture { Invoke-AACAssessment -ReportDir $TestDrive -Output Csv -SkipApi -NoDisplay }
+        $null = & $script:capture { Invoke-AACTenantAssessment -SkipApi -NoDisplay }
         $script:armUris.Count | Should -Be 0
-        $null = & $script:capture { Invoke-AACAssessment -ReportDir $TestDrive -Output Csv -QuotaUsage -SkipVMDetail -NoDisplay }
+        $null = & $script:capture { Invoke-AACTenantAssessment -QuotaUsage -SkipVMDetail -NoDisplay }
         @($script:armUris | Where-Object { $_ -like '*usages*' }).Count | Should -Be 1
         @($script:armUris | Where-Object { $_ -like '*Compute/skus*' }).Count | Should -Be 0
         @($script:armUris | Where-Object { $_ -like '*ResourceHealth/events*queryStartTime=*' }).Count | Should -Be 2
@@ -535,39 +666,51 @@ Describe 'Azure Admin Console - Invoke-AACAssessment' {
 
     It 'carries on when a sheet can''t be read, and says so' {
         $script:failSheet = 'Storage accounts'
-        $result = (& $script:capture { Invoke-AACAssessment -ReportDir $TestDrive -Output Csv -NoDisplay }).Output[0]
+        $result = (& $script:capture { Invoke-AACTenantAssessment -NoDisplay }).Output[0]
         $result.Notices | Should -Contain "Storage accounts couldn't be read: Forbidden"
         @($result.Sheets['Virtual machines']).Count | Should -Be 2
     }
 
     It 'uploads the reports to blob storage' {
-        Mock -ModuleName 'Azure.Admin.Console' -CommandName Send-AACBlobFile -MockWith { foreach ($p in $Path) { @{ File = $p; Blob = "$Prefix/$(Split-Path $p -Leaf)"; Status = 'Uploaded'; Error = '' } } }
-        $result = (& $script:capture { Invoke-AACAssessment -ReportDir $TestDrive -Output Html -StorageAccount 'stcontosoreports' -StorageContainer 'assessments' -NoDisplay }).Output[0]
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Send-AACBlobFile -MockWith { foreach ($p in $Path) { @{ File = $p; Blob = "$Prefix/$([System.IO.Path]::GetRelativePath($Root, $p) -replace '\\', '/')"; Status = 'Uploaded'; Error = '' } } }
+        $result = (& $script:capture { Invoke-AACTenantAssessment -HtmlPath (Join-Path $TestDrive 'Tenant.html') -StorageAccount 'stcontosoreports' -StorageContainer 'assessments' -NoDisplay }).Output[0]
         @($result.Uploads).Count | Should -Be 1
-        Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Send-AACBlobFile -ParameterFilter { $StorageAccount -eq 'stcontosoreports' -and $Container -eq 'assessments' -and $Prefix -eq 'AzureAssessment' } -Times 1 -Exactly
-        { Invoke-AACAssessment -StorageAccount 'only' -NoDisplay } | Should -Throw '*both -StorageAccount and -StorageContainer*'
+        Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Send-AACBlobFile -ParameterFilter { $StorageAccount -eq 'stcontosoreports' -and $Container -eq 'assessments' -and $Prefix -like 'TenantAssessment/*' } -Times 1 -Exactly
+        { Invoke-AACTenantAssessment -StorageAccount 'only' -NoDisplay } | Should -Throw '*both -StorageAccount and -StorageContainer*'
+        $none = (& $script:capture { Invoke-AACTenantAssessment -NoDisplay }).Output[0]
+        @($none.Files).Count | Should -Be 0 -Because 'a report is written only where its parameter says'
+        # An upload with no report asked for writes them all to a temporary folder (here, the test drive).
+        $saved = @{ TMP = $env:TMP; TEMP = $env:TEMP; TMPDIR = $env:TMPDIR }
+        try {
+            $env:TMP = $TestDrive; $env:TEMP = $TestDrive; $env:TMPDIR = $TestDrive
+            $all = (& $script:capture { Invoke-AACTenantAssessment -StorageAccount 'stcontosoreports' -StorageContainer 'assessments' -NoDisplay -WarningAction SilentlyContinue }).Output[0]
+        }
+        finally { $env:TMP = $saved.TMP; $env:TEMP = $saved.TEMP; $env:TMPDIR = $saved.TMPDIR }
+        @($all.Uploads.Blob | Where-Object { $_ -like 'TenantAssessment/*/TenantAssessment.html' }).Count | Should -Be 1
+        @($all.Uploads.Blob | Where-Object { $_ -like 'TenantAssessment/*/csv/Virtual machines.csv' }).Count | Should -Be 1
+        @($all.Uploads.Blob | Where-Object { $_ -like 'TenantAssessment/*/diagrams/TenantAssessment-Network.html' }).Count | Should -Be 1
     }
 
     It 'signs in to -TenantId only when the session is for another tenant, by its domain too' {
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Resolve-AACTenantId -MockWith { if ($Tenant -eq 'contoso.onmicrosoft.com') { 'tenant-1' } else { 'tenant-2' } }
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Connect-AAC -MockWith { }
-        $null = & $script:capture { Invoke-AACAssessment -TenantId 'contoso.onmicrosoft.com' -ReportDir $TestDrive -Output Csv -NoDisplay }
+        $null = & $script:capture { Invoke-AACTenantAssessment -TenantId 'contoso.onmicrosoft.com' -NoDisplay }
         Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Connect-AAC -Times 0 -Exactly -Because 'the session is for that tenant already'
-        $null = & $script:capture { Invoke-AACAssessment -TenantId 'fabrikam.onmicrosoft.com' -ReportDir $TestDrive -Output Csv -NoDisplay }
+        $null = & $script:capture { Invoke-AACTenantAssessment -TenantId 'fabrikam.onmicrosoft.com' -NoDisplay }
         Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Connect-AAC -ParameterFilter { $TenantId -eq 'tenant-2' } -Times 1 -Exactly
     }
 
     It 'signs in with the managed identity in Automation when there is no session' {
         InModuleScope 'Azure.Admin.Console' { $script:AACSession = $null }
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Connect-AAC -MockWith { InModuleScope 'Azure.Admin.Console' { $script:AACSession = [pscustomobject]@{ Account = 'managed identity mi-1'; TenantId = 'tenant-1'; AccessToken = 'x'; ExpiresOn = (Get-Date).AddHours(1) } } }
-        $output = (& $script:capture { Invoke-AACAssessment -Automation -ReportDir $TestDrive -Output Csv -WarningAction SilentlyContinue }).Output
+        $output = (& $script:capture { Invoke-AACTenantAssessment -Automation -WarningAction SilentlyContinue }).Output
         Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Connect-AAC -ParameterFilter { $Identity } -Times 1 -Exactly
         "$output" | Should -BeLike 'Assessed 10 resource(s) in 2 subscription(s)*'
     }
 
     It 'shows what it found, what needs attention and the reports, in characters any console can show' {
-        $text = (& $script:capture { Invoke-AACAssessment -ReportDir $TestDrive -Output Csv -NoPaging } -Ascii).Text
-        foreach ($expected in 'Azure environment assessment', 'Inventory by category', 'Networking', 'Most common resource types', 'Needs attention', 'RETIRING', 'pip-web-2', 'Reports', 'CSV') { $text | Should -BeLike "*$expected*" }
+        $text = (& $script:capture { Invoke-AACTenantAssessment -CsvPath (Join-Path $TestDrive 'csv') -NoPaging } -Ascii).Text
+        foreach ($expected in 'Azure tenant assessment', 'Well-Architected', 'Inventory by category', 'Networking', 'Most common resource types', 'Needs attention', 'RETIRING', 'pip-web-2', 'Reports', 'CSV') { $text | Should -BeLike "*$expected*" }
         foreach ($codePage in 437, 850) {
             $encoding = [System.Text.Encoding]::GetEncoding($codePage)
             @($text.ToCharArray() | Select-Object -Unique | Where-Object { $encoding.GetString($encoding.GetBytes([string]$_)) -ne [string]$_ }) | Should -BeNullOrEmpty

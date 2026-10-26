@@ -1,7 +1,7 @@
 function Write-AACAssessmentCsv {
     <#
     .SYNOPSIS
-        Writes each Invoke-AACAssessment sheet with rows to its own CSV file
+        Writes each Invoke-AACTenantAssessment sheet with rows to its own CSV file
         in -Path (a folder), and returns the files.
     .DESCRIPTION
         One file per sheet, named after it ("Virtual machines.csv"), with

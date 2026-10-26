@@ -5,7 +5,7 @@ function Read-AACAssignedPolicyData {
         Graph: every policy assignment, where every subscription and
         management group sits, and the definitions and initiatives assigned
         (their members included). Shared by Get-AACAssignedPolicy and
-        Invoke-AACAssessment's policy inventory.
+        Invoke-AACTenantAssessment's policy inventory.
     .DESCRIPTION
         Tenant-wide, so a subscription's assignments inherited from its
         management groups are there to filter. Definitions are read by ID,

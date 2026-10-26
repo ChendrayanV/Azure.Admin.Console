@@ -1,7 +1,7 @@
 function Write-AACAssessmentDiagram {
     <#
     .SYNOPSIS
-        Writes Invoke-AACAssessment's interactive diagrams - self-contained
+        Writes Invoke-AACTenantAssessment's interactive diagrams - self-contained
         HTML pages laid out with ELK, with the Azure icons, pan, zoom,
         search, details on click and PNG / SVG export - and returns them.
     .DESCRIPTION

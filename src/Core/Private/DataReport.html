@@ -316,6 +316,15 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
 .drawer dd .act { opacity: 0; flex: 0 0 auto; }
 .drawer dd:hover .act, .drawer dd .act:focus { opacity: 1; }
 @media (hover: none) { .drawer dd .act { opacity: 1; } }
+/* A row's hover card: a table's Hover fields, next to the pointer - a glance before a click. */
+.hovercard { position: fixed; z-index: 45; max-width: min(440px, 92vw); background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 28px rgba(0,0,0,.22); padding: 10px 12px; font-size: 12.5px; pointer-events: none; opacity: 0; transition: opacity .12s ease; }
+.hovercard.on { opacity: 1; }
+.hovercard .hc-title { font-weight: 700; font-size: 13px; margin: 0 0 6px; overflow-wrap: anywhere; }
+.hovercard dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 3px 12px; margin: 0; }
+.hovercard dt { color: var(--muted); white-space: nowrap; }
+.hovercard dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.hovercard .hc-hint { margin-top: 7px; color: var(--faint); font-size: 11.5px; }
+@media (hover: none) { .hovercard { display: none; } }
 .drawer .dempty { color: var(--faint); font-size: 12.5px; margin-top: 10px; }
 @media (max-width: 760px) {
   h1 { font-size: 22px; }
@@ -643,6 +652,32 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
     if (drawer.onMove) drawer.onMove(null);
     if (drawer.back && drawer.back.focus) drawer.back.focus();
   }
+  // A table's Hover fields in a card that follows the pointer over a row (after a short pause,
+  // so moving across the table doesn't flicker). One card for the page.
+  var hover = { card: null, timer: 0 };
+  function hideHover() { clearTimeout(hover.timer); if (hover.card) hover.card.classList.remove('on'); }
+  function placeHover(x, y) {
+    var c = hover.card, w = c.offsetWidth, h = c.offsetHeight, vw = window.innerWidth, vh = window.innerHeight;
+    c.style.left = Math.max(8, x + 16 + w > vw ? x - w - 16 : x + 16) + 'px';
+    c.style.top = Math.max(8, y + 18 + h > vh ? y - h - 12 : y + 18) + 'px';
+  }
+  function showHover(T, cols, r, x, y) {
+    if (!hover.card) { hover.card = el('div', 'hovercard'); hover.card.setAttribute('role', 'tooltip'); document.body.appendChild(hover.card); }
+    var c = hover.card; c.textContent = '';
+    var first = cols.filter(function (k) { return !k.hidden; })[0];
+    var titleKey = T.hoverTitle || (first && first.key);
+    if (titleKey && r[titleKey] !== null && r[titleKey] !== undefined && r[titleKey] !== '') c.appendChild(el('div', 'hc-title', String(r[titleKey])));
+    var dl = el('dl'), any = false;
+    T.hover.forEach(function (key) {
+      var col = cols.filter(function (k) { return k.key === key; })[0] || { key: key, label: key };
+      var value = drawerValue(col, r); if (!value) return;
+      dl.appendChild(el('dt', null, col.label)); var dd = el('dd'); dd.appendChild(value); dl.appendChild(dd); any = true;
+    });
+    if (!any) { hideHover(); return; }
+    c.appendChild(dl); c.appendChild(el('div', 'hc-hint', 'Click the row for every field'));
+    placeHover(x, y); c.classList.add('on');
+  }
+  window.addEventListener('scroll', hideHover, true);
   function moveDrawer(step) { var i = drawer.index + step; if (i >= 0 && i < drawer.list.length) { drawer.index = i; showDrawer(); } }
   $('drawer-close').addEventListener('click', closeDrawer);
   $('drawer-bg').addEventListener('click', closeDrawer);
@@ -900,9 +935,20 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 20px
     var shownRows = [], picked = null;
     function row(r) {
       var tr = el('tr', 'row' + (r === picked ? ' picked' : ''));
-      visible.forEach(function (c, i) { var td = cell(c, r); if (i === 0) td.classList.add('pin'); tr.appendChild(td); });
+      visible.forEach(function (c, i) {
+        var td = cell(c, r); if (i === 0) td.classList.add('pin');
+        // Tip: another field's text as the cell's tooltip (why a value is what it is).
+        if (c.tip && r[c.tip] !== null && r[c.tip] !== undefined && r[c.tip] !== '') td.title = String(r[c.tip]);
+        tr.appendChild(td);
+      });
       var index = shownRows.length; shownRows.push(r); tr._row = r;
+      if (T.hover && T.hover.length) {
+        tr.addEventListener('mouseenter', function (e) { var x = e.clientX, y = e.clientY; clearTimeout(hover.timer); hover.timer = setTimeout(function () { showHover(T, cols, r, x, y); }, 280); });
+        tr.addEventListener('mousemove', function (e) { if (hover.card && hover.card.classList.contains('on')) placeHover(e.clientX, e.clientY); else { var x = e.clientX, y = e.clientY; clearTimeout(hover.timer); hover.timer = setTimeout(function () { showHover(T, cols, r, x, y); }, 280); } });
+        tr.addEventListener('mouseleave', hideHover);
+      }
       tr.addEventListener('click', function (e) {
+        hideHover();
         // Not when a link or button in the row is clicked, or text is being selected.
         if (e.target.closest('a, button')) return;
         var sel = window.getSelection && window.getSelection(); if (sel && String(sel).length) return;

@@ -4,7 +4,7 @@ function ConvertTo-AACResourceSummaryMap {
         Turns every resource into the resource map's model as ARI's
         "resources" view draws it: each subscription a box, holding a node
         per resource type with how many there are - for
-        Invoke-AACAssessment's <name>-Resources.html.
+        Invoke-AACTenantAssessment's <name>-Resources.html.
     .DESCRIPTION
         A node per subscription and resource type: the type's Azure icon and
         name, the count, and the locations and resource groups they're in.

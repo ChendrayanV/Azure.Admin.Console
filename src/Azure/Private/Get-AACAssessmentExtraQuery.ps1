@@ -1,7 +1,7 @@
 function Get-AACAssessmentExtraQuery {
     <#
     .SYNOPSIS
-        The Resource Graph queries of Invoke-AACAssessment besides its
+        The Resource Graph queries of Invoke-AACTenantAssessment besides its
         inventory sheets: the scope, every resource, the organization,
         Advisor (and retirements), Defender for Cloud, Azure Policy,
         support tickets and the diagrams' resources.
@@ -12,7 +12,9 @@ function Get-AACAssessmentExtraQuery {
           Estate      the resource types present, every resource, the
                       resource groups; Advisor unless -SkipAdvisor (only
                       the retirements then), Defender with -SecurityCenter,
-                      Policy unless -SkipPolicy, support tickets
+                      Policy unless -SkipPolicy (by assignment and policy,
+                      by resource group, by resource, and each
+                      non-compliant resource), support tickets
           Diagram     the resources the network diagram draws, with their
                       properties (every resource with -FullEnvironment)
         -Filter is Get-AACAssessmentQuery -Filter's resource group and tag
@@ -81,6 +83,15 @@ function Get-AACAssessmentExtraQuery {
                     "| summarize nc = countif(state =~ 'NonCompliant'), c = countif(state =~ 'Compliant'), ex = countif(state =~ 'Exempt') by resourceId, subscriptionId, resourceGroup"
                     '| summarize resources = count(), nonCompliant = countif(nc > 0), compliant = countif(nc == 0 and c > 0), exempt = countif(nc == 0 and c == 0 and ex > 0), nonCompliantStates = sum(nc) by subscriptionId, resourceGroup'
                     "| extend id = strcat(subscriptionId, '|', resourceGroup)"
+                ) -join ' '
+                # Every evaluated resource once: how many policies it fails, passes
+                # and is exempt from, and (some of) the policies it fails - for the
+                # policy columns of each inventory sheet.
+                $queries['policyByResource'] = @(
+                    "policyresources | where type =~ 'microsoft.policyinsights/policystates'$stateGroups"
+                    '| extend state = tostring(properties.complianceState), resourceId = tolower(tostring(properties.resourceId)), definitionId = tolower(tostring(properties.policyDefinitionId))'
+                    "| summarize nonCompliant = dcountif(definitionId, state =~ 'NonCompliant'), compliant = dcountif(definitionId, state =~ 'Compliant'), exempt = dcountif(definitionId, state =~ 'Exempt'), failing = make_set_if(definitionId, state =~ 'NonCompliant', 5) by resourceId"
+                    '| extend id = resourceId'
                 ) -join ' '
                 # Each non-compliant resource and the policy it fails, with why (capped).
                 $queries['policyResources'] = @(

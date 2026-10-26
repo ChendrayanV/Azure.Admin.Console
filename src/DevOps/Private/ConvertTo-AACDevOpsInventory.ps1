@@ -42,7 +42,7 @@ function ConvertTo-AACDevOpsInventory {
         plans, agent pools, extensions, a summary per project with effort
         points, and a map of where each kind of thing goes.
 
-        -AzureLink (from Get-AACADOInventory -IncludeAzure) maps a service
+        -AzureLink (from Invoke-AACADOAssessment -IncludeAzure) maps a service
         principal's application ID to its Azure role assignments.
 
         Disabled repositories, and the pipelines that build them, are left
@@ -97,7 +97,7 @@ function ConvertTo-AACDevOpsInventory {
     $sumOf = { param([object[]] $Rows, [string] $Property) $total = 0; foreach ($r in $Rows) { if ($null -ne $r.$Property) { $total += [int]$r.$Property } }; $total }
     # Hosted images retired (or retiring) by Microsoft: a pipeline asking for one queues forever or fails.
     $retired = '^(ubuntu-16\.04|ubuntu-18\.04|ubuntu-20\.04|windows-2016|vs2017-win2016|vs2015-win2012r2|win1803|windows-2019|macos-10\.\d+|macos-11|macos-12|macos-13)$'
-    $categories = @('Lint', 'Build', 'Test', 'Security', 'Deploy', 'Publish', 'GitOps')
+    $categories = @('Lint', 'Build', 'Test', 'Security', 'Deploy', 'Publish', 'GitOps', 'SBOM')
     $metricDays = [Math]::Max(1, [int]$Read.MetricDays)
     $since = $Now.AddDays(-$metricDays)
     $weeks = [Math]::Max(1.0, $metricDays / 7.0)
@@ -809,6 +809,7 @@ function ConvertTo-AACDevOpsInventory {
                     Deploy         = $found['Deploy'] -join ', '
                     Publish        = $found['Publish'] -join ', '
                     GitOps         = $found['GitOps'] -join ', '
+                    Sbom           = $found['SBOM'] -join ', '
                     Tasks          = $taskCount
                     Templates      = $templateLabels -join ', '
                     Images         = $refs.Images -join ', '
@@ -826,7 +827,7 @@ function ConvertTo-AACDevOpsInventory {
                 })
             # Coverage: which stages the pipeline has - Yes, No, or Not read (its steps couldn't be read).
             $coverage = [ordered]@{ PSTypeName = 'AAC.DevOpsCoverage'; Organization = $orgName; Project = $projectName; Pipeline = $name; Kind = $(if ($isYaml) { 'YAML' } else { 'Classic build' }) }
-            foreach ($c in 'Lint', 'Build', 'Test', 'Security', 'Deploy', 'Publish', 'GitOps') { $coverage[$c] = if (-not $stepsRead) { 'Not read' } elseif ($found[$c].Count) { 'Yes' } else { 'No' } }
+            foreach ($c in 'Lint', 'Build', 'Test', 'Security', 'Deploy', 'Publish', 'GitOps', 'SBOM') { $coverage[$c] = if (-not $stepsRead) { 'Not read' } elseif ($found[$c].Count) { 'Yes' } else { 'No' } }
             $coverage.Tools = @($found.Values | ForEach-Object { $_ }).Count
             $coverageRows.Add([pscustomobject]$coverage)
         }
@@ -847,7 +848,7 @@ function ConvertTo-AACDevOpsInventory {
                     Repository = ''; RepositoryType = ''; DefaultBranch = ''; State = ''; LastRun = $lastRelease; LastResult = $(if ($lastRelease) { [string](& $member $rd 'lastRelease.name') } else { 'Never released' })
                     LastRunBy = [string](& $member $rd 'lastRelease.createdBy.displayName'); LastRunBranch = ''; DaysSinceRun = $releaseDays; LastPush = $null; LastPushBy = ''; DaysSincePush = $null
                     Runs = $null; SuccessRate = $null; AvgDurationMin = $null; AvgQueueMin = $null; RunsPerWeek = $null
-                    Lint = ''; Build = ''; Test = ''; Security = ''; Deploy = ''; Publish = ''; GitOps = ''; Tasks = 0; Templates = ''; Images = ''; Containers = ''; Connections = ''; VariableGroups = ''; Environments = ''
+                    Lint = ''; Build = ''; Test = ''; Security = ''; Deploy = ''; Publish = ''; GitOps = ''; Sbom = ''; Tasks = 0; Templates = ''; Images = ''; Containers = ''; Connections = ''; VariableGroups = ''; Environments = ''
                     Pools = ''; Variables = $null; SecretVariables = $null; ExtensionTasks = ''; AzureTargets = ''
                     Findings = $findings.Count - $before; Url = "$projectUrl/_release?definitionId=$id"
                 })

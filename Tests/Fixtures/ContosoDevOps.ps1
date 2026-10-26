@@ -110,6 +110,7 @@ steps:
   - script: npm run lint
   - script: make test
   - script: $(ToolsDir)/publish.sh
+  - script: sbom-tool generate -b $(Build.ArtifactStagingDirectory) -bc . -pn payments -pv $(Build.BuildNumber) -ps Contoso
 '@
     $lint = @'
 steps:
@@ -226,6 +227,24 @@ jobs:
             @{ id = 2; isEnabled = $true; isBlocking = $true; isDeleted = $false; type = @{ displayName = 'Build' }; settings = @{ buildDefinitionId = 1; scope = @(@{ repositoryId = $null; refName = 'refs/heads/main'; matchKind = 'Exact' }) } }
             @{ id = 3; isEnabled = $false; isBlocking = $true; isDeleted = $false; type = @{ displayName = 'Minimum number of reviewers' }; settings = @{ minimumApproverCount = 1; scope = @(@{ repositoryId = $r2; refName = 'refs/heads/main'; matchKind = 'Exact' }) } }
         )
+        # SBOM: payments-ci's latest successful run, its artifacts (a pipeline artifact with the Microsoft SBOM
+        # Tool's _manifest, and a build artifact of logs) and the SPDX 2.2 SBOM itself.
+        "$org/$p1/_apis/build/builds|definitions=1"                        = & $list @(@{ id = 1001; buildNumber = '2026.1'; status = 'completed'; result = 'succeeded'; finishTime = (& $ago 2); definition = @{ id = 1 } })
+        "$org/$p1/_apis/build/builds/1001/artifacts"                       = & $list @(@{ name = 'drop'; resource = @{ type = 'PipelineArtifact'; data = 'manifest-drop' } }, @{ name = 'logs'; resource = @{ type = 'Container'; data = '#/777/logs' } })
+        "$org/$p1/_apis/build/builds/1001/artifacts|fileId=manifest-drop"  = & $one @{ items = @(@{ path = '/app/payments.dll'; blob = @{ id = 'b-dll' } }, @{ path = '/_manifest/spdx_2.2/manifest.spdx.json'; blob = @{ id = 'b-sbom' } }, @{ path = '/_manifest/spdx_2.2/manifest.spdx.json.sha256'; blob = @{ id = 'b-sha' } }) }
+        "$org/_apis/resources/Containers/777|itemPath=logs"                = & $list @(@{ path = 'logs/build.log'; itemType = 'file' })
+        "$org/$p1/_apis/build/builds/1001/artifacts|fileId=b-sbom"         = & $one @{
+            spdxVersion = 'SPDX-2.2'; name = 'payments 2026.1'; documentNamespace = 'https://sbom.contoso.com/payments/2026.1'
+            creationInfo = @{ created = '2026-10-24T08:00:00Z'; creators = @('Organization: Contoso', 'Tool: Microsoft.SBOMTool-3.0.1') }
+            documentDescribes = @('SPDXRef-RootPackage'); files = @(@{ fileName = './app/payments.dll' })
+            packages = @(
+                @{ SPDXID = 'SPDXRef-RootPackage'; name = 'payments'; versionInfo = '2026.1'; supplier = 'Organization: Contoso'; licenseConcluded = 'NOASSERTION' }
+                @{ SPDXID = 'SPDXRef-Package-1'; name = 'Newtonsoft.Json'; versionInfo = '13.0.3'; supplier = 'Organization: James Newton-King'; licenseConcluded = 'MIT'; externalRefs = @(@{ referenceCategory = 'PACKAGE-MANAGER'; referenceType = 'purl'; referenceLocator = 'pkg:nuget/Newtonsoft.Json@13.0.3' }) }
+                @{ SPDXID = 'SPDXRef-Package-2'; name = 'lodash'; versionInfo = '4.17.21'; supplier = 'NOASSERTION'; licenseConcluded = 'NOASSERTION'; licenseDeclared = 'MIT'; externalRefs = @(@{ referenceType = 'purl'; referenceLocator = 'pkg:npm/lodash@4.17.21' }) }
+                @{ SPDXID = 'SPDXRef-Package-3'; name = 'readline-gpl'; versionInfo = '1.0.0'; supplier = 'Organization: Example'; licenseConcluded = 'GPL-3.0-only'; externalRefs = @(@{ referenceType = 'purl'; referenceLocator = 'pkg:npm/readline-gpl@1.0.0' }) }
+            )
+            relationships = @(@{ spdxElementId = 'SPDXRef-DOCUMENT'; relationshipType = 'DESCRIBES'; relatedSpdxElement = 'SPDXRef-RootPackage' }, @{ spdxElementId = 'SPDXRef-RootPackage'; relationshipType = 'DEPENDS_ON'; relatedSpdxElement = 'SPDXRef-Package-1' })
+        }
         "$org/$p1/_apis/build/builds"                                      = & $list @(
             foreach ($day in 1..9) { & $run 1 'succeeded' $day }
             (& $run 1 'failed' 12)
@@ -339,6 +358,10 @@ function Get-AACContosoDevOpsAnswer {
         $path = "$path|$file"
     }
     elseif ($path -like '*/checks/configurations') { $path = "$path|$(([regex]::Match($Uri, '[?&]resourceId=([^&]+)')).Groups[1].Value)" }
+    # SBOM: a pipeline's latest run, an artifact's files or one file, and a build artifact's container items.
+    elseif ($path -like '*/_apis/build/builds' -and $Uri -match '[?&]definitions=(\d+)') { $path = "$path|definitions=$($Matches[1])" }
+    elseif ($path -like '*/artifacts' -and $Uri -match '[?&]fileId=([^&]+)') { $path = "$path|fileId=$([System.Uri]::UnescapeDataString($Matches[1]))" }
+    elseif ($path -like '*/_apis/resources/Containers/*' -and $Uri -match '[?&]itemPath=([^&]+)') { $path = "$path|itemPath=$([System.Uri]::UnescapeDataString($Matches[1]))" }
     elseif ($path -like '*/_apis/identities') {
         # Identities by search (filterValue) or by descriptors.
         $by = [regex]::Match($Uri, '[?&](filterValue|descriptors)=([^&]+)')

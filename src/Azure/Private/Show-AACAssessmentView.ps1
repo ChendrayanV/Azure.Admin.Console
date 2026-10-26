@@ -1,7 +1,7 @@
 function Show-AACAssessmentView {
     <#
     .SYNOPSIS
-        Renders the end of an Invoke-AACAssessment run as a Spectre.Console
+        Renders the end of an Invoke-AACTenantAssessment run as a Spectre.Console
         view: what was found, what needs attention, and where the reports are.
     .DESCRIPTION
         The scope; tiles (subscriptions, resource groups, resources, types,
@@ -48,6 +48,9 @@ function Show-AACAssessmentView {
         if ($null -ne $stats.Security) { @{ Value = '{0:N0}' -f $stats.SecurityHigh; Caption = 'Defender High'; Color = $(if ($stats.SecurityHigh) { 'red1' } else { 'green3' }) } }
         @{ Value = '{0:N0}' -f $stats.Orphans; Caption = 'unattached / empty'; Color = $(if ($stats.Orphans) { 'orange1' } else { 'green3' }) }
         if ($null -ne $stats.CostMonthToDate) { @{ Value = '{0:N0} {1}' -f $stats.CostMonthToDate, $stats.Currency; Caption = 'cost this month'; Color = 'green3' } }
+        if ($stats.Contains('WafScore') -and $null -ne $stats.WafScore) { @{ Value = '{0:N0}/100' -f $stats.WafScore; Caption = 'Well-Architected'; Color = $(if ($stats.WafScore -ge 75) { 'green3' } elseif ($stats.WafScore -ge 50) { 'orange1' } else { 'red1' }) } }
+        if ($stats.Contains('AnnualSavings') -and $stats.AnnualSavings) { @{ Value = '{0:N0} {1}' -f $stats.AnnualSavings, $stats.SavingsCurrency; Caption = 'savings a year (est.)'; Color = 'green3' } }
+        if ($stats.Contains('CostTagCoverage') -and $null -ne $stats.CostTagCoverage) { @{ Value = '{0:N0}%' -f $stats.CostTagCoverage; Caption = 'cost-tagged'; Color = $(if ($stats.CostTagCoverage -ge 90) { 'green3' } else { 'orange1' }) } }
     )
     [Spectre.Console.AnsiConsole]::WriteLine()
 

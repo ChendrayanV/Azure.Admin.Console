@@ -1,7 +1,7 @@
 function Write-AACAssessmentPdf {
     <#
     .SYNOPSIS
-        Writes the Invoke-AACAssessment report as a landscape A4 PDF.
+        Writes the Invoke-AACTenantAssessment report as a landscape A4 PDF.
     .DESCRIPTION
         1. Summary: the scope, tiles, the subscriptions, the resources by
            category and the most common resource types.

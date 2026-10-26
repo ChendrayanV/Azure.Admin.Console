@@ -103,7 +103,7 @@ Show-AACCost
 Get-AACInventory -Cost -HtmlPath .\Inventory.html
 
 # The whole environment, ARI-style: inventory, Advisor, retirements, policy, outages - CSV, HTML, PDF, diagrams
-Invoke-AACAssessment -SecurityCenter -IncludeCost
+Invoke-AACTenantAssessment -SecurityCenter -IncludeCost
 
 # Defender for Cloud and Azure Policy: scores, recommendations, alerts, plans, compliance
 Get-AACSecurityPosture -HtmlPath .\Security.html
@@ -152,6 +152,9 @@ Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId 'law-contoso-prod' -HtmlP
 
 # Virtual networks: available IPs, subnets, peerings, NSGs, ASGs, DNS and security
 Invoke-AACVirtualNetworkAssessment -HtmlPath .\VNet.html
+
+# IP address management: your address plan, every IP address, overlaps and the next free ranges
+Get-AACIPAMReport -AddressPlan .\ipam-plan.psd1 -Open
 
 # The last 2 hours of exceptions from Application Insights
 Invoke-AACApplicationInsightQuery -LogWorkspaceName 'law-contoso-prod'
@@ -241,7 +244,8 @@ Commands for an Azure estate - subscriptions and management groups: inventory, c
 | [`Get-AACFirewallRule`](docs/Get-AACFirewallRule.md)                                             | Every Azure Firewall Policy rule: a console view at the prompt (Allow in green, Deny in red), objects down a pipeline, CSV and/or PDF exports.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | [`Show-AACResource`](docs/Show-AACResource.md)                                                   | A colourful bar chart of your resources by type, location, resource group or subscription.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | [`Invoke-AACAksAssessment`](docs/Invoke-AACAksAssessment.md)                                     | AKS clusters through every lens: current settings, about 35 Well-Architected checks scored per pillar, PSRule for Azure, Azure Policy for Kubernetes consolidated by namespace, workload, policy and cluster (the AKS Policy Compliance Toolkit's view) with Gatekeeper's complete counts, versions and upgrades, subnet capacity, Advisor and Defender. A console view, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                      |
-| [`Invoke-AACAssessment`](docs/Invoke-AACAssessment.md)                                           | An Azure environment assessed end to end, in the spirit of Azure Resource Inventory: a sheet per resource type (~95) with its key settings, the organization, Advisor and retirements, Defender, Policy, outages, quotas, reservations and cost - CSV, an interactive HTML report, a PDF and interactive network and organization diagrams, with a live progress display. Runs in Azure Automation with a managed identity and uploads to blob storage.                                                                                                                                                                                           |
+| [`Invoke-AACFunctionAppAssessment`](docs/Invoke-AACFunctionAppAssessment.md) | Function Apps end to end: hosting and plan, usage (executions, GB-seconds, errors, response time, estimated Consumption cost), every function and trigger, runtime support, configuration and app settings (names only), networking, deployment center and slots, backups, Service Connector and named services, the last week's Activity Log, about 30 Well-Architected checks, PSRule for Azure, Advisor and Defender. A console view, objects, and CSV, PDF and a tabbed HTML report with a tab per audience. |
+| [`Invoke-AACTenantAssessment`](docs/Invoke-AACTenantAssessment.md)                                     | An Azure tenant assessed end to end, in the spirit of Azure Resource Inventory: a sheet per resource type (~95) with its key settings and policy compliance, the organization, Advisor and retirements, Defender, Policy, the Well-Architected Framework, PSRule, FinOps (savings, cost allocation, budgets), outages, quotas, reservations and cost - CSV, an interactive HTML report, a PDF and interactive network and organization diagrams, with a live progress display. Runs in Azure Automation with a managed identity and uploads to blob storage.                                                                                                                                                                                           |
 | [`Get-AACInventory`](docs/Get-AACInventory.md)                                                   | The tenant as a tree: management groups, subscriptions, resource groups and resources, with counts, the Defender for Cloud secure score and - with `-Cost` - the cost at every level. A console tree, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                                                                                                                                                         |
 | [`Export-AACDiagram`](docs/Export-AACDiagram.md)                                                 | Your existing resources as an editable draw.io diagram - the resources, the network topology or Application Gateways - with real containers (move a box and what's in it moves too), Azure icons, attached connections, each shape's data and portal link, and a page per subscription or resource group. `-Update` refreshes it from Azure and keeps your changes: new resources added and marked, removed ones faded. |
 | [`Export-AACResource`](docs/Export-AACResource.md)                                               | Every resource - for the tenant, a management group, subscriptions, resource groups or types - with its subscription and management group by name, resource group tags, tags as columns and each type's key settings, to CSV, HTML and PDF. Filters in Resource Graph (type, group, name, location, tag, missing tag, KQL) and free-text search.                                                                                                                                                                                                                                                                                                  |
@@ -281,6 +285,7 @@ Commands for an Azure estate - subscriptions and management groups: inventory, c
 | [`Export-AACDiagnosticBundle`](docs/Export-AACDiagnosticBundle.md)                               | A zip for a support case: each resource's configuration, health and history, Activity Log, diagnostic settings, locks, recommendations, compliance, alerts, changes and role assignments - secrets redacted, with a README and summary.                                                                                                                                                                                                                                                                                                                                                                                                           |
 | [`Invoke-AACPSRule`](docs/Invoke-AACPSRule.md)                                                   | PSRule for Azure, the module's own naming and tag rules and your custom rules on the live estate: include or exclude rules by name or wildcard, with a baseline or settings. Runs of only the module's rules read just names, types and tags.                                                                                                                                                                                                                                                                                                                                                                                                     |
 | [`Invoke-AACVirtualNetworkAssessment`](docs/Invoke-AACVirtualNetworkAssessment.md)               | Virtual networks assessed: address space with total, used and available IPs and the free CIDR ranges; every subnet (capacity, NSG, routes, NAT gateway, outbound path, endpoints, delegations); peerings; NSGs and ASGs; DNS, DDoS, encryption, flow logs, gateways, firewalls and Bastion - with findings by severity. A console view, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                       |
+| [`Get-AACIPAMReport`](docs/Get-AACIPAMReport.md) | IP address management with no server to run: Azure's address space measured against your address plan (spaces and blocks, or the private ranges) - each block's allocation, free space and next free ranges, every network (in the plan or not), subnet and private IP address (unattached interfaces included), overlaps (peered, with on-premises ranges), CIDR checks and findings. A console view, objects, and CSV, PDF and a tabbed HTML report with a tree of the plan and hover cards. |
 | [`Invoke-AACLogAnalyticsWorkspaceAssessment`](docs/Invoke-AACLogAnalyticsWorkspaceAssessment.md) | A Log Analytics workspace assessed: billable and not billable tables with their size, plan and retention; every workspace setting; recommendations (Azure Advisor's and its own: cost, reliability, security); data collection rules; and the Workspace Insights views - Overview, Usage, Health, Agents, Query Audit, Data Collection Rules, Change Log. Read-only. A console view, an object, and CSV and interactive HTML reports.                                                                                                                                                                                                             |
 | [`Invoke-AACApplicationInsightQuery`](docs/Invoke-AACApplicationInsightQuery.md)                 | Application Insights exceptions, flattened, from a Log Analytics workspace or Application Insights resource, or any KQL query.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | [`Invoke-AACWafAssessment`](docs/Invoke-AACWafAssessment.md)                                     | The estate against the Azure Well-Architected Framework's five pillars: about 60 checks plus Advisor and Defender for Cloud, scored 0-100 by pillar, design principle and check, with each pillar's maturity, workbook-style heat maps by subscription, resource group or resource type, team questionnaire answers (`-AttestationPath`) and the trend (`-HistoryPath`). A console view, objects, and CSV, PDF and interactive HTML reports. |
@@ -322,7 +327,7 @@ Commands for Azure DevOps organizations: projects, pipelines and the tools they 
 
 | Command                                                                                          | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`Get-AACADOInventory`](docs/Get-AACADOInventory.md)                                             | One or more Azure DevOps organizations inventoried: projects, pipelines (YAML, or classic - flagged) with their last run and delivery metrics (success rate, duration, queue time, DORA deployment frequency and change failure rate), every task and CLI tool they use with versions - YAML, nested and cross-repository templates, and classic pipelines - and the security posture of service connections, variable groups, environments, branch policies and GitHub Advanced Security, with findings; branching strategy, a DORA assessment and everything a move to GitHub needs (variables, artifacts, test plans, agent pools, extensions). A PAT or your Azure sign-in; `-IncludeAzure` links service connections to Azure roles. A console view, objects, and CSV, HTML and PDF reports.|
+| [`Invoke-AACADOAssessment`](docs/Invoke-AACADOAssessment.md)                                         | One or more Azure DevOps organizations inventoried: projects, pipelines (YAML, or classic - flagged) with their last run and delivery metrics (success rate, duration, queue time, DORA deployment frequency and change failure rate), every task and CLI tool they use with versions - YAML, nested and cross-repository templates, and classic pipelines - and the security posture of service connections, variable groups, environments, branch policies and GitHub Advanced Security, with findings; branching strategy, a DORA assessment and everything a move to GitHub needs (variables, artifacts, test plans, agent pools, extensions). A PAT or your Azure sign-in; `-IncludeAzure` links service connections to Azure roles. A console view, objects, and CSV, HTML and PDF reports.|
 
 Full help:
 
@@ -738,27 +743,38 @@ the charts and totals. Its `Status` is `No cost`, and every output says so:
 the console, the HTML report (a tile and a note) and the PDF (its own
 table).
 
-## Azure environment assessment
+## Azure tenant assessment
 
-`Invoke-AACAssessment` assesses a whole Azure environment in one run - the
-module's take on [Azure Resource Inventory (ARI)](https://github.com/microsoft/ARI):
-an inventory of every resource type with the settings that matter for it, the
-organization, Advisor and retirements, Defender for Cloud, Azure Policy
-compliance and inventory, PSRule for Azure, one list of recommendations,
-outages, quotas and cost - as CSV files, a tabbed HTML workbook, a PDF and
-interactive diagrams. Read-only, Resource Graph and REST only: no Az modules,
-no Excel.
+`Invoke-AACTenantAssessment` (`Invoke-AACAssessment` in 0.14 and earlier) assesses
+a whole Azure tenant in one run - the command to run first in a tenant you
+need to understand, and the module's take on
+[Azure Resource Inventory (ARI)](https://github.com/microsoft/ARI): an inventory
+of every resource type with the settings that matter for it and its policy
+compliance, the organization, Advisor and retirements, Defender for Cloud,
+Azure Policy compliance and inventory, the Well-Architected Framework, PSRule
+for Azure, FinOps (savings, cost allocation, budgets), one list of
+recommendations, outages, quotas and cost - as CSV files, a tabbed HTML
+workbook, a PDF and interactive diagrams. Read-only, Resource Graph and REST
+only: no Az modules, no Excel.
 
 ```powershell
 Connect-AAC
-Invoke-AACAssessment                                                    # everything the account can see
-Invoke-AACAssessment -TenantId 'contoso.onmicrosoft.com' -SecurityCenter -IncludeTag -IncludeCost
-Invoke-AACAssessment -ManagementGroupId 'mg-landingzones' -ReportDir C:\Reports -Output Html, Diagram
-Invoke-AACAssessment -SubscriptionId $sub -TagKey 'Environment' -TagValue 'Production' -Category Compute, Networking
-Invoke-AACAssessment -SubscriptionId $sub -PSRule -PSRuleBaseline 'Azure.Pillar.Security'   # PSRule for Azure too
-(Invoke-AACAssessment -Output Csv -NoDisplay).Sheets['Resource recommendations'] | Where-Object Severity -In 'Critical', 'High'
-(Invoke-AACAssessment -Output Csv -NoDisplay).Sheets['Virtual machines'] | Where-Object 'Power state' -NE 'VM running'
+Invoke-AACTenantAssessment -HtmlPath .\Tenant.html -PdfPath .\Tenant.pdf     # everything the account can see
+Invoke-AACTenantAssessment -TenantId 'contoso.onmicrosoft.com' -Full -HtmlPath .\Contoso.html   # Defender, cost, tags, PSRule and quotas too
+Invoke-AACTenantAssessment -ManagementGroupId 'mg-landingzones' -HtmlPath C:\Reports\LandingZones.html -CsvPath C:\Reports\csv -DiagramPath C:\Reports\diagrams
+Invoke-AACTenantAssessment -SubscriptionId $sub -TagKey 'Environment' -TagValue 'Production' -Category Compute, Networking
+Invoke-AACTenantAssessment -IncludeCost -CostTag 'CostCenter', 'Department'   # FinOps with your own cost-allocation tags
+(Invoke-AACTenantAssessment -NoDisplay).Sheets['Resource recommendations'] | Where-Object Severity -In 'Critical', 'High'
+(Invoke-AACTenantAssessment -NoDisplay).Sheets['All resources'] | Where-Object Policy -EQ 'Non-compliant'
 ```
+
+The focused assessments go deeper into one discipline or service:
+`Invoke-AACWafAssessment` reviews one workload against the Well-Architected
+Framework with the team's answers (`-AttestationPath`), heat maps and the trend
+from run to run; `Invoke-AACPolicyAssessment`, `Invoke-AACDefenderAssessment`
+and `Invoke-AACGovernanceAssessment` go deeper into policy, security and
+governance; the service assessments (AKS, Cosmos DB, Function Apps, Log
+Analytics, Service Bus, storage accounts, virtual networks) into one service.
 
 **How a run goes.** A live Spectre.Console progress display shows each phase as it
 happens, and the run ends with a summary - what was found, what needs attention,
@@ -767,21 +783,68 @@ where the reports are and how long each phase took:
 | Phase      | What it reads                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Scope      | The subscriptions in scope (by `-SubscriptionId`, `-ManagementGroupId` at any depth, or everything the account can see) and the tenant's management groups                                                                                                                                                                                                                                                                                                                                                                                       |
-| Estate     | Every resource and resource group (`-ResourceGroupName`, `-TagKey`/`-TagValue` filter them), the resource types present, Advisor recommendations and retirements, Defender for Cloud (`-SecurityCenter`), Azure Policy compliance (unless `-SkipPolicy`), support tickets                                                                                                                                                                                                                                                                        |
+| Estate     | Every resource and resource group (`-ResourceGroupName`, `-TagKey`/`-TagValue` filter them), the resource types present, Advisor recommendations and retirements, Defender for Cloud (`-SecurityCenter`), Azure Policy compliance - by policy, resource group and resource (unless `-SkipPolicy`), support tickets                                                                                                                                                                                                                                 |
 | Inventory  | A sheet per resource type present - about 95 types in 14 categories (`-Category` picks some): VMs, scale sets, disks, AKS and its node pools, container apps, SQL, Cosmos DB, PostgreSQL and MySQL, Redis, storage accounts, key vaults, virtual networks, subnets, peerings, NSG rules, firewalls, gateways, private endpoints, App Services, Log Analytics, Recovery Services and backup items, Arc servers, AI services and more - each with the settings that matter for it, as Resource Graph projections (only the types present are read) |
-| Azure APIs | Per subscription: the Advisor score, reservation recommendations, the last 6 months' outages (Resource Health service issues), compute quotas (`-QuotaUsage`) and VM sizes' vCPUs and memory (unless `-SkipVMDetail`); `-SkipApi` skips them                                                                                                                                                                                                                                                                                                     |
+| Azure APIs | Per subscription: the Advisor score, reservation recommendations, the budgets, the last 6 months' outages (Resource Health service issues), compute quotas (`-QuotaUsage`) and VM sizes' vCPUs and memory (unless `-SkipVMDetail`); `-SkipApi` skips them                                                                                                                                                                                                                                                                                       |
+| Well-Architected | `Invoke-AACWafAssessment`'s checks across the scope - the five pillars, scored by pillar, design principle and check - in one Resource Graph batch (unless `-SkipWaf`) |
 | Cost       | Each resource's actual cost, this month and last (`-IncludeCost`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Governance | The policy assignments in force and every policy they apply (unless `-SkipPolicy`); PSRule for Azure's rules on the resources (`-PSRule`); then the governance sheets and one list of recommendations |
+| PSRule     | PSRule for Azure's rules on the resources (`-PSRule`) |
+| Governance | The policy assignments in force and every policy they apply (unless `-SkipPolicy`); then the Well-Architected, FinOps and governance sheets and one list of recommendations |
 | Reports    | The reports in `-Output` (all by default), then an upload to blob storage (`-StorageAccount`, `-StorageContainer`)                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
-Every inventory sheet adds, after its own columns, the resource's **Retirement**
-notice (from Advisor), its **Advisor** recommendation count, its **cost** with
-`-IncludeCost` and its **tags** with `-IncludeTag`. Overview sheets come first:
+Every inventory sheet (and All resources) adds, after its own columns, the
+resource's **Retirement** notice (from Advisor), its **Advisor** recommendation
+count, its **policy compliance** (Policy - Non-compliant, Compliant, Exempt or
+Not evaluated; the number of policies it fails, and their names), its **WAF
+gaps** (the Well-Architected checks it fails), its **PSRule failures** with
+`-PSRule`, its **cost** with `-IncludeCost` and its **tags** with `-IncludeTag`.
+`-Full` turns on `-SecurityCenter`, `-IncludeCost`, `-IncludeTag`, `-PSRule`
+and `-QuotaUsage` at once. Overview sheets come first:
 Subscriptions (management groups, counts, secure score, cost), Resource groups
 (the empty ones flagged), Resource types, All resources; then Advisor
 recommendations, Advisor score, Retirements, Security recommendations, Secure
 score, Policy compliance, Outages, Quotas, Support tickets and Reservation
 recommendations.
+
+**Well-Architected.** Unless `-SkipWaf`, the same checks as
+`Invoke-AACWafAssessment`, across the tenant:
+
+| Sheet                 | What's in it                                                                                                   |
+| --------------------- | -------------------------------------------------------------------------------------------------------------- |
+| WAF pillars           | Each pillar's score out of 100 (checks weighted by severity) and its maturity: Initial, Developing, Established, Optimised |
+| WAF design principles | Each design principle's score - or Not assessed, where only a review can tell                                   |
+| WAF checks            | Each check: resources evaluated, passed and failed, its score and what to do                                    |
+| WAF findings          | Each check a resource fails, most severe first, with the detail and what to do                                  |
+
+**FinOps.** Every run adds (the cost sheets with `-IncludeCost`):
+
+| Sheet                  | What's in it                                                                                                                                                                                                                                       |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Savings opportunities  | One list by FinOps lever - Waste (unattached disks, unused public IPs, VMs stopped but still billed, empty App Service plans, old snapshots), Rightsizing and Rate (Advisor's cost recommendations, reservations, savings plans), Licensing (Azure Hybrid Benefit), Modernise (old VM generations) - with the resource's cost last month and an estimated annual saving |
+| Cost allocation        | Per subscription: the resources with a cost-allocation tag (`-CostTag`; CostCenter, Project, Application ... by default), and the cost of those without                                                                                           |
+| Budgets                | Each subscription's budgets - spent and forecast against the amount, the alerts - and the subscriptions with none                                                                                                                                |
+| Cost by service        | Cost by resource type: this month so far, projected to the month's end, last month and the change                                                                                                                                                 |
+| Cost by resource group | The same, by resource group                                                                                                                                                                                                                        |
+| Top cost resources     | The 50 resources that cost the most                                                                                                                                                                                                                |
+
+**A tab for each audience.** Every run also adds four tabs, each gap a
+recommendation:
+
+| Tab | Sheets |
+| --- | --- |
+| Identity and access (IT security) | **Privileged access** - Owner, User Access Administrator, Role Based Access Control Administrator and custom roles allowing `*`, at the root, management groups and subscriptions: who (user, group, service principal, managed identity, guest), and how - permanent, time-bound, activated or eligible in Privileged Identity Management; **Custom roles** and their wildcards; **Classic administrators**; **Defender plans** against the resources each subscription runs; **Expiring credentials** - Key Vault secrets, keys and certificates and app registration secrets and certificates expired or expiring within `-ExpiryDays` (30), values never read; **Management ports open** (SSH, RDP, WinRM from the internet); **Public network access** of PaaS services |
+| Architecture | **Landing zone** - each management group's depth, subscriptions, and the policy and role assignments at each level; subscriptions directly under the root; **Regions** with availability zones and paired regions; **Resilience** of the critical resources - zones, Azure Backup, Site Recovery; **Network topology** - hub and spoke or Virtual WAN, each network's role, DNS, private DNS links and address overlaps; **Private DNS zones** (unlinked and duplicated zones) |
+| Operations | **Diagnostic settings** coverage by type (a sample of up to 500 resources) and **Log Analytics workspaces**; **Monitoring** - Service Health alerts per subscription and **alert rules without an action group**; **Patch compliance** (Update Manager) and **Arc servers**; **Production locks**; the **Activity** Log over `-ActivityDays` (30) and **Failed deployments**; **Deprecated SKUs** (Basic public IPs and load balancers, unmanaged disks, Av1 VMs, classic resources, Application Gateway v1, single server databases...); **Naming and tags** - the Cloud Adoption Framework's abbreviations and owner tags (`-OwnerTag`) |
+| Service delivery | **Subscription offers** and support plans; **Reservations** and **Savings plans** with how much of each is used; **Quota headroom** (with `-QuotaUsage`); the month-on-month **Cost trend** (with `-IncludeCost`); the **Ownership map** - subscription, resource group, owner tags and the subscription's Owners |
+
+Production - a subscription or resource group name, or an Environment tag,
+matching `-ProductionPattern` (prod, prd, production, live) - is judged more
+strictly: backup, zones, locks, Dev/Test offers. `-SkipIdentity` leaves out
+access and Microsoft Graph (principals and app registrations, which need
+Application.Read.All); `-SkipKeyVault` the vaults' data plane (Key Vault
+Reader and a network path); `-ActivityDays 0` the Activity Log. The API
+versions templates use can't be seen from Azure: check them in your
+infrastructure code.
 
 **Governance.** Every run also reads the policy assignments in force and adds:
 
@@ -794,24 +857,25 @@ recommendations.
 | Policy assignments           | Every assignment in force on the scope, inherited ones too: definition, enforcement, policies, resource types, compliance                                                                           |
 | Policies                     | Every policy in force, per assignment: effect, resource types, controls, and status (Failed, Passed, Manual review, Exempt, Not evaluated, Disabled)                                                 |
 | PSRule rules, PSRule results | With `-PSRule` (and `-PSRuleBaseline`): each PSRule for Azure rule run on the resources (checked, passed, failed, its documentation), and each failure with its reason. Needs `PSRule.Rules.Azure` |
-| Resource recommendations     | Everything to act on in one list, most severe first: Advisor, Defender, retirements, unattached and empty resources, policy non-compliance and PSRule, each with a category and what to do          |
+| Resource recommendations     | Everything to act on in one list, most severe first: Advisor, Defender, retirements, unattached and empty resources, policy non-compliance, PSRule, the Well-Architected gaps and FinOps (budgets over or missing, untagged cost), each with a category and what to do |
 
-**The reports**, in `<-ReportDir>\<-ReportName>-<date>\`:
+**The reports** - each written only where its own parameter says (none by default; the sheets are always in the returned object's `Sheets`):
 
 | Report                     | What's in it                                                                                                                                                                                                                                                                                                                               |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `<name>.html`              | A tabbed workbook. Executive summary: tiles (each opening its table), charts that filter the table behind them (policies by status, non-compliant resources by resource group, recommendations by severity and category, PSRule rules, resources by category, location, subscription and type, Advisor, Defender) and the tenant tree. Then Policy compliance, Policy inventory, PSRule results, Resource recommendations, Resources, Inventory, Advisor, Security, Health and Cost, each table with row details and a CSV download - searchable, filterable, groupable, each downloadable as CSV |
-| `csv\`                     | A CSV file per sheet                                                                                                                                                                                                                                                                                                                       |
-| `<name>.pdf`               | The summary, then each category with its sheets' key columns, bookmarked                                                                                                                                                                                                                                                                   |
-| `<name>-Network.html`      | An interactive network diagram: virtual networks and subnets, peerings, gateways and connections, firewalls, Bastion, load balancers, application gateways, private endpoints and DNS zones, with NSGs and route tables (rules and routes) on what they apply to. `-DiagramFullEnvironment` draws every resource and how they connect      |
-| `<name>-Organization.html` | An interactive diagram of management groups > subscriptions > resource groups, with resource counts                                                                                                                                                                                                                                        |
-| `<name>-Resources.html`    | Each subscription with a node per resource type (its Azure icon and count) - ARI's resources view, readable at any tenant size                                                                                                                                                                                                             |
+| `-HtmlPath`                 | A tabbed workbook. Executive summary: tiles (each opening its table), charts that filter the table behind them (policies by status, non-compliant resources by resource group, recommendations by severity and category, the Well-Architected pillars, savings by FinOps lever, PSRule rules, resources by category, location, subscription and type, Advisor, Defender) and the tenant tree. Then Policy compliance, Policy inventory, Well-Architected, PSRule results, Resource recommendations, FinOps, Resources, Inventory, Advisor, Security and Health, each table with row details and a CSV download - searchable, filterable, groupable, each downloadable as CSV |
+| `-PdfPath`                 | The summary, then each category with its sheets' key columns, bookmarked                                                                                                                                                                                                                                                                   |
+| `-CsvPath` (a folder)      | A CSV file per sheet                                                                                                                                                                                                                                                                                                                       |
+| `-DiagramPath` (a folder): `TenantAssessment-Network.html` | An interactive network diagram: virtual networks and subnets, peerings, gateways and connections, firewalls, Bastion, load balancers, application gateways, private endpoints and DNS zones, with NSGs and route tables (rules and routes) on what they apply to. `-DiagramFullEnvironment` draws every resource and how they connect      |
+| `TenantAssessment-Organization.html` | An interactive diagram of management groups > subscriptions > resource groups, with resource counts                                                                                                                                                                                                                                        |
+| `TenantAssessment-Resources.html` | Each subscription with a node per resource type (its Azure icon and count) - ARI's resources view, readable at any tenant size                                                                                                                                                                                                             |
 
 **Automation.** In an Azure Automation runbook (PowerShell 7.4 runtime, this
-module imported), `Invoke-AACAssessment -Automation -StorageAccount <account>
+module imported), `Invoke-AACTenantAssessment -Automation -StorageAccount <account>
 -StorageContainer <container>` signs in with the account's managed identity,
 writes plain progress lines to the job log and uploads the reports to blob
-storage. The identity needs Reader on the management group or subscriptions
+storage, under `TenantAssessment/<date>/` (every report, written to a
+temporary folder, when no report path is given). The identity needs Reader on the management group or subscriptions
 and Storage Blob Data Contributor on the storage account. The same works in a
 pipeline with `Connect-AAC -ClientSecret` or `-CertificatePath` first.
 
@@ -1455,6 +1519,101 @@ read too, for remote peerings, overlaps and zones linked from a hub. Used IPs
 are the IP configurations in a subnet; a delegated service may hold more than
 it shows.
 
+## IP address management
+
+`Get-AACIPAMReport` is IP address management without a server: no app to
+deploy, no database to drift. Every run measures Azure's address space, read
+from Azure Resource Graph, against your address plan.
+
+```powershell
+Get-AACIPAMReport -Open                                              # every network vs the private ranges, in your browser
+Get-AACIPAMReport -AddressPlan .\ipam-plan.psd1 -HtmlPath .\IPAM.html -PdfPath .\IPAM.pdf
+Get-AACIPAMReport -AddressPlan .\ipam-plan.psd1 -NextAvailable 24, 22 -View NextAvailable -NoDisplay
+Get-AACIPAMReport -TestCidr 10.20.8.0/22                             # free? if not, who has it
+Get-AACIPAMReport -ManagementGroupId mg-landingzones -View IpAddress -CsvPath .\ips.csv
+```
+
+The address plan is a `.psd1`, `.json` or `.csv` file (or a hashtable): spaces
+holding blocks, plus external ranges (on-premises, partners) Azure must not
+overlap. Without one, the private ranges (RFC 1918 and RFC 6598) are the plan.
+
+```powershell
+@{ Spaces = @(
+    @{ Name = 'Corp'; Blocks = @(
+        @{ Name = 'Azure-EU'; Cidr = '10.20.0.0/14' }
+        @{ Name = 'Azure-US'; Cidr = '10.24.0.0/14' } ) } )
+   External = @( @{ Name = 'London DC'; Cidr = '10.0.0.0/16' } ) }
+```
+
+- **Blocks:** the networks in each, the address space they take (overlaps
+  counted once), free space, the largest free range, the next free range of
+  the first `-NextAvailable` size and how many still fit; Warning at
+  `-WarningPercent` (80), Critical at `-CriticalPercent` (90), Full.
+- **Networks:** virtual networks, Virtual WAN hubs and external ranges -
+  Managed, Partly managed or Unmanaged - with subnets, addresses used, address
+  space in no subnet, DNS servers, peerings, overlaps and the Azure IPAM
+  reservation tag (`X-IPAM-RES-ID`).
+- **Subnets and IP addresses:** every address Azure counts in a subnet -
+  virtual machines, scale set instances, private endpoints, load balancers,
+  firewalls, gateways, Bastion, application gateways and unattached network
+  interfaces - so a subnet's count and its list always agree.
+- **Overlaps:** High when the networks are peered, Medium with an external
+  range or a hub, Low when isolated.
+- **Free space:** the best fit (the smallest free range a size fits, keeping
+  larger ranges whole) and the lowest free address, and every free range.
+- **HTML report:** a tab for each, the plan as a tree (space > block > network
+  > subnet), a Space selector that filters every tab, and a card that follows
+  the pointer over a row with its details.
+
+It reads; it doesn't hand out reservations. For that, Azure IPAM keeps the
+shared state; this report checks Azure against any plan, Azure IPAM's
+included.
+
+## Function App assessment
+
+`Invoke-AACFunctionAppAssessment` assesses Azure Function Apps - Windows,
+Linux, containers and Flex Consumption - read-only, REST only:
+
+```powershell
+Invoke-AACFunctionAppAssessment -HtmlPath .\Functions.html                       # every app you can see
+Invoke-AACFunctionAppAssessment -Name 'func-orders-*' -TimeRange 30d -PdfPath .\Orders.pdf
+Invoke-AACFunctionAppAssessment -View Finding -NoDisplay | Where-Object Pillar -EQ 'Security'
+Invoke-AACFunctionAppAssessment -View Activity -ActivityDays 30 -NoDisplay | Where-Object Kind -EQ 'Configuration change'
+```
+
+- **App and plan:** hosting (Consumption, Flex Consumption, Elastic Premium,
+  Dedicated, App Service Environment, Container Apps), SKU, instances, burst,
+  zone redundancy, the plan's CPU and memory.
+- **Usage over `-TimeRange` (7d):** executions, GB-seconds, requests, 5xx and
+  4xx, error rate, response time, memory; an estimated monthly cost on
+  Consumption (before the free grant); idle apps.
+- **Functions:** every function with its trigger (HTTP and its auth level,
+  timer and its schedule, queue, Service Bus, Event Hubs...) and bindings.
+- **Runtime:** the Functions runtime, the language version against its end
+  of support, and the .NET in-process model (support ends 10 November 2026).
+- **Configuration:** every setting that matters, by area, and the app
+  settings by name and kind (Key Vault reference, identity-based, key or
+  connection string, plain) - values are never read into the report. Listing
+  app settings needs Website Contributor (or a custom role with
+  `Microsoft.Web/sites/config/list/action`); without it they are left out and
+  said so. `-SkipSettings` doesn't ask.
+- **Networking, deployment, backups, connections:** inbound access, the SCM
+  site, VNet integration, CORS; the deployment center, recent deployments and
+  slots; backups where the plan supports them; Service Connector connections
+  and the Key Vaults, storage accounts, Service Bus and Cosmos DB accounts
+  named in settings, with how each authenticates.
+- **Activity Log (`-ActivityDays`, 7):** restarts, stops, configuration
+  changes, deployments, slot swaps, settings and keys read - who, when, and
+  whether it worked.
+- **Well-Architected, PSRule, Advisor, Defender:** about 30 checks across the
+  five pillars, PSRule for Azure on the apps and plans (`-SkipPSRule`), and
+  Advisor and Defender recommendations - every failure a finding.
+
+The HTML report has a tab per audience: a service summary for service
+delivery managers, apps and plans for architects, configuration and
+networking for administrators, findings for IT security - an App selector
+that filters every tab, and hover cards.
+
 ## AKS cluster assessment
 
 `Invoke-AACAksAssessment` assesses AKS clusters through every lens - every
@@ -1717,20 +1876,39 @@ New-AACApplicationPermission -ServicePrincipal 'My-Enterprise-App' -Group 'SG-Gr
   its token may be cached for up to an hour (24 hours for a managed
   identity) before the change takes effect.
 
-## Azure DevOps inventory
+## Azure DevOps assessment
 
-`Get-AACADOInventory` inventories one or more Azure DevOps organizations -
-read-only, through the Azure DevOps REST API:
+`Invoke-AACADOAssessment` (`Get-AACADOInventory` in 0.14 and earlier) assesses
+one or more Azure DevOps organizations - read-only, through the Azure DevOps
+REST API:
 
 ```powershell
 $pat = Read-Host -Prompt 'Azure DevOps PAT' -AsSecureString
-Get-AACADOInventory -Organization contoso -PersonalAccessToken $pat                       # every project
-Get-AACADOInventory -Organization contoso -PersonalAccessToken $pat -HtmlPath .\ADO.html -PdfPath .\ADO.pdf -CsvPath .\ADO.csv
-Get-AACADOInventory -Organization contoso -PersonalAccessToken $pat -View Task -NoDisplay | Where-Object Kind -EQ 'CLI'
-Get-AACADOInventory -Organization contoso -PersonalAccessToken $pat -View ServiceConnection -NoDisplay | Where-Object OpenToAllPipelines
-Get-AACADOInventory -Organization contoso -Project Payments -PersonalAccessToken $pat -YamlPath .\pipelines -Skip Security, Metrics
-Get-AACADOInventory -DiscoverOrganization -UseAzureSignIn -IncludeAzure -HtmlPath .\ADO.html   # with Connect-AAC: every organization, no PAT
+Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $pat                       # every project
+Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $pat -HtmlPath .\ADO.html -PdfPath .\ADO.pdf -CsvPath .\ADO.csv
+Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $pat -View Task -NoDisplay | Where-Object Kind -EQ 'CLI'
+Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $pat -View ServiceConnection -NoDisplay | Where-Object OpenToAllPipelines
+Invoke-AACADOAssessment -Organization contoso -Project Payments -PersonalAccessToken $pat -YamlPath .\pipelines -Skip Security, Metrics
+Invoke-AACADOAssessment -DiscoverOrganization -UseAzureSignIn -IncludeAzure -HtmlPath .\ADO.html   # with Connect-AAC: every organization, no PAT
+Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $pat -View SbomComponent -NoDisplay | Where-Object Component -EQ 'log4j-core'   # who ships it
 ```
+
+- **SBOM:** which build pipelines produce a software bill of materials - the
+  [Microsoft SBOM Tool](https://github.com/microsoft/sbom-tool) (`sbom-tool
+  generate`, the Manifest Generator task, `GenerateSBOM=true` in a .NET
+  project), 1ES Pipeline Templates, Syft, CycloneDX, Trivy or Docker - and
+  which validate one (`sbom-tool validate`). From each one's **latest
+  successful run**, the SBOM it published - the `_manifest/spdx_2.2` (or
+  `spdx_3.0`) `manifest.spdx.json`, or any SPDX or CycloneDX JSON file in its
+  artifacts: its format, the tool that made it, components and files,
+  completeness against the NTIA minimum elements (name, version, supplier,
+  package URL), licences by kind (permissive, weak or strong copyleft,
+  unknown), and every component with its version, ecosystem, supplier and
+  licence - so when a vulnerable package is announced, one filter says which
+  pipelines ship it. Findings: pipelines that deploy or publish with no SBOM,
+  an SBOM generated but not published, incomplete SBOMs, strong copyleft
+  licences, SBOMs never validated. `-Skip Sbom` leaves the artifacts unread;
+  reading them needs the token's Build (Read) scope.
 
 - **Pipelines:** every build pipeline - **YAML**, or **classic** (built in
   the designer, with no YAML file: flagged) - and every classic release
@@ -2768,7 +2946,7 @@ everything on this side for real:
 | `Connect-AAC`                                                                     | The browser (`Start-Process`) and the token endpoint (`Invoke-RestMethod`)                                                                                                                                                                                                          | The PKCE code, the localhost listener receiving the redirect, state (CSRF) validation, the token exchange and the stored session; app-only sign-in: a client secret, a certificate's signed client assertion (checked with its public key), a managed identity endpoint, and a new token when one runs out                                                                                                                                                                                                                                          |
 | `Invoke-AACPolicyAssessment`                                                      | Resource Graph and Resource Manager, with a made-up Contoso tenant                                                                                                                                                                                                                  | The queries (tenant-wide discovery, worst-state compliance, by-ID chunks), compliance overall and by subscription, management group, assignment, policy and category, thresholds, every finding, identities and roles, exemption expiry, Platform and Application audiences, management group and subscription scopes, excluded scopes, the tree, the built-in definitions Resource Graph lacks read from Resource Manager, the reports and the view                                                                                                |
 | `Invoke-AACAksAssessment`                                                         | Resource Graph, the PSRule exporter and engine, Resource Manager and AKS run command, with made-up Contoso clusters                                                                                                                                                                 | Workloads inferred from pod names, system namespaces, effects and DoNotEnforce, the roll-ups and the 500-record cap, cluster policy states and assignments, version support (supported, LTS, out of support) and upgrades, every Well-Architected check on a well-run and a neglected cluster, subnet capacity, the other lenses as findings, settings, Gatekeeper through run command (Entra ID token, no Gatekeeper, failures), scope and names, PSRule options, the reports and the view                                                         |
-| `Invoke-AACAssessment`                                                            | Resource Graph, Resource Manager and Cost Management, with a made-up Contoso tenant                                                                                                                                                                                                 | The catalog (every sheet, column spec and key column) and its queries, resource group and tag filters, every sheet by label, VM sizes and subnet IPs filled in afterwards, retirements, Advisor, cost and tags on each row, the overview sheets, Advisor, Defender, Policy, outages across subscriptions, quotas, reservations, the tenant tree and organization diagram, scope and `-Category`, which Azure APIs are asked, the governance sheets (policy status, controls, why a resource fails, PSRule, recommendations ranked) and `-PSRule`, a sheet that fails, the upload, Automation sign-in, the reports and the view                                           |
+| `Invoke-AACTenantAssessment`                                                      | Resource Graph, Resource Manager and Cost Management, with a made-up Contoso tenant                                                                                                                                                                                                 | The catalog (every sheet, column spec and key column) and its queries, resource group and tag filters, every sheet by label, VM sizes and subnet IPs filled in afterwards, retirements, Advisor, cost and tags on each row, the overview sheets, Advisor, Defender, Policy, outages across subscriptions, quotas, reservations, the tenant tree and organization diagram, scope and `-Category`, which Azure APIs are asked, the governance sheets (policy status, controls, why a resource fails, PSRule, recommendations ranked) and `-PSRule`, a sheet that fails, the upload, Automation sign-in, the reports and the view                                           |
 | The transport (`Invoke-AACHttp`, `Invoke-AACArmParallel`, `Invoke-AACGraphBatch`) | The single HTTP send (`Send-AACHttpRequest`), or nothing (a local test server)                                                                                                                                                                                                      | Retries as Azure's retry headers ask (`Retry-After`, Cost Management's and Resource Graph's own), paging (`nextLink`, `$skipToken`), the throttle limit, Azure's error messages, failures allowed per query                                                                                                                                                                                                                                                                                                                                         |
 | `Get-AACAdvisorRecommendation`, `Get-AACFirewallRule`, `Show-AACResource`         | Resource Graph, with hand-built rows (through a shim that runs each batched query one by one)                                                                                                                                                                                       | Flattening, filters and search, output modes, CSV, PDF and HTML, and the console view                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `Get-AACInventory`                                                                | Resource Graph and Cost Management, with a made-up Contoso tenant                                                                                                                                                                                                                   | The tree and its rolled-up counts, secure scores, cost (management group scope and the per-subscription fallback, deleted resources, currencies), insights (the mix, what needs attention, subnets), the views and the exports                                                                                                                                                                                                                                                                                                                      |

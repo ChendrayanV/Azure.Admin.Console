@@ -4,7 +4,7 @@ function Send-AACBlobFile {
         Uploads files to a blob container with the Azure Storage REST API
         (Put Blob) and an Entra ID token - no Az.Storage, no account key.
     .DESCRIPTION
-        For Invoke-AACAssessment -StorageAccount/-StorageContainer (a
+        For Invoke-AACTenantAssessment -StorageAccount/-StorageContainer (a
         scheduled run's reports): each file becomes a block blob named
         <-Prefix>/<its path under -Root>, replacing one of the same name.
         The signed-in identity needs Storage Blob Data Contributor on the

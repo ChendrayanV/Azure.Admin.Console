@@ -199,8 +199,8 @@ $displayProperties = [ordered]@{
     'AAC.M365InactiveUser' = 'UserPrincipalName', 'Products', 'LastActivity'
     'AAC.M365AppProtectionPolicy' = 'Policy', 'Platform', 'Assigned', 'PinRequired', 'SendDataTo'
     'AAC.M365Coverage' = 'Area', 'Lens', 'Status', 'Reads', 'Reason'
-    # Invoke-AACAssessment: the run's summary (its sheets are plain rows).
-    'AAC.Assessment' = 'Subscriptions', 'Resources', 'ResourceTypes', 'AdvisorHigh', 'Retirements', 'SecurityHigh', 'ReportFolder'
+    # Invoke-AACTenantAssessment: the run's summary (its sheets are plain rows).
+    'AAC.TenantAssessment' = 'Subscriptions', 'Resources', 'ResourceTypes', 'AdvisorHigh', 'Retirements', 'SecurityHigh', 'WafScore', 'AnnualSavings'
     # Invoke-AACVirtualNetworkAssessment: networks, subnets, peerings, free ranges, findings.
     'AAC.VirtualNetwork' = 'Name', 'Role', 'AddressSpace', 'UsedIps', 'AvailableIps', 'UsedPercent', 'SubnetCount', 'PeeringCount', 'High', 'Medium', 'Low'
     'AAC.VirtualNetworkSubnet' = 'VirtualNetwork', 'Subnet', 'Prefix', 'Usable', 'Used', 'Available', 'UsedPercent', 'Nsg', 'Outbound'

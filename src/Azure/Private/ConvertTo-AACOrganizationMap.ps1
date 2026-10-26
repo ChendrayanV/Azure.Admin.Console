@@ -3,7 +3,7 @@ function ConvertTo-AACOrganizationMap {
     .SYNOPSIS
         Turns the tenant's organization - management groups, subscriptions
         and resource groups - into the resource map's model (boxes and
-        nodes), for Invoke-AACAssessment's organization diagram.
+        nodes), for Invoke-AACTenantAssessment's organization diagram.
     .DESCRIPTION
         Management groups are nested boxes; a subscription is a box in its
         management group, with its resource groups in it as nodes (their
@@ -13,7 +13,7 @@ function ConvertTo-AACOrganizationMap {
         instead, so a large tenant's diagram stays readable. A management
         group with nothing in it is a node too.
 
-        Inputs are Invoke-AACAssessment's rows: -ManagementGroup (name,
+        Inputs are Invoke-AACTenantAssessment's rows: -ManagementGroup (name,
         displayName, parent), -Subscription (subscriptionId, name, state,
         chain), -ResourceGroup (id, name, subscriptionId, location) and
         -ResourceCount ('subscription|group' -> resources). Returns

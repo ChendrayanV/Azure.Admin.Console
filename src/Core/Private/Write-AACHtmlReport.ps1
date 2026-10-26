@@ -24,12 +24,18 @@ function Write-AACHtmlReport {
           -Table    @{ Id; Title; Note; Noun; File; Rows; Columns; Sort =
                        @{ Key; Desc }; GroupBy = @('Column', ...); Group;
                        Filters = @{ Column = 'Value' } (what it opens with);
-                       PageSize; Section }
+                       PageSize; Section; Hover = @('Column', ...);
+                       HoverTitle }
+                    Hover: those columns (hidden ones too) in a card that
+                    follows the pointer over a row, under the row's first
+                    column (or HoverTitle) - a glance before the click that
+                    opens every field.
                     Section: tables with one are drawn under its heading
                     (in the order sections first appear) and listed in a
                     Contents block above the tables - for reports with many.
                     Columns: @{ Key; Label; Type; Facet; Hidden; Tones;
-                    Format; Sum; CurrencyKey; IdKey; Href; Text; Soon }.
+                    Format; Sum; CurrencyKey; IdKey; Href; Text; Soon; Tip }.
+                    Tip: another column whose text is the cell's tooltip.
                     Types: text (default), wide (long text, clamped), mono,
                     number, money, score (0-100 as a percentage: 70+
                     green, 40-69 amber, under 40 red), path ('a → b → c': steps
@@ -147,7 +153,7 @@ function Write-AACHtmlReport {
         $t['columns'] = @(foreach ($column in @($item.Columns)) { & $camel $column })
         # Rows: only the columns' properties, as plain values.
         $keys = @($t['columns'] | ForEach-Object { $_['key'] })
-        $idKeys = @($t['columns'] | ForEach-Object { $_['idKey'], $_['href'], $_['currencyKey'] } | Where-Object { $_ })
+        $idKeys = @($t['columns'] | ForEach-Object { $_['idKey'], $_['href'], $_['currencyKey'], $_['tip'] } | Where-Object { $_ }) + @($item['Hover'] | Where-Object { $_ }) + @($item['HoverTitle'] | Where-Object { $_ })
         $keys = @($keys + $idKeys + 'ResourceId' | Select-Object -Unique)
         # Every cell of every row passes through here: read properties inline, a
         # function call per cell is what made big reports slow.
