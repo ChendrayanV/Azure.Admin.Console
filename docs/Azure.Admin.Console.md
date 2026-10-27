@@ -1,4 +1,4 @@
-# Azure.Admin.Console 0.14.7
+# Azure.Admin.Console 0.14.8
 
 Azure administration from PowerShell over plain REST - no Az or Microsoft.Graph modules, no app registration. Inventory and resource export, cost, Advisor, security (Defender for Cloud, alerts, attack paths, access reviews, legacy authentication), Azure Policy and compliance, operations and troubleshooting (Resource Health, failed operations, load balancers, private endpoints, unused resources, diagnostic bundles), networks, AKS, Log Analytics, Microsoft 365 and Entra ID (application permissions, groups), and Azure DevOps (pipelines, the tools they run, security posture, delivery metrics) - each command with a console view, objects, and CSV, HTML and PDF reports. Documentation: https://github.com/ChendrayanV/Azure.Admin.Console/tree/main/docs
 
@@ -111,3 +111,16 @@ Commands for Azure DevOps organizations: projects, pipelines and the tools they 
 | Command | Synopsis |
 |---|---|
 | [Invoke-AACADOAssessment](Invoke-AACADOAssessment.md) | Assesses one or more Azure DevOps organizations - projects, pipelines (YAML, or classic with no YAML file - flagged) with their last run and delivery metrics, every task and tool they use (with versions), repositories, service connections, variable groups and environments with their security posture, the software bill of materials (SBOM) each pipeline produces, DORA and the move to GitHub - as a Spectre.Console view, objects, and CSV, HTML and PDF reports. |
+
+### Architecture design
+
+Design-time commands for Azure architects: probe questions that capture the requirements, cloud design patterns ranked against them, a design model, its validation against the Well-Architected Framework, inherited Azure Policy, guardrails and PSRule for Azure, Mermaid and draw.io diagrams with compliance layers, and architecture decision records.
+
+| Command | Synopsis |
+|---|---|
+| [Export-AACArchitectureDecision](Export-AACArchitectureDecision.md) | Step 6: writes architecture decision records (Markdown) for the design - topology, each pattern, each accepted risk. |
+| [Get-AACArchitecturePattern](Get-AACArchitecturePattern.md) | Step 2 (optional): shows which cloud design patterns fit the brief, why, and their Well-Architected trade-offs. |
+| [New-AACArchitectureBrief](New-AACArchitectureBrief.md) | Step 1: captures a workload's requirements by asking about 20 probe questions, and returns the brief. |
+| [New-AACArchitectureDesign](New-AACArchitectureDesign.md) | Step 3: builds the design - components, settings and connections - from a brief and the recommended (or chosen) patterns, and returns it. |
+| [New-AACArchitectureDiagram](New-AACArchitectureDiagram.md) | Step 5: draws the design as Mermaid, Markdown and draw.io files, coloured by its findings, with compliance layers. |
+| [Test-AACArchitectureDesign](Test-AACArchitectureDesign.md) | Step 4: checks a design against the Well-Architected Framework, inherited Azure Policy, your guardrails and PSRule for Azure, and says what to fix. |

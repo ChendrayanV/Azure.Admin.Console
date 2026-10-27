@@ -20,9 +20,9 @@ function Get-AACResourceMapAsset {
         return $script:AACResourceMapAsset
     }
 
+    # The icons are checked by Get-AACAzureIconSet (Core), which the architecture diagrams share.
     $expected = @{
-        'lib/elk/elk.bundled.js'            = '1222E44F953CE7746AF23801E723708F8E6F436B8B377A6A5FC7552F34A307B3'
-        'lib/azure-icons/azure-icons.json'  = '85B824FD42006B89F35F6D832F763702F51393A94AC7A6B545EDA7798AEF91C1'
+        'lib/elk/elk.bundled.js' = '1222E44F953CE7746AF23801E723708F8E6F436B8B377A6A5FC7552F34A307B3'
     }
     $text = @{}
     foreach ($relative in $expected.Keys) {
@@ -39,7 +39,7 @@ function Get-AACResourceMapAsset {
 
     $script:AACResourceMapAsset = @{
         Elk      = $text['lib/elk/elk.bundled.js']
-        Icons    = ConvertFrom-Json -InputObject $text['lib/azure-icons/azure-icons.json'] -AsHashtable
+        Icons    = Get-AACAzureIconSet
         Template = [System.IO.File]::ReadAllText((Join-Path -Path $script:AACModuleRoot -ChildPath 'src/Azure/Private/ResourceMap.html'), [System.Text.Encoding]::UTF8)
     }
     $script:AACResourceMapAsset

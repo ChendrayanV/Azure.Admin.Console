@@ -32,6 +32,9 @@ $script:AACUnicodeHintShown = $false
 # The resource map's page template, ELK and icons (Get-AACResourceMapAsset),
 # read and checked once per session.
 $script:AACResourceMapAsset = $null
+# The Azure icon set (Get-AACAzureIconSet), shared by the resource map and the
+# architecture diagrams; read and checked once per session.
+$script:AACAzureIconSet = $null
 # The HttpClient Invoke-AACArmParallel sends its requests through - one per
 # session, so connections are pooled and reused.
 $script:AACHttpClient = $null
@@ -200,7 +203,12 @@ $displayProperties = [ordered]@{
     'AAC.M365AppProtectionPolicy' = 'Policy', 'Platform', 'Assigned', 'PinRequired', 'SendDataTo'
     'AAC.M365Coverage' = 'Area', 'Lens', 'Status', 'Reads', 'Reason'
     # Invoke-AACTenantAssessment: the run's summary (its sheets are plain rows).
-    'AAC.TenantAssessment' = 'Subscriptions', 'Resources', 'ResourceTypes', 'AdvisorHigh', 'Retirements', 'SecurityHigh', 'WafScore', 'AnnualSavings'
+    # The Architecture area: a brief, a design, patterns and findings, one line each.
+    'AAC.ArchitectureBrief' = 'Name', 'CatalogVersion', 'Open', 'Assumed'
+    'AAC.ArchitectureDesign' = 'Name', 'Regions', 'Components', 'Patterns', 'LandingZone'
+    'AAC.ArchitecturePattern' = 'Rank', 'Name', 'Recommended', 'Score', 'Why'
+    'AAC.ArchitectureFinding' = 'Severity', 'Status', 'Rule', 'Finding', 'Component'
+    'AAC.TenantAssessment' ='Subscriptions', 'Resources', 'ResourceTypes', 'AdvisorHigh', 'Retirements', 'SecurityHigh', 'WafScore', 'AnnualSavings'
     # Invoke-AACVirtualNetworkAssessment: networks, subnets, peerings, free ranges, findings.
     'AAC.VirtualNetwork' = 'Name', 'Role', 'AddressSpace', 'UsedIps', 'AvailableIps', 'UsedPercent', 'SubnetCount', 'PeeringCount', 'High', 'Medium', 'Low'
     'AAC.VirtualNetworkSubnet' = 'VirtualNetwork', 'Subnet', 'Prefix', 'Usable', 'Used', 'Available', 'UsedPercent', 'Nsg', 'Outbound'

@@ -15,7 +15,7 @@ Plain REST. No Az or Microsoft.Graph modules. Read-only by default.
 [![License: MIT](https://img.shields.io/badge/license-MIT-7B61FF.svg)](LICENSE)
 [![Sponsor](https://img.shields.io/github/sponsors/ChendrayanV?label=Sponsor&logo=githubsponsors&color=EA4AAA)](https://github.com/sponsors/ChendrayanV)
 
-[How to use it](#how-to-use-it) · [Commands](#whats-inside) · [Full guide](GUIDE.md) · [Contribute](#contributing) · [Contact](#contact)
+[How to use it](#how-to-use-it) · [What's new](#whats-new-in-0148) · [Architecture design](#architecture-design) · [Commands](#whats-inside) · [Full guide](GUIDE.md) · [Contribute](#contributing) · [Contact](#contact)
 
 </div>
 
@@ -31,17 +31,121 @@ Plain REST. No Az or Microsoft.Graph modules. Read-only by default.
 | **Platform / cloud engineer** | Assessments for AKS, networks, storage, Cosmos DB, Service Bus, Log Analytics, WAF and ALZ |
 | **Security and compliance** | Defender, Azure Policy, attack paths, access reviews, legacy authentication, NSGs |
 | **FinOps** | Costs, anomalies, unused and under-used resources, Advisor savings |
+| **Solution architect** | A guided design - patterns, components, policy checks, draw.io and Mermaid diagrams, decision records - before anything is deployed |
 | **Microsoft 365 / Entra admin** | Tenant assessment, nested group membership, application permissions |
-| **DevOps team** | An Azure DevOps inventory: pipelines, tools, security, DORA - and a plan to move to GitHub |
+| **DevOps team** | An Azure DevOps assessment: pipelines, tools, SBOM, security, DORA - and a plan to move to GitHub |
 | **Consultant** | Hand-over-ready HTML, PDF and CSV reports from a read-only sign-in |
+
+## What's new in 0.14.8
+
+Click a tab to open it.
+
+<details open>
+<summary><b>🏗️ Architecture design</b> &nbsp;·&nbsp; <i>new area, 6 commands</i></summary>
+
+<br>
+
+From a workload's requirements to a validated Azure design, diagrams and decision records - offline, in minutes.
+`New-AACArchitectureBrief` · `Get-AACArchitecturePattern` · `New-AACArchitectureDesign` · `Test-AACArchitectureDesign` · `New-AACArchitectureDiagram` · `Export-AACArchitectureDecision` - see [Architecture design](#architecture-design).
+
+</details>
+
+<details>
+<summary><b>🏢 Tenant assessment</b> &nbsp;·&nbsp; <i><code>Invoke-AACTenantAssessment</code> (was <code>Invoke-AACAssessment</code>)</i></summary>
+
+<br>
+
+The whole Azure environment in one report, now with the Well-Architected Framework, FinOps, PSRule and each resource's policy compliance - and a tab for each audience: **Identity and access** for security, **Architecture** for architects, **Operations** for admins and **Service delivery** for service managers. Each report goes where you say: `-HtmlPath`, `-PdfPath`, `-CsvPath`.
+
+```powershell
+Invoke-AACTenantAssessment -ManagementGroupId 'mg-landingzones' -HtmlPath .\tenant.html -PdfPath .\tenant.pdf
+```
+
+</details>
+
+<details>
+<summary><b>🔧 Azure DevOps assessment</b> &nbsp;·&nbsp; <i><code>Invoke-AACADOAssessment</code> (was <code>Get-AACADOInventory</code>), now with SBOM</i></summary>
+
+<br>
+
+Pipelines and the tools they run, security posture, DORA metrics - and a new **SBOM** tab: which pipelines publish a software bill of materials (Microsoft SBOM Tool, Syft, CycloneDX), and the components and licences in them.
+
+```powershell
+Invoke-AACADOAssessment -Organization contoso -UseAzureSignIn -HtmlPath .\ado.html
+```
+
+</details>
+
+<details>
+<summary><b>📊 Log Analytics workspace report</b> &nbsp;·&nbsp; <i><code>Invoke-AACLogAnalyticsWorkspaceAssessment</code>, tabbed HTML and PDF</i></summary>
+
+<br>
+
+Billable and free tables, settings, data collection rules and recommendations, now split into tabs like the other assessments, with a PDF.
+
+```powershell
+Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId $workspaceId -HtmlPath .\law.html -PdfPath .\law.pdf
+```
+
+</details>
+
+Breaking changes (two renames, the tenant assessment's report parameters) are in the [changelog](CHANGELOG.md).
+
+## Architecture design
+
+**Design it before you deploy it, and draw it the way you'll deploy it.** Architecture reviews usually start from a whiteboard sketch that nobody keeps up to date, then find out at deployment that a policy denies it. The Architecture commands turn the conversation into a design: they ask the questions an Azure architect would ask, pick the [cloud design patterns](https://learn.microsoft.com/azure/architecture/patterns/) that fit, lay out the components, check them against the Well-Architected Framework and your landing zone's Azure Policy, and draw the result. The diagram, the findings and the decision records all come from the same model, so they agree.
+
+| Step | Command | What you get |
+|:---:|---|---|
+| 1 | `New-AACArchitectureBrief` | About 20 probe questions - business, reliability, security, performance, data, cost, operations. Answer them at the prompt, from a hashtable or a file; whatever isn't answered is listed as an assumption |
+| 2 | `Get-AACArchitecturePattern` | 15 patterns ranked for the brief (Cache-Aside, Queue-Based Load Leveling, Deployment Stamps, Geode...), each with why it fits and its trade-offs |
+| 3 | `New-AACArchitectureDesign` | The components and their settings: SKUs, zone redundancy, private endpoints, identity, hub and spoke, a second region when the RTO or SLA needs one. Signed in, it reads the landing zone's inherited policy and allowed locations |
+| 4 | `Test-AACArchitectureDesign` | Findings by pillar and severity, each mapped to its Azure Policy definition and PSRule for Azure rule; *Blocking* when the landing zone would deny it. `-FailOnGap` fails a pipeline |
+| 5 | `New-AACArchitectureDiagram` | Mermaid, Markdown and a multi-page **draw.io** diagram with Azure icons |
+| 6 | `Export-AACArchitectureDecision` | Architecture decision records: the topology, each pattern, each accepted risk with its owner and review date |
+
+```powershell
+$brief  = New-AACArchitectureBrief -Name 'contoso-orders'                    # asks the questions
+$design = Get-AACArchitecturePattern -Brief $brief -RecommendedOnly |
+          New-AACArchitectureDesign -Brief $brief -LandingZone 'mg-corp' -OutPath .\contoso-orders.design.json
+Test-AACArchitectureDesign -Design $design -HtmlPath .\validation.html
+New-AACArchitectureDiagram -Design $design -Path .\diagrams                   # .mmd, .md, .drawio
+Export-AACArchitectureDecision -Design $design -Path .\adr -Owner 'Orders team'
+```
+
+**The diagram.** `New-AACArchitectureDiagram` writes a draw.io file you can open in the desktop app, [app.diagrams.net](https://app.diagrams.net) or VS Code, and keep editing. It isn't a picture:
+
+- **Azure icons** inside real containers: landing zone, region, hub and spoke virtual networks, data tier, operations, delivery pipeline. Move a box and what's in it moves too.
+- **A status dot** on every component for its worst open finding: green, amber or red.
+- **Shape data** on every component (Edit > Edit Data): service, SKU, region, zone redundancy, private endpoint, identity, open findings.
+- **Layers** you can turn on and off: WAF badges, Azure Policy, guardrail zones, the PSRule gate, Advisor and Defender recommendations.
+- **Five pages:** a cover, the architecture, policy and compliance, the findings, and a legend.
+
+<table>
+<tr>
+<td colspan="2" align="center"><b>Architecture</b> - two regions in a landing zone, Azure icons, finding dots, policy chips, guardrail zones<br><img src="assets/readme/architecture-diagram.png" alt="draw.io architecture page: a landing zone holding a global edge, two regions with hub and spoke virtual networks and private data tiers, operations and a delivery pipeline, drawn with Azure icons"></td>
+</tr>
+<tr>
+<td width="50%" align="center"><b>Cover</b> - facts, open findings, pillar scores<br><img src="assets/readme/architecture-cover.png" alt="draw.io cover page with the design's facts, open findings by severity and Well-Architected pillar scores"></td>
+<td width="50%" align="center"><b>Policy and compliance</b> - its own tab<br><img src="assets/readme/architecture-policy.png" alt="draw.io policy page listing inherited Azure Policy assignments and each component's rules with Azure Policy, PSRule and result"></td>
+</tr>
+<tr>
+<td colspan="2" align="center"><b>Validation report</b> - <code>Test-AACArchitectureDesign -HtmlPath</code><br><img src="assets/readme/architecture-validation.png" alt="HTML validation report with the Well-Architected score, blocking and high findings and a score per pillar"></td>
+</tr>
+</table>
+
+<sub>Snapshots from a fictional design (contoso-orders) in a fictional landing zone.</sub>
+
+Everything except reading the landing zone runs offline, so a design can be reviewed before there is a subscription for it. The walkthrough is in [the guide](GUIDE.md#architecture-design).
 
 ## What's inside
 
-78 commands. Every one gives a **console view**, **objects**, and **CSV, HTML and PDF** reports.
+84 commands. Every one gives a **console view**, **objects**, and **CSV, HTML and PDF** reports.
 
 | Area | Commands |
 |---|---|
-| **Assess** | `Invoke-AACAssessment` · `Invoke-AACWafAssessment` · `Invoke-AACGovernanceAssessment` · `Invoke-AACPSRule` · `Test-AACGoLiveReadiness` · `Invoke-AACAksAssessment` · `Invoke-AACFunctionAppAssessment` and 11 more |
+| **Design** 🆕 | `New-AACArchitectureBrief` · `Get-AACArchitecturePattern` · `New-AACArchitectureDesign` · `Test-AACArchitectureDesign` · `New-AACArchitectureDiagram` · `Export-AACArchitectureDecision` |
+| **Assess** | `Invoke-AACTenantAssessment` · `Invoke-AACWafAssessment` · `Invoke-AACGovernanceAssessment` · `Invoke-AACPSRule` · `Test-AACGoLiveReadiness` · `Invoke-AACAksAssessment` · `Invoke-AACFunctionAppAssessment` and 11 more |
 | **See** | `Show-AACDashboard` · `Get-AACInventory` · `Show-AACResourceMap` · `Show-AACNetworkTopology` · `Get-AACDependencyGraph` |
 | **Cost** | `Show-AACCost` · `Get-AACCostAnomaly` · `Get-AACUnusedResource` · `Get-AACResourceUtilization` · `Get-AACAdvisorRecommendation` |
 | **Secure** | `Get-AACSecurityPosture` · `Get-AACAttackPath` · `Get-AACAccessReview` · `Get-AACNetworkSecurityGroup` · `Get-AACLegacyAuthentication` |
@@ -49,7 +153,7 @@ Plain REST. No Az or Microsoft.Graph modules. Read-only by default.
 | **Govern** | `Get-AACPolicyState` · `Get-AACComplianceGap` · `Get-AACConfigurationDrift` · `Get-AACResourceLock` · `Test-AACAzureLimit` |
 | **Operate** | `Get-AACResourceHealth` · `Get-AACChangeHistory` · `Get-AACResourceError` · `Invoke-AACHealthCheck` · `Get-AACFailoverReadiness` |
 | **Microsoft 365** | `Invoke-AACM365Assessment` · `Get-AACEntraGroupMembership` · `Get-AACApplicationPermission` · `New-AACApplicationPermission` |
-| **Azure DevOps** | `Get-AACADOInventory` |
+| **Azure DevOps** | `Invoke-AACADOAssessment` |
 | **Build** | `Export-AACTerraform` · `Get-AACTerraformPlan` · `Deploy-AACStorageAccount` |
 
 Every command, with examples: [**the full guide**](GUIDE.md) and [**docs/**](docs/).
@@ -60,9 +164,9 @@ Every command, with examples: [**the full guide**](GUIDE.md) and [**docs/**](doc
 Install-PSResource -Name Azure.Admin.Console        # or: Install-Module Azure.Admin.Console -Scope CurrentUser
 Connect-AAC                                         # sign in once, in your browser
 
-Show-AACDashboard                                   # the estate on one screen
-Invoke-AACAssessment -HtmlPath .\assessment.html    # the whole environment, as a report
-Get-AACADOInventory -Organization contoso -UseAzureSignIn -HtmlPath .\ado.html
+Show-AACDashboard                                         # the estate on one screen
+Invoke-AACTenantAssessment -HtmlPath .\tenant.html        # the whole environment, as a report
+Invoke-AACADOAssessment -Organization contoso -UseAzureSignIn -HtmlPath .\ado.html
 ```
 
 The same switches work everywhere:
@@ -94,6 +198,7 @@ src\
   Azure\    commands scoped to subscriptions and management groups
   M365\     commands for the Entra ID / Microsoft 365 tenant
   DevOps\   commands for Azure DevOps
+  Architecture\  architecture design: brief, patterns, design, rules, diagrams, decisions
     <Area>\Public\    one exported command per file
     <Area>\Private\   its helpers
 Tests\<Area>\         Pester tests, fully mocked - no Azure sign-in needed

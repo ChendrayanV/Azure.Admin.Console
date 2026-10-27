@@ -21,7 +21,7 @@ Assesses a Log Analytics workspace: billable and free tables and their size, eve
 ```
 Invoke-AACLogAnalyticsWorkspaceAssessment [-WorkspaceId] <string> [-SubscriptionId <string[]>]
  [-Days <int>] [-Section <string[]>] [-IncludeEmptyTable] [-CsvPath <string>] [-HtmlPath <string>]
- [-Title <string>] [-PassThru] [-NoDisplay] [-NoPaging]
+ [-PdfPath <string>] [-Title <string>] [-PassThru] [-NoDisplay] [-NoPaging]
 ```
 
 ## ALIASES
@@ -101,9 +101,12 @@ What you get depends on where the command runs:
   -NoDisplay       the object only
 ```
 
--CsvPath writes the tables (one row each). -HtmlPath writes an
-interactive report with every section, searchable and downloadable
-as CSV.
+-CsvPath writes the tables (one row each). -HtmlPath writes a tabbed
+interactive report - a Summary (headline, tiles, charts), then a tab
+per section: Recommendations, Tables, Settings, Usage, Health,
+Agents, Query audit, Data collection rules and Change log - every
+table searchable, filterable and downloadable as CSV. -PdfPath writes
+the same as a PDF, each section a bookmarked heading.
 
 ## EXAMPLES
 
@@ -119,10 +122,10 @@ The whole assessment of one workspace, by its workspace ID.
 ### Example 2
 
 ```powershell
-Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId 'law-contoso-prod' -Days 7 -HtmlPath .\out\Workspace.html -CsvPath .\out\Tables.csv
+Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId 'law-contoso-prod' -Days 7 -HtmlPath .\out\Workspace.html -PdfPath .\out\Workspace.pdf -CsvPath .\out\Tables.csv
 ```
 
-The last 7 days, as an HTML report and the tables as CSV.
+The last 7 days, as a tabbed HTML report and a PDF, and the tables as CSV.
 
 ### Example 3
 
@@ -187,7 +190,7 @@ HelpMessage: ''
 
 ### -HtmlPath
 
-Write an interactive HTML report to this file.
+Write a tabbed interactive HTML report to this file.
 
 ```yaml
 Type: System.String
@@ -291,6 +294,27 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -PdfPath
+
+Write a PDF report to this file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -Section
 
 Only these sections: Overview, Tables, Settings, Recommendations,
@@ -338,7 +362,7 @@ HelpMessage: ''
 
 ### -Title
 
-The HTML report's title.
+The HTML and PDF reports' title.
 
 ```yaml
 Type: System.String

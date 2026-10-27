@@ -69,9 +69,12 @@ function Invoke-AACLogAnalyticsWorkspaceAssessment {
           piped onward     the assessment object, with no view
           -PassThru        the view and the object
           -NoDisplay       the object only
-        -CsvPath writes the tables (one row each). -HtmlPath writes an
-        interactive report with every section, searchable and downloadable
-        as CSV.
+        -CsvPath writes the tables (one row each). -HtmlPath writes a tabbed
+        interactive report - a Summary (headline, tiles, charts), then a tab
+        per section: Recommendations, Tables, Settings, Usage, Health,
+        Agents, Query audit, Data collection rules and Change log - every
+        table searchable, filterable and downloadable as CSV. -PdfPath writes
+        the same as a PDF, each section a bookmarked heading.
     .PARAMETER WorkspaceId
         The workspace: its workspace ID (GUID), resource ID or name.
     .PARAMETER SubscriptionId
@@ -90,9 +93,11 @@ function Invoke-AACLogAnalyticsWorkspaceAssessment {
     .PARAMETER CsvPath
         Write the tables to this CSV file.
     .PARAMETER HtmlPath
-        Write an interactive HTML report to this file.
+        Write a tabbed interactive HTML report to this file.
+    .PARAMETER PdfPath
+        Write a PDF report to this file.
     .PARAMETER Title
-        The HTML report's title.
+        The HTML and PDF reports' title.
     .PARAMETER PassThru
         Show the view and also return the assessment.
     .PARAMETER NoDisplay
@@ -104,8 +109,8 @@ function Invoke-AACLogAnalyticsWorkspaceAssessment {
         Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId 00000000-0000-0000-0000-000000000000
         The whole assessment of one workspace, by its workspace ID.
     .EXAMPLE
-        Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId 'law-contoso-prod' -Days 7 -HtmlPath .\out\Workspace.html -CsvPath .\out\Tables.csv
-        The last 7 days, as an HTML report and the tables as CSV.
+        Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId 'law-contoso-prod' -Days 7 -HtmlPath .\out\Workspace.html -PdfPath .\out\Workspace.pdf -CsvPath .\out\Tables.csv
+        The last 7 days, as a tabbed HTML report and a PDF, and the tables as CSV.
     .EXAMPLE
         (Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId 'law-contoso-prod' -Section Tables -NoDisplay).Tables | Where-Object Billing -EQ 'Billable' | Sort-Object BillableGB -Descending | Select-Object -First 10
         The ten largest billable tables.
@@ -138,6 +143,8 @@ function Invoke-AACLogAnalyticsWorkspaceAssessment {
 
         [string] $HtmlPath,
 
+        [string] $PdfPath,
+
         [string] $Title = 'Log Analytics workspace assessment',
 
         [switch] $PassThru,
@@ -155,11 +162,12 @@ function Invoke-AACLogAnalyticsWorkspaceAssessment {
 
     $pipedOnward = $MyInvocation.PipelinePosition -lt $MyInvocation.PipelineLength
     $interactive = -not $NoDisplay -and -not $pipedOnward
-    $showView = $interactive -and -not ($CsvPath -or $HtmlPath)
+    $showView = $interactive -and -not ($CsvPath -or $HtmlPath -or $PdfPath)
     $returnObjects = $PassThru -or $NoDisplay -or $pipedOnward
     $resolve = { param([string] $Path) if ($Path) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path) } }
     $csvFullPath = & $resolve $CsvPath
     $htmlFullPath = & $resolve $HtmlPath
+    $pdfFullPath = & $resolve $PdfPath
     # Read here, not inside the progress block (it runs in Invoke-AACProgress's scope).
     $request = @{
         Target            = $WorkspaceId.Trim()
@@ -279,10 +287,13 @@ function Invoke-AACLogAnalyticsWorkspaceAssessment {
             Errors              = $assessment.Errors
         }
         $detail = [ordered]@{ Workspace = "$($assessment.Workspace.Name) ($($assessment.Workspace.WorkspaceId))"; 'Resource group' = $assessment.Workspace.ResourceGroup; Period = "last $($request.Days) day(s)" }
-        $null = Invoke-AACExport -CsvPath $csvFullPath -CsvObject @($assessment.Tables) -Noun 'table' -HtmlPath $htmlFullPath -WriteHtml {
-            Write-AACWorkspaceAssessmentHtml -Assessment $assessment -Path $htmlFullPath -Title $request.Title -Detail $detail
-        }
-        @{ Assessment = $assessment; Result = $result }
+        @{ Assessment = $assessment; Result = $result; Detail = $detail }
+    }
+
+    # The reports: CSV of the tables, and the tabbed HTML report and PDF from one report model.
+    if ($csvFullPath -or $htmlFullPath -or $pdfFullPath) {
+        $report = ConvertTo-AACWorkspaceReport -Assessment $state.Assessment -Detail $state.Detail
+        Invoke-AACReportOutput -Report $report -Title $Title -CsvObject @($state.Assessment.Tables) -Noun 'table' -CsvPath $csvFullPath -HtmlPath $htmlFullPath -PdfPath $pdfFullPath
     }
 
     if ($showView) {

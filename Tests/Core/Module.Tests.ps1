@@ -44,6 +44,12 @@ Describe 'Azure Admin Console - Module scaffold' {
             'Export-AACWafQuestionnaire'
             'Get-AACAccessReview'
             'Invoke-AACADOAssessment'
+            'New-AACArchitectureBrief'
+            'Get-AACArchitecturePattern'
+            'New-AACArchitectureDesign'
+            'Test-AACArchitectureDesign'
+            'New-AACArchitectureDiagram'
+            'Export-AACArchitectureDecision'
             'Get-AACAdvisorRecommendation'
             'Get-AACApplicationPermission'
             'Get-AACAssignedPolicy'
@@ -124,7 +130,7 @@ Describe 'Azure Admin Console - Module scaffold' {
 
     It 'is a parent with child areas, each described by its area.psd1, Core first' {
         $areas = @(Get-ChildItem -Path (Join-Path $script:aacModulePath 'src') -Directory)
-        @($areas.Name | Sort-Object) | Should -Be @('Azure', 'Core', 'DevOps', 'M365')
+        @($areas.Name | Sort-Object) | Should -Be @('Architecture', 'Azure', 'Core', 'DevOps', 'M365')
         foreach ($area in $areas) {
             $data = Import-PowerShellDataFile -LiteralPath (Join-Path $area.FullName 'area.psd1')
             "$($data.Name) $($data.Title.Length -gt 0) $($data.Description.Length -gt 20)" | Should -Be "$($area.Name) True True"

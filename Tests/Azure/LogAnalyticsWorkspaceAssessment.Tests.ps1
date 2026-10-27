@@ -307,7 +307,7 @@ Describe 'Azure Admin Console - Invoke-AACLogAnalyticsWorkspaceAssessment' {
         $text | Should -Not -Match 'Billable tables'
     }
 
-    It 'writes the tables to CSV and every section to an HTML report' {
+    It 'writes the tables to CSV and every section to a tabbed HTML report' {
         $csv = Join-Path $TestDrive 'tables.csv'
         $html = Join-Path $TestDrive 'workspace.html'
         $null = & $script:capture { Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId $script:contoso.ResourceId -CsvPath $csv -HtmlPath $html }
@@ -315,8 +315,27 @@ Describe 'Azure Admin Console - Invoke-AACLogAnalyticsWorkspaceAssessment' {
         $rows.Table | Should -Contain 'ContainerLogV2'
         $rows[0].PSObject.Properties.Name | Should -Contain 'BillableGB'
         $page = Get-Content -LiteralPath $html -Raw
-        foreach ($expected in 'Recommendations', 'Workspace settings', 'Usage: ingestion per day', 'Health: operations', 'Agents', 'Query audit: by user and app', 'Data collection rules sending to this workspace', 'Change log') {
-            $page | Should -Match ([regex]::Escape($expected))
+        $model = [regex]::Match($page, '<script id="aac-data" type="application/json">(.*?)</script>', 'Singleline').Groups[1].Value | ConvertFrom-Json
+        $model.overviewTab | Should -Be 'Summary'
+        @($model.tabs.name) | Should -Be @('Recommendations', 'Tables', 'Settings', 'Usage', 'Health', 'Agents', 'Query audit', 'Data collection rules', 'Change log')
+        ($model.tables | Where-Object id -EQ 'daily').section | Should -Be 'Usage'
+        ($model.tables | Where-Object id -EQ 'agents').section | Should -Be 'Agents'
+        foreach ($expected in 'Workspace settings', 'Ingestion per day', 'Operations (_LogOperation)', 'Data collection rules sending to this workspace', 'Change log (activity log)') {
+            @($model.tables.title) | Should -Contain $expected
         }
+    }
+
+    It 'gives only the sections asked for a tab' {
+        $html = Join-Path $TestDrive 'tables-only.html'
+        $null = & $script:capture { Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId $script:contoso.ResourceId -Section Tables, Recommendations -HtmlPath $html }
+        $model = [regex]::Match((Get-Content -LiteralPath $html -Raw), '<script id="aac-data" type="application/json">(.*?)</script>', 'Singleline').Groups[1].Value | ConvertFrom-Json
+        @($model.tabs.name) | Should -Be @('Recommendations', 'Tables')
+    }
+
+    It 'writes a PDF report, a bookmarked heading per section' -Skip:(-not ($IsWindows -and $PSVersionTable.PSVersion -ge [version]'7.4')) {
+        $pdf = Join-Path $TestDrive 'workspace.pdf'
+        $null = & $script:capture { Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId $script:contoso.ResourceId -PdfPath $pdf }
+        (Get-Item -LiteralPath $pdf).Length | Should -BeGreaterThan 1000
+        [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($pdf), 0, 5) | Should -Be '%PDF-'
     }
 }

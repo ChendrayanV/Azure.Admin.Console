@@ -148,7 +148,7 @@ Deploy-AACStorageAccount -SubscriptionId <subscription> -ResourceGroupName rg-da
 Get-AACDiagnosticSetting -ExpectedWorkspace 'law-central' -HtmlPath .\Diagnostics.html
 
 # A Log Analytics workspace: table sizes, settings, recommendations, insights
-Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId 'law-contoso-prod' -HtmlPath .\Workspace.html
+Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId 'law-contoso-prod' -HtmlPath .\Workspace.html -PdfPath .\Workspace.pdf
 
 # Virtual networks: available IPs, subnets, peerings, NSGs, ASGs, DNS and security
 Invoke-AACVirtualNetworkAssessment -HtmlPath .\VNet.html
@@ -286,7 +286,7 @@ Commands for an Azure estate - subscriptions and management groups: inventory, c
 | [`Invoke-AACPSRule`](docs/Invoke-AACPSRule.md)                                                   | PSRule for Azure, the module's own naming and tag rules and your custom rules on the live estate: include or exclude rules by name or wildcard, with a baseline or settings. Runs of only the module's rules read just names, types and tags.                                                                                                                                                                                                                                                                                                                                                                                                     |
 | [`Invoke-AACVirtualNetworkAssessment`](docs/Invoke-AACVirtualNetworkAssessment.md)               | Virtual networks assessed: address space with total, used and available IPs and the free CIDR ranges; every subnet (capacity, NSG, routes, NAT gateway, outbound path, endpoints, delegations); peerings; NSGs and ASGs; DNS, DDoS, encryption, flow logs, gateways, firewalls and Bastion - with findings by severity. A console view, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                       |
 | [`Get-AACIPAMReport`](docs/Get-AACIPAMReport.md) | IP address management with no server to run: Azure's address space measured against your address plan (spaces and blocks, or the private ranges) - each block's allocation, free space and next free ranges, every network (in the plan or not), subnet and private IP address (unattached interfaces included), overlaps (peered, with on-premises ranges), CIDR checks and findings. A console view, objects, and CSV, PDF and a tabbed HTML report with a tree of the plan and hover cards. |
-| [`Invoke-AACLogAnalyticsWorkspaceAssessment`](docs/Invoke-AACLogAnalyticsWorkspaceAssessment.md) | A Log Analytics workspace assessed: billable and not billable tables with their size, plan and retention; every workspace setting; recommendations (Azure Advisor's and its own: cost, reliability, security); data collection rules; and the Workspace Insights views - Overview, Usage, Health, Agents, Query Audit, Data Collection Rules, Change Log. Read-only. A console view, an object, and CSV and interactive HTML reports.                                                                                                                                                                                                             |
+| [`Invoke-AACLogAnalyticsWorkspaceAssessment`](docs/Invoke-AACLogAnalyticsWorkspaceAssessment.md) | A Log Analytics workspace assessed: billable and not billable tables with their size, plan and retention; every workspace setting; recommendations (Azure Advisor's and its own: cost, reliability, security); data collection rules; and the Workspace Insights views - Overview, Usage, Health, Agents, Query Audit, Data Collection Rules, Change Log. Read-only. A console view, an object, CSV, a tabbed HTML report (a tab per section) and a PDF.                                                                                                                                                                                                             |
 | [`Invoke-AACApplicationInsightQuery`](docs/Invoke-AACApplicationInsightQuery.md)                 | Application Insights exceptions, flattened, from a Log Analytics workspace or Application Insights resource, or any KQL query.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | [`Invoke-AACWafAssessment`](docs/Invoke-AACWafAssessment.md)                                     | The estate against the Azure Well-Architected Framework's five pillars: about 60 checks plus Advisor and Defender for Cloud, scored 0-100 by pillar, design principle and check, with each pillar's maturity, workbook-style heat maps by subscription, resource group or resource type, team questionnaire answers (`-AttestationPath`) and the trend (`-HistoryPath`). A console view, objects, and CSV, PDF and interactive HTML reports. |
 | [`Test-AACGoLiveReadiness`](docs/Test-AACGoLiveReadiness.md)                                     | A go-live gate: the Well-Architected assessment on a workload, Ready or Not ready - pillar scores against a minimum, no high-severity findings, the checks that must pass - with the blockers. `-FailOnGap` fails a pipeline stage. |
@@ -328,6 +328,12 @@ Commands for Azure DevOps organizations: projects, pipelines and the tools they 
 | Command                                                                                          | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`Invoke-AACADOAssessment`](docs/Invoke-AACADOAssessment.md)                                         | One or more Azure DevOps organizations inventoried: projects, pipelines (YAML, or classic - flagged) with their last run and delivery metrics (success rate, duration, queue time, DORA deployment frequency and change failure rate), every task and CLI tool they use with versions - YAML, nested and cross-repository templates, and classic pipelines - and the security posture of service connections, variable groups, environments, branch policies and GitHub Advanced Security, with findings; branching strategy, a DORA assessment and everything a move to GitHub needs (variables, artifacts, test plans, agent pools, extensions). A PAT or your Azure sign-in; `-IncludeAzure` links service connections to Azure roles. A console view, objects, and CSV, HTML and PDF reports.|
+| [`New-AACArchitectureBrief`](docs/New-AACArchitectureBrief.md) | A workload's requirements captured as an architecture brief: about 20 probe questions on the business, reliability, security, performance, cost and operations - asked at the prompt or taken from a file - with open decisions and assumptions. Offline. |
+| [`Get-AACArchitecturePattern`](docs/Get-AACArchitecturePattern.md) | The Azure Architecture Center's cloud design patterns ranked against a brief: which fit, why, and their Well-Architected trade-offs. |
+| [`New-AACArchitectureDesign`](docs/New-AACArchitectureDesign.md) | A design model from a brief and the chosen patterns: components, zones, settings and connections; the landing zone's inherited Azure Policy and allowed locations read live. |
+| [`Test-AACArchitectureDesign`](docs/Test-AACArchitectureDesign.md) | A design validated before deployment against the Well-Architected Framework, inherited Azure Policy, your guardrails and PSRule for Azure: findings with remediation, a score per pillar, accepted risks, `-FailOnGap`. Tabbed HTML and PDF. |
+| [`New-AACArchitectureDiagram`](docs/New-AACArchitectureDiagram.md) | A design drawn as Mermaid (and Markdown that renders it) and editable draw.io, with layers for WAF findings, Azure Policy, guardrails, PSRule and Azure Recommendations. |
+| [`Export-AACArchitectureDecision`](docs/Export-AACArchitectureDecision.md) | Architecture decision records for a design - topology, each pattern, each accepted risk - with the open decisions and assumptions, as Markdown. |
 
 Full help:
 
@@ -1876,6 +1882,39 @@ New-AACApplicationPermission -ServicePrincipal 'My-Enterprise-App' -Group 'SG-Gr
   its token may be cached for up to an hour (24 hours for a managed
   identity) before the change takes effect.
 
+## Architecture design
+
+Six commands take a workload from requirements to a validated, drawn and
+recorded design - offline (only the landing zone's policy is read from
+Azure, and `-Offline` skips that):
+
+```powershell
+$brief = New-AACArchitectureBrief -Name 'orders-api' -OutPath .\orders-api.brief.json      # the probe questions, at the prompt
+Get-AACArchitecturePattern -Brief $brief                                                    # the patterns that fit, and why
+$design = Get-AACArchitecturePattern -Brief $brief -RecommendedOnly -NoDisplay |
+    New-AACArchitectureDesign -Brief $brief -Region westeurope, northeurope -LandingZone 'mg-landingzones' -OutPath .\orders-api.design.json
+Test-AACArchitectureDesign -Design $design -GuardrailPath .\guardrails.psd1 -HtmlPath .\orders-api.validation.html
+New-AACArchitectureDiagram -Design $design -Path .\docs\architecture                        # .mmd, .md and .drawio
+Export-AACArchitectureDecision -Design $design -Path .\docs\adr -Owner 'Platform architecture'
+```
+
+| Step | What it does |
+| --- | --- |
+| Brief | About 20 probe questions, each tied to a Well-Architected pillar: workload kind and criticality; RTO, RPO, SLA, degraded running; data classification, frameworks, exposure, identity; read/write mix, response target, load, geographies, data store; budget and baseline; deployment, observability, landing zone. `-Answer` or `-AnswerPath` gives answers; `?` means "don't know" - the default is used and the question stays open; unanswered questions are recorded as assumptions. |
+| Patterns | Fifteen cloud design patterns from the Azure Architecture Center, each with fit rules over the answers (and the reason), its effect on each pillar, and a score weighted by what the brief values. |
+| Design | Components from the answers and the patterns (compute for the workload kind, the data store, Front Door or Application Gateway with the WAF, hub and spoke with private DNS and Azure Firewall where the data and exposure call for them, Key Vault, monitoring, a budget, the pipeline with its PSRule gate), their settings (zones, private endpoints, identity, TLS, purge protection), a second region when the RTO or SLA needs one, and the landing zone's inherited policy and allowed locations. `-Override` changes any component. |
+| Validate | Rules with a pillar, severity, the built-in Azure Policy and PSRule for Azure rule they correspond to, the Advisor category and the fix. Blocking: what an inherited Deny policy or your guardrails would refuse. `-Accept` records an accepted risk; `-FailOnGap` fails a pipeline on open Blocking or High findings. |
+| Diagram | Mermaid, Markdown (renders in Azure DevOps wikis, GitHub, VS Code) and draw.io - components coloured by their worst finding, with layers for WAF, Azure Policy, guardrails, the PSRule gate and Azure Recommendations. The draw.io has five pages: Cover, Architecture (Azure icons in landing zone, region, virtual network and data boxes), Policy and compliance, Findings and Legend. |
+| Decisions | ADRs: hosting and topology, each pattern, each accepted risk (reason, owner, review date), with an index of open decisions and assumptions. |
+
+Guardrails are a .psd1 or .json file of the organisation's own rules:
+`@{ AllowedRegions = @('westeurope', 'northeurope'); DenyPublicEndpoint = $true;
+DeniedSkus = @('Basic*'); RequiredTags = @('CostCenter', 'Owner') }`. Every
+brief, design and decision record carries the catalog version it was made with,
+and Test-AACArchitectureDesign says when a design was made with an older one.
+The policy display names and PSRule rule names in the catalog are references to
+verify against current Microsoft data.
+
 ## Azure DevOps assessment
 
 `Invoke-AACADOAssessment` (`Get-AACADOInventory` in 0.14 and earlier) assesses
@@ -2783,7 +2822,7 @@ workspace ID (GUID), resource ID or name - without changing anything:
 
 ```powershell
 Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId 00000000-0000-0000-0000-000000000000
-Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId 'law-contoso-prod' -Days 7 -HtmlPath .\Workspace.html -CsvPath .\Tables.csv
+Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId 'law-contoso-prod' -Days 7 -HtmlPath .\Workspace.html -PdfPath .\Workspace.pdf -CsvPath .\Tables.csv
 (Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId 'law-contoso-prod' -Section Tables -NoDisplay).Tables | Where-Object Billing -EQ 'Billable'
 (Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId 'law-contoso-prod' -NoDisplay).Recommendations | Where-Object Severity -EQ 'High'
 ```
@@ -2800,6 +2839,13 @@ Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId 'law-contoso-prod' -Days 
 | Query Audit           | Queries per user and app, the slowest, the failed                                                                                                                                                                                                                                                         | `LAQueryLogs` (KQL)                                         |
 | Data Collection Rules | The DCRs sending to the workspace: data sources, streams, output tables, transformations, associations                                                                                                                                                                                                    | Resource Graph                                              |
 | Change Log            | Changes to the workspace and its tables, from the activity log                                                                                                                                                                                                                                            | Resource Manager                                            |
+
+`-HtmlPath` writes a tabbed report like the other assessments: a Summary tab
+(headline, tiles and charts), then a tab per section - Recommendations,
+Tables, Settings, Usage, Health, Agents, Query audit, Data collection rules
+and Change log - with every table searchable, filterable and downloadable as
+CSV. `-PdfPath` writes the same as a PDF, each section a bookmarked heading
+with its tables' key columns.
 
 The assessment's own recommendations: a legacy pricing tier; a commitment tier
 when billable ingestion averages 100 GB a day or more, or one above what is
@@ -3030,8 +3076,8 @@ area (Core first), for a faster import.
 2. Commit, then push a tag that matches the version:
 
    ```powershell
-   git tag -a v0.14.7 -m "Azure.Admin.Console v0.14.7"
-   git push origin v0.14.7
+   git tag -a v0.14.8 -m "Azure.Admin.Console v0.14.8"
+   git push origin v0.14.8
    ```
 
 **Pre-releases.** A `Prerelease` value in the manifest's `PSData` (for
