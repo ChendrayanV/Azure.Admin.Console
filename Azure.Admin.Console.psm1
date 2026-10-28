@@ -209,6 +209,13 @@ $displayProperties = [ordered]@{
     'AAC.ArchitecturePattern' = 'Rank', 'Name', 'Recommended', 'Score', 'Why'
     'AAC.ArchitectureFinding' = 'Severity', 'Status', 'Rule', 'Finding', 'Component'
     'AAC.TenantAssessment' ='Subscriptions', 'Resources', 'ResourceTypes', 'AdvisorHigh', 'Retirements', 'SecurityHigh', 'WafScore', 'AnnualSavings'
+    # Show-AACServiceBusEntity: queues and topics as the sign-in sees them, subscriptions, metrics, samples, findings, access.
+    'AAC.ServiceBusLookup' = 'Entity', 'Kind', 'Status', 'Active', 'DeadLettered', 'Scheduled', 'UsedPct', 'Access', 'Metrics'
+    'AAC.ServiceBusLookupSample' = 'Time', 'Entity', 'Active', 'DeadLettered', 'Scheduled'
+    'AAC.ServiceBusLookupSubscription' = 'Topic', 'Subscription', 'Status', 'Active', 'DeadLettered', 'Scheduled', 'LastAccessed'
+    'AAC.ServiceBusLookupMetric' = 'Entity', 'Metric', 'Total', 'Average', 'Peak', 'Trend'
+    'AAC.ServiceBusLookupFinding' = 'Severity', 'Entity', 'Finding', 'Detail'
+    'AAC.ServiceBusLookupAccess' = 'Entity', 'Kind', 'LiveState', 'Subscriptions', 'Metrics', 'Needed'
     # Invoke-AACVirtualNetworkAssessment: networks, subnets, peerings, free ranges, findings.
     'AAC.VirtualNetwork' = 'Name', 'Role', 'AddressSpace', 'UsedIps', 'AvailableIps', 'UsedPercent', 'SubnetCount', 'PeeringCount', 'High', 'Medium', 'Low'
     'AAC.VirtualNetworkSubnet' = 'VirtualNetwork', 'Subnet', 'Prefix', 'Usable', 'Used', 'Available', 'UsedPercent', 'Nsg', 'Outbound'

@@ -2,6 +2,16 @@
 
 All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never published to the PowerShell Gallery.
 
+## Unreleased
+
+### New
+
+- **Service Bus entities, as you can see them.** `Show-AACServiceBusEntity -NamespaceId <id> -EntityName <names>` shows queues and topics as the signed-in user can read them - with a role on the namespace, or only on the entities (Azure Service Bus Data Sender or Receiver) - and says which. Live state for everyone: active, dead-lettered, scheduled and transfer messages, size against the maximum, status, each topic subscription and every setting. With namespace access, also wildcards or every entity, and Azure Monitor metrics per queue or topic over `-TimeRange` (messages in and out, completed and abandoned, requests, errors, throttling, backlog, size, send latency, Premium CPU and memory) with a trend. Without it, `-Sample` reads the live counts a few times for a backlog trend. Findings (dead-letters, filling up, throttling, a growing backlog, no role, not found), a "What you can see" tab with the role that would show more, and the usual console view, objects (`-View Entity`, `Subscription`, `Metric`, `Sample`, `Finding`, `Access`) and CSV, HTML and PDF reports.
+
+### Changed
+
+- `Read-AACMetric` (internal) returns each call's HTTP status, so a 403 shows as "no permission" rather than a failure.
+
 ## v0.14.8
 
 Architecture design - from requirements to a validated design, diagrams (Mermaid and a multi-page draw.io with Azure icons) and decision records - plus a tenant assessment with a tab for each audience, SBOM in the Azure DevOps assessment and a tabbed Log Analytics workspace report.

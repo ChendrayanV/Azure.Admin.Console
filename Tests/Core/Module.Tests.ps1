@@ -103,6 +103,7 @@ Describe 'Azure Admin Console - Module scaffold' {
             'Invoke-AACPolicyAssessment'
             'Invoke-AACPSRule'
             'Invoke-AACServiceBusAssessment'
+            'Show-AACServiceBusEntity'
             'Invoke-AACStorageAccountAssessment'
             'Invoke-AACVirtualNetworkAssessment'
             'Invoke-AACWafAssessment'

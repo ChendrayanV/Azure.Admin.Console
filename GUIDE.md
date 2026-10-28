@@ -295,6 +295,7 @@ Commands for an Azure estate - subscriptions and management groups: inventory, c
 | [`Get-AACKeyVaultInsight`](docs/Get-AACKeyVaultInsight.md)                                       | Key Vaults: what Azure Monitor's Key Vault workbook shows (availability, transactions, latency, failures by status, operations from the audit logs) plus saturation, posture, callers denied or throttled, and secrets, keys and certificates near expiry (`-IncludeObjects`) - as a heat map and findings. |
 | [`Invoke-AACStorageAccountAssessment`](docs/Invoke-AACStorageAccountAssessment.md)               | Storage accounts: what Azure Monitor's Storage accounts workbook shows (transactions, latency, errors by response type, capacity by service) plus availability, throttling, security posture, data protection (soft delete, versioning, redundancy) and cost (lifecycle rules, legacy kinds, idle and hot-but-quiet accounts) - as a heat map and findings. |
 | [`Invoke-AACServiceBusAssessment`](docs/Invoke-AACServiceBusAssessment.md)                       | Service Bus namespaces assessed: requests, errors and throttling, Premium CPU and memory, every queue, topic and subscription's messages (active, dead-lettered, scheduled) and how full it is, security (TLS, SAS keys, network, logs), resilience (zones, geo-disaster recovery) and cost, as a heat map and findings. A console view, objects, and CSV, HTML and PDF reports.|
+| [`Show-AACServiceBusEntity`](docs/Show-AACServiceBusEntity.md) | Queues and topics as you can see them - with a role on the namespace or only on the entities: live counts, dead-letters, subscriptions, configuration, and (with namespace access) Azure Monitor metrics with trends; `-Sample` for a backlog trend without metrics. |
 | [`Invoke-AACCosmosDBAssessment`](docs/Invoke-AACCosmosDBAssessment.md)                           | Cosmos DB accounts assessed in every API: availability, requests by status and rate limiting (429), throughput and the busiest partition, storage, every database and container with its throughput, security (network, keys, TLS, logs, Defender), resilience (regions, failover, zones, backup) and cost, as a heat map and findings. A console view, objects, and CSV, HTML and PDF reports.|
 | [`Show-AACApplicationGatewayMap`](docs/Show-AACApplicationGatewayMap.md)                         | Application Gateways drawn as their traffic flow - frontend IPs, listeners, rules, path rules and redirects, backend settings and probes, pools and targets, WAF policies - with health (`-IncludeHealth` for the live backend health) and findings, opened in your browser. |
 | [`Get-AACNetworkHealth`](docs/Get-AACNetworkHealth.md)                                           | The hybrid and edge network's health - ExpressRoute circuits and gateways, VPN gateways, connections and tunnels, Azure Firewalls and NAT gateways - from metrics, configuration and Resource Health: % of capacity, thresholds and findings, each with when it happened. |
@@ -1776,6 +1777,47 @@ Invoke-AACServiceBusAssessment -View Finding -NoDisplay | Where-Object Signal -E
 
 It reads Resource Graph, Resource Manager and Azure Monitor metrics: Reader
 is enough. It reads no messages and no keys.
+
+### Service Bus entities, as you can see them
+
+The assessment needs the namespace. Application teams often hold a role on
+their own queues and topics only - *Azure Service Bus Data Sender* or *Data
+Receiver* - and `Show-AACServiceBusEntity` is for them as much as for the
+platform team. It works out what your sign-in can read, entity by entity:
+
+```powershell
+Show-AACServiceBusEntity -NamespaceId $namespaceId -EntityName 'orders'                       # one queue or topic
+Show-AACServiceBusEntity -NamespaceId $namespaceId -EntityName 'orders-*' -TimeRange 7d -HtmlPath .\sb.html
+Show-AACServiceBusEntity -NamespaceId $namespaceId -EntityName 'orders' -Sample 10 -SampleInterval 00:00:30
+Show-AACServiceBusEntity -NamespaceId $namespaceId -EntityName 'events' -View Subscription -NoDisplay | Where-Object DeadLettered
+```
+
+| Your role | What you see |
+|---|---|
+| On the namespace (Reader, Monitoring Reader, Data Owner) | Every queue and topic (wildcards, or no `-EntityName` for all), their live state, and their Azure Monitor metrics over `-TimeRange` |
+| On the entity only (Data Sender or Receiver) | The named entities' live state. Service Bus publishes metrics on the namespace, so an entity role can't read them; `-Sample` reads the live counts a few times instead, for a backlog trend |
+| None | The entity is listed as *No role*, with the role to ask for |
+
+- **Live state:** active, dead-lettered, scheduled, transfer and transfer
+  dead-lettered messages, size against the maximum, status and when it was
+  last used. A topic's counts are the sum of its subscriptions'.
+- **Dead-letter, Subscriptions, Configuration:** each queue's and
+  subscription's dead-letter queue and why messages land there; each topic's
+  subscriptions; every setting (lock, max deliveries, TTL, sessions,
+  duplicate detection, forwarding, partitioning, auto-delete).
+- **Metrics:** messages in and out, completed and abandoned, requests,
+  server and user errors, throttling, backlog over time, size and send
+  latency per queue or topic - total, average, peak and a trend (▁▃▅█) - and
+  a Premium namespace's CPU and memory.
+- **Findings:** dead-letters, auto-forwarding failing, entities filling up
+  or disabled, throttling, server errors, messages arriving with none
+  received, a growing backlog (from metrics or samples), idle entities,
+  expired messages dropped.
+- **What you can see:** for each entity, what this sign-in could read and
+  the role that would show the rest.
+
+With only an entity role you can't look the namespace up, so ask the
+platform team for its resource ID.
 
 ## Cosmos DB assessment
 

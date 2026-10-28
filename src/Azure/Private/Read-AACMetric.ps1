@@ -10,7 +10,7 @@ function Read-AACMetric {
         empty) }). A call fails on its own - a metric a resource doesn't have,
         say - and the others carry on.
 
-        Returns @{ resource ID = @{ call key = @{ Error; Series = @(@{ Name
+        Returns @{ resource ID = @{ call key = @{ Error; Status (HTTP); Series = @(@{ Name
         (metric); Dims (@{ dimension (lower case) = value }); Points (data
         points: average, maximum, total, minimum) }) } } }.
     #>
@@ -58,7 +58,9 @@ function Read-AACMetric {
             }
         }
         elseif (-not $failure) { $failure = 'No metrics returned.' }
-        $out[$id][$callKey] = @{ Error = $failure; Series = $series.ToArray() }
+        # Status lets a caller tell "no permission" (403) from a metric the resource doesn't publish (400).
+        $status = if ($answer -is [System.Collections.IDictionary] -and $answer.Contains('Status')) { [int]$answer['Status'] } else { 0 }
+        $out[$id][$callKey] = @{ Error = $failure; Status = $status; Series = $series.ToArray() }
     }
     $out
 }
