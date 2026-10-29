@@ -253,6 +253,8 @@ Commands for an Azure estate - subscriptions and management groups: inventory, c
 | [`Get-AACSecurityAlert`](docs/Get-AACSecurityAlert.md)                                           | Microsoft Defender for Cloud security alerts across every subscription in one query - the Get-AzSecurityAlert equivalent, with more in each alert: MITRE ATT&CK tactics and techniques, the hosts, accounts and IP addresses involved, extended properties, remediation steps, incidents and recurring alerts. Filters by status, severity, age, name, type, tactic and resource, and takes resources from the pipeline.                                                                                                                                                                                                                          |
 | [`Get-AACSkuAvailability`](docs/Get-AACSkuAvailability.md)                                       | Which VM sizes you can use for virtual machines or AKS node pools in a region and its availability zones - the subscription's restrictions, vCPU quota and AKS's rules - and why a size can't be used; an AKS cluster's node pools. Read-only REST, nothing deployed. A console view, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                                                                         |
 | [`Get-AACAssignedPolicy`](docs/Get-AACAssignedPolicy.md)                                         | Every Azure Policy assignment and its parameters - the default, assigned and effective value of each - with the resource types the policy applies to (its rule's type conditions, parameters resolved), one row per assignment and parameter. Assignments inherited from management groups included. A console view, objects, and CSV and interactive HTML reports.                                                                                                                                                                                                                                                                               |
+| [`Show-AACEffectivePolicy`](docs/Show-AACEffectivePolicy.md) | The Azure Policy that applies to a resource - existing, or one you are about to deploy - and what each policy does to it (blocks, audits, changes, deploys), where it is assigned, its compliance and why (field, expected, found), the exemption covering it, what notScopes, resource selectors or the rule leave out, and the assignment chain. |
+| [`Test-AACPolicyDeployment`](docs/Test-AACPolicyDeployment.md) | An ARM template or Bicep file checked against Azure Policy before it is deployed: what would be refused, audited or changed, resource by resource, why, and the values allowed - a pull-request check or pipeline gate (`-FailOn Deny`). |
 | [`Invoke-AACPolicyAssessment`](docs/Invoke-AACPolicyAssessment.md)                               | Azure Policy assessed as a whole, in the spirit of AzPolicyLens: compliance (each resource counted at its worst state) overall and by subscription, management group, assignment, policy and category; exemptions and their expiry; initiatives and definitions; the managed identities' roles; what to improve (direct assignments, DoNotEnforce, remediation without an identity or role, deprecated policies, overlapping assignments, stale exemptions, unassigned custom definitions, unused groups). Platform and Application audiences. A console view, objects, and CSV, PDF and interactive HTML reports with the management group tree. |
 | [`Invoke-AACDefenderAssessment`](docs/Invoke-AACDefenderAssessment.md)                           | Microsoft Defender for Cloud assessed across subscriptions: every recommendation (unhealthy, healthy and not applicable resources, risk level), attack paths step by step, security alerts with MITRE tactics and remediation, the inventory with each resource's plan coverage, vulnerabilities (CVEs), secure score controls, Defender plans with extensions, regulatory compliance, and environment settings (contacts, notifications, integrations, connectors, just-in-time) - with findings on how Defender is set up. A console view, an object, CSV and a tabbed HTML report in the portal's order. |
 | [`Get-AACPolicyState`](docs/Get-AACPolicyState.md)                                               | Azure Policy compliance for every resource - one row per resource and policy, with initiative, assignment, effect and when it was evaluated - by management group, subscription or resource group, with compliance per assignment, policy, subscription and resource group. A console view, objects, and CSV, PDF and interactive HTML reports.                                                                                                                                                                                                                                                                                                   |
@@ -1291,6 +1293,118 @@ A policy without parameters is one row with no parameter, so every
 assignment is listed. The console view shows the assignments by scope, the
 resource types with the most assignments, and each assignment's parameters
 as a tree (assigned values in green, defaults in grey).
+
+### The policy that applies to a resource
+
+The commands above start from the assignment. `Show-AACEffectivePolicy`
+starts from the resource and answers the question admins and architects
+actually ask: *what applies to this, what does it do to it, and why?*
+
+```powershell
+Show-AACEffectivePolicy -ResourceId $storageId                                 # one resource (or pipe resources in)
+Show-AACEffectivePolicy -SubscriptionId $sub -ResourceGroupName 'rg-orders' -HtmlPath .\orders-policy.html
+Show-AACEffectivePolicy -ResourceId $vmId -Impact Blocks, 'Blocks delete'       # only what refuses a change or a delete
+Show-AACEffectivePolicy -ResourceId $storageId -IncludeNotApplicable            # also what's on the path but doesn't target it, and why
+
+# Before deploying: what would Azure Policy do to a new storage account there?
+Show-AACEffectivePolicy -Scope "/subscriptions/$sub/resourceGroups/rg-new" -ResourceType 'Microsoft.Storage/storageAccounts' `
+    -Location 'westeurope' -Sku 'Standard_LRS' -Tag @{ CostCenter = 'cc-01' }
+```
+
+Every assignment on the resource's path (its management groups, root first,
+then its subscription, resource group and the resource itself) is expanded.
+Each initiative becomes its member policies. Each policy gets one verdict:
+
+| Verdict        | Meaning                                                                                                                       |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `Applies`      | The policy evaluates the resource                                                                                             |
+| `Exempt`       | An exemption covers it: Waiver or Mitigated, for every policy in the assignment or only some, until a date. An expired exemption is shown but no longer exempts |
+| `Excluded`     | The assignment's `notScopes` leave it out                                                                                     |
+| `Not selected` | The assignment's resource selectors (location, type) leave it out                                                            |
+| `Not targeted` | The rule is about other resource types, or a data-plane policy (`Microsoft.Kubernetes.Data`, ...) is for another kind of resource. Shown with `-IncludeNotApplicable` |
+
+**Impact** says what the effect does to the resource. The effect is worked
+out from the parameters, then the initiative, then the assignment, then its
+overrides. `Blocks` (deny), `Blocks delete` (denyAction), `Changes`
+(modify, append), `Deploys` (deployIfNotExists), `Audits`, `Manual` and
+`Disabled` are the effects themselves. `Reports only` means the assignment
+isn't enforced (`DoNotEnforce`), so a deny, change or deploy only reports.
+
+For an existing resource you also get Azure's compliance state and when it
+was last evaluated. A non-compliant resource also says why: the field, the
+value the policy expects and the value it found, read from Policy
+Insights for up to 25 resources. Skip that read with `-SkipReason`.
+
+For a planned resource, Azure Policy itself is asked: `checkPolicyRestrictions`,
+with audits included. It says what would refuse the resource, audit it or
+change it, and which values are allowed: locations, types and SKUs, plus
+required tags. `deployIfNotExists`, `auditIfNotExists` and `denyAction` act
+on what exists after the deployment, so they show as `After deployment`.
+
+The HTML report has these tabs:
+- **In force**: worst impact first.
+- **Non-compliant**: each evaluation with its reason.
+- **Allowed values**: planned resources only.
+- **Exemptions**: with the dates they end.
+- **Left out**: each policy with the reason.
+- **Assignment chain**: scope, enforcement, managed identity, exclusions, resource selectors and definition version.
+- **Resources.**
+- **Findings**, as follows:
+  - **High:** a non-compliant resource that a deny will refuse at its next deployment.
+  - **High:** a remediation that can't run because the assignment has no managed identity.
+  - **Medium:** remediation that hasn't run yet.
+  - **Medium:** an exemption that ends within 30 days.
+  - **Low:** an expired exemption.
+  - **Info:** policies with no result yet.
+
+### Testing a template against Azure Policy
+
+`Test-AACPolicyDeployment` checks an ARM template or a Bicep file before it
+is deployed, which makes it useful in a pull request or as a pipeline gate.
+
+```powershell
+Test-AACPolicyDeployment -TemplatePath .\main.bicep -SubscriptionId $sub -ResourceGroupName 'rg-orders'
+Test-AACPolicyDeployment -TemplatePath .\main.json -ParameterPath .\prod.parameters.json -SubscriptionId $sub `
+    -ResourceGroupName 'rg-orders' -FailOn Deny -HtmlPath .\policy-gate.html
+```
+
+The template's resources are worked out offline: parameters, variables,
+most template functions, Bicep modules (followed into other resource groups)
+and child resources. Each resource body is then sent to Azure Policy. The
+outcomes:
+
+| Outcome       | Meaning                                                        |
+| ------------- | -------------------------------------------------------------- |
+| `Blocked`     | A deny would refuse it. You get the field, the expected and found values, and the values allowed |
+| `Audited`     | It deploys, but is reported non-compliant                      |
+| `Changed`     | Modify or append would change it as it deploys                 |
+| `Passes`      | Nothing refuses, audits or changes it                          |
+| `Not checked` | Azure couldn't be asked                                        |
+
+Some values can only be known at deployment, such as `uniqueString()`,
+`reference()` or a parameter with no value. They are left out of the body,
+never guessed, and named on the resource, because a policy that reads them
+can't be judged. A `.bicep` file is compiled with the Bicep CLI when
+`bicep` is on the PATH. A resource group that doesn't exist yet is checked
+at the subscription; give `-Location` for anything that uses
+`resourceGroup().location`. `-FailOn Deny` (or `Audit`) ends with an error
+after the report is written, which fails the pipeline.
+
+### Which policy command?
+
+| You want to know                                                              | Command                                       |
+| ----------------------------------------------------------------------------- | --------------------------------------------- |
+| What applies to this resource, what it does to it, and why                   | `Show-AACEffectivePolicy -ResourceId`         |
+| What Azure Policy would do to a resource I'm about to create                  | `Show-AACEffectivePolicy -Scope -ResourceType` |
+| Whether my template or Bicep file will deploy                                 | `Test-AACPolicyDeployment`                    |
+| How compliant a scope is, per resource and policy                             | `Get-AACPolicyState`                          |
+| What is assigned, with which parameter values                                 | `Get-AACAssignedPolicy`                       |
+| Whether our policy programme is healthy (identities, exemptions, hygiene)     | `Invoke-AACPolicyAssessment`                  |
+| Whether remediation tasks are running                                         | `Get-AACPolicyRemediation`                    |
+| How we stand against CIS, PCI, ISO or the Microsoft cloud security benchmark  | `Get-AACComplianceGap`                        |
+| How our management groups compare with the Azure Landing Zones reference      | `Test-AACAlzPolicy`                           |
+| Who changed policy recently                                                   | `Get-AACGovernanceChange`                     |
+| What policy denied in the activity log                                        | `Get-AACResourceError`                        |
 
 ## VM size availability (virtual machines and AKS)
 

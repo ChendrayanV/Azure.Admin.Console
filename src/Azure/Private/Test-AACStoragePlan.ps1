@@ -113,35 +113,20 @@ function Test-AACStoragePlan {
         foreach ($item in $checks) {
             $content = [ordered]@{ type = $item.Type; name = $item.Name }
             foreach ($key in @($item.Planned.Keys)) { if ($key -notin 'id', 'name', 'type', 'etag', 'systemData') { $content[$key] = $item.Planned[$key] } }
-            $details = [ordered]@{ resourceContent = $content; apiVersion = ($item.Uri -replace '^.*api-version=', '') }
             $isChild = $item.Kind -ne 'account' -and $item.Kind -ne 'privateEndpoint'
-            if ($isChild) { $details['scope'] = $item.Parent }
             $where = if ($item.Kind -eq 'privateEndpoint') { $item.Parent } else { $group }
-            $request = [ordered]@{ resourceDetails = $details; includeAuditEffect = $true }
-            try {
-                $result = Invoke-AACArmRequest -Method Post -Uri "$where/providers/Microsoft.PolicyInsights/checkPolicyRestrictions?api-version=2024-10-01" -Body (ConvertTo-Json -InputObject $request -Depth 50 -Compress)
-            }
-            catch {
-                & $gate 'Policy' 'Warn' $item.Resource '' "The policy check couldn't run: $($_.Exception.Message)"
+            $result = Invoke-AACPolicyRestrictionCheck -Scope $where -ResourceContent $content -ApiVersion ($item.Uri -replace '^.*api-version=', '') -ParentId $(if ($isChild) { $item.Parent } else { '' }) -AssignmentName $names
+            if ($result.Error) {
+                & $gate 'Policy' 'Warn' $item.Resource '' "The policy check couldn't run: $($result.Error)"
                 Update-AACProgress -Id 'policy' -Increment 1
                 continue
             }
-            $assignmentName = { param($Info) $id = ([string]$Info['policyAssignmentId']).ToLowerInvariant(); if ($names.Contains($id)) { $names[$id] } else { ($id -split '/')[-1] } }
-            foreach ($evaluation in @($result['contentEvaluationResult']['policyEvaluations'])) {
-                if ($evaluation -isnot [System.Collections.IDictionary] -or [string]$evaluation['evaluationResult'] -ne 'NonCompliant') { continue }
-                $effect = [string]$evaluation['effectDetails']['policyEffect']
-                $why = [string]$evaluation['evaluationDetails']['reason']
-                $failed = @($evaluation['evaluationDetails']['evaluatedExpressions'] | Where-Object { $_ -is [System.Collections.IDictionary] -and [string]$_['result'] -eq 'True' -and $_['path'] -ne 'type' } | ForEach-Object { "$($_['path']) $($_['operator']) $(ConvertTo-Json -InputObject $_['targetValue'] -Compress)" })
-                $detail = @($(if ($why) { $why }), $(if ($failed) { "($($failed -join '; '))" })) | Where-Object { $_ }
-                & $gate 'Policy' $(if ($effect -eq 'Deny') { 'Blocks' } elseif ($effect -match 'Audit') { 'Audit' } else { 'Changes' }) $item.Resource (& $assignmentName $evaluation['policyInfo']) "$effect$(if ($detail) { ": $($detail -join ' ')" })" ([string]$evaluation['policyInfo']['policyDefinitionId'])
+            foreach ($evaluation in $result.Evaluations) {
+                & $gate 'Policy' $(if ($evaluation.Outcome -eq 'Audits') { 'Audit' } else { $evaluation.Outcome }) $item.Resource $evaluation.Assignment "$($evaluation.Effect)$(if ($evaluation.Detail) { ": $($evaluation.Detail)" })" $evaluation.DefinitionId
             }
-            foreach ($field in @($result['fieldRestrictions'])) {
-                if ($field -isnot [System.Collections.IDictionary]) { continue }
-                foreach ($restriction in @($field['restrictions'] | Where-Object { $_ -is [System.Collections.IDictionary] })) {
-                    $kind = [string]$restriction['result']
-                    if ($kind -eq 'Required' -and $restriction['defaultValue']) { & $gate 'Policy' 'Changes' $item.Resource (& $assignmentName $restriction['policy']) "Sets $($field['field']) to '$($restriction['defaultValue'])' when it isn't given ($($restriction['policyEffect']))." }
-                    elseif ($kind -eq 'Removed') { & $gate 'Policy' 'Changes' $item.Resource (& $assignmentName $restriction['policy']) "Removes $($field['field']) ($($restriction['policyEffect']))." }
-                }
+            foreach ($restriction in $result.Restrictions) {
+                if ($restriction.Result -eq 'Required' -and $restriction.DefaultValue) { & $gate 'Policy' 'Changes' $item.Resource $restriction.Assignment "Sets $($restriction.Field) to '$($restriction.DefaultValue)' when it isn't given ($($restriction.Effect))." }
+                elseif ($restriction.Result -eq 'Removed') { & $gate 'Policy' 'Changes' $item.Resource $restriction.Assignment "Removes $($restriction.Field) ($($restriction.Effect))." }
             }
             Update-AACProgress -Id 'policy' -Increment 1
         }

@@ -111,6 +111,7 @@ Describe 'Azure Admin Console - Module scaffold' {
             'Show-AACApplicationGatewayMap'
             'Show-AACCost'
             'Show-AACDashboard'
+            'Show-AACEffectivePolicy'
             'Show-AACJson'
             'Show-AACManagementGroupMap'
             'Show-AACNetworkTopology'
@@ -119,6 +120,7 @@ Describe 'Azure Admin Console - Module scaffold' {
             'Test-AACAlzPolicy'
             'Test-AACAzureLimit'
             'Test-AACGoLiveReadiness'
+            'Test-AACPolicyDeployment'
         )
         @((Get-Command -Module 'Azure.Admin.Console').Name | Sort-Object) | Should -Be @($expectedFunctions | Sort-Object)
         Get-Command -Name 'Invoke-AACPester' -ErrorAction Ignore | Should -BeNullOrEmpty -Because 'Invoke-AACPester is parked (Parked\README.md)'

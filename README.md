@@ -140,7 +140,7 @@ Everything except reading the landing zone runs offline, so a design can be revi
 
 ## What's inside
 
-85 commands. Every one gives a **console view**, **objects**, and **CSV, HTML and PDF** reports.
+87 commands. Every one gives a **console view**, **objects**, and **CSV, HTML and PDF** reports.
 
 | Area | Commands |
 |---|---|

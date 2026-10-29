@@ -108,6 +108,7 @@
         'Show-AACApplicationGatewayMap'
         'Show-AACCost'
         'Show-AACDashboard'
+        'Show-AACEffectivePolicy'
         'Show-AACJson'
         'Show-AACManagementGroupMap'
         'Show-AACNetworkTopology'
@@ -116,6 +117,7 @@
         'Test-AACAlzPolicy'
         'Test-AACAzureLimit'
         'Test-AACGoLiveReadiness'
+        'Test-AACPolicyDeployment'
     )
     CmdletsToExport      = @()
     VariablesToExport    = @()

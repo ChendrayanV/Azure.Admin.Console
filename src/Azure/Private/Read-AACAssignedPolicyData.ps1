@@ -25,7 +25,7 @@ function Read-AACAssignedPolicyData {
 
     # --- The assignments and where every scope sits (tenant-wide) --------------------------------
     $queries = [ordered]@{
-        assignments      = @{ Tenant = $true; Query = "policyresources | where type =~ 'microsoft.authorization/policyassignments' | project id, name, displayName = tostring(properties.displayName), scope = tostring(properties.scope), definitionId = tostring(properties.policyDefinitionId), parameters = properties.parameters, enforcement = tostring(properties.enforcementMode), notScopes = properties.notScopes, overrides = properties.overrides, description = tostring(properties.description)" }
+        assignments      = @{ Tenant = $true; Query = "policyresources | where type =~ 'microsoft.authorization/policyassignments' | project id, name, displayName = tostring(properties.displayName), scope = tostring(properties.scope), definitionId = tostring(properties.policyDefinitionId), parameters = properties.parameters, enforcement = tostring(properties.enforcementMode), notScopes = properties.notScopes, overrides = properties.overrides, description = tostring(properties.description), resourceSelectors = properties.resourceSelectors, nonComplianceMessages = properties.nonComplianceMessages, definitionVersion = tostring(properties.definitionVersion), identityType = tostring(identity.type)" }
         subscriptions    = @{ Tenant = $true; Query = "resourcecontainers | where type =~ 'microsoft.resources/subscriptions' | project id, subscriptionId, name, chain = properties.managementGroupAncestorsChain" }
         managementGroups = @{ Tenant = $true; Query = "resourcecontainers | where type =~ 'microsoft.management/managementgroups' | project id, name, displayName = tostring(properties.displayName), chain = properties.details.managementGroupAncestorsChain" }
     }
@@ -66,7 +66,7 @@ function Read-AACAssignedPolicyData {
         $definitions[([string]$Row['id']).ToLowerInvariant()] = @{
             Id = [string]$Row['id']; Name = [string]$Row['name']; Kind = $Kind
             DisplayName = $(if ($Row['displayName']) { [string]$Row['displayName'] } else { [string]$Row['name'] })
-            PolicyType = [string]$Row['policyType']; Category = [string]$Row['category']; Description = [string]$Row['description']
+            PolicyType = [string]$Row['policyType']; Category = [string]$Row['category']; Description = [string]$Row['description']; Mode = [string]$Row['mode']
             Parameters = $Row['parameters']; Rule = $Row['rule']; Members = @($Row['members'])
         }
     }
@@ -79,7 +79,7 @@ function Read-AACAssignedPolicyData {
         $chunks = [ordered]@{}
         for ($i = 0; $i -lt $wanted.Count; $i += 100) {
             $ids = @($wanted[$i..([Math]::Min($i + 99, $wanted.Count - 1))] | ForEach-Object { "'$_'" }) -join ', '
-            $chunks["definitions$round-$i"] = @{ Tenant = $true; Query = "policyresources | where type in~ ('microsoft.authorization/policydefinitions', 'microsoft.authorization/policysetdefinitions') | where tolower(id) in ($ids) | project id, name, type, displayName = tostring(properties.displayName), description = tostring(properties.description), policyType = tostring(properties.policyType), category = tostring(properties.metadata.category), parameters = properties.parameters, rule = properties.policyRule, members = properties.policyDefinitions" }
+            $chunks["definitions$round-$i"] = @{ Tenant = $true; Query = "policyresources | where type in~ ('microsoft.authorization/policydefinitions', 'microsoft.authorization/policysetdefinitions') | where tolower(id) in ($ids) | project id, name, type, displayName = tostring(properties.displayName), description = tostring(properties.description), policyType = tostring(properties.policyType), category = tostring(properties.metadata.category), mode = tostring(properties.mode), parameters = properties.parameters, rule = properties.policyRule, members = properties.policyDefinitions" }
         }
         $read = Invoke-AACGraphBatch -Query $chunks
         foreach ($rows in $read.Rows.Values) { foreach ($row in @($rows)) { & $add $row (& $kindOf ([string]$row['id'])) } }
@@ -99,7 +99,7 @@ function Read-AACAssignedPolicyData {
             if (-not $result -or $result.Error -or $result.Body -isnot [System.Collections.IDictionary]) { continue }
             $p = $result.Body['properties']
             if ($p -isnot [System.Collections.IDictionary]) { $p = @{} }
-            & $add @{ id = $result.Body['id']; name = $result.Body['name']; displayName = $p['displayName']; description = $p['description']; policyType = $p['policyType']; category = $(if ($p['metadata'] -is [System.Collections.IDictionary]) { $p['metadata']['category'] }); parameters = $p['parameters']; rule = $p['policyRule']; members = $p['policyDefinitions'] } (& $kindOf $id)
+            & $add @{ id = $result.Body['id']; name = $result.Body['name']; displayName = $p['displayName']; description = $p['description']; policyType = $p['policyType']; mode = $p['mode']; category = $(if ($p['metadata'] -is [System.Collections.IDictionary]) { $p['metadata']['category'] }); parameters = $p['parameters']; rule = $p['policyRule']; members = $p['policyDefinitions'] } (& $kindOf $id)
         }
     }
     $setCount = @($definitions.Values | Where-Object Kind -EQ 'PolicySet').Count

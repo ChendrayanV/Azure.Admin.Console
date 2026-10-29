@@ -216,6 +216,14 @@ $displayProperties = [ordered]@{
     'AAC.ServiceBusLookupMetric' = 'Entity', 'Metric', 'Total', 'Average', 'Peak', 'Trend'
     'AAC.ServiceBusLookupFinding' = 'Severity', 'Entity', 'Finding', 'Detail'
     'AAC.ServiceBusLookupAccess' = 'Entity', 'Kind', 'LiveState', 'Subscriptions', 'Metrics', 'Needed'
+    # Show-AACEffectivePolicy and Test-AACPolicyDeployment: the policy that applies to a resource, and what it does.
+    'AAC.EffectivePolicy' = 'Resource', 'Impact', 'Policy', 'State', 'AssignedAt', 'Applicability'
+    'AAC.EffectivePolicyResource' = 'Resource', 'ResourceType', 'State', 'Policies', 'Blocks', 'Audits', 'Changes', 'NonCompliant', 'Exempt'
+    'AAC.EffectivePolicyAssignment' = 'Level', 'Scope', 'Assignment', 'Kind', 'Policies', 'Enforcement', 'Identity'
+    'AAC.EffectivePolicyExemption' = 'Exemption', 'Category', 'Status', 'Expires', 'Assignment', 'Resources'
+    'AAC.EffectivePolicyRestriction' = 'Resource', 'Field', 'Rule', 'Values', 'Policy'
+    'AAC.EffectivePolicyFinding' = 'Severity', 'Resource', 'Policy', 'Finding'
+    'AAC.PolicyDeploymentResource' = 'Resource', 'ResourceType', 'Outcome', 'Blocks', 'Audits', 'Changes', 'AfterDeployment'
     # Invoke-AACVirtualNetworkAssessment: networks, subnets, peerings, free ranges, findings.
     'AAC.VirtualNetwork' = 'Name', 'Role', 'AddressSpace', 'UsedIps', 'AvailableIps', 'UsedPercent', 'SubnetCount', 'PeeringCount', 'High', 'Medium', 'Low'
     'AAC.VirtualNetworkSubnet' = 'VirtualNetwork', 'Subnet', 'Prefix', 'Usable', 'Used', 'Available', 'UsedPercent', 'Nsg', 'Outbound'
