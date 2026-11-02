@@ -1,5 +1,5 @@
 <#
-    Made-up Contoso Key Vaults for KeyVaultInsight.Tests.ps1, as Resource
+    Made-up Contoso Key Vaults for KeyVaultAssessment.Tests.ps1, as Resource
     Graph, Azure Monitor metrics, diagnostic settings, Log Analytics and the
     Key Vault data plane return them.
 

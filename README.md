@@ -15,7 +15,7 @@ Plain REST. No Az or Microsoft.Graph modules. Read-only by default.
 [![License: MIT](https://img.shields.io/badge/license-MIT-7B61FF.svg)](LICENSE)
 [![Sponsor](https://img.shields.io/github/sponsors/ChendrayanV?label=Sponsor&logo=githubsponsors&color=EA4AAA)](https://github.com/sponsors/ChendrayanV)
 
-[How to use it](#how-to-use-it) · [What's new](#whats-new-in-0148) · [Architecture design](#architecture-design) · [Commands](#whats-inside) · [Full guide](GUIDE.md) · [Contribute](#contributing) · [Contact](#contact)
+[How to use it](#how-to-use-it) · [What's new](#whats-new-in-0149) · [Architecture design](#architecture-design) · [Commands](#whats-inside) · [Full guide](GUIDE.md) · [Contribute](#contributing) · [Contact](#contact)
 
 </div>
 
@@ -36,60 +36,73 @@ Plain REST. No Az or Microsoft.Graph modules. Read-only by default.
 | **DevOps team** | An Azure DevOps assessment: pipelines, tools, SBOM, security, DORA - and a plan to move to GitHub |
 | **Consultant** | Hand-over-ready HTML, PDF and CSV reports from a read-only sign-in |
 
-## What's new in 0.14.8
+## What's new in 0.14.9
 
 Click a tab to open it.
 
 <details open>
-<summary><b>🏗️ Architecture design</b> &nbsp;·&nbsp; <i>new area, 6 commands</i></summary>
+<summary><b>📜 Activity Log assessment</b> &nbsp;·&nbsp; <i><code>Invoke-AACActivityLogAssessment</code>, 90, 180 or 365 days</i></summary>
 
 <br>
 
-From a workload's requirements to a validated Azure design, diagrams and decision records - offline, in minutes.
-`New-AACArchitectureBrief` · `Get-AACArchitecturePattern` · `New-AACArchitectureDesign` · `Test-AACArchitectureDesign` · `New-AACArchitectureDiagram` · `Export-AACArchitectureDecision` - see [Architecture design](#architecture-design).
-
-</details>
-
-<details>
-<summary><b>🏢 Tenant assessment</b> &nbsp;·&nbsp; <i><code>Invoke-AACTenantAssessment</code> (was <code>Invoke-AACAssessment</code>)</i></summary>
-
-<br>
-
-The whole Azure environment in one report, now with the Well-Architected Framework, FinOps, PSRule and each resource's policy compliance - and a tab for each audience: **Identity and access** for security, **Architecture** for architects, **Operations** for admins and **Service delivery** for service managers. Each report goes where you say: `-HtmlPath`, `-PdfPath`, `-CsvPath`.
+Every resource's activity, with subscription, resource group, resource and tags on every row: who changed what and when, when each resource was last used, which are idle or were deleted, changes made by hand, guests and people changing access, keys read by people. It reads the Log Analytics workspace each subscription already sends its Activity Log to, found automatically, so a year takes seconds. Subscriptions with no export fall back to the REST API, which keeps 90 days. A Coverage tab says which source each subscription used.
 
 ```powershell
-Invoke-AACTenantAssessment -ManagementGroupId 'mg-landingzones' -HtmlPath .\tenant.html -PdfPath .\tenant.pdf
+Invoke-AACActivityLogAssessment -ManagementGroupId 'mg-landingzones' -Days 365 -TagName CostCenter -RequiredTag CostCenter -HtmlPath .\activity.html
 ```
 
 </details>
 
 <details>
-<summary><b>🔧 Azure DevOps assessment</b> &nbsp;·&nbsp; <i><code>Invoke-AACADOAssessment</code> (was <code>Get-AACADOInventory</code>), now with SBOM</i></summary>
+<summary><b>🔎 Activity Log events, readable</b> &nbsp;·&nbsp; <i><code>Show-AACActivityLogEvent</code></i></summary>
 
 <br>
 
-Pipelines and the tools they run, security posture, DORA metrics - and a new **SBOM** tab: which pipelines publish a software bill of materials (Microsoft SBOM Tool, Syft, CycloneDX), and the components and licences in them.
+An Activity Log event holds about sixty values, nested six levels deep. This command makes each one a card: what failed and why (the innermost error and what to do), who (decoded from the token: service principal, managed identity or user, how it signed in, which tenant, which roles), where, and the IDs to trace it. It reads the JSON you copy from the portal (no sign-in needed), takes a correlation ID, or accepts the failures an assessment found from the pipeline.
 
 ```powershell
-Invoke-AACADOAssessment -Organization contoso -UseAzureSignIn -HtmlPath .\ado.html
+Show-AACActivityLogEvent -Path .\event.json -PdfPath .\incident.pdf
 ```
 
 </details>
 
 <details>
-<summary><b>📊 Log Analytics workspace report</b> &nbsp;·&nbsp; <i><code>Invoke-AACLogAnalyticsWorkspaceAssessment</code>, tabbed HTML and PDF</i></summary>
+<summary><b>🛡️ Effective Azure Policy</b> &nbsp;·&nbsp; <i><code>Show-AACEffectivePolicy</code> · <code>Test-AACPolicyDeployment</code></i></summary>
 
 <br>
 
-Billable and free tables, settings, data collection rules and recommendations, now split into tabs like the other assessments, with a PDF.
+Starts from the resource, not the assignment. You see every policy that applies, what it does to the resource (blocks, audits, changes, deploys), where it is assigned, whether the resource complies and why not, and what exempts it or leaves it out. For a resource you haven't deployed yet, Azure Policy itself says what it would refuse and which values it allows. `Test-AACPolicyDeployment` checks an ARM template or Bicep file before it deploys, and can fail a pipeline.
 
 ```powershell
-Invoke-AACLogAnalyticsWorkspaceAssessment -WorkspaceId $workspaceId -HtmlPath .\law.html -PdfPath .\law.pdf
+Show-AACEffectivePolicy -ResourceId $storageId
+Test-AACPolicyDeployment -TemplatePath .\main.bicep -SubscriptionId $sub -ResourceGroupName 'rg-orders' -FailOn Deny
 ```
 
 </details>
 
-Breaking changes (two renames, the tenant assessment's report parameters) are in the [changelog](CHANGELOG.md).
+<details>
+<summary><b>📨 Service Bus entities</b> &nbsp;·&nbsp; <i><code>Show-AACServiceBusEntity</code></i></summary>
+
+<br>
+
+Queues and topics as the signed-in user can see them, whether the role is on the namespace or only on the entities. You get live counts, dead-letters, subscriptions and configuration, plus Azure Monitor metrics with trends when the role covers the namespace. With an entity role only, `-Sample` builds a backlog trend instead.
+
+```powershell
+Show-AACServiceBusEntity -NamespaceId $namespaceId -EntityName 'orders-*' -TimeRange 7d -HtmlPath .\sb.html
+```
+
+</details>
+
+<details>
+<summary><b>🔑 Key Vault assessment</b> &nbsp;·&nbsp; <i><code>Invoke-AACKeyVaultAssessment</code> (was <code>Get-AACKeyVaultInsight</code>)</i></summary>
+
+<br>
+
+Renamed to match the other `Invoke-AAC<Thing>Assessment` commands; it works as before. Replace the old name in your scripts, and `AAC.KeyVaultInsight` with `AAC.KeyVaultAssessment` anywhere you test the type.
+
+</details>
+
+The breaking change (one rename, no alias) is in the [changelog](CHANGELOG.md), with 0.14.8 (the Architecture design area) and earlier releases.
 
 ## Architecture design
 
@@ -140,18 +153,18 @@ Everything except reading the landing zone runs offline, so a design can be revi
 
 ## What's inside
 
-87 commands. Every one gives a **console view**, **objects**, and **CSV, HTML and PDF** reports.
+89 commands. Every one gives a **console view**, **objects**, and **CSV, HTML and PDF** reports.
 
 | Area | Commands |
 |---|---|
-| **Design** 🆕 | `New-AACArchitectureBrief` · `Get-AACArchitecturePattern` · `New-AACArchitectureDesign` · `Test-AACArchitectureDesign` · `New-AACArchitectureDiagram` · `Export-AACArchitectureDecision` |
+| **Design** | `New-AACArchitectureBrief` · `Get-AACArchitecturePattern` · `New-AACArchitectureDesign` · `Test-AACArchitectureDesign` · `New-AACArchitectureDiagram` · `Export-AACArchitectureDecision` |
 | **Assess** | `Invoke-AACTenantAssessment` · `Invoke-AACWafAssessment` · `Invoke-AACGovernanceAssessment` · `Invoke-AACPSRule` · `Test-AACGoLiveReadiness` · `Invoke-AACAksAssessment` · `Invoke-AACFunctionAppAssessment` and 11 more |
 | **See** | `Show-AACDashboard` · `Get-AACInventory` · `Show-AACResourceMap` · `Show-AACNetworkTopology` · `Get-AACDependencyGraph` |
 | **Cost** | `Show-AACCost` · `Get-AACCostAnomaly` · `Get-AACUnusedResource` · `Get-AACResourceUtilization` · `Get-AACAdvisorRecommendation` |
 | **Secure** | `Get-AACSecurityPosture` · `Get-AACAttackPath` · `Get-AACAccessReview` · `Get-AACNetworkSecurityGroup` · `Get-AACLegacyAuthentication` |
 | **Plan IPs** | `Get-AACIPAMReport` - your address plan, every IP address, overlaps and the next free ranges |
-| **Govern** | `Get-AACPolicyState` · `Get-AACComplianceGap` · `Get-AACConfigurationDrift` · `Get-AACResourceLock` · `Test-AACAzureLimit` |
-| **Operate** | `Get-AACResourceHealth` · `Get-AACChangeHistory` · `Get-AACResourceError` · `Invoke-AACHealthCheck` · `Get-AACFailoverReadiness` · `Show-AACServiceBusEntity` 🆕 |
+| **Govern** | `Show-AACEffectivePolicy` 🆕 · `Test-AACPolicyDeployment` 🆕 · `Get-AACPolicyState` · `Get-AACComplianceGap` · `Get-AACConfigurationDrift` · `Get-AACResourceLock` · `Test-AACAzureLimit` |
+| **Operate** | `Get-AACResourceHealth` · `Get-AACChangeHistory` · `Get-AACResourceError` · `Invoke-AACHealthCheck` · `Get-AACFailoverReadiness` · `Invoke-AACActivityLogAssessment` 🆕 · `Show-AACActivityLogEvent` 🆕 · `Show-AACServiceBusEntity` 🆕 |
 | **Microsoft 365** | `Invoke-AACM365Assessment` · `Get-AACEntraGroupMembership` · `Get-AACApplicationPermission` · `New-AACApplicationPermission` |
 | **Azure DevOps** | `Invoke-AACADOAssessment` |
 | **Build** | `Export-AACTerraform` · `Get-AACTerraformPlan` · `Deploy-AACStorageAccount` |

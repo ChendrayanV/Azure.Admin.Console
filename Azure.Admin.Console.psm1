@@ -216,6 +216,18 @@ $displayProperties = [ordered]@{
     'AAC.ServiceBusLookupMetric' = 'Entity', 'Metric', 'Total', 'Average', 'Peak', 'Trend'
     'AAC.ServiceBusLookupFinding' = 'Severity', 'Entity', 'Finding', 'Detail'
     'AAC.ServiceBusLookupAccess' = 'Entity', 'Kind', 'LiveState', 'Subscriptions', 'Metrics', 'Needed'
+    # Invoke-AACActivityLogAssessment: resources with their activity and last use, distinct activity, callers, findings, coverage.
+    'AAC.ActivityLogResource' = 'Resource', 'ResourceGroup', 'State', 'LastUsed', 'IdleDays', 'Operations', 'ByPeople', 'LastCaller'
+    'AAC.ActivityLogActivity' = 'Resource', 'Caller', 'Operation', 'Status', 'Count', 'Last'
+    'AAC.ActivityLogCaller' = 'Caller', 'CallerKind', 'Operations', 'Writes', 'Deletes', 'Failed', 'Resources', 'LastSeen'
+    'AAC.ActivityLogFinding' = 'Severity', 'Area', 'Resource', 'Finding'
+    'AAC.ActivityLogCoverage' = 'Subscription', 'Source', 'Workspace', 'RetentionDays', 'CoveredFrom'
+    # Show-AACActivityLogEvent: each event flattened, as cards, errors by code, callers, claims.
+    'AAC.ActivityLogEvent' = 'Time', 'Status', 'Operation', 'ErrorCode', 'Caller', 'Resource'
+    'AAC.ActivityLogEventDetail' = 'Event', 'Section', 'Field', 'Value'
+    'AAC.ActivityLogEventError' = 'ErrorCode', 'Category', 'Events', 'Message'
+    'AAC.ActivityLogEventCaller' = 'Caller', 'CallerKind', 'AuthMethod', 'Events', 'Failed'
+    'AAC.ActivityLogEventClaim' = 'Event', 'Claim', 'Value'
     # Show-AACEffectivePolicy and Test-AACPolicyDeployment: the policy that applies to a resource, and what it does.
     'AAC.EffectivePolicy' = 'Resource', 'Impact', 'Policy', 'State', 'AssignedAt', 'Applicability'
     'AAC.EffectivePolicyResource' = 'Resource', 'ResourceType', 'State', 'Policies', 'Blocks', 'Audits', 'Changes', 'NonCompliant', 'Exempt'

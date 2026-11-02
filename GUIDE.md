@@ -271,6 +271,8 @@ Commands for an Azure estate - subscriptions and management groups: inventory, c
 | [`Get-AACAttackPath`](docs/Get-AACAttackPath.md)                                                 | Attack paths from the Internet, through managed identities, to what an attacker could control or read - with blast radius, risk and the fix; plus Defender for Clouds own paths.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | [`Get-AACAccessReview`](docs/Get-AACAccessReview.md)                                             | A least-privilege access review of Azure RBAC (permanent, PIM-activated, eligible), classic admins, Entra ID roles and Graph application permissions - unused, standing, guest, orphaned and over-broad access, with an attestation CSV.                                                                                                                                                                                                                                                                                                                                                                                                          |
 | [`Get-AACChangeHistory`](docs/Get-AACChangeHistory.md)                                           | Who changed what, when and from where - properties before and after, how to undo it, and the alerts and health events that followed - a timeline for incidents and change control.                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| [`Invoke-AACActivityLogAssessment`](docs/Invoke-AACActivityLogAssessment.md) | The Activity Log of every resource over 90, 180 or 365 days - subscription, resource group, resource and tags on every row: who changed what and when, when each resource was last used, idle and deleted resources, changes by hand, guests, access and secrets touched by people. Read from the Log Analytics workspace each subscription exports to (found automatically) - seconds for a year - else the REST API (90 days). |
+| [`Show-AACActivityLogEvent`](docs/Show-AACActivityLogEvent.md) | Activity Log events the way an admin reads them: when, what, the result and why it failed (the innermost error and what to do), who (decoded from the token: kind, app, sign-in method, tenant, roles), where, and the IDs to trace it. From a JSON file saved from the portal (no sign-in needed), a correlation ID (Activity Log or Log Analytics), or the pipeline. A card per event in the console and PDF, plus CSV and HTML. |
 | [`Invoke-AACHealthCheck`](docs/Invoke-AACHealthCheck.md)                                         | Endpoints (synthetic requests, latency, TLS expiry), databases, Service Bus queues, Resource Health, Service Health and alerts - by tier, with an SLA report and a live -Watch board.                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | [`Get-AACComplianceGap`](docs/Get-AACComplianceGap.md)                                           | Compliance gaps per framework (CIS, PCI-DSS, HIPAA, SOC 2, GDPR, ISO 27001, NIST, MCSB) from Defender and Azure Policy, prioritised by risk and effort as a roadmap, with progress against a baseline.                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | [`Get-AACFailoverReadiness`](docs/Get-AACFailoverReadiness.md)                                   | Disaster recovery readiness: backups (fresh, succeeding, restore-tested), Site Recovery (health, RPO, test failover), vault settings and recovery plan runbooks, with a confidence score.                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -294,7 +296,7 @@ Commands for an Azure estate - subscriptions and management groups: inventory, c
 | [`Test-AACGoLiveReadiness`](docs/Test-AACGoLiveReadiness.md)                                     | A go-live gate: the Well-Architected assessment on a workload, Ready or Not ready - pillar scores against a minimum, no high-severity findings, the checks that must pass - with the blockers. `-FailOnGap` fails a pipeline stage. |
 | [`Export-AACWafQuestionnaire`](docs/Export-AACWafQuestionnaire.md)                               | The Well-Architected questionnaire - one question per design principle, for what no API can test - as a CSV the team answers and `Invoke-AACWafAssessment -AttestationPath` scores. |
 | [`Get-AACWafCheck`](docs/Get-AACWafCheck.md)                                                     | The checks the Well-Architected assessment runs, by pillar and design principle, with the resource type, severity, fix and link for each. |
-| [`Get-AACKeyVaultInsight`](docs/Get-AACKeyVaultInsight.md)                                       | Key Vaults: what Azure Monitor's Key Vault workbook shows (availability, transactions, latency, failures by status, operations from the audit logs) plus saturation, posture, callers denied or throttled, and secrets, keys and certificates near expiry (`-IncludeObjects`) - as a heat map and findings. |
+| [`Invoke-AACKeyVaultAssessment`](docs/Invoke-AACKeyVaultAssessment.md)                                       | Key Vaults: what Azure Monitor's Key Vault workbook shows (availability, transactions, latency, failures by status, operations from the audit logs) plus saturation, posture, callers denied or throttled, and secrets, keys and certificates near expiry (`-IncludeObjects`) - as a heat map and findings. |
 | [`Invoke-AACStorageAccountAssessment`](docs/Invoke-AACStorageAccountAssessment.md)               | Storage accounts: what Azure Monitor's Storage accounts workbook shows (transactions, latency, errors by response type, capacity by service) plus availability, throttling, security posture, data protection (soft delete, versioning, redundancy) and cost (lifecycle rules, legacy kinds, idle and hot-but-quiet accounts) - as a heat map and findings. |
 | [`Invoke-AACServiceBusAssessment`](docs/Invoke-AACServiceBusAssessment.md)                       | Service Bus namespaces assessed: requests, errors and throttling, Premium CPU and memory, every queue, topic and subscription's messages (active, dead-lettered, scheduled) and how full it is, security (TLS, SAS keys, network, logs), resilience (zones, geo-disaster recovery) and cost, as a heat map and findings. A console view, objects, and CSV, HTML and PDF reports.|
 | [`Show-AACServiceBusEntity`](docs/Show-AACServiceBusEntity.md) | Queues and topics as you can see them - with a role on the namespace or only on the entities: live counts, dead-letters, subscriptions, configuration, and (with namespace access) Azure Monitor metrics with trends; `-Sample` for a backlog trend without metrics. |
@@ -686,6 +688,74 @@ The rest of #8 is answered by commands the module already has:
 | `Get-AACActivityLog` - administrative changes | `Get-AACChangeHistory` (what changed, who, before and after); failed actions and permission issues: `Get-AACResourceError` |
 | `Get-AACBackupStatus` - backup health and recovery readiness | `Get-AACFailoverReadiness` (backups, restores, Site Recovery, vaults, recovery plans) |
 | `Get-AACResourceDependencies` - upstream and downstream dependencies | `Get-AACDependencyGraph` (blast radius, single points of failure, a Graphviz export) |
+
+## Activity Log assessment
+
+`Invoke-AACActivityLogAssessment` answers, for every resource: who changed it, when, and when it was
+last used. Every row carries the subscription, resource group, resource name and tags.
+
+```powershell
+Invoke-AACActivityLogAssessment -SubscriptionId $sub -HtmlPath .ctivity.html                      # the last 90 days
+Invoke-AACActivityLogAssessment -ManagementGroupId 'mg-landingzones' -Days 365 -TagName CostCenter, Owner -RequiredTag CostCenter -HtmlPath .ctivity-year.html
+Invoke-AACActivityLogAssessment -SubscriptionId $sub -Days 180 -NoDisplay | Where-Object State -EQ 'Idle' | Sort-Object IdleDays -Descending
+Invoke-AACActivityLogAssessment -SubscriptionId $sub -View Coverage -NoDisplay                      # where each subscription was read from
+```
+
+**How it reads the log, fastest first**
+
+| Source | When | Speed and reach |
+| ------ | ---- | --------------- |
+| Log Analytics | The subscription's diagnostic setting sends its Activity Log to a workspace. The command finds it, or you give `-WorkspaceId` | A few queries per workspace, already summarised in the workspace and run five at a time. Seconds for 90, 180 or 365 days, limited only by the workspace's retention |
+| Activity Log REST API | No export, `-Source ActivityLog`, or the workspace can't be read | Azure keeps 90 days. The window is cut into about 1,500 slices read side by side (`-SliceHours`, `-ThrottleLimit`) |
+
+The **Coverage** view shows which source each subscription used and how far back its data goes. A
+subscription that doesn't export its Activity Log, or whose workspace keeps less than the window,
+gets a finding: 180 or 365 days need an export to a workspace.
+
+**What you get**
+
+- **Resources:** every resource, with:
+  - **State:** Active, New, Quiet, Idle (no change for `-IdleDays`, 90 by default), Deleted (in the window, with who deleted it), or Gone (has activity but isn't there now).
+  - **Last used:** the latest of its last Activity Log event, last change and creation, plus the number of idle days.
+  - **Activity:** operations, writes, deletes, actions, failures and changes made by hand; the callers, the last operation and by whom; who made the earliest write.
+- **Activity:** one row per resource, caller, operation and status, with how many times, first and last, the caller kind (user, guest, service principal, managed identity, Azure) and the caller's IP.
+- **Callers:** each caller's operations, writes, deletes, failures, resources touched and when last seen.
+- **Findings:**
+  - **High:** guests changing resources; people changing access (role assignments, locks, policy).
+  - **Medium:** keys or secrets read by people; failure hotspots; coverage gaps.
+  - **Low:** changes made by hand; idle resources; a missing `-RequiredTag`.
+  - **Info:** deletions in the window.
+
+Last used is control-plane only. Data-plane use (reads, requests, sign-ins) never reaches the
+Activity Log, so check an idle resource's metrics before removing it.
+
+### One event, readable
+
+An Activity Log event holds about sixty values, nested six levels deep. The error is JSON stored
+inside a string, and who made the call is hidden in token claims. `Show-AACActivityLogEvent` flattens
+each event into one row and shows it as a card:
+
+```powershell
+Show-AACActivityLogEvent -Path .\event.json                                    # saved from the portal's JSON tab; no sign-in needed
+Show-AACActivityLogEvent -CorrelationId $correlationId -SubscriptionId $sub -PdfPath .\incident.pdf
+Show-AACActivityLogEvent -CorrelationId $correlationId -WorkspaceId $workspaceId -Days 365 -ResolveIdentity
+Invoke-AACActivityLogAssessment -SubscriptionId $sub -View Activity -NoDisplay | Where-Object Status -EQ 'Failed' | Show-AACActivityLogEvent -HtmlPath .\failures.html
+```
+
+| Section | What it shows |
+| ------- | ------------- |
+| When | Time, phase (begin or end request), ingestion delay |
+| What | Operation, the authorised action and scope, category, channel, level |
+| Result | Status, HTTP status and sub-status. For a failure: the innermost error code, message and target, the kind of failure, what to do and a docs link (read the same way as `Get-AACResourceError`) |
+| Who | User, guest, service principal, managed identity or Azure; app and object ID; how it signed in (public client, client secret, certificate or federated credential, or a user's authentication methods); home or external tenant; directory roles; when the token was issued and expires; caller IP. `-ResolveIdentity` adds names from Microsoft Graph |
+| Where | Subscription, resource group, type, name, location, tags, portal link |
+| Trace | Correlation, operation and event IDs, tenant, hierarchy |
+
+The token's opaque values (`aio`, `rh`, `uti`, `xms_*`) are left out. `-IncludeClaims` adds every
+claim, as `Claim:<name>` columns and a Claims tab. Views: Event (one row per event), Detail (the
+cards), Error (failures grouped by code), Caller and Claim. Rows from
+`Invoke-AACActivityLogAssessment -View Activity` carry the latest operation's correlation ID and,
+for failures, `ErrorCode` and `ErrorMessage`, so you can pipe them in for the full events.
 
 ## Resources and costs
 
@@ -3183,7 +3253,7 @@ everything on this side for real:
 | PSRule runner                                                                     | Nothing                                                                                                                                                                                                                                                                             | Real PSRule for Azure in a child `pwsh`: the AAC.\* rules (naming with its defaults, tags), `-Type` binding for custom rules, wildcard include/exclude, a rule error not stopping the run                                                                                                                                                                                                                                                                                                                                                           |
 | `Invoke-AACLogAnalyticsWorkspaceAssessment`                                       | Resource Manager, Resource Graph and the KQL batch, with a made-up Contoso workspace; the HTTP batch for the query helper                                                                                                                                                           | Table sizes and billing, settings (anything new under Other), every recommendation rule and what it leaves out, agents' states, DCRs and associations, the change log, missing LAQueryLogs and Heartbeat, `-Section`, `-Days`, the view and the exports                                                                                                                                                                                                                                                                                             |
 | `Invoke-AACVirtualNetworkAssessment`                                              | Resource Graph, with a made-up Contoso hub and spokes                                                                                                                                                                                                                               | The CIDR arithmetic and free ranges, IPs per network and subnet, outbound paths, roles, peerings (reverse, remote not visible), ASGs, private endpoints and DNS zones, every finding and no others, the NSG engine's findings, scope and `-Name`, a query that fails, the view and the exports                                                                                                                                                                                                                                                      |
-| `Invoke-AACWafAssessment`, `Get-AACKeyVaultInsight`, `Invoke-AACStorageAccountAssessment`, `Show-AACApplicationGatewayMap`, `Get-AACNetworkHealth`, `Show-AACNetworkTopology` | Resource Graph, Azure Monitor metrics, Resource Health, Log Analytics and the services' settings and data planes, each with a made-up Contoso fixture | Every check, signal and finding, the heat maps, scores, timestamps, scope and `-Name`, the views, and the console, CSV, PDF and HTML outputs |
+| `Invoke-AACWafAssessment`, `Invoke-AACKeyVaultAssessment`, `Invoke-AACStorageAccountAssessment`, `Show-AACApplicationGatewayMap`, `Get-AACNetworkHealth`, `Show-AACNetworkTopology` | Resource Graph, Azure Monitor metrics, Resource Health, Log Analytics and the services' settings and data planes, each with a made-up Contoso fixture | Every check, signal and finding, the heat maps, scores, timestamps, scope and `-Name`, the views, and the console, CSV, PDF and HTML outputs |
 | `Invoke-AACApplicationInsightQuery`                                               | Resource Graph and the query API (`Invoke-AACArmRequest`)                                                                                                                                                                                                                           | The KQL built from the parameters (with escaping), both table schemas flattened, `-Query`, errors, the view and the exports                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 The console views are checked by swapping the Spectre console for one that
@@ -3232,8 +3302,8 @@ area (Core first), for a faster import.
 2. Commit, then push a tag that matches the version:
 
    ```powershell
-   git tag -a v0.14.8 -m "Azure.Admin.Console v0.14.8"
-   git push origin v0.14.8
+   git tag -a v0.14.9 -m "Azure.Admin.Console v0.14.9"
+   git push origin v0.14.9
    ```
 
 **Pre-releases.** A `Prerelease` value in the manifest's `PSData` (for

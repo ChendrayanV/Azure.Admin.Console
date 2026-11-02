@@ -1,7 +1,7 @@
 function Get-AACKeyVaultQuery {
     <#
     .SYNOPSIS
-        The Resource Graph batch Get-AACKeyVaultInsight reads: the vaults,
+        The Resource Graph batch Invoke-AACKeyVaultAssessment reads: the vaults,
         the Defender for Key Vault plan and alerts, and the Log Analytics
         workspaces (for their query IDs).
     .DESCRIPTION

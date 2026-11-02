@@ -1,25 +1,25 @@
 ---
 document type: cmdlet
 external help file: Azure.Admin.Console-help.xml
-HelpUri: https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACKeyVaultInsight.md
+HelpUri: https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Invoke-AACKeyVaultAssessment.md
 Locale: en-US
 Module Name: Azure.Admin.Console
 PlatyPS schema version: 2024-05-01
-title: Get-AACKeyVaultInsight
+title: Invoke-AACKeyVaultAssessment
 ---
 
-# Get-AACKeyVaultInsight
+# Invoke-AACKeyVaultAssessment
 
 ## SYNOPSIS
 
-Key Vault insights across subscriptions - what Azure Monitor's Key Vault workbook shows (availability, transactions, latency, failures by status, operations from the audit logs) plus saturation, posture, callers that are denied or throttled, and secrets, keys and certificates near expiry - as a heat map, findings, a Spectre.Console view, objects, and CSV, PDF and interactive HTML reports.
+Key Vaults assessed across subscriptions - what Azure Monitor's Key Vault workbook shows (availability, transactions, latency, failures by status, operations from the audit logs) plus saturation, posture, callers that are denied or throttled, and secrets, keys and certificates near expiry - as a heat map, findings, a Spectre.Console view, objects, and CSV, PDF and interactive HTML reports.
 
 ## SYNTAX
 
 ### __AllParameterSets
 
 ```
-Get-AACKeyVaultInsight [[-SubscriptionId] <string[]>] [[-ManagementGroupId] <string[]>]
+Invoke-AACKeyVaultAssessment [[-SubscriptionId] <string[]>] [[-ManagementGroupId] <string[]>]
  [[-ResourceGroupName] <string[]>] [[-Name] <string[]>] [[-TimeRange] <string>]
  [[-ExpiryDays] <int>] [[-View] <string>] [[-ThrottleLimit] <int>] [[-CsvPath] <string>]
  [[-HtmlPath] <string>] [[-PdfPath] <string>] [[-Title] <string>] [-IncludeOperations]
@@ -76,7 +76,7 @@ written to -CsvPath: Vault (default), Operation, Object or Finding.
 
 ```powershell
 Connect-AAC
-Get-AACKeyVaultInsight
+Invoke-AACKeyVaultAssessment
 ```
 
 Every vault's health, posture and findings over the last day.
@@ -84,14 +84,14 @@ Every vault's health, posture and findings over the last day.
 ### Example 2
 
 ```powershell
-Get-AACKeyVaultInsight -ResourceGroupName 'rg-app-prod' -TimeRange 7d -IncludeOperations -IncludeObjects -HtmlPath .\out\KeyVault.html -PdfPath .\out\KeyVault.pdf
+Invoke-AACKeyVaultAssessment -ResourceGroupName 'rg-app-prod' -TimeRange 7d -IncludeOperations -IncludeObjects -HtmlPath .\out\KeyVault.html -PdfPath .\out\KeyVault.pdf
 A week of a workload's vaults: operations, callers, objects near expiry, as reports.
 ```
 
 ### Example 3
 
 ```powershell
-Get-AACKeyVaultInsight -IncludeObjects -View Object -NoDisplay | Where-Object Status -In 'Expired', 'Expiring'
+Invoke-AACKeyVaultAssessment -IncludeObjects -View Object -NoDisplay | Where-Object Status -In 'Expired', 'Expiring'
 ```
 
 Secrets, keys and certificates to rotate.
@@ -99,7 +99,7 @@ Secrets, keys and certificates to rotate.
 ### Example 4
 
 ```powershell
-Get-AACKeyVaultInsight -IncludeOperations -View Operation -NoDisplay | Where-Object AuthDenied | Sort-Object AuthDenied -Descending | Select-Object -First 10
+Invoke-AACKeyVaultAssessment -IncludeOperations -View Operation -NoDisplay | Where-Object AuthDenied | Sort-Object AuthDenied -Descending | Select-Object -First 10
 ```
 
 The callers denied most often.
@@ -428,7 +428,7 @@ The reports' title.
 
 ```yaml
 Type: System.String
-DefaultValue: "'Key Vault insights'"
+DefaultValue: "'Key Vault assessment'"
 SupportsWildcards: false
 Aliases: []
 ParameterSets:
@@ -476,11 +476,11 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## OUTPUTS
 
-### AAC.KeyVaultInsight, AAC.KeyVaultOperation, AAC.KeyVaultObject or AAC.KeyVaultFinding, by -View (piped onward, or with -PassThru or -NoDisplay)
+### AAC.KeyVaultAssessment, AAC.KeyVaultOperation, AAC.KeyVaultObject or AAC.KeyVaultFinding, by -View (piped onward, or with -PassThru or -NoDisplay)
 
 ## NOTES
 
 ## RELATED LINKS
 
-- [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACKeyVaultInsight.md)
+- [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Invoke-AACKeyVaultAssessment.md)
 - [about_Azure.Admin.Console](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md)

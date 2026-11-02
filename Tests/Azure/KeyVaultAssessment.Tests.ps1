@@ -1,5 +1,5 @@
 <#
-    Unit tests for Get-AACKeyVaultInsight: health from metrics (availability,
+    Unit tests for Invoke-AACKeyVaultAssessment: health from metrics (availability,
     status codes, saturation), posture and audit-log coverage, operations and
     callers from the logs, objects from the data plane, findings and the heat
     map - with Resource Graph, Azure Monitor, Log Analytics and the Key Vault
@@ -34,7 +34,7 @@ BeforeAll {
     }
 }
 
-Describe 'Azure Admin Console - Get-AACKeyVaultInsight' {
+Describe 'Azure Admin Console - Invoke-AACKeyVaultAssessment' {
     BeforeEach {
         $script:logCalls = 0
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Get-AACAccessToken -MockWith { 'fake-token' }
@@ -71,18 +71,18 @@ Describe 'Azure Admin Console - Get-AACKeyVaultInsight' {
     }
 
     It 'reads health from metrics: availability, transactions, status codes, latency and saturation' {
-        $v = @(Get-AACKeyVaultInsight -NoDisplay)
+        $v = @(Invoke-AACKeyVaultAssessment -NoDisplay)
         $prod = $v | Where-Object Vault -EQ 'kv-prod'
         "$($prod.Availability) $($prod.Transactions) $($prod.Successes) $($prod.Unauthorized) $($prod.Forbidden) $($prod.Throttled)" | Should -Be '99.98 1000 900 50 20 30'
         $prod.FailureRate | Should -Be 5 -Because '403 and 429 count, the 401 SDK challenge does not'
         "$($prod.LatencyAvgMs) $($prod.LatencyMaxMs) $($prod.SaturationAvg) $($prod.SaturationMax)" | Should -Be '25 120 35 80'
         $prod.RequestTypes | Should -Be 'SecretGet 800, KeyGet 200'
-        $prod.PSObject.TypeNames | Should -Contain 'AAC.KeyVaultInsight'
+        $prod.PSObject.TypeNames | Should -Contain 'AAC.KeyVaultAssessment'
         Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACArmParallel -Times 1 -Exactly -ParameterFilter { @($Uri | Where-Object { $_ -match 'SaturationShoebox' }).Count -eq 2 }
     }
 
     It 'reads posture and where the audit logs go' {
-        $v = @(Get-AACKeyVaultInsight -NoDisplay)
+        $v = @(Invoke-AACKeyVaultAssessment -NoDisplay)
         $prod = $v | Where-Object Vault -EQ 'kv-prod'
         "$($prod.Network) $($prod.PrivateEndpoints) $($prod.PermissionModel) $($prod.Defender) $($prod.AuditLogsTo) $($prod.AuditTable)" | Should -Be 'Private 1 RBAC On law-prod AZKVAuditLogs'
         $dev = $v | Where-Object Vault -EQ 'kv-dev'
@@ -90,7 +90,7 @@ Describe 'Azure Admin Console - Get-AACKeyVaultInsight' {
     }
 
     It 'finds what to fix: throttling, saturation, 403s, purge protection, open networks, no audit logs, idle vaults' {
-        $f = @(Get-AACKeyVaultInsight -View Finding -NoDisplay)
+        $f = @(Invoke-AACKeyVaultAssessment -View Finding -NoDisplay)
         $one = { param($Vault, $Finding) $f | Where-Object { $_.Vault -eq $Vault -and $_.Finding -eq $Finding } }
         (& $one 'kv-prod' 'Requests throttled (429)').Severity | Should -Be 'High' -Because '30 of 1,000 is 3%'
         (& $one 'kv-prod' 'Vault close to its limits').Severity | Should -Be 'High' -Because 'saturation peaked at 80%'
@@ -101,35 +101,35 @@ Describe 'Azure Admin Console - Get-AACKeyVaultInsight' {
     }
 
     It 'reads operations and callers from the audit logs with -IncludeOperations, both tables, without the SDK challenge' {
-        $null = Get-AACKeyVaultInsight -NoDisplay
+        $null = Invoke-AACKeyVaultAssessment -NoDisplay
         $script:logCalls | Should -Be 0
-        $ops = @(Get-AACKeyVaultInsight -IncludeOperations -View Operation -NoDisplay)
+        $ops = @(Invoke-AACKeyVaultAssessment -IncludeOperations -View Operation -NoDisplay)
         $script:logWorkspace | Should -Be 'cust-1'
         $script:logQuery | Should -Match 'AZKVAuditLogs'
         $script:logQuery | Should -Match 'AzureDiagnostics'
         $script:logQuery | Should -Match "not \(Operation == 'Authentication' and Status == 401\)"
         $ops.Count | Should -Be 2
         ($ops | Where-Object Caller -EQ 'app-2').AuthDenied | Should -Be 25
-        $f = @(Get-AACKeyVaultInsight -IncludeOperations -View Finding -NoDisplay)
+        $f = @(Invoke-AACKeyVaultAssessment -IncludeOperations -View Finding -NoDisplay)
         ($f | Where-Object Finding -EQ 'A caller is repeatedly denied').Detail | Should -BeLike '*25 denied request(s) from app-2 (10.0.0.9): SecretGet*'
     }
 
     It 'reads secrets, keys and certificates with -IncludeObjects: expired, expiring, no expiry, and vaults it can''t read' {
-        $null = Get-AACKeyVaultInsight -NoDisplay
+        $null = Invoke-AACKeyVaultAssessment -NoDisplay
         Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACHttpBatch -Times 0 -Exactly
-        $o = @(Get-AACKeyVaultInsight -IncludeObjects -View Object -NoDisplay)
+        $o = @(Invoke-AACKeyVaultAssessment -IncludeObjects -View Object -NoDisplay)
         Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACHttpBatch -ParameterFilter { $Resource -eq 'https://vault.azure.net' }
         @($o | ForEach-Object { "$($_.Kind) $($_.Name) $($_.Status)" } | Sort-Object) | Should -Be @('Certificate web-tls Expired', 'Key cmk No expiry', 'Secret db-password Expiring') -Because 'the certificate''s managed secret is left out'
-        $v = @(Get-AACKeyVaultInsight -IncludeObjects -NoDisplay)
+        $v = @(Invoke-AACKeyVaultAssessment -IncludeObjects -NoDisplay)
         ($v | Where-Object Vault -EQ 'kv-dev').ObjectAccess | Should -Be 'Denied'
         ($v | Where-Object Vault -EQ 'kv-prod').Expired | Should -Be 1
-        $f = @(Get-AACKeyVaultInsight -IncludeObjects -View Finding -NoDisplay)
+        $f = @(Invoke-AACKeyVaultAssessment -IncludeObjects -View Finding -NoDisplay)
         ($f | Where-Object Finding -EQ 'Expired secrets, keys or certificates').Severity | Should -Be 'High'
         ($f | Where-Object Finding -EQ 'Objects not read: denied').Vault | Should -Be 'kv-dev'
     }
 
     It 'shows the heat map and findings at the prompt, in characters any console can show' {
-        $text = (& $script:capture { Get-AACKeyVaultInsight -IncludeObjects -NoPaging }).Text
+        $text = (& $script:capture { Invoke-AACKeyVaultAssessment -IncludeObjects -NoPaging }).Text
         foreach ($expected in 'Vaults by signal', 'Saturation', 'kv-prod', 'kv-dev', 'Requests throttled (429)', 'Findings') { $text | Should -BeLike "*$expected*" }
         foreach ($codePage in 437, 850) {
             $encoding = [System.Text.Encoding]::GetEncoding($codePage)
@@ -140,7 +140,7 @@ Describe 'Azure Admin Console - Get-AACKeyVaultInsight' {
     It 'writes CSV by -View and an HTML report with the heat map and tabs' {
         $csv = Join-Path $TestDrive 'kv.csv'
         $html = Join-Path $TestDrive 'kv.html'
-        $null = & $script:capture { Get-AACKeyVaultInsight -IncludeOperations -IncludeObjects -View Object -CsvPath $csv -HtmlPath $html }
+        $null = & $script:capture { Invoke-AACKeyVaultAssessment -IncludeOperations -IncludeObjects -View Object -CsvPath $csv -HtmlPath $html }
         @(Import-Csv -LiteralPath $csv).Count | Should -Be 3
         $model = [regex]::Match((Get-Content -LiteralPath $html -Raw), '<script id="aac-data" type="application/json">(.*?)</script>', 'Singleline').Groups[1].Value | ConvertFrom-Json
         $model.heatmaps[0].title | Should -Be 'Vaults by signal'
@@ -149,9 +149,9 @@ Describe 'Azure Admin Console - Get-AACKeyVaultInsight' {
     }
 
     It 'narrows by -Name, and writes a PDF report' -Skip:(-not $script:canWritePdf) {
-        @(Get-AACKeyVaultInsight -Name 'kv-p*' -NoDisplay).Vault | Should -Be @('kv-prod')
+        @(Invoke-AACKeyVaultAssessment -Name 'kv-p*' -NoDisplay).Vault | Should -Be @('kv-prod')
         $pdf = Join-Path $TestDrive 'kv.pdf'
-        $null = & $script:capture { Get-AACKeyVaultInsight -IncludeObjects -PdfPath $pdf }
+        $null = & $script:capture { Invoke-AACKeyVaultAssessment -IncludeObjects -PdfPath $pdf }
         (Get-Item -LiteralPath $pdf).Length | Should -BeGreaterThan 1000
     }
 }

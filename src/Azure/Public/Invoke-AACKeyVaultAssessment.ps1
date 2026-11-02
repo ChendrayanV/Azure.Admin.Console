@@ -1,8 +1,8 @@
-function Get-AACKeyVaultInsight {
+function Invoke-AACKeyVaultAssessment {
     <#
     .EXTERNALHELP Azure.Admin.Console-help.xml
     .SYNOPSIS
-        Key Vault insights across subscriptions - what Azure Monitor's Key
+        Key Vaults assessed across subscriptions - what Azure Monitor's Key
         Vault workbook shows (availability, transactions, latency, failures by
         status, operations from the audit logs) plus saturation, posture,
         callers that are denied or throttled, and secrets, keys and
@@ -81,22 +81,22 @@ function Get-AACKeyVaultInsight {
         Show the whole view at once.
     .EXAMPLE
         Connect-AAC
-        Get-AACKeyVaultInsight
+        Invoke-AACKeyVaultAssessment
         Every vault's health, posture and findings over the last day.
     .EXAMPLE
-        Get-AACKeyVaultInsight -ResourceGroupName 'rg-app-prod' -TimeRange 7d -IncludeOperations -IncludeObjects -HtmlPath .\out\KeyVault.html -PdfPath .\out\KeyVault.pdf
+        Invoke-AACKeyVaultAssessment -ResourceGroupName 'rg-app-prod' -TimeRange 7d -IncludeOperations -IncludeObjects -HtmlPath .\out\KeyVault.html -PdfPath .\out\KeyVault.pdf
         A week of a workload's vaults: operations, callers, objects near expiry, as reports.
     .EXAMPLE
-        Get-AACKeyVaultInsight -IncludeObjects -View Object -NoDisplay | Where-Object Status -In 'Expired', 'Expiring'
+        Invoke-AACKeyVaultAssessment -IncludeObjects -View Object -NoDisplay | Where-Object Status -In 'Expired', 'Expiring'
         Secrets, keys and certificates to rotate.
     .EXAMPLE
-        Get-AACKeyVaultInsight -IncludeOperations -View Operation -NoDisplay | Where-Object AuthDenied | Sort-Object AuthDenied -Descending | Select-Object -First 10
+        Invoke-AACKeyVaultAssessment -IncludeOperations -View Operation -NoDisplay | Where-Object AuthDenied | Sort-Object AuthDenied -Descending | Select-Object -First 10
         The callers denied most often.
     .OUTPUTS
-        AAC.KeyVaultInsight, AAC.KeyVaultOperation, AAC.KeyVaultObject or AAC.KeyVaultFinding, by -View (piped onward, or with -PassThru or -NoDisplay)
+        AAC.KeyVaultAssessment, AAC.KeyVaultOperation, AAC.KeyVaultObject or AAC.KeyVaultFinding, by -View (piped onward, or with -PassThru or -NoDisplay)
     #>
     [CmdletBinding()]
-    [OutputType('AAC.KeyVaultInsight', 'AAC.KeyVaultOperation', 'AAC.KeyVaultObject', 'AAC.KeyVaultFinding')]
+    [OutputType('AAC.KeyVaultAssessment', 'AAC.KeyVaultOperation', 'AAC.KeyVaultObject', 'AAC.KeyVaultFinding')]
     param(
         [ValidatePattern('^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$')]
         [string[]] $SubscriptionId,
@@ -132,7 +132,7 @@ function Get-AACKeyVaultInsight {
 
         [string] $PdfPath,
 
-        [string] $Title = 'Key Vault insights',
+        [string] $Title = 'Key Vault assessment',
 
         [switch] $PassThru,
 
@@ -156,7 +156,7 @@ function Get-AACKeyVaultInsight {
     }
 
     $null = Get-AACAccessToken
-    if ($interactive) { Write-AACRule -Title 'Azure Admin Console :: Key Vault insights' -Color 'gold1' }
+    if ($interactive) { Write-AACRule -Title 'Azure Admin Console :: Key Vault assessment' -Color 'gold1' }
     $state = Invoke-AACProgress -ScriptBlock {
         Update-AACProgress -Id 'scope' -Indeterminate -Description 'Finding the subscriptions'
         $scope = Resolve-AACScope -SubscriptionId $request.SubscriptionId -ManagementGroupId $request.ManagementGroupId
@@ -185,7 +185,7 @@ function Get-AACKeyVaultInsight {
         $customerId = @{}
         foreach ($w in @($read.Rows['workspaces'])) { if ($w) { $workspaceName[[string]$w['id']] = [string]$w['name']; $customerId[[string]$w['id']] = [string]$w['customerId'] } }
         $common = @{ Vault = $vaults; Telemetry = $telemetry; Pricing = @($read.Rows['pricing']); Alert = @($read.Rows['alerts']); WorkspaceName = $workspaceName; Object = $objects; SubscriptionName = $scope.Names; ExpiryDays = $request.ExpiryDays }
-        $result = ConvertTo-AACKeyVaultInsight @common
+        $result = ConvertTo-AACKeyVaultAssessment @common
 
         if ($request.IncludeOperations) {
             $targets = @{}
@@ -199,7 +199,7 @@ function Get-AACKeyVaultInsight {
             Update-AACProgress -Id 'logs' -Indeterminate -Description ('Reading audit logs from {0:N0} workspace(s)' -f $targets.Count)
             $logs = Read-AACKeyVaultLog -Workspace $targets -Duration $request.Duration
             foreach ($cid in @($logs.Errors.Keys)) { $notices.Add("Audit logs couldn't be read from workspace $($cid): $($logs.Errors[$cid] -replace '\s+', ' ')") }
-            $result = ConvertTo-AACKeyVaultInsight @common -Log $logs.Rows
+            $result = ConvertTo-AACKeyVaultAssessment @common -Log $logs.Rows
             Update-AACProgress -Id 'logs' -Complete -Description ('Read {0:N0} operation row(s)' -f @($result.Operations).Count)
         }
         @{ Result = $result; Scope = $scope; Notices = $notices.ToArray() }
@@ -216,7 +216,7 @@ function Get-AACKeyVaultInsight {
     $deniedCallers = @($r.Operations | Where-Object AuthDenied | Group-Object -Property Caller | ForEach-Object { @{ Label = $(if ($_.Name) { $_.Name } else { '(unknown)' }); Value = ($_.Group | Measure-Object -Property AuthDenied -Sum).Sum; Filter = $_.Name } } | Sort-Object -Property { $_.Value } -Descending | Select-Object -First 10)
     $tones = @{ Expired = 'bad'; Expiring = 'warn'; 'No expiry' = 'neutral'; OK = 'good'; Disabled = 'neutral' }
     $report = @{
-        Subtitle = "Key Vault insights - last $TimeRange"
+        Subtitle = "Key Vault assessment - last $TimeRange"
         Facts    = [ordered]@{ Scope = $state.Scope.Label; 'Time range' = $TimeRange; Operations = $(if ($IncludeOperations) { 'audit logs read' } else { 'not read (-IncludeOperations)' }); Objects = $(if ($IncludeObjects) { "read; expiring within $ExpiryDays days" } else { 'not read (-IncludeObjects)' }) }
         Status   = $(if ($stats.High) { 'Failed' } elseif (@($r.Findings).Count) { 'Warning' } else { 'Success' })
         Headline = $(if (-not $stats.Vaults) { 'No Key Vault in scope.' } else { "$($stats.Vaults) vault(s), $('{0:N0}' -f $stats.Transactions) transaction(s): $($stats.High) high finding(s); $('{0:N0}' -f $stats.Throttled) throttled, $('{0:N0}' -f $stats.Forbidden) denied (403)$(if ($IncludeObjects) { "; $($stats.Expired) expired, $($stats.Expiring) expiring" })" })

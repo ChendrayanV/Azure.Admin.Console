@@ -1,10 +1,10 @@
-function ConvertTo-AACKeyVaultInsight {
+function ConvertTo-AACKeyVaultAssessment {
     <#
     .SYNOPSIS
-        Turns what Get-AACKeyVaultInsight read into per-vault health, posture,
+        Turns what Invoke-AACKeyVaultAssessment read into per-vault health, posture,
         operations, objects, findings and a heat map.
     .DESCRIPTION
-        No Azure calls. Per vault (AAC.KeyVaultInsight):
+        No Azure calls. Per vault (AAC.KeyVaultAssessment):
           health     Availability (average %), Transactions, Successes (2xx),
                      Unauthorized (401 - includes the SDKs' normal challenge),
                      Forbidden (403), Throttled (429), OtherFailures,
@@ -185,7 +185,7 @@ function ConvertTo-AACKeyVaultInsight {
         $heatRows.Add(@{ Label = $name; Filter = $name; Cells = $cells; Total = $(if ($null -ne $overall) { @{ Score = $overall } } else { $null }); Overall = $overall })
 
         $vaultRows.Add([pscustomobject][ordered]@{
-                PSTypeName       = 'AAC.KeyVaultInsight'
+                PSTypeName       = 'AAC.KeyVaultAssessment'
                 Vault            = $name
                 Score            = $overall
                 Availability     = $availability
