@@ -1039,7 +1039,7 @@ function ConvertTo-AACM365Assessment {
             , @('Microsoft Purview', 'Data loss prevention, sensitivity labels, retention and insider risk', 'Security & Compliance PowerShell (Connect-IPPSSession) or the Microsoft Purview portal')
             , @('Microsoft Teams', 'External access, guest access and meeting policies', 'MicrosoftTeams PowerShell (Get-CsTenantFederationConfiguration, Get-CsTeamsMeetingPolicy)')
             , @('Microsoft Defender for Cloud Apps', 'Session and app governance policies, discovered apps', 'The Defender for Cloud Apps API, with its own token')
-            , @('Microsoft Sentinel', 'Data connectors, analytics rules, automation and incidents', 'Azure Resource Manager (Microsoft.SecurityInsights) with the Microsoft Sentinel Reader role: not Microsoft Graph. Invoke-AACLogAnalyticsWorkspaceAssessment covers the workspace')
+            , @('Microsoft Sentinel', 'Data connectors, analytics rules, automation and incidents', 'Azure Resource Manager (Microsoft.SecurityInsights) with the Microsoft Sentinel Reader role: not Microsoft Graph. Invoke-AACSentinelAssessment covers it')
             , @('Entra Connect servers', 'Sync server health and version', 'Microsoft Entra Connect Health, on the servers themselves')
         )) {
         $coverage.Add((& $object 'AAC.M365Coverage' ([ordered]@{ Area = $gap[0]; Lens = $gap[1]; Status = 'Not covered'; Reads = ''; Reason = 'Not in Microsoft Graph.'; ToCover = $gap[2]; Source = 'Outside Microsoft Graph' })))

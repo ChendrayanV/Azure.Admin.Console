@@ -187,24 +187,7 @@ function Invoke-AACLogAnalyticsWorkspaceAssessment {
 
         # --- Which workspace ------------------------------------------------------------------------------------
         Update-AACProgress -Id 'find' -Description "Finding workspace $($request.Target)" -Indeterminate
-        $target = $request.Target
-        $resourceId = if ($target -match '^/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft\.OperationalInsights/workspaces/[^/]+$') {
-            $target
-        }
-        elseif ($target -match '^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$') {
-            $found = Invoke-AACGraphBatch -SubscriptionId $request.SubscriptionId -Query @{ workspace = "resources | where type =~ 'microsoft.operationalinsights/workspaces' and tostring(properties.customerId) =~ '$($target.ToLowerInvariant())' | project id" }
-            $ids = @($found.Rows['workspace'] | ForEach-Object { [string]$_['id'] })
-            if (-not $ids.Count) {
-                $problem = [System.InvalidOperationException]::new("No Log Analytics workspace with workspace ID $target was found$(if ($request.SubscriptionId) { " in subscription $($request.SubscriptionId -join ', ')" } else { ' in the subscriptions the account can see' }).")
-                $problem.Data['AACHint'] = 'The workspace ID is on the workspace''s Overview page in the portal. You can also pass its resource ID or name.'
-                throw $problem
-            }
-            $ids[0]
-        }
-        else {
-            (Resolve-AACLogResource -Kind Workspace -Name $target -SubscriptionId $request.SubscriptionId).Id
-        }
-        $resourceId = $resourceId.TrimEnd('/')
+        $resourceId = Resolve-AACWorkspaceResourceId -Target $request.Target -SubscriptionId $request.SubscriptionId
         $segments = $resourceId -split '/'
         $subscription = $segments[2]
         $group = $segments[4]

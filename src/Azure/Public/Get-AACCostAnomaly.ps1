@@ -161,7 +161,7 @@ function Get-AACCostAnomaly {
         Update-AACProgress -Id 'scope' -Complete -Description ('Scope: {0:N0} enabled subscription(s)' -f $subscriptions.Count)
 
         $invariant = [cultureinfo]::InvariantCulture
-        $lastDay = [datetime]::UtcNow.Date.AddDays(-1 - $request.SettleDays)
+        $lastDay = (Get-AACUtcToday).AddDays(-1 - $request.SettleDays)
         $firstDay = $lastDay.AddDays( - ($request.Days - 1))
         $dataset = @{ granularity = 'Daily'; aggregation = @{ totalCost = @{ name = 'Cost'; function = 'Sum' } } }
         if ($dimension) { $dataset.grouping = @(@{ type = 'Dimension'; name = $dimension }) }

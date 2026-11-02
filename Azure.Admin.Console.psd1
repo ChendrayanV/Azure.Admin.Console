@@ -32,7 +32,9 @@
 
     FunctionsToExport    = @(
         'Connect-AAC'
+        'Deploy-AACSentinelHuntingQuery'
         'Deploy-AACStorageAccount'
+        'Find-AACSentinelHuntingQuery'
         'Disconnect-AAC'
         'Export-AACDiagnosticBundle'
         'Export-AACDiagram'
@@ -79,6 +81,7 @@
         'Get-AACRoleAssignment'
         'Get-AACSecurityAlert'
         'Get-AACSecurityPosture'
+        'Get-AACSentinelHuntingQuery'
         'Get-AACServicePrincipalInsight'
         'Get-AACSkuAvailability'
         'Get-AACStorageAccountContainerSize'
@@ -100,6 +103,7 @@
         'Invoke-AACM365Assessment'
         'Invoke-AACPolicyAssessment'
         'Invoke-AACPSRule'
+        'Invoke-AACSentinelAssessment'
         'Invoke-AACServiceBusAssessment'
         'Show-AACServiceBusEntity'
         'Invoke-AACStorageAccountAssessment'

@@ -480,6 +480,656 @@ up. Defaults to 180 seconds.</maml:para>
   </command:command>
   <command:command>
     <command:details>
+      <command:name>Deploy-AACSentinelHuntingQuery</command:name>
+      <maml:description>
+        <maml:para>Adds hunting queries to a Microsoft Sentinel workspace, from the packs, from YAML files you name or from Find-AACSentinelHuntingQuery, and keeps them up to date.</maml:para>
+      </maml:description>
+      <command:verb>Deploy</command:verb>
+      <command:noun>AACSentinelHuntingQuery</command:noun>
+    </command:details>
+    <maml:description>
+      <maml:para>Plans, shows the plan, asks, applies. Each query is a saved search in
+the Hunting Queries category, which is how Sentinel stores them, with
+the query's ID from its source file: running this again updates it
+rather than adding another.
+
+What happens to each query:
+  Create   not on the workspace, and ready
+  Update   deployed by this module, unedited, and the catalog has moved on
+  Skip     already current; not ready (a table with no data, a missing
+           watchlist - -IncludeNotReady deploys it anyway); edited in the
+           workspace or not deployed by this module (-OverwriteChanged
+           replaces it); or this name is already there under another ID,
+           say from Content hub (always skipped: a second copy would
+           only confuse)
+
+Entity mappings in the source files aren't deployed: a saved search has
+nowhere to put them, and Microsoft's own solutions leave them out too.
+
+These queries are community content, and only read data: read one before
+relying on it. -WhatIf shows the plan and writes nothing. -Force skips
+the question, for pipelines; it doesn't overwrite an edited query.
+
+-YamlSource deploys files you name instead of a pack: links to GitHub, or
+files on this computer. They go through the same plan and rules, so a
+file whose tables have no data is skipped unless -IncludeNotReady says
+otherwise. A link to a branch reads whatever is on it now, not the
+pinned commit: link to a commit to deploy exactly what you read.
+
+Needs Microsoft Sentinel Contributor or Log Analytics Contributor on the
+workspace.</maml:para>
+    </maml:description>
+    <command:syntax>
+      <command:syntaxItem>
+        <maml:name>Deploy-AACSentinelHuntingQuery</maml:name>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="Workspace, WorkspaceName, ResourceId">
+          <maml:name>WorkspaceId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Pack</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Name</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Tactic</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>SubscriptionId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>ResourceGroupName</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Days</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">int</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Int32</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Ref</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Path</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>IncludeNotReady</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>OverwriteChanged</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Force</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>PassThru</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoDisplay</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>WhatIf</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Confirm</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+      <command:syntaxItem>
+        <maml:name>Deploy-AACSentinelHuntingQuery</maml:name>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="Workspace, WorkspaceName, ResourceId">
+          <maml:name>WorkspaceId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>InputObject</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">Object[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Object[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Name</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Tactic</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>SubscriptionId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>ResourceGroupName</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Days</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">int</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Int32</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>IncludeNotReady</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>OverwriteChanged</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Force</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>PassThru</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoDisplay</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>WhatIf</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Confirm</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+      <command:syntaxItem>
+        <maml:name>Deploy-AACSentinelHuntingQuery</maml:name>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="Workspace, WorkspaceName, ResourceId">
+          <maml:name>WorkspaceId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>YamlSource</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Name</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Tactic</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>SubscriptionId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>ResourceGroupName</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Days</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">int</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Int32</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>IncludeNotReady</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>OverwriteChanged</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Force</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>PassThru</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoDisplay</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>WhatIf</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Confirm</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="cf">
+        <maml:name>Confirm</maml:name>
+        <maml:description>
+          <maml:para />
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Days</maml:name>
+        <maml:description>
+          <maml:para>How far back a table must have data to count: 1 to 90 days, 30 by
+default.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Int32</maml:name>
+        </dev:type>
+        <dev:defaultValue>30</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Force</maml:name>
+        <maml:description>
+          <maml:para>Apply without asking (for pipelines).</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>IncludeNotReady</maml:name>
+        <maml:description>
+          <maml:para>Also create queries whose tables have no data or whose watchlists are
+missing.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="true (ByValue)" position="Named" aliases="none">
+        <maml:name>InputObject</maml:name>
+        <maml:description>
+          <maml:para>Queries from Find-AACSentinelHuntingQuery, instead of -Pack.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.Object[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Object[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="true" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Name</maml:name>
+        <maml:description>
+          <maml:para>Only queries with these names (wildcards work).</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoDisplay</maml:name>
+        <maml:description>
+          <maml:para>Return the deployment without showing the plan.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>OverwriteChanged</maml:name>
+        <maml:description>
+          <maml:para>Replace queries that were edited in the workspace, or that this module
+didn't deploy.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Pack</maml:name>
+        <maml:description>
+          <maml:para>SignIn, M365, EntraAudit, Intune.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>PassThru</maml:name>
+        <maml:description>
+          <maml:para>Show the plan and also return the deployment.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Path</maml:name>
+        <maml:description>
+          <maml:para>The top folder of a local clone of Azure/Azure-Sentinel, instead of
+GitHub.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Ref</maml:name>
+        <maml:description>
+          <maml:para>The commit, branch or tag of Azure/Azure-Sentinel to read. A commit
+pinned in the module by default.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>ResourceGroupName</maml:name>
+        <maml:description>
+          <maml:para>Narrows a workspace given by name, when the name is in more than one
+resource group.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>SubscriptionId</maml:name>
+        <maml:description>
+          <maml:para>Where to look for a workspace given by ID (GUID) or name. Every
+subscription the account can see by default.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Tactic</maml:name>
+        <maml:description>
+          <maml:para>Only queries for these MITRE ATT&amp;CK tactics, such as InitialAccess.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="wi">
+        <maml:name>WhatIf</maml:name>
+        <maml:description>
+          <maml:para />
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="Workspace, WorkspaceName, ResourceId">
+        <maml:name>WorkspaceId</maml:name>
+        <maml:description>
+          <maml:para>The workspace: its workspace ID (GUID), resource ID or name.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>YamlSource</maml:name>
+        <maml:description>
+          <maml:para>Hunting query YAML files, instead of a pack: github.com/.../blob/... or
+raw.githubusercontent.com links, or local paths. A stub in
+Azure/Azure-Sentinel is followed to where the query moved. If one can't
+be read, nothing is deployed.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes />
+    <command:returnValues>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>AAC.SentinelHuntingDeployment (piped onward, or with -PassThru or -NoDisplay)</maml:name>
+        </dev:type>
+        <maml:description>
+          <maml:para />
+        </maml:description>
+      </command:returnValue>
+    </command:returnValues>
+    <maml:alertSet>
+      <maml:alert>
+        <maml:para />
+      </maml:alert>
+    </maml:alertSet>
+    <command:examples>
+      <command:example>
+        <maml:title>--------- Example 1 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Connect-AAC
+Deploy-AACSentinelHuntingQuery -WorkspaceId 'law-contoso-sentinel' -Pack SignIn, M365, Intune -WhatIf</dev:code>
+        <dev:remarks>
+          <maml:para>The plan: what would be created, updated and skipped, and why. Nothing is written.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 2 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Deploy-AACSentinelHuntingQuery -WorkspaceId 'law-contoso-sentinel' -Pack Intune -IncludeNotReady</dev:code>
+        <dev:remarks>
+          <maml:para>Add the Intune queries, even before Intune's logs reach the workspace.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 3 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Find-AACSentinelHuntingQuery -Pack SignIn -Tactic InitialAccess | Deploy-AACSentinelHuntingQuery -WorkspaceId 'law-contoso-sentinel'</dev:code>
+        <dev:remarks>
+          <maml:para>Add the sign-in queries for one tactic.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 4 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Deploy-AACSentinelHuntingQuery -SubscriptionId 00000000-0000-0000-0000-000000000000 -ResourceGroupName 'rg-sentinel' -WorkspaceName 'law-sentinel' -YamlSource 'https://github.com/Azure/Azure-Sentinel/blob/master/Hunting%20Queries/OfficeActivity/AnomolousUserAccessingOtherUsersMailbox.yaml'</dev:code>
+        <dev:remarks>
+          <maml:para>Add one query from a link. This file has moved, so the query is read from where it says it went.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 5 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Deploy-AACSentinelHuntingQuery -WorkspaceId 'law-sentinel' -YamlSource .\queries\OurOwnQuery.yaml, .\queries\AnotherOne.yaml -WhatIf</dev:code>
+        <dev:remarks>
+          <maml:para>The plan for your own query files.</maml:para>
+        </dev:remarks>
+      </command:example>
+    </command:examples>
+    <command:relatedLinks>
+      <maml:navigationLink>
+        <maml:linkText>Online Version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Deploy-AACSentinelHuntingQuery.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>Online version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Deploy-AACSentinelHuntingQuery.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>about_Azure.Admin.Console</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md</maml:uri>
+      </maml:navigationLink>
+    </command:relatedLinks>
+  </command:command>
+  <command:command>
+    <command:details>
       <command:name>Deploy-AACStorageAccount</command:name>
       <maml:description>
         <maml:para>Creates or updates a storage account - and its containers, file shares, queues, tables, blobs and settings - idempotently, with the Azure REST APIs: plan, gates (Azure Policy and PSRule), then apply. No ARM, Bicep or Terraform template.</maml:para>
@@ -4383,6 +5033,554 @@ replaced with -Force (its answers would be lost).</maml:para>
       <maml:navigationLink>
         <maml:linkText>Online version</maml:linkText>
         <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Export-AACWafQuestionnaire.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>about_Azure.Admin.Console</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md</maml:uri>
+      </maml:navigationLink>
+    </command:relatedLinks>
+  </command:command>
+  <command:command>
+    <command:details>
+      <command:name>Find-AACSentinelHuntingQuery</command:name>
+      <maml:description>
+        <maml:para>Lists the hunting queries you could deploy to Microsoft Sentinel - for Entra ID sign-ins and audit, Microsoft 365 and Intune - and, for a workspace, whether each is ready and how it stands there.</maml:para>
+      </maml:description>
+      <command:verb>Find</command:verb>
+      <command:noun>AACSentinelHuntingQuery</command:noun>
+    </command:details>
+    <maml:description>
+      <maml:para>The shopping list: Get-AACSentinelHuntingQuery is the inventory of what
+a workspace already has. Pipe this command to
+Deploy-AACSentinelHuntingQuery. Read-only.
+
+The packs:
+  SignIn       Entra ID sign-ins (SigninLogs and non-interactive)
+  M365         Microsoft 365 (OfficeActivity, CloudAppEvents)
+  EntraAudit   Entra ID directory changes (AuditLogs)
+  Intune       Intune, written for this module: the Azure-Sentinel
+               repository has none
+The first three come from the Azure-Sentinel repository on GitHub, at a
+commit pinned in the module, including the queries that repository
+moved into its solutions. These queries are community content: read
+one before relying on it. -Ref picks another commit, and -Path reads a
+local clone instead of GitHub.
+
+-YamlSource looks at files you name instead of the packs: links to
+GitHub, or files on this computer. A link to a branch reads whatever is
+on it now, not the pinned commit.
+
+With -WorkspaceId, each query also says:
+  Readiness    Ready; Missing data (a table it needs had nothing in the
+               last -Days); Missing watchlist; Unknown
+  Deployment   New; Current; Update available; Changed (edited in the
+               workspace, or not deployed by this module); Other copy
+               (this name under another ID, say from Content hub)
+Without it, it lists the catalog and needs no Azure sign-in.
+
+Intune's tables fill only when Intune's diagnostic settings send logs
+to the workspace (Intune admin center, Reports, Diagnostics settings).
+
+What you get depends on where the command runs:
+  at the prompt    a summary, then the queries
+  piped onward     the queries, with no view
+  -PassThru        the view and the queries
+  -NoDisplay       the queries only
+-CsvPath, -HtmlPath and -PdfPath write reports instead of the view.</maml:para>
+    </maml:description>
+    <command:syntax>
+      <command:syntaxItem>
+        <maml:name>Find-AACSentinelHuntingQuery</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Pack</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Name</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Tactic</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="Workspace, WorkspaceName, ResourceId">
+          <maml:name>WorkspaceId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>SubscriptionId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>ResourceGroupName</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Days</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">int</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Int32</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Ref</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Path</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>CsvPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>HtmlPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>PdfPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Title</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>PassThru</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoDisplay</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoPaging</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+      <command:syntaxItem>
+        <maml:name>Find-AACSentinelHuntingQuery</maml:name>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>YamlSource</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Name</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Tactic</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="Workspace, WorkspaceName, ResourceId">
+          <maml:name>WorkspaceId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>SubscriptionId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>ResourceGroupName</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Days</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">int</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Int32</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>CsvPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>HtmlPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>PdfPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Title</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>PassThru</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoDisplay</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoPaging</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>CsvPath</maml:name>
+        <maml:description>
+          <maml:para>Write the queries to this CSV file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Days</maml:name>
+        <maml:description>
+          <maml:para>How far back a table must have data to count: 1 to 90 days, 30 by
+default.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Int32</maml:name>
+        </dev:type>
+        <dev:defaultValue>30</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>HtmlPath</maml:name>
+        <maml:description>
+          <maml:para>Write an interactive HTML report to this file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="true" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Name</maml:name>
+        <maml:description>
+          <maml:para>Only queries with these names (wildcards work).</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoDisplay</maml:name>
+        <maml:description>
+          <maml:para>Return the queries without showing the view.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoPaging</maml:name>
+        <maml:description>
+          <maml:para>Show the whole view at once instead of a page at a time.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Pack</maml:name>
+        <maml:description>
+          <maml:para>SignIn, M365, EntraAudit, Intune. All of them by default.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+        <dev:defaultValue>@('SignIn', 'M365', 'EntraAudit', 'Intune')</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>PassThru</maml:name>
+        <maml:description>
+          <maml:para>Show the view and also return the queries.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Path</maml:name>
+        <maml:description>
+          <maml:para>The top folder of a local clone of Azure/Azure-Sentinel, instead of
+GitHub.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>PdfPath</maml:name>
+        <maml:description>
+          <maml:para>Write a PDF report to this file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Ref</maml:name>
+        <maml:description>
+          <maml:para>The commit, branch or tag of Azure/Azure-Sentinel to read. A commit
+pinned in the module by default.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>ResourceGroupName</maml:name>
+        <maml:description>
+          <maml:para>Narrows a workspace given by name, when the name is in more than one
+resource group.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>SubscriptionId</maml:name>
+        <maml:description>
+          <maml:para>Where to look for a workspace given by ID (GUID) or name. Every
+subscription the account can see by default.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Tactic</maml:name>
+        <maml:description>
+          <maml:para>Only queries for these MITRE ATT&amp;CK tactics, such as InitialAccess.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Title</maml:name>
+        <maml:description>
+          <maml:para>The HTML and PDF reports' title.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+        <dev:defaultValue>'Microsoft Sentinel hunting queries'</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="Workspace, WorkspaceName, ResourceId">
+        <maml:name>WorkspaceId</maml:name>
+        <maml:description>
+          <maml:para>The workspace to check against: its workspace ID (GUID), resource ID or
+name. Without it, only the catalog is listed.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>YamlSource</maml:name>
+        <maml:description>
+          <maml:para>Hunting query YAML files, instead of the packs: github.com/.../blob/...
+or raw.githubusercontent.com links, or local paths. A stub in
+Azure/Azure-Sentinel is followed to where the query moved. Stops if one
+can't be read.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes />
+    <command:returnValues>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>AAC.SentinelHuntingQuery (piped onward, or with -PassThru or -NoDisplay)</maml:name>
+        </dev:type>
+        <maml:description>
+          <maml:para />
+        </maml:description>
+      </command:returnValue>
+    </command:returnValues>
+    <maml:alertSet>
+      <maml:alert>
+        <maml:para />
+      </maml:alert>
+    </maml:alertSet>
+    <command:examples>
+      <command:example>
+        <maml:title>--------- Example 1 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Find-AACSentinelHuntingQuery -Pack Intune</dev:code>
+        <dev:remarks>
+          <maml:para>The Intune queries, with no Azure sign-in.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 2 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Connect-AAC
+Find-AACSentinelHuntingQuery -Pack SignIn, M365, Intune -WorkspaceId 'law-contoso-sentinel' -HtmlPath .\out\Hunting.html</dev:code>
+        <dev:remarks>
+          <maml:para>What each pack offers, what this workspace is ready for, as a report.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 3 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Find-AACSentinelHuntingQuery -Pack SignIn -Tactic InitialAccess -WorkspaceId 'law-contoso-sentinel' | Where-Object Ready | Deploy-AACSentinelHuntingQuery -WorkspaceId 'law-contoso-sentinel' -WhatIf</dev:code>
+        <dev:remarks>
+          <maml:para>What deploying the ready sign-in queries for initial access would do.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 4 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>(Find-AACSentinelHuntingQuery -Name '*break-glass*' -NoDisplay).Query</dev:code>
+        <dev:remarks>
+          <maml:para>Read a query before deploying it.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 5 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Find-AACSentinelHuntingQuery -YamlSource 'https://github.com/Azure/Azure-Sentinel/blob/master/Hunting%20Queries/OfficeActivity/AnomolousUserAccessingOtherUsersMailbox.yaml' -WorkspaceId 'law-contoso-sentinel'</dev:code>
+        <dev:remarks>
+          <maml:para>Look at one file, and whether this workspace is ready for it.</maml:para>
+        </dev:remarks>
+      </command:example>
+    </command:examples>
+    <command:relatedLinks>
+      <maml:navigationLink>
+        <maml:linkText>Online Version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Find-AACSentinelHuntingQuery.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>Online version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Find-AACSentinelHuntingQuery.md</maml:uri>
       </maml:navigationLink>
       <maml:navigationLink>
         <maml:linkText>about_Azure.Admin.Console</maml:linkText>
@@ -17131,6 +18329,311 @@ ISO 27001 compliance, with the failing resources, as a PDF.</dev:code>
   </command:command>
   <command:command>
     <command:details>
+      <command:name>Get-AACSentinelHuntingQuery</command:name>
+      <maml:description>
+        <maml:para>Lists the hunting queries on a Microsoft Sentinel workspace: whatever put them there.</maml:para>
+      </maml:description>
+      <command:verb>Get</command:verb>
+      <command:noun>AACSentinelHuntingQuery</command:noun>
+    </command:details>
+    <maml:description>
+      <maml:para>The inventory: Find-AACSentinelHuntingQuery is the shopping list of what
+could be deployed. Reads the workspace's saved searches in the Hunting
+Queries category, which is how Sentinel stores them. Read-only.
+
+For each: its name, tactics and techniques, description and KQL, and
+  Source   This module (deployed by Deploy-AACSentinelHuntingQuery), or
+           Elsewhere (the portal, Content hub, another tool)
+  Origin   for this module's: the pack's source file and commit
+  Edited   this module's query was changed in the workspace after it was
+           deployed; blank for queries from elsewhere, which this
+           module can't judge
+
+What you get depends on where the command runs:
+  at the prompt    a summary, then the queries
+  piped onward     the queries, with no view
+  -PassThru        the view and the queries
+  -NoDisplay       the queries only
+-CsvPath, -HtmlPath and -PdfPath write reports instead of the view.
+
+Needs Reader, Microsoft Sentinel Reader or Log Analytics Reader on the
+workspace.</maml:para>
+    </maml:description>
+    <command:syntax>
+      <command:syntaxItem>
+        <maml:name>Get-AACSentinelHuntingQuery</maml:name>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="Workspace, WorkspaceName, ResourceId">
+          <maml:name>WorkspaceId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>SubscriptionId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>ResourceGroupName</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Name</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Tactic</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>CsvPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>HtmlPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>PdfPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Title</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>PassThru</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoDisplay</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoPaging</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>CsvPath</maml:name>
+        <maml:description>
+          <maml:para>Write the queries to this CSV file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>HtmlPath</maml:name>
+        <maml:description>
+          <maml:para>Write an interactive HTML report to this file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="true" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Name</maml:name>
+        <maml:description>
+          <maml:para>Only queries with these names (wildcards work).</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoDisplay</maml:name>
+        <maml:description>
+          <maml:para>Return the queries without showing the view.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoPaging</maml:name>
+        <maml:description>
+          <maml:para>Show the whole view at once instead of a page at a time.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>PassThru</maml:name>
+        <maml:description>
+          <maml:para>Show the view and also return the queries.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>PdfPath</maml:name>
+        <maml:description>
+          <maml:para>Write a PDF report to this file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>ResourceGroupName</maml:name>
+        <maml:description>
+          <maml:para>Narrows a workspace given by name, when the name is in more than one
+resource group.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>SubscriptionId</maml:name>
+        <maml:description>
+          <maml:para>Where to look for a workspace given by ID (GUID) or name. Every
+subscription the account can see by default.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Tactic</maml:name>
+        <maml:description>
+          <maml:para>Only queries for these MITRE ATT&amp;CK tactics, such as InitialAccess.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Title</maml:name>
+        <maml:description>
+          <maml:para>The HTML and PDF reports' title.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+        <dev:defaultValue>'Microsoft Sentinel hunting queries on the workspace'</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="Workspace, WorkspaceName, ResourceId">
+        <maml:name>WorkspaceId</maml:name>
+        <maml:description>
+          <maml:para>The workspace: its workspace ID (GUID), resource ID or name.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes />
+    <command:returnValues>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>AAC.SentinelInstalledHuntingQuery (piped onward, or with -PassThru or -NoDisplay)</maml:name>
+        </dev:type>
+        <maml:description>
+          <maml:para />
+        </maml:description>
+      </command:returnValue>
+    </command:returnValues>
+    <maml:alertSet>
+      <maml:alert>
+        <maml:para />
+      </maml:alert>
+    </maml:alertSet>
+    <command:examples>
+      <command:example>
+        <maml:title>--------- Example 1 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Connect-AAC
+Get-AACSentinelHuntingQuery -WorkspaceId 'law-contoso-sentinel'</dev:code>
+        <dev:remarks>
+          <maml:para>Every hunting query on the workspace.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 2 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Get-AACSentinelHuntingQuery -WorkspaceId 'law-contoso-sentinel' | Where-Object Source -EQ 'This module' | Where-Object Edited</dev:code>
+        <dev:remarks>
+          <maml:para>The queries this module deployed that someone has since edited.</maml:para>
+        </dev:remarks>
+      </command:example>
+    </command:examples>
+    <command:relatedLinks>
+      <maml:navigationLink>
+        <maml:linkText>Online Version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACSentinelHuntingQuery.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>Online version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACSentinelHuntingQuery.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>about_Azure.Admin.Console</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md</maml:uri>
+      </maml:navigationLink>
+    </command:relatedLinks>
+  </command:command>
+  <command:command>
+    <command:details>
       <command:name>Get-AACServicePrincipalInsight</command:name>
       <maml:description>
         <maml:para>Lists every service principal and managed identity that holds an Azure role - application or another tenant's, system- or user-assigned identity, policy assignment identity - with its roles, the resources it is attached to, and credentials about to expire.</maml:para>
@@ -26276,6 +27779,386 @@ Invoke-AACPSRule</dev:code>
       <maml:navigationLink>
         <maml:linkText>Online version</maml:linkText>
         <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Invoke-AACPSRule.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>about_Azure.Admin.Console</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md</maml:uri>
+      </maml:navigationLink>
+    </command:relatedLinks>
+  </command:command>
+  <command:command>
+    <command:details>
+      <command:name>Invoke-AACSentinelAssessment</command:name>
+      <maml:description>
+        <maml:para>Assesses Microsoft Sentinel on a Log Analytics workspace: analytics rules and MITRE ATT&amp;CK coverage, rule templates, data connectors, tables and ingestion, health failures, incidents, automation rules and recommendations - with a Spectre.Console view, an object, and CSV and interactive HTML and PDF reports.</maml:para>
+      </maml:description>
+      <command:verb>Invoke</command:verb>
+      <command:noun>AACSentinelAssessment</command:noun>
+    </command:details>
+    <maml:description>
+      <maml:para>Reads one workspace - read-only, nothing is changed - from:
+  Azure Resource Manager   whether Sentinel is enabled, its analytics
+                           rules and templates, data connectors,
+                           incidents and automation rules, and the
+                           workspace's tables (plan, retention)
+  the workspace itself     KQL: Usage (size and last record per table),
+                           _SentinelHealth (failures per resource) and
+                           SecurityIncident (when incidents closed)
+
+-WorkspaceId is the workspace ID (its customerId GUID, as the portal
+shows it), the full resource ID, or the workspace's name.
+
+What comes back:
+  AnalyticsRules    every rule: kind, severity, enabled, tactics,
+                    frequency, query, its health failures and
+                    incidents. Failing rules first.
+  TacticCoverage    how many enabled rules declare each MITRE ATT&amp;CK
+                    Enterprise tactic
+  RuleTemplates     every template the API lists (built-in and from
+                    installed solutions): the data it needs, whether
+                    that data is arriving and whether a rule uses it.
+                    Candidates - data arriving, no rule yet - first.
+  Incidents         every incident created in the last -Days: severity,
+                    status, owner, classification, hours to close.
+                    These hold people's names and email addresses, and
+                    so do the reports.
+  AutomationRules   every automation rule, in the order they run:
+                    state, triggers, actions, expiry
+  DataConnectors    every connector the API lists: kind, state, data
+                    types. A source can send data without being listed
+                    here, so Tables is what shows what really arrives.
+  Tables            billable and free GB over -Days, share of billable
+                    data, daily average, plan, retention, last record.
+                    Tables with no data are left out unless custom, or
+                    with -IncludeEmptyTable.
+  HealthFailures    what _SentinelHealth reports as failed: resource,
+                    operation, count, last failure and reason
+  Recommendations   Sentinel not enabled, enabled rules failing, tables
+                    that stopped receiving data, health monitoring off,
+                    connector or automation failures, billable tables
+                    no enabled rule reads, templates to enable, MITRE
+                    ATT&amp;CK gaps, incidents with no owner or slow to
+                    close, noisy rules, expired or disabled automation,
+                    rules with a newer template - by severity, with
+                    what to do
+-Section limits the reading to some of: AnalyticsRules, RuleTemplates,
+DataConnectors, Tables, Health, Incidents, AutomationRules,
+Recommendations.
+
+Needs Microsoft Sentinel Reader and Log Analytics Reader on the
+workspace. What can't be read is reported, and the rest carries on.
+
+What you get depends on where the command runs:
+  at the prompt    tiles, then each section - a page at a time
+  piped onward     the assessment object, with no view
+  -PassThru        the view and the object
+  -NoDisplay       the object only
+-CsvPath writes the analytics rules (one row each). -HtmlPath writes a
+tabbed interactive report - a Summary (headline, tiles, charts), then
+a tab per section - every table searchable, filterable and
+downloadable as CSV. -PdfPath writes the same as a PDF, each section a
+bookmarked heading.</maml:para>
+    </maml:description>
+    <command:syntax>
+      <command:syntaxItem>
+        <maml:name>Invoke-AACSentinelAssessment</maml:name>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="Workspace, ResourceId">
+          <maml:name>WorkspaceId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>SubscriptionId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Days</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">int</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Int32</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Section</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>IncludeEmptyTable</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>CsvPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>HtmlPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>PdfPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>Title</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>PassThru</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoDisplay</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoPaging</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>CsvPath</maml:name>
+        <maml:description>
+          <maml:para>Write the analytics rules to this CSV file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Days</maml:name>
+        <maml:description>
+          <maml:para>How far back ingestion, health and incidents look: 1 to 90 days, 30 by
+default.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Int32</maml:name>
+        </dev:type>
+        <dev:defaultValue>30</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>HtmlPath</maml:name>
+        <maml:description>
+          <maml:para>Write a tabbed interactive HTML report to this file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>IncludeEmptyTable</maml:name>
+        <maml:description>
+          <maml:para>Also list the tables with no data in the period (a workspace has
+hundreds).</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoDisplay</maml:name>
+        <maml:description>
+          <maml:para>Return the assessment without showing the view.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoPaging</maml:name>
+        <maml:description>
+          <maml:para>Show the whole view at once instead of a page at a time.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>PassThru</maml:name>
+        <maml:description>
+          <maml:para>Show the view and also return the assessment.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>PdfPath</maml:name>
+        <maml:description>
+          <maml:para>Write a PDF report to this file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Section</maml:name>
+        <maml:description>
+          <maml:para>Only these sections: AnalyticsRules, RuleTemplates, DataConnectors,
+Tables, Health, Incidents, AutomationRules, Recommendations. All of
+them by default.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>SubscriptionId</maml:name>
+        <maml:description>
+          <maml:para>Where to look for a workspace given by ID (GUID) or name. Every
+subscription the account can see by default.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>Title</maml:name>
+        <maml:description>
+          <maml:para>The HTML and PDF reports' title.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+        <dev:defaultValue>'Microsoft Sentinel assessment'</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="Workspace, ResourceId">
+        <maml:name>WorkspaceId</maml:name>
+        <maml:description>
+          <maml:para>The workspace: its workspace ID (GUID), resource ID or name.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes />
+    <command:returnValues>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>AAC.SentinelAssessment (piped onward, or with -PassThru or -NoDisplay)</maml:name>
+        </dev:type>
+        <maml:description>
+          <maml:para />
+        </maml:description>
+      </command:returnValue>
+    </command:returnValues>
+    <maml:alertSet>
+      <maml:alert>
+        <maml:para />
+      </maml:alert>
+    </maml:alertSet>
+    <command:examples>
+      <command:example>
+        <maml:title>--------- Example 1 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Connect-AAC
+Invoke-AACSentinelAssessment -WorkspaceId 00000000-0000-0000-0000-000000000000</dev:code>
+        <dev:remarks>
+          <maml:para>The whole assessment of one workspace, by its workspace ID.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 2 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Invoke-AACSentinelAssessment -WorkspaceId 'law-contoso-sentinel' -Days 7 -Section Tables, Health</dev:code>
+        <dev:remarks>
+          <maml:para>Ingestion and health failures over the last 7 days.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 3 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Invoke-AACSentinelAssessment -WorkspaceId 'law-contoso-sentinel' -HtmlPath .\out\Sentinel.html -PdfPath .\out\Sentinel.pdf -CsvPath .\out\AnalyticsRules.csv
+A tabbed HTML report and a PDF, and the analytics rules as CSV.</dev:code>
+        <dev:remarks />
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 4 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>(Invoke-AACSentinelAssessment -WorkspaceId 'law-contoso-sentinel' -Section RuleTemplates -NoDisplay).RuleTemplates | Where-Object Candidate</dev:code>
+        <dev:remarks>
+          <maml:para>The templates worth enabling: their data is arriving and no rule uses them.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 5 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>(Invoke-AACSentinelAssessment -WorkspaceId 'law-contoso-sentinel' -Section AnalyticsRules -NoDisplay).AnalyticsRules | Where-Object Enabled -EQ $false</dev:code>
+        <dev:remarks>
+          <maml:para>The analytics rules that are turned off.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 6 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>(Invoke-AACSentinelAssessment -WorkspaceId 'law-contoso-sentinel' -NoDisplay).Recommendations | Where-Object Severity -EQ 'High'</dev:code>
+        <dev:remarks>
+          <maml:para>The high-severity recommendations.</maml:para>
+        </dev:remarks>
+      </command:example>
+    </command:examples>
+    <command:relatedLinks>
+      <maml:navigationLink>
+        <maml:linkText>Online Version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Invoke-AACSentinelAssessment.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>Online version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Invoke-AACSentinelAssessment.md</maml:uri>
       </maml:navigationLink>
       <maml:navigationLink>
         <maml:linkText>about_Azure.Admin.Console</maml:linkText>

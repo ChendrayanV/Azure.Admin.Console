@@ -35,7 +35,9 @@ Describe 'Azure Admin Console - Module scaffold' {
     It 'exports exactly the public functions, and nothing parked or private' {
         $expectedFunctions = @(
             'Connect-AAC'
+            'Deploy-AACSentinelHuntingQuery'
             'Deploy-AACStorageAccount'
+            'Find-AACSentinelHuntingQuery'
             'Disconnect-AAC'
             'Export-AACDiagnosticBundle'
             'Export-AACDiagram'
@@ -82,6 +84,7 @@ Describe 'Azure Admin Console - Module scaffold' {
             'Get-AACRoleAssignment'
             'Get-AACSecurityAlert'
             'Get-AACSecurityPosture'
+            'Get-AACSentinelHuntingQuery'
             'Get-AACServicePrincipalInsight'
             'Get-AACSkuAvailability'
             'Get-AACStorageAccountContainerSize'
@@ -103,6 +106,7 @@ Describe 'Azure Admin Console - Module scaffold' {
             'Invoke-AACM365Assessment'
             'Invoke-AACPolicyAssessment'
             'Invoke-AACPSRule'
+            'Invoke-AACSentinelAssessment'
             'Invoke-AACServiceBusAssessment'
             'Show-AACServiceBusEntity'
             'Invoke-AACStorageAccountAssessment'

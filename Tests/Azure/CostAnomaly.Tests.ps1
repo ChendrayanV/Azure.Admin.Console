@@ -100,15 +100,17 @@ Describe 'Azure Admin Console - Get-AACCostAnomaly' {
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACGraphBatch -MockWith {
             @{ Rows = @{ subscriptions = @(@{ subscriptionId = $script:f.Prod; name = 'sub-prod'; state = 'Enabled'; chain = @(@{ name = 'mg-prod' }) }, @{ subscriptionId = $script:f.Dev; name = 'sub-dev'; state = 'Enabled'; chain = @(@{ name = 'mg-dev' }) }) }; Errors = @{} }
         }
+        # Today is two days after the made-up series end, so they end on the
+        # command's last complete day. Pinned, not moved to the real date: what
+        # is found depends on where the window ends in the month (a window
+        # ending on a month's last day has no forecast to raise here).
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Get-AACUtcToday -MockWith { $script:f.End.AddDays(2) }
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACCostBatch -MockWith {
             $script:bodies.Add(@{ Scope = @($Scope); Body = $Body })
-            # The daily series, moved so they end on the command's last complete day.
-            $shift = ([datetime]::UtcNow.Date.AddDays(-2) - $script:f.End).Days
-            $move = { param($Row) $copy = [ordered]@{}; foreach ($p in $Row.PSObject.Properties) { $copy[$p.Name] = $p.Value }; $copy.UsageDate = [int]([datetime]::ParseExact([string]$Row.UsageDate, 'yyyyMMdd', $null).AddDays($shift).ToString('yyyyMMdd')); [pscustomobject]$copy }
             $result = @{}
             foreach ($s in $Scope) {
                 $rows = if ($Body.dataset.grouping[0].name -eq 'ResourceId') { $script:f.Resources } else { $script:f.Cost[$s].Rows }
-                $result[$s] = @{ Rows = @($rows | ForEach-Object { & $move $_ }); Status = 'OK' }
+                $result[$s] = @{ Rows = @($rows); Status = 'OK' }
             }
             $result
         }
