@@ -242,6 +242,7 @@ function ConvertTo-AACDrawio {
                 $health = [string](& $get $n 'health')
                 $label = "<b>$(& $esc ([string]$n.name))</b><br><span style='font-size:9px;color:#5B6B80'>$(& $esc $typeLabel)</span>"
                 if ($health -and $healthColor.Contains($health)) { $label += "<br><span style='font-size:9px;color:$($healthColor[$health])'>&#9679; $(& $esc $health)</span>" }
+                if (& $get $n 'caption') { $label += "<br><span style='font-size:9px;font-weight:bold;color:$(& $esc ([string](& $get $n 'captionColor')))'>&#9679; $(& $esc ([string]$n.caption))</span>" }
                 $uri = & $iconUri ([string](& $get $n 'icon'))
                 $style = if ($uri) { "image;html=1;aspect=fixed;image=$uri;verticalLabelPosition=bottom;verticalAlign=top;labelPosition=center;align=center;fontSize=11;whiteSpace=wrap;labelWidth=136;" }
                 else { 'rounded=1;html=1;whiteSpace=wrap;fillColor=#FFFFFF;strokeColor=#8C9BB0;fontSize=10;verticalLabelPosition=bottom;verticalAlign=top;labelWidth=136;' }

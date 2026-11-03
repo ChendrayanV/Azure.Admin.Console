@@ -78,6 +78,7 @@ $packageItems = @(
     'lib'
     'en-US'
     'LICENSE'
+    'THIRD-PARTY-NOTICES.md'
     'README.md'
     'CHANGELOG.md'
 )
@@ -95,6 +96,7 @@ function Invoke-DocsTask {
     Write-Step 'Docs: building the help with PlatyPS (docs\*.md and en-US MAML)'
     & pwsh -NoProfile -NonInteractive -File (Join-Path $root 'tools/Build-Help.ps1') -ModuleManifest $manifestPath -DocsPath $docs -HelpPath (Join-Path $root 'en-US')
     if ($LASTEXITCODE) { throw 'Building the help failed.' }
+    & (Join-Path $root 'tools/Build-LlmsText.ps1') -ModuleManifest $manifestPath -Root $root
 }
 
 # --- Test ------------------------------------------------------------------------

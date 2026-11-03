@@ -149,7 +149,7 @@ Export-AACArchitectureDecision -Design $design -Path .\adr -Owner 'Orders team'
 
 <sub>Snapshots from a fictional design (contoso-orders) in a fictional landing zone.</sub>
 
-Everything except reading the landing zone runs offline, so a design can be reviewed before there is a subscription for it. The walkthrough is in [the guide](GUIDE.md#architecture-design).
+Everything except reading the landing zone runs offline, so a design can be reviewed before there is a subscription for it. The walkthrough is in [the guide](docs/guide/architecture-design.md).
 
 ## What's inside
 
@@ -199,7 +199,7 @@ Only `Deploy-AACStorageAccount` and `New-AACApplicationPermission` change anythi
 ## Contributing
 
 New commands, fixes, ideas and bug reports are all welcome - you don't need to be an expert to help.
-Open an [issue](https://github.com/ChendrayanV/Azure.Admin.Console/issues) to say what you'd like to work on, and we'll shape it together.
+Open an [issue](https://github.com/ChendrayanV/Azure.Admin.Console/issues) to say what you'd like to work on, and we'll shape it together. The rules and steps, for people and AI coding agents, are in [AGENTS.md](AGENTS.md).
 
 <details>
 <summary><b>How the project is laid out - and how to add a command</b></summary>
@@ -243,7 +243,7 @@ With thanks to the people whose work and ideas shaped this module:
 |:---:|
 | <img src="https://github.com/shashi-create.png?size=80" width="40" height="40" alt="Shashi Shetty"> **Shashi Shetty** [![GitHub](https://img.shields.io/badge/GitHub-shashi--create-181717?logo=github)](https://github.com/shashi-create) |
 
-Built on [Spectre.Console](https://spectreconsole.net), [PDFsharp and MigraDoc](https://www.pdfsharp.com) and [PSRule for Azure](https://azure.github.io/PSRule.Rules.Azure/).
+Built on [Spectre.Console](https://spectreconsole.net), [PDFsharp and MigraDoc](https://www.pdfsharp.com) and [PSRule for Azure](https://azure.github.io/PSRule.Rules.Azure/), with alert and resiliency data from [Azure Monitor Baseline Alerts](https://github.com/Azure/azure-monitor-baseline-alerts) and the [Azure Proactive Resiliency Library](https://github.com/Azure/Azure-Proactive-Resiliency-Library-v2) ([notices](THIRD-PARTY-NOTICES.md)).
 
 ## Contact
 

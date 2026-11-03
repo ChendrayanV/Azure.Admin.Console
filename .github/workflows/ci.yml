@@ -80,10 +80,10 @@ jobs:
         run: |
           ./tools/Install-BuildModule.ps1 -Name Microsoft.PowerShell.PlatyPS -Version '[1.0.3,2.0)'
           ./build.ps1 -Task Docs
-          git add --intent-to-add -- docs en-US
-          git diff --ignore-cr-at-eol --exit-code -- docs en-US
+          git add --intent-to-add -- docs en-US llms.txt llms-full.txt
+          git diff --ignore-cr-at-eol --exit-code -- docs en-US llms.txt llms-full.txt
           if ($LASTEXITCODE -ne 0) {
-              Write-Output '::error::docs/ or en-US/ is out of date. Run ./build.ps1 -Task Docs and commit the result.'
+              Write-Output '::error::docs/, en-US/ or the llms files are out of date. Run ./build.ps1 -Task Docs and commit the result.'
               exit 1
           }
 

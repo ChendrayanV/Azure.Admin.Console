@@ -35,6 +35,11 @@ $script:AACResourceMapAsset = $null
 # The Azure icon set (Get-AACAzureIconSet), shared by the resource map and the
 # architecture diagrams; read and checked once per session.
 $script:AACAzureIconSet = $null
+# Azure's list of services (Get-AACServiceCatalog), read once per session: tab
+# completion uses it, and it hardly changes.
+$script:AACServiceCatalog = $null
+# The AMBA and APRL data (Get-AACServiceBaseline), read once per session.
+$script:AACServiceBaseline = $null
 # The HttpClient Invoke-AACArmParallel sends its requests through - one per
 # session, so connections are pooled and reused.
 $script:AACHttpClient = $null
