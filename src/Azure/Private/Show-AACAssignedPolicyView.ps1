@@ -172,5 +172,5 @@ function Show-AACAssignedPolicyView {
     [Spectre.Console.AnsiConsole]::WriteLine()
 
     foreach ($notice in @($Inventory.Notice)) { Write-AACMarkup "[orange1]$(& $escape $notice)[/]" }
-    Write-AACMarkup "[grey42]Add -PassThru (or pipe the command) for one row per assignment and parameter$(if ($ExpandPolicySet) { ' (here: per policy in force and parameter)' }); -CsvPath and -HtmlPath write every one.[/]"
+    Write-AACMarkup "[grey42]Add -PassThru (or pipe the command) for one row per assignment and parameter$(if ($ExpandPolicySet) { ' (here: per policy in force and parameter)' }); -CsvPath and -HtmlPath write every one; -HtmlPath and -PdfPath write the tabbed report, resource types included.[/]"
 }

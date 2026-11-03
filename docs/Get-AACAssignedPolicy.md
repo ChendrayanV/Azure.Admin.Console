@@ -12,7 +12,7 @@ title: Get-AACAssignedPolicy
 
 ## SYNOPSIS
 
-Every Azure Policy assignment with its parameters - the default, assigned and effective value of each - and the resource types the policy applies to, with a Spectre.Console view, objects, and CSV and interactive HTML reports.
+Every Azure Policy assignment with its parameters - the default, assigned and effective value of each - and the resource types the policy applies to, with a Spectre.Console view, objects, and CSV and tabbed HTML and PDF reports.
 
 ## SYNTAX
 
@@ -20,8 +20,8 @@ Every Azure Policy assignment with its parameters - the default, assigned and ef
 
 ```
 Get-AACAssignedPolicy [[-ManagementGroupId] <string[]>] [[-SubscriptionId] <string[]>]
- [[-AssignmentName] <string[]>] [[-CsvPath] <string>] [[-HtmlPath] <string>] [[-Title] <string>]
- [-ExpandPolicySet] [-PassThru] [-NoDisplay] [-NoPaging]
+ [[-AssignmentName] <string[]>] [[-CsvPath] <string>] [[-HtmlPath] <string>] [[-PdfPath] <string>]
+ [[-Title] <string>] [-ExpandPolicySet] [-PassThru] [-NoDisplay] [-NoPaging]
 ```
 
 ## ALIASES
@@ -33,10 +33,12 @@ This command has no aliases.
 An inventory of what is assigned, not of compliance (for that, see
 Get-AACPolicyState). Reads the assignments, the policy definitions
 and initiatives they assign and the initiatives' member policies
-with Azure Resource Graph - a handful of queries however many
-assignments there are, with the Connect-AAC sign-in; Reader is
-enough, no Az modules. A definition Resource Graph doesn't return is
-read from Azure Resource Manager.
+from Azure Resource Manager's REST APIs, with the Connect-AAC
+sign-in; Reader is enough, no Az modules. That is one call per
+subscription, management group and definition, so -SubscriptionId or
+-ManagementGroupId makes it quicker in a large tenant. Azure Resource
+Graph is read only for what those calls couldn't, and the report says
+when it was.
 
 Without parameters: every assignment the account can see. With
 -SubscriptionId or -ManagementGroupId: the assignments that apply
@@ -110,10 +112,22 @@ What you get depends on where the command runs:
   -NoDisplay       the rows only
 ```
 
--CsvPath writes the rows. -HtmlPath writes an interactive report:
-tiles, charts, a table of the assignments and one of every
-parameter, searchable, filterable and downloadable as CSV. With
-either, the console shows only the progress and the files written.
+-CsvPath writes the rows. -HtmlPath writes one interactive report in
+tabs, each table searchable, filterable and downloadable as CSV:
+
+```text
+  Summary            tiles and charts
+  Assignments        where each is assigned, what it does, enforcement
+  Policies in force  each initiative opened up: its policies, effects
+                     and the value of every parameter
+  Resource types     what is assigned per type: how many policies
+                     block, audit, change or only report, and which
+  Parameters         the default, assigned and effective value of each
+```
+
+-PdfPath writes the same report, with each tab a bookmarked chapter.
+With any of them, the console shows only the progress and the files
+written.
 
 ## EXAMPLES
 
@@ -145,12 +159,20 @@ Everything assigned at, above or below a management group, as an interactive HTM
 ### Example 4
 
 ```powershell
+Get-AACAssignedPolicy -SubscriptionId '00000000-0000-0000-0000-000000000000' -HtmlPath .\out\AssignedPolicy.html -PdfPath .\out\AssignedPolicy.pdf
+```
+
+One report on what applies to a subscription, in HTML tabs and as a PDF.
+
+### Example 5
+
+```powershell
 Get-AACAssignedPolicy -NoDisplay | Where-Object { $_.ValueSource -eq 'Assigned' -and $_.AssignedValue -ne $_.DefaultValue }
 ```
 
 The parameters set to something other than their default.
 
-### Example 5
+### Example 6
 
 ```powershell
 Get-AACAssignedPolicy -NoDisplay | Where-Object ResourceType -Like '*Microsoft.Storage/storageAccounts*' | Select-Object AssignmentDisplayName, DefinitionDisplayName -Unique
@@ -158,7 +180,7 @@ Get-AACAssignedPolicy -NoDisplay | Where-Object ResourceType -Like '*Microsoft.S
 
 The assignments with a policy for storage accounts.
 
-### Example 6
+### Example 7
 
 ```powershell
 Get-AACAssignedPolicy -AssignmentName '*PostgreSQL*' -ExpandPolicySet -NoDisplay | Format-Table PolicyDisplayName, Effect, ParameterName, EffectiveValue, ValueSource
@@ -166,7 +188,7 @@ Get-AACAssignedPolicy -AssignmentName '*PostgreSQL*' -ExpandPolicySet -NoDisplay
 
 The policies inside an initiative assignment, with the effect and the value of every parameter.
 
-### Example 7
+### Example 8
 
 ```powershell
 Get-AACAssignedPolicy -ExpandPolicySet -CsvPath .\policySetMembers.csv
@@ -247,7 +269,7 @@ HelpMessage: ''
 
 ### -HtmlPath
 
-Write an interactive HTML report to this file.
+Write an interactive, tabbed HTML report to this file.
 
 ```yaml
 Type: System.String
@@ -351,6 +373,28 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -PdfPath
+
+Write the report as a PDF, each tab a bookmarked chapter of up to
+2,000 rows a table (the CSV and HTML report have every row).
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 5
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -SubscriptionId
 
 Only the assignments that apply to these subscriptions.
@@ -374,7 +418,7 @@ HelpMessage: ''
 
 ### -Title
 
-The HTML report's title.
+The HTML and PDF reports' title.
 
 ```yaml
 Type: System.String
@@ -383,7 +427,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 5
+  Position: 6
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false

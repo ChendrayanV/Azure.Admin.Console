@@ -5,15 +5,17 @@ function Get-AACAssignedPolicy {
         Every Azure Policy assignment with its parameters - the default,
         assigned and effective value of each - and the resource types the
         policy applies to, with a Spectre.Console view, objects, and CSV and
-        interactive HTML reports.
+        tabbed HTML and PDF reports.
     .DESCRIPTION
         An inventory of what is assigned, not of compliance (for that, see
         Get-AACPolicyState). Reads the assignments, the policy definitions
         and initiatives they assign and the initiatives' member policies
-        with Azure Resource Graph - a handful of queries however many
-        assignments there are, with the Connect-AAC sign-in; Reader is
-        enough, no Az modules. A definition Resource Graph doesn't return is
-        read from Azure Resource Manager.
+        from Azure Resource Manager's REST APIs, with the Connect-AAC
+        sign-in; Reader is enough, no Az modules. That is one call per
+        subscription, management group and definition, so -SubscriptionId or
+        -ManagementGroupId makes it quicker in a large tenant. Azure Resource
+        Graph is read only for what those calls couldn't, and the report says
+        when it was.
 
         Without parameters: every assignment the account can see. With
         -SubscriptionId or -ManagementGroupId: the assignments that apply
@@ -75,10 +77,18 @@ function Get-AACAssignedPolicy {
           piped onward     the rows, with no view
           -PassThru        the view and the rows
           -NoDisplay       the rows only
-        -CsvPath writes the rows. -HtmlPath writes an interactive report:
-        tiles, charts, a table of the assignments and one of every
-        parameter, searchable, filterable and downloadable as CSV. With
-        either, the console shows only the progress and the files written.
+        -CsvPath writes the rows. -HtmlPath writes one interactive report in
+        tabs, each table searchable, filterable and downloadable as CSV:
+          Summary            tiles and charts
+          Assignments        where each is assigned, what it does, enforcement
+          Policies in force  each initiative opened up: its policies, effects
+                             and the value of every parameter
+          Resource types     what is assigned per type: how many policies
+                             block, audit, change or only report, and which
+          Parameters         the default, assigned and effective value of each
+        -PdfPath writes the same report, with each tab a bookmarked chapter.
+        With any of them, the console shows only the progress and the files
+        written.
     .PARAMETER ManagementGroupId
         Only the assignments that apply to these management groups (their
         ID, the name in the portal's URL).
@@ -90,9 +100,12 @@ function Get-AACAssignedPolicy {
     .PARAMETER CsvPath
         Write every row to this CSV file. Alias: OutputPath.
     .PARAMETER HtmlPath
-        Write an interactive HTML report to this file.
+        Write an interactive, tabbed HTML report to this file.
+    .PARAMETER PdfPath
+        Write the report as a PDF, each tab a bookmarked chapter of up to
+        2,000 rows a table (the CSV and HTML report have every row).
     .PARAMETER Title
-        The HTML report's title.
+        The HTML and PDF reports' title.
     .PARAMETER ExpandPolicySet
         One row per policy in force and its parameter - every member policy
         of an assigned initiative with its effect and the effective value
@@ -115,6 +128,9 @@ function Get-AACAssignedPolicy {
     .EXAMPLE
         Get-AACAssignedPolicy -ManagementGroupId 'mg-landingzones' -HtmlPath .\out\AssignedPolicy.html
         Everything assigned at, above or below a management group, as an interactive HTML report.
+    .EXAMPLE
+        Get-AACAssignedPolicy -SubscriptionId '00000000-0000-0000-0000-000000000000' -HtmlPath .\out\AssignedPolicy.html -PdfPath .\out\AssignedPolicy.pdf
+        One report on what applies to a subscription, in HTML tabs and as a PDF.
     .EXAMPLE
         Get-AACAssignedPolicy -NoDisplay | Where-Object { $_.ValueSource -eq 'Assigned' -and $_.AssignedValue -ne $_.DefaultValue }
         The parameters set to something other than their default.
@@ -149,6 +165,8 @@ function Get-AACAssignedPolicy {
 
         [string] $HtmlPath,
 
+        [string] $PdfPath,
+
         [string] $Title = 'Assigned Azure Policy',
 
         [switch] $ExpandPolicySet,
@@ -168,11 +186,9 @@ function Get-AACAssignedPolicy {
 
     $pipedOnward = $MyInvocation.PipelinePosition -lt $MyInvocation.PipelineLength
     $interactive = -not $NoDisplay -and -not $pipedOnward
-    $showView = $interactive -and -not ($CsvPath -or $HtmlPath)
+    $showView = $interactive -and -not ($CsvPath -or $HtmlPath -or $PdfPath)
     $returnObjects = $PassThru -or $NoDisplay -or $pipedOnward
     $resolve = { param([string] $Path) if ($Path) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path) } }
-    $csvFullPath = & $resolve $CsvPath
-    $htmlFullPath = & $resolve $HtmlPath
 
     if ($interactive) {
         Write-AACRule -Title 'Azure Admin Console :: Assigned Azure Policy' -Color 'deepskyblue3_1'
@@ -180,8 +196,8 @@ function Get-AACAssignedPolicy {
     $state = Invoke-AACProgress -ScriptBlock {
         $null = Get-AACAccessToken
 
-        # The assignments, where every scope sits and the definitions assigned (tenant-wide).
-        $policyData = Read-AACAssignedPolicyData
+        # The assignments, where every scope sits and the definitions assigned.
+        $policyData = Read-AACAssignedPolicyRest -SubscriptionId @($SubscriptionId | Where-Object { $_ }) -ManagementGroupId @($ManagementGroupId | Where-Object { $_ })
         $assignments = $policyData.Assignments; $definitions = $policyData.Definitions
         $subscriptionNames = $policyData.SubscriptionNames; $groupNames = $policyData.GroupNames
         $subscriptionChain = $policyData.SubscriptionChain; $groupChain = $policyData.GroupChain
@@ -195,6 +211,7 @@ function Get-AACAssignedPolicy {
         Update-AACProgress -Id 'flatten' -Complete -Description ('{0:N0} assignment(s): {1:N0} initiative(s), {2:N0} policies - {3:N0} parameter(s), {4:N0} assigned, {5:N0} default' -f $stats.Assignments, $stats.Initiatives, $stats.Policies, $stats.Parameters, $stats.Assigned, $stats.Default)
 
         $notices = [System.Collections.Generic.List[string]]::new()
+        foreach ($notice in @($policyData.Notices)) { $notices.Add($notice) }
         if ($stats.Missing) { $notices.Add("$($stats.Missing) definition(s) couldn't be read (deleted, or at a scope you can't see); their assignments are listed without parameters or resource types.") }
         if (-not $stats.Assignments) { $notices.Add('No policy assignments were found in this scope.') }
         $scope = [ordered]@{}
@@ -205,12 +222,13 @@ function Get-AACAssignedPolicy {
         if (-not $scope['Scope']) { $scope['Scope'] = 'every assignment the account can see' }
         if ($AssignmentName) { $scope['Assignments'] = $AssignmentName -join ', ' }
         $inventory.Notice = $notices.ToArray()
+        @{ Inventory = $inventory; Scope = $scope; Source = $policyData.Source }
+    }
 
-        $csvRows = if ($ExpandPolicySet) { @($inventory.Members) } else { @($inventory.Rows) }
-        $null = Invoke-AACExport -CsvPath $csvFullPath -CsvObject $csvRows -Noun $(if ($ExpandPolicySet) { 'policy parameter' } else { 'assigned parameter' }) -HtmlPath $htmlFullPath -WriteHtml {
-            Write-AACAssignedPolicyHtml -Inventory $inventory -Path $htmlFullPath -Title $Title -Detail $scope
-        }
-        @{ Inventory = $inventory; Scope = $scope }
+    if ($CsvPath -or $HtmlPath -or $PdfPath) {
+        $report = ConvertTo-AACAssignedPolicyReport -Inventory $state.Inventory -Detail $state.Scope -Source $state.Source
+        $csvRows = if ($ExpandPolicySet) { @($state.Inventory.Members) } else { @($state.Inventory.Rows) }
+        Invoke-AACReportOutput -Report $report -Title $Title -CsvObject $csvRows -Noun $(if ($ExpandPolicySet) { 'policy parameter' } else { 'assigned parameter' }) -CsvPath (& $resolve $CsvPath) -HtmlPath (& $resolve $HtmlPath) -PdfPath (& $resolve $PdfPath)
     }
 
     if ($showView) {

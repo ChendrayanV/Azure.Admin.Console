@@ -6915,7 +6915,7 @@ the recommended ones unless you pipe in others. Offline.</maml:para>
     <command:details>
       <command:name>Get-AACAssignedPolicy</command:name>
       <maml:description>
-        <maml:para>Every Azure Policy assignment with its parameters - the default, assigned and effective value of each - and the resource types the policy applies to, with a Spectre.Console view, objects, and CSV and interactive HTML reports.</maml:para>
+        <maml:para>Every Azure Policy assignment with its parameters - the default, assigned and effective value of each - and the resource types the policy applies to, with a Spectre.Console view, objects, and CSV and tabbed HTML and PDF reports.</maml:para>
       </maml:description>
       <command:verb>Get</command:verb>
       <command:noun>AACAssignedPolicy</command:noun>
@@ -6924,10 +6924,12 @@ the recommended ones unless you pipe in others. Offline.</maml:para>
       <maml:para>An inventory of what is assigned, not of compliance (for that, see
 Get-AACPolicyState). Reads the assignments, the policy definitions
 and initiatives they assign and the initiatives' member policies
-with Azure Resource Graph - a handful of queries however many
-assignments there are, with the Connect-AAC sign-in; Reader is
-enough, no Az modules. A definition Resource Graph doesn't return is
-read from Azure Resource Manager.
+from Azure Resource Manager's REST APIs, with the Connect-AAC
+sign-in; Reader is enough, no Az modules. That is one call per
+subscription, management group and definition, so -SubscriptionId or
+-ManagementGroupId makes it quicker in a large tenant. Azure Resource
+Graph is read only for what those calls couldn't, and the report says
+when it was.
 
 Without parameters: every assignment the account can see. With
 -SubscriptionId or -ManagementGroupId: the assignments that apply
@@ -6989,10 +6991,18 @@ What you get depends on where the command runs:
   piped onward     the rows, with no view
   -PassThru        the view and the rows
   -NoDisplay       the rows only
--CsvPath writes the rows. -HtmlPath writes an interactive report:
-tiles, charts, a table of the assignments and one of every
-parameter, searchable, filterable and downloadable as CSV. With
-either, the console shows only the progress and the files written.</maml:para>
+-CsvPath writes the rows. -HtmlPath writes one interactive report in
+tabs, each table searchable, filterable and downloadable as CSV:
+  Summary            tiles and charts
+  Assignments        where each is assigned, what it does, enforcement
+  Policies in force  each initiative opened up: its policies, effects
+                     and the value of every parameter
+  Resource types     what is assigned per type: how many policies
+                     block, audit, change or only report, and which
+  Parameters         the default, assigned and effective value of each
+-PdfPath writes the same report, with each tab a bookmarked chapter.
+With any of them, the console shows only the progress and the files
+written.</maml:para>
     </maml:description>
     <command:syntax>
       <command:syntaxItem>
@@ -7038,6 +7048,14 @@ either, the console shows only the progress and the files written.</maml:para>
           </dev:type>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="5" aliases="none">
+          <maml:name>PdfPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="6" aliases="none">
           <maml:name>Title</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
@@ -7114,7 +7132,7 @@ parameter. The view lists each initiative's member policies, and
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="4" aliases="none">
         <maml:name>HtmlPath</maml:name>
         <maml:description>
-          <maml:para>Write an interactive HTML report to this file.</maml:para>
+          <maml:para>Write an interactive, tabbed HTML report to this file.</maml:para>
         </maml:description>
         <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
         <dev:type>
@@ -7162,6 +7180,17 @@ ID, the name in the portal's URL).</maml:para>
         </dev:type>
         <dev:defaultValue>False</dev:defaultValue>
       </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="5" aliases="none">
+        <maml:name>PdfPath</maml:name>
+        <maml:description>
+          <maml:para>Write the report as a PDF, each tab a bookmarked chapter of up to
+2,000 rows a table (the CSV and HTML report have every row).</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="1" aliases="none">
         <maml:name>SubscriptionId</maml:name>
         <maml:description>
@@ -7172,10 +7201,10 @@ ID, the name in the portal's URL).</maml:para>
           <maml:name>System.String[]</maml:name>
         </dev:type>
       </command:parameter>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="5" aliases="none">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="6" aliases="none">
         <maml:name>Title</maml:name>
         <maml:description>
-          <maml:para>The HTML report's title.</maml:para>
+          <maml:para>The HTML and PDF reports' title.</maml:para>
         </maml:description>
         <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
         <dev:type>
@@ -7229,13 +7258,21 @@ Get-AACAssignedPolicy</dev:code>
       <command:example>
         <maml:title>--------- Example 4 ---------</maml:title>
         <maml:introduction></maml:introduction>
+        <dev:code>Get-AACAssignedPolicy -SubscriptionId '00000000-0000-0000-0000-000000000000' -HtmlPath .\out\AssignedPolicy.html -PdfPath .\out\AssignedPolicy.pdf</dev:code>
+        <dev:remarks>
+          <maml:para>One report on what applies to a subscription, in HTML tabs and as a PDF.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 5 ---------</maml:title>
+        <maml:introduction></maml:introduction>
         <dev:code>Get-AACAssignedPolicy -NoDisplay | Where-Object { $_.ValueSource -eq 'Assigned' -and $_.AssignedValue -ne $_.DefaultValue }</dev:code>
         <dev:remarks>
           <maml:para>The parameters set to something other than their default.</maml:para>
         </dev:remarks>
       </command:example>
       <command:example>
-        <maml:title>--------- Example 5 ---------</maml:title>
+        <maml:title>--------- Example 6 ---------</maml:title>
         <maml:introduction></maml:introduction>
         <dev:code>Get-AACAssignedPolicy -NoDisplay | Where-Object ResourceType -Like '*Microsoft.Storage/storageAccounts*' | Select-Object AssignmentDisplayName, DefinitionDisplayName -Unique</dev:code>
         <dev:remarks>
@@ -7243,7 +7280,7 @@ Get-AACAssignedPolicy</dev:code>
         </dev:remarks>
       </command:example>
       <command:example>
-        <maml:title>--------- Example 6 ---------</maml:title>
+        <maml:title>--------- Example 7 ---------</maml:title>
         <maml:introduction></maml:introduction>
         <dev:code>Get-AACAssignedPolicy -AssignmentName '*PostgreSQL*' -ExpandPolicySet -NoDisplay | Format-Table PolicyDisplayName, Effect, ParameterName, EffectiveValue, ValueSource</dev:code>
         <dev:remarks>
@@ -7251,7 +7288,7 @@ Get-AACAssignedPolicy</dev:code>
         </dev:remarks>
       </command:example>
       <command:example>
-        <maml:title>--------- Example 7 ---------</maml:title>
+        <maml:title>--------- Example 8 ---------</maml:title>
         <maml:introduction></maml:introduction>
         <dev:code>Get-AACAssignedPolicy -ExpandPolicySet -CsvPath .\policySetMembers.csv</dev:code>
         <dev:remarks>

@@ -114,12 +114,16 @@ Describe 'Azure Admin Console - Get-AACAssignedPolicy' {
 
     BeforeEach {
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Get-AACAccessToken -MockWith { 'fake-token' }
+        $script:graphCalls = 0
+        $script:failUri = ''
+        # The fill-in for what REST couldn't read: only ever reached when something failed.
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACGraphBatch -MockWith {
+            $script:graphCalls++
             $rows = @{}
             foreach ($name in @($Query.Keys)) {
                 $text = [string]$Query[$name]['Query']
                 $rows[$name] = switch -Wildcard ($name) {
-                    'assignments' { @($script:assignmentRows) }
+                    'assignments' { @($script:assignmentRows) + @($script:graphOnlyAssignment) }
                     'subscriptions' { @($script:subscriptions) }
                     'managementGroups' { @($script:groups) }
                     'definitions*' {
@@ -131,10 +135,46 @@ Describe 'Azure Admin Console - Get-AACAssignedPolicy' {
             }
             @{ Rows = $rows; Errors = @{} }
         }
+        # Azure Resource Manager, answering as its REST APIs do: the assignments
+        # a scope lists follow its documented filter.
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACArmParallel -MockWith {
+            $list = { param($Items) @{ Status = 200; Body = @{ value = @($Items) }; Items = [System.Collections.Generic.List[object]]@($Items); Error = '' } }
+            $asRest = {
+                param($Row)
+                @{ id = $Row.id; name = $Row.name; properties = @{ displayName = $Row.displayName; scope = $Row.scope; policyDefinitionId = $Row.definitionId; parameters = $Row.parameters; enforcementMode = $Row.enforcement; notScopes = $Row.notScopes; description = $Row.description } }
+            }
             $out = @{}
             foreach ($u in $Uri) {
-                $out[$u] = if ($u -like '*/vm-os?*') { @{ Status = 200; Body = $script:armDefinition; Items = $null; Error = '' } } else { @{ Status = 404; Body = $null; Items = $null; Error = 'The policy definition was not found.' } }
+                $lower = $u.ToLowerInvariant()
+                $path = ($lower -split '\?')[0]
+                $out[$u] = if ($script:failUri -and $lower -like $script:failUri) { @{ Status = 403; Body = $null; Items = $null; Error = 'Forbidden.' } }
+                elseif ($path -like '*/getentities') {
+                    # The fixture's chains are nearest first; getEntities' are root first.
+                    $rootFirst = { param($Chain) $names = @($Chain | ForEach-Object { $_.name }); [array]::Reverse($names); , $names }
+                    & $list @(
+                        foreach ($g in $script:groups) { @{ id = $g.id; name = $g.name; type = 'Microsoft.Management/managementGroups'; properties = @{ displayName = $g.displayName; parentNameChain = (& $rootFirst $g.chain) } } }
+                        foreach ($s in $script:subscriptions) { @{ id = $s.id; name = $s.subscriptionId; type = '/subscriptions'; properties = @{ displayName = $s.name; parentNameChain = (& $rootFirst $s.chain) } } }
+                    )
+                }
+                elseif ($path -eq '/subscriptions') { & $list @($script:subscriptions | ForEach-Object { @{ subscriptionId = $_.subscriptionId; displayName = $_.name; state = 'Enabled' } }) }
+                elseif ($path -match '^/subscriptions/([^/]+)/providers/microsoft\.authorization/policyassignments$') {
+                    # At the subscription, inside it, and from the management groups above it.
+                    $sub = $Matches[1]
+                    $above = @(@($script:subscriptions | Where-Object subscriptionId -EQ $sub).chain.name)
+                    & $list @($script:assignmentRows | Where-Object { $_.scope.ToLowerInvariant().StartsWith("/subscriptions/$sub") -or ($_.scope -split '/')[-1] -in $above } | ForEach-Object { & $asRest $_ })
+                }
+                elseif ($path -match '/managementgroups/([^/]+)/providers/microsoft\.authorization/policyassignments$') {
+                    # At the management group and its ancestors (atScope()).
+                    $name = $Matches[1]
+                    $self = @($script:groups | Where-Object name -EQ $name)
+                    & $list @($script:assignmentRows | Where-Object { $_.scope -like '/providers/*' -and ($_.scope -split '/')[-1] -in (@($name) + @($self.chain.name)) } | ForEach-Object { & $asRest $_ })
+                }
+                else {
+                    $row = @($script:definitionRows | Where-Object { $_.id.ToLowerInvariant() -eq $path })[0]
+                    if ($path -like '*/vm-os') { @{ Status = 200; Body = $script:armDefinition; Items = $null; Error = '' } }
+                    elseif ($row) { @{ Status = 200; Items = $null; Error = ''; Body = @{ id = $row.id; name = $row.name; properties = @{ displayName = $row.displayName; policyType = $row.policyType; metadata = @{ category = $row.category }; description = "What $($row.name) does"; parameters = $row.parameters; policyRule = $row.rule; policyDefinitions = $row.members } } } }
+                    else { @{ Status = 404; Body = $null; Items = $null; Error = 'The policy definition was not found.' } }
+                }
             }
             $out
         }
@@ -176,7 +216,86 @@ Describe 'Azure Admin Console - Get-AACAssignedPolicy' {
         @($rows | Where-Object AssignmentName -EQ 'tls' | ForEach-Object ResourceType | Select-Object -Unique) | Should -Be @('Microsoft.Storage/storageAccounts')
         ($rows | Where-Object { $_.AssignmentName -eq 'baseline' -and $_.ParameterName -eq 'tlsVersion' }).ResourceType | Should -Be 'Microsoft.Storage/storageAccounts'
         ($rows | Where-Object { $_.AssignmentName -eq 'baseline' -and $_.ParameterName -eq 'tags' }).ResourceType | Should -Be 'Microsoft.Compute/virtualMachines, Microsoft.Storage/storageAccounts' -Because 'a parameter no member uses gets every member''s types'
-        Should -Invoke -ModuleName 'Azure.Admin.Console' Invoke-AACArmParallel -ParameterFilter { @($Uri | Where-Object { $_ -like '*/vm-os?*' }).Count -eq 1 } -Because 'a member Resource Graph didn''t return is read from Resource Manager'
+    }
+
+    It 'reads everything from REST, without Resource Graph, when REST can read it all' {
+        $rows = @(Get-AACAssignedPolicy -NoDisplay)
+        @($rows.AssignmentName | Select-Object -Unique | Sort-Object) | Should -Be @('baseline', 'gone', 'locations', 'tls')
+        $script:graphCalls | Should -Be 0
+        Should -Invoke -ModuleName 'Azure.Admin.Console' Invoke-AACArmParallel -ParameterFilter { @($Uri | Where-Object { $_ -like '*/vm-os?*' }).Count -eq 1 } -Because 'each initiative''s member policies are read by ID'
+    }
+
+    It 'lists each assignment once, though several scopes return it' {
+        @(Get-AACAssignedPolicy -ExpandPolicySet -NoDisplay | Where-Object AssignmentName -EQ 'locations').Count | Should -Be 1
+    }
+
+    It 'reads only the scopes that can hold what applies to the subscription asked about' {
+        $null = @(Get-AACAssignedPolicy -SubscriptionId $script:subA -NoDisplay)
+        Should -Invoke -ModuleName 'Azure.Admin.Console' Invoke-AACArmParallel -ParameterFilter { @($Uri | Where-Object { $_ -like "/subscriptions/$script:subB/*" }).Count -gt 0 } -Times 0 -Exactly
+    }
+
+    It 'fills in from Resource Graph only what REST couldn''t read, and says so' {
+        $script:failUri = "/subscriptions/$script:subB/providers/*"
+        $script:graphOnlyAssignment = @{ id = "/subscriptions/$script:subB/providers/Microsoft.Authorization/policyAssignments/only-in-graph"; name = 'only-in-graph'; displayName = 'Only in Graph'; scope = "/subscriptions/$script:subB"; definitionId = '/providers/Microsoft.Authorization/policyDefinitions/allowed-locations'; parameters = @{}; enforcement = 'Default'; notScopes = @(); description = '' }
+        try {
+            $names = @(Get-AACAssignedPolicy -NoDisplay | ForEach-Object AssignmentName | Select-Object -Unique)
+            $names | Should -Contain 'only-in-graph'
+            $names | Should -Contain 'tls' -Because 'its subscription failed in REST and Resource Graph has it'
+            $script:graphCalls | Should -BeGreaterThan 0
+            $text = (& $script:capture { Get-AACAssignedPolicy -NoPaging }).Text
+            $text | Should -Match 'Resource Graph filled'
+        }
+        finally { $script:graphOnlyAssignment = $null }
+    }
+
+    It 'stops with Resource Graph''s error when neither source can read anything' {
+        $script:failUri = '*'
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACGraphBatch -MockWith { throw 'Azure Admin Console could not query Resource Graph.' }
+        { Get-AACAssignedPolicy -NoDisplay } | Should -Throw '*could not query Resource Graph*'
+    }
+
+    It 'lists what is assigned per resource type: a row per type and policy, and one heading for the policies naming none' {
+        $result = InModuleScope 'Azure.Admin.Console' -Parameters @{ A = $script:assignmentRows; R = $script:definitionRows; V = $script:armDefinition } {
+            param($A, $R, $V)
+            $definitions = @{}
+            foreach ($row in $R) { $definitions[$row.id.ToLowerInvariant()] = @{ Id = $row.id; Name = $row.name; Kind = $(if ($row.id -match 'policySetDefinitions') { 'PolicySet' } else { 'Policy' }); DisplayName = $row.displayName; PolicyType = $row.policyType; Category = $row.category; Description = ''; Parameters = $row.parameters; Rule = $row.rule; Members = @($row.members) } }
+            $definitions[$V.id.ToLowerInvariant()] = @{ Id = $V.id; Name = $V.name; Kind = 'Policy'; DisplayName = $V.properties.displayName; PolicyType = 'BuiltIn'; Category = 'Compute'; Description = ''; Parameters = $V.properties.parameters; Rule = $V.properties.policyRule; Members = @() }
+            ConvertTo-AACAssignedPolicy -Assignment $A -Definition $definitions
+        }
+        $storage = $result.ResourceTypeSummaries | Where-Object ResourceType -EQ 'Microsoft.Storage/storageAccounts'
+        "$($storage.Coverage) $($storage.Assignments) $($storage.Policies) $($storage.Blocks) $($storage.ReportsOnly) $($storage.Audits)" | Should -Be 'Named 2 2 1 0 1' -Because 'the baseline fixes Deny; the tls assignment is Audit by default, and an audit still audits when not enforced'
+        $result.ResourceTypeRows[0].PSObject.TypeNames | Should -Contain 'AAC.PolicyResourceTypeAssignment'
+        (@($result.ResourceTypeRows | Where-Object { $_.AssignmentDisplayName -eq 'Allowed locations - UK' }).ResourceType) | Should -Be '(all resource types)'
+        $result.ResourceTypeSummaries[-1].Coverage | Should -Not -Be 'Named' -Because 'the types a policy names come first'
+        @($result.ResourceTypeRows | Where-Object PolicyDisplayName -EQ '(definition not found)').Count | Should -Be 0 -Because 'a missing definition''s types aren''t known'
+    }
+
+    It 'reports a deny on an assignment that isn''t enforced as Reports only' {
+        $result = InModuleScope 'Azure.Admin.Console' {
+            $id = '/providers/Microsoft.Authorization/policyDefinitions/deny-sql'
+            $definitions = @{ $id = @{ Id = $id; Name = 'deny-sql'; Kind = 'Policy'; DisplayName = 'Deny SQL'; PolicyType = 'Custom'; Category = ''; Description = ''; Parameters = @{}; Members = @(); Rule = @{ if = @{ field = 'type'; equals = 'Microsoft.Sql/servers' }; then = @{ effect = 'deny' } } } }
+            ConvertTo-AACAssignedPolicy -Assignment @(@{ id = '/subscriptions/s/providers/Microsoft.Authorization/policyAssignments/x'; name = 'x'; displayName = 'x'; scope = '/subscriptions/s'; definitionId = $id; parameters = @{}; enforcement = 'DoNotEnforce' }) -Definition $definitions
+        }
+        $result.ResourceTypeRows[0].Impact | Should -Be 'Reports only'
+        $result.ResourceTypeSummaries[0].ReportsOnly | Should -Be 1
+    }
+
+    It 'writes one tabbed report as HTML and PDF, with the resource types and what each definition does' {
+        $html = Join-Path $TestDrive 'tabbed.html'
+        $pdf = Join-Path $TestDrive 'tabbed.pdf'
+        $canWritePdf = $IsWindows -and $PSVersionTable.PSVersion -ge [version]'7.4'
+        $null = & $script:capture { Get-AACAssignedPolicy -HtmlPath $html -PdfPath $(if ($canWritePdf) { $pdf }) }
+        # -AsHashtable: an effect's tones hold 'Deny' and 'deny', which plain ConvertFrom-Json refuses.
+        $model = [regex]::Match((Get-Content -LiteralPath $html -Raw), '<script id="aac-data" type="application/json">(.*?)</script>', 'Singleline').Groups[1].Value | ConvertFrom-Json -AsHashtable
+        @($model.tabs | ForEach-Object { $_.name }) | Should -Be @('Assignments', 'Policies in force', 'Resource types', 'Parameters')
+        $model.overviewTab | Should -Be 'Summary'
+        @($model.tables | ForEach-Object { $_.id }) | Should -Be @('assignments', 'policies', 'resourcetypes', 'typepolicies', 'parameters')
+        $tabNames = @($model.tabs | ForEach-Object { $_.name })
+        @($model.tables | Where-Object { $_.section -in $tabNames }).Count | Should -Be 5 -Because 'every table belongs to a tab'
+        @(@($model.tables | Where-Object { $_.id -eq 'resourcetypes' })[0].rows | ForEach-Object { $_.ResourceType }) | Should -Contain 'Microsoft.Storage/storageAccounts'
+        @(@($model.tables | Where-Object { $_.id -eq 'assignments' })[0].rows | ForEach-Object { $_.DefinitionDescription }) | Should -Contain 'What security-baseline does'
+        @($model.facts | Where-Object { $_.k -eq 'Read from' })[0].v | Should -Be 'Azure Resource Manager REST APIs'
+        if ($canWritePdf) { (Get-Item -LiteralPath $pdf).Length | Should -BeGreaterThan 1000 }
     }
 
     It "shows 'All' for an initiative parameter that a policy for every type uses" {

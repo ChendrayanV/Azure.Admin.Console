@@ -44,7 +44,9 @@ function ConvertTo-AACAssignedPolicy {
 
         Returns @{ Rows (AAC.AssignedPolicy); Members
         (AAC.AssignedPolicyMember); Assignments (AAC.PolicyAssignmentSummary);
-        Missing (definition IDs not found); Stats }.
+        ResourceTypeSummaries (AAC.PolicyResourceTypeSummary, one per type);
+        ResourceTypeRows (AAC.PolicyResourceTypeAssignment, one per type and
+        policy in force); Missing (definition IDs not found); Stats }.
     #>
     [CmdletBinding()]
     [OutputType([hashtable])]
@@ -305,6 +307,7 @@ function ConvertTo-AACAssignedPolicy {
                 EffectSource          = $(if ($member.Effect) { $member.EffectSource } else { '' })
                 Groups                = @($member.Groups) -join ', '
                 ResourceType          = $(if ($inSet) { [string]$member.ResourceType } else { $assignmentTypes })
+                PolicyDescription     = $(if ($memberDefinition) { [string](& $get $memberDefinition 'Description') } else { '' })
                 ParameterName         = ''
                 ParameterDisplayName  = ''
                 ParameterType         = ''
@@ -357,6 +360,8 @@ function ConvertTo-AACAssignedPolicy {
                 Assigned              = $assignedCount
                 ResourceType          = $assignmentTypes
                 ResourceTypes         = $allTypes.Count
+                Description           = [string](& $get $a 'description')
+                DefinitionDescription = $(if ($policy) { [string](& $get $policy 'Description') } else { '' })
                 NotScopes             = $base.NotScopes
                 AssignmentScope       = $scope
                 AssignmentId          = $base.AssignmentId
@@ -370,10 +375,74 @@ function ConvertTo-AACAssignedPolicy {
     $parameterRows = @($sortedRows | Where-Object ParameterName)
     $sortedMembers = @($memberRows | Sort-Object -Property @{ Expression = { $scopeOrder[$_.ScopeType] } }, ScopeName, AssignmentDisplayName, AssignmentName, PolicyDisplayName, ReferenceId, ParameterName)
     $setMembers = @($sortedMembers | Where-Object DefinitionType -EQ 'PolicySet')
+
+    # --- What is assigned for each resource type ----------------------------------------------------
+    # From the policies in force, one row per type and policy: a policy naming
+    # no type is under one heading, not repeated for every type in Azure.
+    $impactOf = {
+        param([string] $Effect, [string] $Enforcement)
+        $impact = switch ($Effect.ToLowerInvariant()) {
+            'deny' { 'Blocks' } 'denyaction' { 'Blocks delete' } 'audit' { 'Audits' } 'auditifnotexists' { 'Audits' }
+            'modify' { 'Changes' } 'append' { 'Changes' } 'deployifnotexists' { 'Deploys' } 'manual' { 'Manual' } 'disabled' { 'Disabled' }
+            default { 'Unknown' }
+        }
+        # Not enforced: it still reports, but doesn't deny, change or deploy.
+        if ($Enforcement -eq 'DoNotEnforce' -and $impact -in 'Blocks', 'Blocks delete', 'Changes', 'Deploys') { 'Reports only' } else { $impact }
+    }
+    $typeRows = [System.Collections.Generic.List[object]]::new()
+    $seenPolicy = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($m in $sortedMembers) {
+        if (-not $seenPolicy.Add("$($m.AssignmentId)|$($m.ReferenceId)|$($m.PolicyId)") -or -not $m.ResourceType) { continue }
+        $coverage = if ($m.ResourceType -eq 'All') { 'All types' } elseif ($m.ResourceType.StartsWith('All except ')) { 'All except some' } else { 'Named' }
+        $typeNames = if ($coverage -eq 'Named') { @($m.ResourceType -split ', ') } elseif ($coverage -eq 'All types') { @('(all resource types)') } else { @('(all types, with exceptions)') }
+        foreach ($typeName in $typeNames) {
+            $typeRows.Add([pscustomobject][ordered]@{
+                    PSTypeName            = 'AAC.PolicyResourceTypeAssignment'
+                    ResourceType          = $typeName
+                    Provider              = $(if ($coverage -eq 'Named') { ($typeName -split '/')[0] } else { '' })
+                    Coverage              = $coverage
+                    Excludes              = $(if ($coverage -eq 'All except some') { $m.ResourceType.Substring(11) } else { '' })
+                    PolicyDisplayName     = $m.PolicyDisplayName
+                    PolicySetDisplayName  = $m.PolicySetDisplayName
+                    AssignmentDisplayName = $(if ($m.AssignmentDisplayName) { $m.AssignmentDisplayName } else { $m.AssignmentName })
+                    ScopeType             = $m.ScopeType
+                    ScopeName             = $m.ScopeName
+                    Inherited             = $m.Inherited
+                    EnforcementMode       = $m.EnforcementMode
+                    Effect                = $m.Effect
+                    Impact                = (& $impactOf ([string]$m.Effect) $m.EnforcementMode)
+                    PolicyType            = $m.PolicyType
+                    Category              = $m.Category
+                    NotScopes             = $m.NotScopes
+                    AssignmentId          = $m.AssignmentId
+                    PolicyId              = $m.PolicyId
+                })
+        }
+    }
+    $count = { param($Rows, [string[]] $Impact) @($Rows | Where-Object Impact -In $Impact).Count }
+    $typeSummaries = @($typeRows | Group-Object ResourceType | ForEach-Object {
+            $group = @($_.Group)
+            [pscustomobject][ordered]@{
+                PSTypeName   = 'AAC.PolicyResourceTypeSummary'
+                ResourceType = $_.Name
+                Coverage     = $group[0].Coverage
+                Provider     = $group[0].Provider
+                Assignments  = @($group.AssignmentId | Select-Object -Unique).Count
+                Policies     = $group.Count
+                Blocks       = & $count $group 'Blocks', 'Blocks delete'
+                Audits       = & $count $group 'Audits'
+                Changes      = & $count $group 'Changes', 'Deploys'
+                ReportsOnly  = & $count $group 'Reports only'
+                Disabled     = & $count $group 'Disabled'
+                Other        = & $count $group 'Manual', 'Unknown'
+            }
+        } | Sort-Object -Property @{ Expression = { $_.Coverage -ne 'Named' } }, @{ Expression = 'Policies'; Descending = $true }, ResourceType)
     @{
         Rows        = $sortedRows
         Members     = $sortedMembers
         Assignments = $sortedSummaries
+        ResourceTypeSummaries = $typeSummaries
+        ResourceTypeRows      = @($typeRows | Sort-Object -Property @{ Expression = { $_.Coverage -ne 'Named' } }, ResourceType, AssignmentDisplayName, PolicyDisplayName)
         Missing     = @($missing)
         Stats       = @{
             Assignments   = $sortedSummaries.Count
