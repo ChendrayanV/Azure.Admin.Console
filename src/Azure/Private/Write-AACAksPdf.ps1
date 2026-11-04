@@ -111,6 +111,19 @@ function Write-AACAksPdf {
         if ($nonCompliant.Count) { $section.AddParagraph('Non-compliant policies on the clusters', 'Heading2') | Out-Null; & $table $nonCompliant (& $ordered 'Cluster', 'Cluster', 'Policy', 'Policy', 'Scope', 'Scope', 'Effect', 'Effect', 'Assignment', 'Assignment') @(2, 5, 1, 1.4, 2.5) }
     }
 
+    # --- In the cluster ------------------------------------------------------------------------------------------------
+    if (@($Assessment.WorkloadChecks).Count) {
+        $section.AddPageBreak()
+        $section.AddParagraph('In the cluster', 'Heading1') | Out-Null
+        $section.AddParagraph('Moving to AKS Automatic', 'Heading2') | Out-Null
+        & $table $Assessment.Readiness (& $ordered 'Cluster', 'Cluster', 'Verdict', 'Verdict', 'Fix first', 'FixFirst', 'Changed by Automatic', 'ChangedByAutomatic', 'Review', 'Review', 'Checks not run', 'NotChecked') @(4, 3, 1, 2, 1, 1)
+        $unmet = @($Assessment.WorkloadChecks | Where-Object Status -NE 'Pass')
+        if ($unmet.Count) {
+            $section.AddParagraph('Checks failed or not run', 'Heading2') | Out-Null
+            & $table $unmet (& $ordered 'Status', 'Status', 'Severity', 'Severity', 'Area', 'Area', 'Check', 'Check', 'Cluster', 'Cluster', 'What was found', 'Detail', 'What to do', 'Recommendation') @(1.2, 1, 1.5, 3, 2, 4, 4)
+        }
+    }
+
     # --- 4. Each cluster -------------------------------------------------------------------------------------------
     foreach ($cluster in $Assessment.Clusters) {
         $id = $cluster.ResourceId

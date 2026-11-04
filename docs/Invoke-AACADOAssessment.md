@@ -23,10 +23,10 @@ Invoke-AACADOAssessment [[-Organization] <string[]>] [[-Project] <string[]>] [[-
  [[-PersonalAccessToken] <securestring>] [[-Skip] <string[]>] [[-MetricDays] <int>]
  [[-TemplateDepth] <int>] [[-StaleDays] <int>] [[-InactiveDays] <int>] [[-StaleBranchDays] <int>]
  [[-ToolRule] <Object[]>] [[-ToolRulePath] <string>] [[-MaxScriptFiles] <int>]
- [[-YamlPath] <string>] [[-View] <string>] [[-ThrottleLimit] <int>] [[-CsvPath] <string>]
- [[-HtmlPath] <string>] [[-PdfPath] <string>] [[-Title] <string>] [-DiscoverOrganization]
- [-UseAzureSignIn] [-SkipYaml] [-IncludeAzure] [-IncludeDisabledRepository] [-PassThru] [-NoDisplay]
- [-NoPaging]
+ [[-YamlPath] <string>] [[-View] <string>] [[-ThrottleLimit] <int>] [[-SuppressionFile] <string>]
+ [[-PreviousPath] <string>] [[-CsvPath] <string>] [[-HtmlPath] <string>] [[-PdfPath] <string>]
+ [[-Title] <string>] [-DiscoverOrganization] [-UseAzureSignIn] [-SkipYaml] [-IncludeAzure]
+ [-IncludeDisabledRepository] [-PassThru] [-NoDisplay] [-NoPaging]
 ```
 
 ## ALIASES
@@ -109,7 +109,8 @@ strong copyleft licences, SBOMs never validated. -Skip Sbom leaves
 the artifacts unread (the generators are still found in the steps).
 
 Delivery metrics over -MetricDays: each pipeline's runs, success
-rate (cancelled runs left out), average duration and queue time,
+rate (cancelled runs left out), average duration, total minutes (and
+each project's share of them), whether it is getting slower, queue time,
 runs a week; each environment's deployments, deployments a week,
 and change failure rate (DORA).
 
@@ -239,7 +240,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 16
+  Position: 18
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -282,7 +283,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 17
+  Position: 19
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -500,7 +501,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 18
+  Position: 20
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -545,6 +546,29 @@ Aliases: []
 ParameterSets:
 - Name: (All)
   Position: 2
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PreviousPath
+
+A findings CSV from an earlier run (-CsvPath), or the folder holding its
+findings.csv: each finding is then marked New or Open, and the report
+lists what has been resolved.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 17
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -669,6 +693,33 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -SuppressionFile
+
+A JSON file of findings you have reviewed and accepted. Each entry names a
+finding by its FindingKey, or by source and rule (and a subject, wildcards
+allowed), with the reason and, if you like, an expiry date:
+[{ "key": "a1b2c3d4e5f60718", "reason": "Accepted risk", "expires": "2027-01-01" }].
+They leave the counts and the findings, and the report lists them with
+their reasons. An expired entry is reported and ignored; a file that can't
+be understood stops the command.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 16
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -TemplateDepth
 
 How deep included templates are followed (3 if not given; 0 reads
@@ -723,7 +774,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 19
+  Position: 21
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false

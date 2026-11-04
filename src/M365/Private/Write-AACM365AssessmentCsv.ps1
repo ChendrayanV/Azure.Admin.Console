@@ -23,7 +23,7 @@ function Write-AACM365AssessmentCsv {
 
     if (-not (Test-Path -LiteralPath $Path)) { New-Item -ItemType Directory -Path $Path -Force | Out-Null }
     $files = [ordered]@{
-        findings = 'Findings'; settings = 'Settings'; 'conditional-access' = 'ConditionalAccess'; 'named-locations' = 'NamedLocations'; 'admin-roles' = 'RoleAssignments'
+        findings = 'Findings'; 'suppressed-findings' = 'SuppressedFindings'; 'resolved-findings' = 'ResolvedFindings'; settings = 'Settings'; 'conditional-access' = 'ConditionalAccess'; 'named-locations' = 'NamedLocations'; 'admin-roles' = 'RoleAssignments'
         'mfa-registration' = 'Registration'; 'authentication-methods' = 'AuthenticationMethods'; licenses = 'Licenses'; 'identity-providers' = 'IdentityProviders'; domains = 'Domains'
         'secure-score' = 'SecureScoreControls'; 'enrollment-restrictions' = 'EnrollmentRestrictions'; 'compliance-policies' = 'CompliancePolicies'; 'endpoint-security' = 'EndpointSecurity'
         'managed-devices' = 'ManagedDevices'; 'entra-devices' = 'EntraDevices'; permissions = 'Permissions'
@@ -33,7 +33,7 @@ function Write-AACM365AssessmentCsv {
         'risk-detections' = 'RiskDetections'; incidents = 'Incidents'; 'inactive-users' = 'InactiveUsers'; 'app-protection' = 'AppProtection'; coverage = 'Coverage'
     }
     foreach ($file in $files.Keys) {
-        $rows = @($Assessment[$files[$file]])
+        $rows = @($Assessment[$files[$file]] | Where-Object { $_ })
         if (-not $rows.Count) { continue }
         $target = Join-Path -Path $Path -ChildPath "m365-$file.csv"
         $rows | Export-Csv -LiteralPath $target -NoTypeInformation -Encoding utf8

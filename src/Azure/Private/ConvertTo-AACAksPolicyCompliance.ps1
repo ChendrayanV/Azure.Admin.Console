@@ -48,7 +48,7 @@ function ConvertTo-AACAksPolicyCompliance {
         [hashtable] $ClusterName = @{},
         [hashtable] $SubscriptionName = @{},
         [switch] $IncludeSystemNamespace,
-        [string[]] $SystemNamespace = @('kube-system', 'gatekeeper-system', 'azure-arc', 'azure-extensions-usage-system', 'flux-system', 'kube-public', 'kube-node-lease', 'calico-system', 'tigera-operator', 'aks-command', 'app-routing-system', 'aks-istio-system', 'kube-egress-gateway-system', 'dapr-system')
+        [string[]] $SystemNamespace = @(Get-AACAksSystemNamespace)
     )
 
     $value = { param($Row, [string] $Key) if ($Row -is [System.Collections.IDictionary]) { if ($Row.Contains($Key)) { $Row[$Key] } } elseif ($null -ne $Row) { Get-AACPropertyValue -InputObject $Row -Name $Key } }

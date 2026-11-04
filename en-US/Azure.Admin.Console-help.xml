@@ -22161,7 +22161,8 @@ strong copyleft licences, SBOMs never validated. -Skip Sbom leaves
 the artifacts unread (the generators are still found in the steps).
 
 Delivery metrics over -MetricDays: each pipeline's runs, success
-rate (cancelled runs left out), average duration and queue time,
+rate (cancelled runs left out), average duration, total minutes (and
+each project's share of them), whether it is getting slower, queue time,
 runs a week; each environment's deployments, deployments a week,
 and change failure rate (DORA).
 
@@ -22338,7 +22339,7 @@ The token is sent only to Azure DevOps and never written anywhere.</maml:para>
           </dev:type>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="16" aliases="none">
-          <maml:name>CsvPath</maml:name>
+          <maml:name>SuppressionFile</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
           <dev:type>
@@ -22346,7 +22347,7 @@ The token is sent only to Azure DevOps and never written anywhere.</maml:para>
           </dev:type>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="17" aliases="none">
-          <maml:name>HtmlPath</maml:name>
+          <maml:name>PreviousPath</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
           <dev:type>
@@ -22354,7 +22355,7 @@ The token is sent only to Azure DevOps and never written anywhere.</maml:para>
           </dev:type>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="18" aliases="none">
-          <maml:name>PdfPath</maml:name>
+          <maml:name>CsvPath</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
           <dev:type>
@@ -22362,6 +22363,22 @@ The token is sent only to Azure DevOps and never written anywhere.</maml:para>
           </dev:type>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="19" aliases="none">
+          <maml:name>HtmlPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="20" aliases="none">
+          <maml:name>PdfPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="21" aliases="none">
           <maml:name>Title</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
@@ -22428,7 +22445,7 @@ The token is sent only to Azure DevOps and never written anywhere.</maml:para>
       </command:syntaxItem>
     </command:syntax>
     <command:parameters>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="16" aliases="none">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="18" aliases="none">
         <maml:name>CsvPath</maml:name>
         <maml:description>
           <maml:para>Write the -View rows to this CSV file.</maml:para>
@@ -22449,7 +22466,7 @@ with -UseAzureSignIn, or a PAT for all accessible organizations).</maml:para>
         </dev:type>
         <dev:defaultValue>False</dev:defaultValue>
       </command:parameter>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="17" aliases="none">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="19" aliases="none">
         <maml:name>HtmlPath</maml:name>
         <maml:description>
           <maml:para>Write an interactive HTML report.</maml:para>
@@ -22560,7 +22577,7 @@ given; 1 to 365).</maml:para>
         </dev:type>
         <dev:defaultValue>False</dev:defaultValue>
       </command:parameter>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="18" aliases="none">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="20" aliases="none">
         <maml:name>PdfPath</maml:name>
         <maml:description>
           <maml:para>Write a PDF report.</maml:para>
@@ -22589,6 +22606,18 @@ are per project. Classic releases are then left out.</maml:para>
         <command:parameterValue required="true" variableLength="true">System.Int32[]</command:parameterValue>
         <dev:type>
           <maml:name>System.Int32[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="17" aliases="none">
+        <maml:name>PreviousPath</maml:name>
+        <maml:description>
+          <maml:para>A findings CSV from an earlier run (-CsvPath), or the folder holding its
+findings.csv: each finding is then marked New or Open, and the report
+lists what has been resolved.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
         </dev:type>
       </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="1" aliases="ProjectId">
@@ -22653,6 +22682,22 @@ stale (90 if not given).</maml:para>
         </dev:type>
         <dev:defaultValue>90</dev:defaultValue>
       </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="16" aliases="none">
+        <maml:name>SuppressionFile</maml:name>
+        <maml:description>
+          <maml:para>A JSON file of findings you have reviewed and accepted. Each entry names a
+finding by its FindingKey, or by source and rule (and a subject, wildcards
+allowed), with the reason and, if you like, an expiry date:
+[{ "key": "a1b2c3d4e5f60718", "reason": "Accepted risk", "expires": "2027-01-01" }].
+They leave the counts and the findings, and the report lists them with
+their reasons. An expired entry is reported and ignored; a file that can't
+be understood stops the command.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="6" aliases="none">
         <maml:name>TemplateDepth</maml:name>
         <maml:description>
@@ -22676,7 +22721,7 @@ none).</maml:para>
         </dev:type>
         <dev:defaultValue>8</dev:defaultValue>
       </command:parameter>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="19" aliases="none">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="21" aliases="none">
         <maml:name>Title</maml:name>
         <maml:description>
           <maml:para>The reports' title.</maml:para>
@@ -22880,20 +22925,30 @@ REST only - no Az modules, no kubectl. For each cluster:
                     mode, OS, nodes, autoscale, zones, max pods,
                     versions, node image and its age, disks, Spot,
                     subnet, taints
-  Well-Architected  about 35 checks across the five pillars -
-                    Reliability (SLA tier, zones, system pool, Spot,
-                    version support, maintenance, surge), Security
-                    (local accounts, Entra ID, Azure RBAC, API server
-                    exposure, network policy, Azure Policy, Defender,
-                    workload identity, pod identity, image cleaner,
-                    KMS, node public IPs, encryption at host, managed
-                    identity, node images, lockdown), Operational
-                    Excellence (upgrade channels, Container insights,
-                    Prometheus, audit logs, version drift, retired
-                    add-ons), Cost Optimization (autoscaler, cost
-                    analysis) and Performance Efficiency (ephemeral
-                    OS disks, kubenet, load balancer, subnet IPs at
-                    full scale) - Pass or Fail, a score per pillar
+  Well-Architected  about 50 checks across the five pillars -
+                    Reliability (SLA tier, zones, system pool and its
+                    taint, Spot, burstable sizes, version support,
+                    maintenance, surge), Security (local accounts,
+                    Kubernetes RBAC, Entra ID, Azure RBAC, API server
+                    exposure, private API server, network policy,
+                    Azure Policy, Defender, OIDC issuer, workload
+                    identity, pod identity, user-assigned identity,
+                    image cleaner, KMS, Key Vault provider, dashboard
+                    add-on, Azure Linux, node public IPs, encryption
+                    at host, managed identity, node images, lockdown;
+                    with -IncludeConstraint, whether allowed images
+                    and privileged containers are enforced),
+                    Operational Excellence (upgrade channels,
+                    Container insights, Prometheus, audit logs,
+                    version drift, retired add-ons, managed ingress,
+                    node resource group name), Cost Optimization
+                    (autoscaler or node auto-provisioning, vertical
+                    pod autoscaler, cost analysis) and Performance
+                    Efficiency (ephemeral OS disks, OS disk size, VM
+                    generation, kubenet, Cilium, KEDA, load balancer,
+                    subnet IPs at full scale) - Pass or Fail, a score
+                    per pillar. Several of these follow KubeBuddy's
+                    AKS checks (github.com/KubeDeckio/KubeBuddy)
   PSRule for Azure  the Azure.AKS.* rules (unless -SkipPSRule), on
                     the cluster as Export-AzRuleData reads it -
                     -Baseline and -ExcludeRule as for Invoke-AACPSRule
@@ -22909,6 +22964,23 @@ REST only - no Az modules, no kubectl. For each cluster:
                     complete violation count from inside the cluster
                     (Azure Policy keeps 500 records per policy and
                     cluster), with AKS run command
+  In the cluster    with -IncludeWorkload: what is running, read with
+                    AKS run command - health (failing, pending and
+                    restarting pods, nodes, services, volumes),
+                    workload design (requests, limits, probes,
+                    replicas, spread, disruption budgets), pod security
+                    (privileged, host namespaces and paths, capabilities,
+                    seccomp, root), namespaces (network policies, quotas,
+                    limit ranges), RBAC (cluster-admin, wide access,
+                    default service accounts) and network and storage -
+                    many following KubeBuddy's checks
+                    (github.com/KubeDeckio/KubeBuddy). Their failures
+                    are findings, but not in the WAF score
+  AKS Automatic     with -IncludeWorkload: what would stop these workloads
+                    moving to a new AKS Automatic cluster, from Microsoft's
+                    Deployment Safeguards and baseline Pod Security
+                    Standards - Fix first (refused), Changed by Automatic
+                    (admitted but altered) and Review
   Versions          the control plane's version and its support
                     (supported, long-term support, out of support),
                     the upgrades available, how far behind the
@@ -22971,7 +23043,7 @@ section per cluster.</maml:para>
           </dev:type>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="4" aliases="none">
-          <maml:name>Baseline</maml:name>
+          <maml:name>SuppressionFile</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
           <dev:type>
@@ -22979,15 +23051,15 @@ section per cluster.</maml:para>
           </dev:type>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="5" aliases="none">
-          <maml:name>ExcludeRule</maml:name>
+          <maml:name>PreviousPath</maml:name>
           <maml:description />
-          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
           <dev:type>
-            <maml:name>System.String[]</maml:name>
+            <maml:name>System.String</maml:name>
           </dev:type>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="6" aliases="none">
-          <maml:name>CsvPath</maml:name>
+          <maml:name>Baseline</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
           <dev:type>
@@ -22995,15 +23067,15 @@ section per cluster.</maml:para>
           </dev:type>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="7" aliases="none">
-          <maml:name>PdfPath</maml:name>
+          <maml:name>ExcludeRule</maml:name>
           <maml:description />
-          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
           <dev:type>
-            <maml:name>System.String</maml:name>
+            <maml:name>System.String[]</maml:name>
           </dev:type>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="8" aliases="none">
-          <maml:name>HtmlPath</maml:name>
+          <maml:name>CsvPath</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
           <dev:type>
@@ -23011,6 +23083,22 @@ section per cluster.</maml:para>
           </dev:type>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="9" aliases="none">
+          <maml:name>PdfPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="10" aliases="none">
+          <maml:name>HtmlPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="11" aliases="none">
           <maml:name>Title</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
@@ -23027,6 +23115,13 @@ section per cluster.</maml:para>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
           <maml:name>IncludeConstraint</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>IncludeWorkload</maml:name>
           <maml:description />
           <dev:type>
             <maml:name>System.Management.Automation.SwitchParameter</maml:name>
@@ -23063,7 +23158,7 @@ section per cluster.</maml:para>
       </command:syntaxItem>
     </command:syntax>
     <command:parameters>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="4" aliases="none">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="6" aliases="none">
         <maml:name>Baseline</maml:name>
         <maml:description>
           <maml:para>The PSRule for Azure baseline (Azure.Default by default), e.g.
@@ -23074,7 +23169,7 @@ Azure.GA_2024_12.</maml:para>
           <maml:name>System.String</maml:name>
         </dev:type>
       </command:parameter>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="6" aliases="none">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="8" aliases="none">
         <maml:name>CsvPath</maml:name>
         <maml:description>
           <maml:para>A folder to write a CSV per table to.</maml:para>
@@ -23084,7 +23179,7 @@ Azure.GA_2024_12.</maml:para>
           <maml:name>System.String</maml:name>
         </dev:type>
       </command:parameter>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="5" aliases="none">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="7" aliases="none">
         <maml:name>ExcludeRule</maml:name>
         <maml:description>
           <maml:para>PSRule rules to leave out, by name or wildcard.</maml:para>
@@ -23095,7 +23190,7 @@ Azure.GA_2024_12.</maml:para>
         </dev:type>
         <dev:defaultValue>@()</dev:defaultValue>
       </command:parameter>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="8" aliases="none">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="10" aliases="none">
         <maml:name>HtmlPath</maml:name>
         <maml:description>
           <maml:para>Write an interactive HTML report to this file.</maml:para>
@@ -23125,6 +23220,25 @@ the aks-command namespace.</maml:para>
         <maml:description>
           <maml:para>Keep kube-system, gatekeeper-system and the other system namespaces
 in the policy compliance views (they are left out by default).</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>IncludeWorkload</maml:name>
+        <maml:description>
+          <maml:para>Read what is running inside each cluster with AKS run command, and assess
+it. Needs the Microsoft.ContainerService/managedClusters/runCommand/action
+permission and run command allowed on the cluster, and starts two
+short-lived pods in the aks-command namespace. It changes nothing else. On
+a cluster with Entra ID it reads what your account may see in Kubernetes:
+what it may not read shows as Not checked. Secrets and ConfigMaps are not
+read, and no environment variable's value leaves the cluster. Run command's
+output stops at 512 kB: a check that didn't see everything says Not checked
+rather than Pass. -IncludeSystemNamespace also takes in the system
+namespaces.</maml:para>
         </maml:description>
         <dev:type>
           <maml:name>System.Management.Automation.SwitchParameter</maml:name>
@@ -23181,10 +23295,22 @@ in the policy compliance views (they are left out by default).</maml:para>
         </dev:type>
         <dev:defaultValue>False</dev:defaultValue>
       </command:parameter>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="7" aliases="none">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="9" aliases="none">
         <maml:name>PdfPath</maml:name>
         <maml:description>
           <maml:para>Write a PDF report to this file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="5" aliases="none">
+        <maml:name>PreviousPath</maml:name>
+        <maml:description>
+          <maml:para>A findings CSV from an earlier run (-CsvPath), or the folder holding its
+findings.csv: each finding is then marked New or Open, and the report
+lists what has been resolved.</maml:para>
         </maml:description>
         <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
         <dev:type>
@@ -23221,7 +23347,23 @@ in the policy compliance views (they are left out by default).</maml:para>
           <maml:name>System.String[]</maml:name>
         </dev:type>
       </command:parameter>
-      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="9" aliases="none">
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="4" aliases="none">
+        <maml:name>SuppressionFile</maml:name>
+        <maml:description>
+          <maml:para>A JSON file of findings you have reviewed and accepted. Each entry names a
+finding by its FindingKey, or by source and rule (and a subject, wildcards
+allowed), with the reason and, if you like, an expiry date:
+[{ "key": "a1b2c3d4e5f60718", "reason": "Accepted risk", "expires": "2027-01-01" }].
+They leave the counts and the findings, and the report lists them with
+their reasons. An expired entry is reported and ignored; a file that can't
+be understood stops the command.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="11" aliases="none">
         <maml:name>Title</maml:name>
         <maml:description>
           <maml:para>The PDF and HTML reports' title.</maml:para>
@@ -23277,6 +23419,14 @@ Invoke-AACAksAssessment</dev:code>
       </command:example>
       <command:example>
         <maml:title>--------- Example 4 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Invoke-AACAksAssessment -Name 'aks-prod-weu' -IncludeWorkload -HtmlPath .\out\AKS.html</dev:code>
+        <dev:remarks>
+          <maml:para>Also what runs inside the cluster - health, probes, requests, pod security, RBAC - and whether it could move to AKS Automatic.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 5 ---------</maml:title>
         <maml:introduction></maml:introduction>
         <dev:code>(Invoke-AACAksAssessment -SubscriptionId 00000000-0000-0000-0000-000000000000 -NoDisplay).Checks | Where-Object { $_.Status -eq 'Fail' -and $_.Pillar -eq 'Security' }</dev:code>
         <dev:remarks>
@@ -26517,6 +26667,360 @@ A week of a workload's vaults: operations, callers, objects near expiry, as repo
   </command:command>
   <command:command>
     <command:details>
+      <command:name>Invoke-AACLandingZoneAssessment</command:name>
+      <maml:description>
+        <maml:para>Checks the estate against the Azure Landing Zone checklist, with Resource Graph: what fails, what only a person can judge, and what no query can answer - with a console view, objects, and CSV, HTML and PDF reports.</maml:para>
+      </maml:description>
+      <command:verb>Invoke</command:verb>
+      <command:noun>AACLandingZoneAssessment</command:noun>
+    </command:details>
+    <maml:description>
+      <maml:para>Read-only (Reader is enough). Runs the Resource Graph queries of the Azure
+Landing Zone checklist (github.com/martinopedal/alz-graph-queries, at a
+pinned commit shipped with the module): about 130 of its 206 items can be
+queried, and the rest are listed as Manual, with why.
+
+These are community queries, and they don't all measure the same thing. So
+a check's status says what its evidence can bear:
+
+  Fail         found something that doesn't comply
+  Review       as Fail, but judged by a name, which proves little
+  Pass         found things, and all comply
+  Present      can only say the resource is there
+  No evidence  nothing came back: not used, or not needed. Not a pass
+  Manual       Resource Graph can't answer this one
+  Not checked  the query failed
+
+A failed check isn't always a fault: many items depend on your design, such
+as those that apply only if you run ExpressRoute. Read it as a list to go
+through, not a score, which is why there is no score. Findings are the Fail
+and Review checks; Review counts as Info. Test-AACAlzPolicy compares your
+policy assignments with the landing zone's, which this doesn't.</maml:para>
+    </maml:description>
+    <command:syntax>
+      <command:syntaxItem>
+        <maml:name>Invoke-AACLandingZoneAssessment</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="none">
+          <maml:name>SubscriptionId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="1" aliases="none">
+          <maml:name>ManagementGroupId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="2" aliases="none">
+          <maml:name>Category</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="3" aliases="none">
+          <maml:name>Severity</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="4" aliases="none">
+          <maml:name>Status</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="5" aliases="none">
+          <maml:name>SuppressionFile</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="6" aliases="none">
+          <maml:name>PreviousPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="7" aliases="none">
+          <maml:name>CsvPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="8" aliases="none">
+          <maml:name>HtmlPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="9" aliases="none">
+          <maml:name>PdfPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="10" aliases="none">
+          <maml:name>Title</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>PassThru</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoDisplay</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoPaging</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="true" pipelineInput="false" position="2" aliases="none">
+        <maml:name>Category</maml:name>
+        <maml:description>
+          <maml:para>Only these checklist categories, such as Security or 'Network Topology and
+Connectivity'. Wildcards work.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="7" aliases="none">
+        <maml:name>CsvPath</maml:name>
+        <maml:description>
+          <maml:para>Write the findings to this CSV file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="8" aliases="none">
+        <maml:name>HtmlPath</maml:name>
+        <maml:description>
+          <maml:para>Write an interactive HTML report.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="1" aliases="none">
+        <maml:name>ManagementGroupId</maml:name>
+        <maml:description>
+          <maml:para>Only the subscriptions under these management groups. Queries about
+management groups themselves always read the whole tenant.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoDisplay</maml:name>
+        <maml:description>
+          <maml:para>Return the checks without showing the view.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoPaging</maml:name>
+        <maml:description>
+          <maml:para>Show the whole view at once.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>PassThru</maml:name>
+        <maml:description>
+          <maml:para>Show the view and also return the checks.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="9" aliases="none">
+        <maml:name>PdfPath</maml:name>
+        <maml:description>
+          <maml:para>Write a PDF report.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="6" aliases="none">
+        <maml:name>PreviousPath</maml:name>
+        <maml:description>
+          <maml:para>A findings CSV from an earlier run (-CsvPath): each finding is then marked New
+or Open, and the report lists what has been resolved.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="3" aliases="none">
+        <maml:name>Severity</maml:name>
+        <maml:description>
+          <maml:para>Only these severities: High, Medium, Low.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="4" aliases="none">
+        <maml:name>Status</maml:name>
+        <maml:description>
+          <maml:para>Show only checks with these statuses.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="none">
+        <maml:name>SubscriptionId</maml:name>
+        <maml:description>
+          <maml:para>Only these subscriptions.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="5" aliases="none">
+        <maml:name>SuppressionFile</maml:name>
+        <maml:description>
+          <maml:para>A JSON file of findings you have reviewed and accepted. Each entry names a
+finding by its FindingKey, or by source (LandingZone) and rule (and a subject,
+wildcards allowed), with the reason and, if you like, an expiry date:
+[{ "key": "a1b2c3d4e5f60718", "reason": "Accepted risk", "expires": "2027-01-01" }].
+They leave the counts, and the report lists them with their reasons.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="10" aliases="none">
+        <maml:name>Title</maml:name>
+        <maml:description>
+          <maml:para>The reports' title.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+        <dev:defaultValue>'Azure Landing Zone assessment'</dev:defaultValue>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes />
+    <command:returnValues>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>AAC.LandingZoneCheck</maml:name>
+        </dev:type>
+        <maml:description>
+          <maml:para />
+        </maml:description>
+      </command:returnValue>
+    </command:returnValues>
+    <maml:alertSet>
+      <maml:alert>
+        <maml:para />
+      </maml:alert>
+    </maml:alertSet>
+    <command:examples>
+      <command:example>
+        <maml:title>--------- Example 1 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Connect-AAC
+Invoke-AACLandingZoneAssessment -ManagementGroupId 'mg-landingzones' -HtmlPath .\LandingZone.html</dev:code>
+        <dev:remarks>
+          <maml:para>The landing zones against the checklist, as a report.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 2 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Invoke-AACLandingZoneAssessment -Category 'Network*' -Status Fail, Review -NoDisplay</dev:code>
+        <dev:remarks>
+          <maml:para>The network checks to look at, as objects.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 3 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Invoke-AACLandingZoneAssessment -CsvPath .\lz-new.csv -PreviousPath .\lz-last.csv -SuppressionFile .\accepted.json</dev:code>
+        <dev:remarks>
+          <maml:para>What changed since last time, leaving out what has been accepted.</maml:para>
+        </dev:remarks>
+      </command:example>
+    </command:examples>
+    <command:relatedLinks>
+      <maml:navigationLink>
+        <maml:linkText>Online Version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Invoke-AACLandingZoneAssessment.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>Online version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Invoke-AACLandingZoneAssessment.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>about_Azure.Admin.Console</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md</maml:uri>
+      </maml:navigationLink>
+    </command:relatedLinks>
+  </command:command>
+  <command:command>
+    <command:details>
       <command:name>Invoke-AACLogAnalyticsWorkspaceAssessment</command:name>
       <maml:description>
         <maml:para>Assesses a Log Analytics workspace: billable and free tables and their size, every workspace setting, recommendations, data collection rules and the Workspace Insights views (Overview, Usage, Health, Agents, Query Audit, Data Collection Rules, Change Log) - with a Spectre.Console view, an object, and CSV and interactive HTML reports.</maml:para>
@@ -27028,6 +27532,22 @@ and downloaded, and a row opens all its details.</maml:para>
           </dev:type>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>SuppressionFile</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>PreviousPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
           <maml:name>CsvPath</maml:name>
           <maml:description />
           <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
@@ -27088,6 +27608,22 @@ and downloaded, and a row opens all its details.</maml:para>
           <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
           <dev:type>
             <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>PreviousPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>CsvPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
           </dev:type>
         </command:parameter>
       </command:syntaxItem>
@@ -27155,6 +27691,18 @@ for Connect-AAC -Scope), and read nothing.</maml:para>
         <dev:defaultValue>False</dev:defaultValue>
       </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>PreviousPath</maml:name>
+        <maml:description>
+          <maml:para>A findings CSV from an earlier run (-CsvPath), or the folder holding its
+findings.csv: each finding is then marked New or Open, and the report
+lists what has been resolved.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
         <maml:name>Section</maml:name>
         <maml:description>
           <maml:para>What to read: Entra, Microsoft365, Intune. All by default.</maml:para>
@@ -27189,6 +27737,22 @@ more than this many days is stale. 90 by default.</maml:para>
           <maml:name>System.Int32</maml:name>
         </dev:type>
         <dev:defaultValue>90</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>SuppressionFile</maml:name>
+        <maml:description>
+          <maml:para>A JSON file of findings you have reviewed and accepted. Each entry names a
+finding by its FindingKey, or by source and rule (and a subject, wildcards
+allowed), with the reason and, if you like, an expiry date:
+[{ "key": "a1b2c3d4e5f60718", "reason": "Accepted risk", "expires": "2027-01-01" }].
+They leave the counts and the findings, and the report lists them with
+their reasons. An expired entry is reported and ignored; a file that can't
+be understood stops the command.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
       </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
         <maml:name>Title</maml:name>
@@ -28283,6 +28847,354 @@ Invoke-AACPSRule</dev:code>
       <maml:navigationLink>
         <maml:linkText>Online version</maml:linkText>
         <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Invoke-AACPSRule.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>about_Azure.Admin.Console</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md</maml:uri>
+      </maml:navigationLink>
+    </command:relatedLinks>
+  </command:command>
+  <command:command>
+    <command:details>
+      <command:name>Invoke-AACResiliencyAssessment</command:name>
+      <maml:description>
+        <maml:para>Checks your resources against the Azure Proactive Resiliency Library, with Resource Graph: which recommendations they miss, and which only a person can check - with a console view, objects, and CSV, HTML and PDF reports.</maml:para>
+      </maml:description>
+      <command:verb>Invoke</command:verb>
+      <command:noun>AACResiliencyAssessment</command:noun>
+    </command:details>
+    <maml:description>
+      <maml:para>Read-only (Reader is enough). Get-AACResiliencyRecommendation lists what the
+Azure Proactive Resiliency Library (APRL) recommends; this runs APRL's own
+queries, at the pinned commit shipped with the module, to say which resources
+don't follow it.
+
+About half of APRL's recommendations have a query. The rest are listed as
+Manual when you use that resource type, because they need a person: a report
+with no failures doesn't mean they are met.
+
+  Fail         the query listed resources
+  Pass         you have resources of this type, and it listed none
+  Manual       APRL has no query for it
+  Not checked  the query failed
+
+Recommendations for types you don't use aren't shown. Queries are only run for
+types you have. Findings are the failed recommendations, with their impact as
+severity; every affected resource is in the report.</maml:para>
+    </maml:description>
+    <command:syntax>
+      <command:syntaxItem>
+        <maml:name>Invoke-AACResiliencyAssessment</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="none">
+          <maml:name>SubscriptionId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="1" aliases="none">
+          <maml:name>ManagementGroupId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="2" aliases="none">
+          <maml:name>ResourceType</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="3" aliases="none">
+          <maml:name>Impact</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="4" aliases="none">
+          <maml:name>Status</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="5" aliases="none">
+          <maml:name>SuppressionFile</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="6" aliases="none">
+          <maml:name>PreviousPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="7" aliases="none">
+          <maml:name>CsvPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="8" aliases="none">
+          <maml:name>HtmlPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="9" aliases="none">
+          <maml:name>PdfPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="10" aliases="none">
+          <maml:name>Title</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>PassThru</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoDisplay</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoPaging</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="7" aliases="none">
+        <maml:name>CsvPath</maml:name>
+        <maml:description>
+          <maml:para>Write the findings to this CSV file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="8" aliases="none">
+        <maml:name>HtmlPath</maml:name>
+        <maml:description>
+          <maml:para>Write an interactive HTML report.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="3" aliases="none">
+        <maml:name>Impact</maml:name>
+        <maml:description>
+          <maml:para>Only these impacts: High, Medium, Low.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="1" aliases="none">
+        <maml:name>ManagementGroupId</maml:name>
+        <maml:description>
+          <maml:para>Only the subscriptions under these management groups.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoDisplay</maml:name>
+        <maml:description>
+          <maml:para>Return the checks without showing the view.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoPaging</maml:name>
+        <maml:description>
+          <maml:para>Show the whole view at once.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>PassThru</maml:name>
+        <maml:description>
+          <maml:para>Show the view and also return the checks.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="9" aliases="none">
+        <maml:name>PdfPath</maml:name>
+        <maml:description>
+          <maml:para>Write a PDF report.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="6" aliases="none">
+        <maml:name>PreviousPath</maml:name>
+        <maml:description>
+          <maml:para>A findings CSV from an earlier run (-CsvPath): each finding is then marked New
+or Open, and the report lists what has been resolved.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="true" pipelineInput="false" position="2" aliases="none">
+        <maml:name>ResourceType</maml:name>
+        <maml:description>
+          <maml:para>Only these resource types; wildcards work, e.g. 'Microsoft.Storage/*'.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+        <dev:defaultValue>@('*')</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="4" aliases="none">
+        <maml:name>Status</maml:name>
+        <maml:description>
+          <maml:para>Show only checks with these statuses.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="none">
+        <maml:name>SubscriptionId</maml:name>
+        <maml:description>
+          <maml:para>Only these subscriptions.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="5" aliases="none">
+        <maml:name>SuppressionFile</maml:name>
+        <maml:description>
+          <maml:para>A JSON file of findings you have reviewed and accepted. Each entry names a
+finding by its FindingKey, or by source (Resiliency) and rule (and a subject,
+wildcards allowed), with the reason and, if you like, an expiry date:
+[{ "key": "a1b2c3d4e5f60718", "reason": "Accepted risk", "expires": "2027-01-01" }].
+They leave the counts, and the report lists them with their reasons.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="10" aliases="none">
+        <maml:name>Title</maml:name>
+        <maml:description>
+          <maml:para>The reports' title.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+        <dev:defaultValue>'Azure resiliency assessment'</dev:defaultValue>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes />
+    <command:returnValues>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>AAC.ResiliencyCheck</maml:name>
+        </dev:type>
+        <maml:description>
+          <maml:para />
+        </maml:description>
+      </command:returnValue>
+    </command:returnValues>
+    <maml:alertSet>
+      <maml:alert>
+        <maml:para />
+      </maml:alert>
+    </maml:alertSet>
+    <command:examples>
+      <command:example>
+        <maml:title>--------- Example 1 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Connect-AAC
+Invoke-AACResiliencyAssessment -SubscriptionId 00000000-0000-0000-0000-000000000000 -HtmlPath .\Resiliency.html
+A subscription against APRL, as a report.</dev:code>
+        <dev:remarks />
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 2 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Invoke-AACResiliencyAssessment -ResourceType 'Microsoft.Storage/*' -Impact High -Status Fail -NoDisplay</dev:code>
+        <dev:remarks>
+          <maml:para>The storage recommendations of high impact that fail, as objects.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 3 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Invoke-AACResiliencyAssessment -CsvPath .\new.csv -PreviousPath .\last.csv</dev:code>
+        <dev:remarks>
+          <maml:para>What has changed since the last run.</maml:para>
+        </dev:remarks>
+      </command:example>
+    </command:examples>
+    <command:relatedLinks>
+      <maml:navigationLink>
+        <maml:linkText>Online Version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Invoke-AACResiliencyAssessment.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>Online version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Invoke-AACResiliencyAssessment.md</maml:uri>
       </maml:navigationLink>
       <maml:navigationLink>
         <maml:linkText>about_Azure.Admin.Console</maml:linkText>
@@ -38023,6 +38935,9 @@ limit:
                      group or resource (50)
   Resource group     policy assignments and exemptions - listed
                      only when they reach the warning level
+  Region             with -IncludeQuota: each compute, network and
+                     storage quota in use, per subscription and region,
+                     against the maximum Azure reports for it
 Each (AAC.AzureLimit) has its use, the maximum, the percentage, what
 is left and - when it is close - what to do. Critical at
 -CriticalPercent (95%) or more, Warning at -WarningPercent (80%).
@@ -38124,6 +39039,13 @@ the subscriptions in scope sits under them.</maml:para>
           </dev:type>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>IncludeQuota</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
           <maml:name>PassThru</maml:name>
           <maml:description />
           <dev:type>
@@ -38188,6 +39110,19 @@ the subscriptions in scope sits under them.</maml:para>
         <dev:type>
           <maml:name>System.String</maml:name>
         </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>IncludeQuota</maml:name>
+        <maml:description>
+          <maml:para>Also read the compute, network and storage quota of each region the
+subscriptions have resources in: three calls per subscription and region,
+so it takes longer. The maximums come from Azure, and -Maximum doesn't
+apply to them. Reader is enough.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
       </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="1" aliases="none">
         <maml:name>ManagementGroupId</maml:name>
@@ -38348,6 +39283,13 @@ A pipeline gate: fails if anything under the landing zones is at 80% of a limit.
         <dev:remarks>
           <maml:para>With a raised role assignment limit, as a report.</maml:para>
         </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 5 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Test-AACAzureLimit -SubscriptionId 00000000-0000-0000-0000-000000000000 -IncludeQuota -FailOnLimit Warning
+A gate before a deployment: fails if a governance limit, or a vCPU, network or storage quota in a region, is at 80%.</dev:code>
+        <dev:remarks />
       </command:example>
     </command:examples>
     <command:relatedLinks>

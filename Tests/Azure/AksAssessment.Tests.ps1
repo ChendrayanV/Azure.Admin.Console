@@ -129,6 +129,48 @@ Describe 'Azure Admin Console - AKS assessment' {
         (& $script:checkOf 'aks-dev' 'Supported network plugin (not kubenet)' (& $script:assess -Clusters @($plugin))).Status | Should -Be 'Fail'
     }
 
+    It 'checks the node pools'' sizes and disks, identity and add-ons' {
+        foreach ($expected in 'No burstable (B-series) nodes', 'Managed OS disks of at least 128 GB', 'Azure Linux on Linux pools', 'Kubernetes RBAC', 'User-assigned cluster identity', 'Private API server', 'OIDC issuer', 'Key Vault secrets provider', 'No Kubernetes dashboard add-on', 'Managed ingress', 'Node resource group named on purpose', 'Azure CNI powered by Cilium', 'KEDA', 'Vertical pod autoscaler') {
+            (& $script:checkOf 'aks-dev' $expected).Status | Should -Be 'Fail' -Because "$expected fails on the neglected cluster"
+            (& $script:checkOf 'aks-prod-weu' $expected).Status | Should -Be 'Pass' -Because "$expected passes on the well-run cluster"
+        }
+        (& $script:checkOf 'aks-dev' 'Managed OS disks of at least 128 GB').Detail | Should -BeLike '*nodepool1 (64 GB)*'
+    }
+
+    It 'doesn''t fail what it can''t see, or what doesn''t apply' {
+        $bare = & $script:copy $script:f.Clusters[1]; $bare.properties.Remove('enableRBAC')
+        (& $script:checkOf 'aks-dev' 'Kubernetes RBAC' (& $script:assess -Clusters @($bare))).Status | Should -Be 'Pass' -Because 'only an explicit false is off'
+        & $script:checkOf 'aks-dev' 'System pool keeps application pods off' | Should -BeNullOrEmpty -Because 'a cluster with only a system pool has nowhere else for application pods'
+        & $script:checkOf 'aks-dev' 'AKS-managed Entra ID (not legacy)' | Should -BeNullOrEmpty -Because 'it has no Entra ID integration to be legacy'
+        $legacy = & $script:copy $script:f.Clusters[0]; $legacy.properties.aadProfile.managed = $false
+        (& $script:checkOf 'aks-prod-weu' 'AKS-managed Entra ID (not legacy)' (& $script:assess -Clusters @($legacy))).Status | Should -Be 'Fail'
+    }
+
+    It 'judges a VM size by its family: older D, E and F sizes, but not special ones' {
+        $older = & $script:copy $script:f.Clusters[0]; $older.properties.agentPoolProfiles[1].vmSize = 'Standard_DS2_v2'
+        (& $script:checkOf 'aks-prod-weu' 'Current generation VM sizes (v5 or newer)' (& $script:assess -Clusters @($older))).Detail | Should -BeLike '*apps (Standard_DS2_v2)*'
+        foreach ($size in 'Standard_NC24ads_A100_v4', 'Standard_DC4s_v3', 'Standard_E4-2ds_v5') {
+            $other = & $script:copy $script:f.Clusters[0]; $other.properties.agentPoolProfiles[1].vmSize = $size
+            (& $script:checkOf 'aks-prod-weu' 'Current generation VM sizes (v5 or newer)' (& $script:assess -Clusters @($other))).Status | Should -Be 'Pass' -Because $size
+        }
+    }
+
+    It 'counts node auto-provisioning as scaling, so a fixed pool beside it isn''t waste' {
+        $fixed = & $script:copy $script:f.Clusters[0]; $fixed.properties.agentPoolProfiles[1].enableAutoScaling = $false
+        (& $script:checkOf 'aks-prod-weu' 'Cluster autoscaler on user pools' (& $script:assess -Clusters @($fixed))).Status | Should -Be 'Fail'
+        $fixed.properties.nodeProvisioningProfile = @{ mode = 'Auto' }
+        (& $script:checkOf 'aks-prod-weu' 'Cluster autoscaler on user pools' (& $script:assess -Clusters @($fixed))).Status | Should -Be 'Pass'
+    }
+
+    It 'checks what Gatekeeper enforces only when it was read' {
+        (& $script:checkOf 'aks-prod-weu' 'Privileged containers refused').Status | Should -Be 'Pass'
+        & $script:checkOf 'aks-dev' 'Privileged containers refused' | Should -BeNullOrEmpty -Because 'without -IncludeConstraint nothing says what is enforced'
+        $audit = @{ Status = 'OK'; Violations = @(); Totals = @([pscustomobject]@{ Kind = 'K8sAzureV2NoPrivilege'; Name = 'azurepolicy-privileged-1'; Action = 'dryrun'; TotalViolations = 2; Assignment = ''; ReferenceId = '' }) }
+        $model = & $script:assess -With @{ Constraint = @{ $script:f.ProdId.ToLowerInvariant() = $audit } }
+        (& $script:checkOf 'aks-prod-weu' 'Privileged containers refused' $model).Detail | Should -BeLike '*only audits (dryrun)*'
+        (& $script:checkOf 'aks-prod-weu' 'Allowed container images enforced' $model).Detail | Should -BeLike 'No constraint for this*'
+    }
+
     It 'brings in the other lenses as findings: PSRule, Advisor, Defender, Azure Policy' {
         $dev = @($script:a.Findings | Where-Object { $_.Cluster -eq 'aks-dev' -and $_.Source -ne 'Well-Architected' })
         @($dev | ForEach-Object { "$($_.Source):$($_.Severity)" } | Sort-Object) | Should -Be @('Advisor:High', 'Azure Policy:Medium', 'Defender:High', 'PSRule:High', 'PSRule:Medium') -Because 'Critical PSRule rules are High, Important ones Medium'
@@ -248,6 +290,49 @@ Describe 'Azure Admin Console - Invoke-AACAksAssessment' {
         $null = & $script:capture { Invoke-AACAksAssessment -IncludeConstraint -NoDisplay }
         Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Get-AACAksConstraint -ParameterFilter { $ClusterId -eq $script:f.ProdId -and $EntraId } -Times 1 -Exactly
         Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Get-AACAksConstraint -ParameterFilter { $ClusterId -eq $script:f.DevId -and -not $EntraId } -Times 1 -Exactly
+    }
+
+    It 'reads what runs in each cluster only with -IncludeWorkload, and returns it on each cluster' {
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Get-AACAksWorkload -MockWith {
+            if (-not $EntraId) { return @{ Rows = @(); Unread = @('pods'); Status = "Couldn't start the command: Run command is disabled" } }
+            @{ Rows = @(@{ t = 'pod'; ns = 'shop'; ok = 'Deployment'; on = 'web'; ph = @{ Running = 1 }; c = @(@{ n = 'web'; pv = $true; img = 'contoso/web:1.0' }) }); Unread = @('nodes'); Status = 'OK' }
+        }
+        $plain = @(& $script:capture { Invoke-AACAksAssessment -NoDisplay }).Output
+        Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Get-AACAksWorkload -Times 0 -Exactly
+        @($plain[0].InCluster).Count | Should -Be 0
+        $html = Join-Path $TestDrive 'inside.html'
+        $null = & $script:capture { Invoke-AACAksAssessment -IncludeWorkload -HtmlPath $html }
+        Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Get-AACAksWorkload -ParameterFilter { $ClusterId -eq $script:f.ProdId -and $EntraId } -Times 1 -Exactly
+        Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Get-AACAksWorkload -ParameterFilter { $ClusterId -eq $script:f.DevId -and -not $EntraId } -Times 1 -Exactly
+        foreach ($expected in 'In-cluster checks on aks-dev', 'Run command is disabled', 'In-cluster checks on aks-prod-weu', 'Privileged containers') { (Get-Content -LiteralPath $html -Raw) | Should -Match ([regex]::Escape($expected)) -Because $expected }
+        $clusters = @(& $script:capture { Invoke-AACAksAssessment -IncludeWorkload -NoDisplay }).Output
+        $prod = @($clusters | Where-Object Name -EQ 'aks-prod-weu')[0]
+        @($prod.InClusterItems | Where-Object Check -EQ 'Privileged containers').Name | Should -Be 'web'
+        @($prod.Findings | Where-Object Source -EQ 'In-cluster').Count | Should -BeGreaterThan 0
+    }
+
+    It 'leaves a suppressed finding out of the counts, and compares with an earlier run''s CSV' {
+        $folder = Join-Path $TestDrive 'first'
+        $first = @(& $script:capture { Invoke-AACAksAssessment -Name 'aks-dev' -CsvPath $folder -PassThru }).Output
+        $before = @($first | Where-Object Name -EQ 'aks-dev')[0]
+        $target = @($before.Findings | Where-Object { $_.Check -eq 'Private API server' })[0]
+        $file = Join-Path $TestDrive 'accepted.json'
+        [System.IO.File]::WriteAllText($file, "[{`"key`":`"$($target.FindingKey)`",`"reason`":`"Dev stays public`"}]")
+        $html = Join-Path $TestDrive 'review.html'
+        $second = Join-Path $TestDrive 'second'
+        $after = @(@(& $script:capture { Invoke-AACAksAssessment -Name 'aks-dev' -SuppressionFile $file -PreviousPath $folder -CsvPath $second -HtmlPath $html -PassThru }).Output | Where-Object Name -EQ 'aks-dev')[0]
+        @($after.Findings | Where-Object Check -EQ 'Private API server').Count | Should -Be 0
+        $after.Medium | Should -Be ($before.Medium - 1)
+        @($after.Findings | Where-Object Change -NE 'Open').Count | Should -Be 0 -Because 'the same cluster has only the same findings'
+        (Import-Csv -LiteralPath (Join-Path $second 'suppressed-findings.csv')).SuppressionReason | Should -Be 'Dev stays public'
+        foreach ($expected in 'Dev stays public', 'finding(s) suppressed', 'Compared with the earlier run') { (Get-Content -LiteralPath $html -Raw) | Should -Match ([regex]::Escape($expected)) }
+    }
+
+    It 'stops on a bad suppression file before reading anything from Azure' {
+        $file = Join-Path $TestDrive 'bad.json'
+        [System.IO.File]::WriteAllText($file, '[{"key":"abc"}]')
+        { & $script:capture { Invoke-AACAksAssessment -SuppressionFile $file -NoDisplay } } | Should -Throw '*has no reason*'
+        Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACGraphBatch -Times 0 -Exactly
     }
 
     It 'writes the CSV files (and a file per namespace), the HTML report and the PDF' {

@@ -11,6 +11,9 @@ function Get-AACServiceBaseline {
         once per session. Types are matched without regard to case: Azure's list
         of services sends them in upper case.
 
+        LandingZone is the Azure Landing Zone checklist's queries, which are for no one
+        resource type, so -ResourceType leaves them alone.
+
         -ResourceType takes wildcards. -Kind is a resource's kind, such as
         functionapp,linux: an alert written for other kinds of the type is left
         out, and one that names no kind stays.
@@ -23,7 +26,7 @@ function Get-AACServiceBaseline {
     [OutputType([hashtable])]
     param(
         [Parameter(Mandatory)]
-        [ValidateSet('Alerts', 'Resiliency')]
+        [ValidateSet('Alerts', 'Resiliency', 'LandingZone')]
         [string] $Set,
 
         [string[]] $ResourceType = @('*'),
@@ -48,17 +51,20 @@ function Get-AACServiceBaseline {
         $resiliency = @(foreach ($row in $data.Resiliency) {
                 [pscustomobject][ordered]@{
                     PSTypeName = 'AAC.ResiliencyRecommendation'; ResourceType = $row.ResourceType; Name = $row.Name; Impact = $row.Impact; Control = $row.Control; Benefit = $row.Benefit
-                    Verified = $row.Verified; Automated = $row.Automated; Description = $row.Description; Link = $row.Link; Guid = $row.Guid
+                    Verified = $row.Verified; Automated = $row.Automated; Description = $row.Description; Link = $row.Link; Guid = $row.Guid; Query = $row.Query
                 }
             })
-        $script:AACServiceBaseline = @{ Sources = $data.Sources; Alerts = $alerts; Resiliency = $resiliency }
+        $landingZone = @(foreach ($row in $data.LandingZone) {
+                [pscustomobject][ordered]@{ PSTypeName = 'AAC.LandingZoneItem'; Category = $row.Category; Subcategory = $row.Subcategory; Name = $row.Name; Severity = $row.Severity; Queryable = $row.Queryable; Reason = $row.Reason; Query = $row.Query; Guid = $row.Guid; ResourceType = '' }
+            })
+        $script:AACServiceBaseline = @{ Sources = $data.Sources; Alerts = $alerts; Resiliency = $resiliency; LandingZone = $landingZone }
     }
 
     $all = @($script:AACServiceBaseline[$Set])
     $rows = @($all | Where-Object {
             $row = $_
             $typeFits = @($ResourceType | Where-Object { $row.ResourceType -like $_ }).Count
-            $typeFits -and (-not $Kind -or $Set -ne 'Alerts' -or -not $row.Kinds.Count -or $row.Kinds -contains $Kind)
+            ($typeFits -or $Set -eq 'LandingZone') -and (-not $Kind -or $Set -ne 'Alerts' -or -not $row.Kinds.Count -or $row.Kinds -contains $Kind)
         })
     @{ Rows = $rows; Source = $script:AACServiceBaseline.Sources[$Set]; Types = @($all.ResourceType | Sort-Object -Unique) }
 }

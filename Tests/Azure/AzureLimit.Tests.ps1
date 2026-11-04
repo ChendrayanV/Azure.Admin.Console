@@ -113,6 +113,49 @@ Describe 'Azure Admin Console - Test-AACAzureLimit' {
         }
     }
 
+    It 'reads the quota of each region in use only with -IncludeQuota, and rates it against Azure''s own maximum' {
+        $prod = @($script:f.Subscriptions | Select-Object -First 1)[0].subscriptionId
+        $script:quotaUris = @()
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACGraphBatch -MockWith {
+            if ($Query.Contains('subscriptions')) { return @{ Rows = @{ subscriptions = $script:f.Subscriptions }; Errors = @{} } }
+            if ($Query.Contains('quotaLocations')) { return @{ Rows = @{ quotaLocations = @(@{ subscriptionId = $script:prodId; location = 'westeurope' }) }; Errors = @{} } }
+            $script:f.Read
+        }
+        $script:prodId = $prod
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACArmParallel -MockWith {
+            $script:quotaUris = @($Uri)
+            $answers = @{}
+            foreach ($item in $Uri) {
+                $answers[$item] = switch -Wildcard ($item) {
+                    '*Microsoft.Compute*' { @{ Status = 200; Error = ''; Items = @(@{ name = @{ value = 'cores'; localizedValue = 'Total Regional vCPUs' }; currentValue = 96; limit = 100 }, @{ name = @{ value = 'availabilitySets'; localizedValue = 'Availability Sets' }; currentValue = 0; limit = 2500 }, @{ name = @{ value = 'nope'; localizedValue = 'Not offered' }; currentValue = 3; limit = 0 }) } }
+                    '*Microsoft.Network*' { @{ Status = 200; Error = ''; Items = @(@{ name = @{ value = 'PublicIPAddresses'; localizedValue = 'Public IP Addresses' }; currentValue = 85; limit = 100 }) } }
+                    default { @{ Status = 409; Error = 'Not registered'; Items = $null } }
+                }
+            }
+            $answers
+        }
+        $plain = @(Test-AACAzureLimit -ManagementGroupId 'mg-platform' -NoDisplay)
+        @($plain | Where-Object ScopeType -EQ 'Region').Count | Should -Be 0
+        Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACArmParallel -Times 0 -Exactly
+        $all = @(Test-AACAzureLimit -ManagementGroupId 'mg-platform' -IncludeQuota -NoDisplay)
+        @($script:quotaUris | Where-Object { $_ -like "*/subscriptions/$prod/providers/Microsoft.*/locations/westeurope/usages*" }).Count | Should -Be 3
+        $regions = @($all | Where-Object ScopeType -EQ 'Region')
+        @($regions | ForEach-Object { "$($_.Status) | $($_.Limit) | $($_.Used)/$($_.Maximum)" }) | Should -Be @('Critical | Compute quota: Total Regional vCPUs | 96/100', 'Warning | Network quota: Public IP Addresses | 85/100') -Because 'unused quotas, and those with no maximum, are left out'
+        $regions[0].Scope | Should -BeLike 'westeurope (*'
+        $regions[0].Advice | Should -BeLike 'Request a quota increase*'
+        { Test-AACAzureLimit -ManagementGroupId 'mg-platform' -Maximum @{ RoleAssignmentsPerSubscription = 9000; PolicyAssignmentsPerScope = 900 } -IncludeQuota -FailOnLimit Critical -NoDisplay } | Should -Throw '*vCPUs*'
+    }
+
+    It 'says when quota couldn''t be read, beyond a provider that isn''t registered' {
+        $answers = { param($Status, $ErrorText) @{ Status = $Status; Error = $ErrorText; Items = $null } }
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACArmParallel -MockWith { $map = @{}; foreach ($item in $Uri) { $map[$item] = @{ Status = 403; Error = 'Authorization failed'; Items = $null } }; $map }
+        $read = InModuleScope 'Azure.Admin.Console' { Get-AACAzureQuota -Location @(@{ subscriptionId = 's'; location = 'westeurope' }) }
+        @($read.Rows).Count | Should -Be 0
+        @($read.Notices)[0] | Should -BeLike "3 of 3 quota answer(s) couldn't be read*Authorization failed*"
+        Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACArmParallel -MockWith { $map = @{}; foreach ($item in $Uri) { $map[$item] = @{ Status = 404; Error = 'Not found'; Items = $null } }; $map }
+        @((InModuleScope 'Azure.Admin.Console' { Get-AACAzureQuota -Location @(@{ subscriptionId = 's'; location = 'westeurope' }) }).Notices).Count | Should -Be 0
+    }
+
     It 'writes the limits to CSV and an HTML report' {
         $csv = Join-Path $TestDrive 'limits.csv'
         $html = Join-Path $TestDrive 'limits.html'

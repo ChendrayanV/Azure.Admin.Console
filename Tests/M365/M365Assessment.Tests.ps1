@@ -196,6 +196,42 @@ Describe 'Azure Admin Console - the Microsoft 365 assessment' {
             ) | Sort-Object)
     }
 
+    It 'flags Conditional Access that leaves administrators out, and only then' {
+        $ga = '62e90394-69f5-4237-9190-012177145e10'
+        $policy = { param([string] $Name, [string] $State, [hashtable] $Users, [hashtable] $Grant) @{ id = $Name; displayName = $Name; state = $State; conditions = @{ users = $Users; applications = @{ includeApplications = @('All') }; clientAppTypes = @('all') }; grantControls = $Grant; createdDateTime = '2026-01-01T00:00:00Z'; modifiedDateTime = '2026-01-01T00:00:00Z' } }
+        $mfa = @{ operator = 'OR'; builtInControls = @('mfa') }
+        $data = $script:f.Data.Clone()
+        $data.ConditionalAccess = @(
+            (& $policy 'No GA' 'enabled' @{ includeUsers = @('All'); excludeRoles = @($ga) } $mfa)
+            (& $policy 'Switched off' 'disabled' @{ includeRoles = @($ga) } $mfa)
+            (& $policy 'Many out' 'enabled' @{ includeUsers = @('All'); excludeUsers = @('a', 'b', 'c') } @{ operator = 'OR'; builtInControls = @('block') })
+            (& $policy 'Terms only' 'enabled' @{ includeUsers = @('All'); excludeUsers = @('a', 'b') } @{ operator = 'OR'; builtInControls = @(); termsOfUse = @('t') })
+            (& $policy 'Off, does nothing' 'disabled' @{ includeUsers = @('All') } @{ operator = 'OR'; builtInControls = @('compliantDevice') })
+            (& $policy 'Session only' 'enabled' @{ includeUsers = @('All') } $null)
+        )
+        $found = @((& $script:assess $data).Findings | Where-Object Area -EQ 'Entra ID')
+        $detail = { param([string] $Title) @($found | Where-Object Finding -EQ $Title | ForEach-Object Detail) -join ' ' }
+        & $detail 'Global Administrators excluded from an MFA policy' | Should -BeLike 'No GA require MFA*'
+        & $detail 'Protection for administrators is turned off' | Should -BeLike 'Switched off would cover*' -Because 'a disabled policy with no MFA or block protects nobody'
+        & $detail 'Too many accounts excluded from an all-users policy' | Should -BeLike 'Many out (3) exclude*' -Because 'two break-glass accounts are what Microsoft recommends'
+        & $detail 'Enabled policy with no strong control' | Should -BeLike 'Terms only grant access*' -Because 'blocking and session-only policies are not weak'
+        $tidy = $script:f.Data.Clone()
+        $tidy.ConditionalAccess = @(& $policy 'Good' 'enabled' @{ includeUsers = @('All'); excludeUsers = @('a', 'b') } $mfa)
+        $titles = @((& $script:assess $tidy).Findings | ForEach-Object Finding)
+        foreach ($title in 'Global Administrators excluded from an MFA policy', 'Protection for administrators is turned off', 'Too many accounts excluded from an all-users policy', 'Enabled policy with no strong control') { $titles | Should -Not -Contain $title }
+    }
+
+    It 'keeps a finding''s key from run to run, though its count changes' {
+        $title = 'Users without MFA registered'
+        $data = $script:f.Data.Clone()
+        $first = InModuleScope 'Azure.Admin.Console' -Parameters @{ A = (& $script:assess $data) } { param($A) (Invoke-AACFindingReview -Finding $A.Findings).Findings }
+        $data.Registration = @($script:f.Data.Registration | Select-Object -Skip 1)
+        $second = InModuleScope 'Azure.Admin.Console' -Parameters @{ A = (& $script:assess $data) } { param($A) (Invoke-AACFindingReview -Finding $A.Findings).Findings }
+        $a = @($first | Where-Object Finding -EQ $title)[0]; $b = @($second | Where-Object Finding -EQ $title)[0]
+        $a.Item | Should -Not -Be $b.Item -Because 'this test needs the count to have changed'
+        $a.FindingKey | Should -Be $b.FindingKey
+    }
+
     It 'measures MFA coverage - registered and phishing-resistant - by members, admins and guests' {
         @($script:a.MfaCoverage | ForEach-Object { "$($_.Scope) $($_.Users) $($_.MfaPercent)% $($_.PhishingResistant)" }) | Should -Be @('Members 6 50% 0', 'Administrators 3 67% 0', 'Guests 1 0% 0')
         ($script:a.Settings | Where-Object Setting -EQ 'MFA required by Conditional Access for').Value | Should -Be 'All users - 1 user(s) and 1 group(s) excluded'

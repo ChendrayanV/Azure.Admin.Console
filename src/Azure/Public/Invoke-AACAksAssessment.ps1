@@ -27,20 +27,30 @@ function Invoke-AACAksAssessment {
                             mode, OS, nodes, autoscale, zones, max pods,
                             versions, node image and its age, disks, Spot,
                             subnet, taints
-          Well-Architected  about 35 checks across the five pillars -
-                            Reliability (SLA tier, zones, system pool, Spot,
-                            version support, maintenance, surge), Security
-                            (local accounts, Entra ID, Azure RBAC, API server
-                            exposure, network policy, Azure Policy, Defender,
-                            workload identity, pod identity, image cleaner,
-                            KMS, node public IPs, encryption at host, managed
-                            identity, node images, lockdown), Operational
-                            Excellence (upgrade channels, Container insights,
-                            Prometheus, audit logs, version drift, retired
-                            add-ons), Cost Optimization (autoscaler, cost
-                            analysis) and Performance Efficiency (ephemeral
-                            OS disks, kubenet, load balancer, subnet IPs at
-                            full scale) - Pass or Fail, a score per pillar
+          Well-Architected  about 50 checks across the five pillars -
+                            Reliability (SLA tier, zones, system pool and its
+                            taint, Spot, burstable sizes, version support,
+                            maintenance, surge), Security (local accounts,
+                            Kubernetes RBAC, Entra ID, Azure RBAC, API server
+                            exposure, private API server, network policy,
+                            Azure Policy, Defender, OIDC issuer, workload
+                            identity, pod identity, user-assigned identity,
+                            image cleaner, KMS, Key Vault provider, dashboard
+                            add-on, Azure Linux, node public IPs, encryption
+                            at host, managed identity, node images, lockdown;
+                            with -IncludeConstraint, whether allowed images
+                            and privileged containers are enforced),
+                            Operational Excellence (upgrade channels,
+                            Container insights, Prometheus, audit logs,
+                            version drift, retired add-ons, managed ingress,
+                            node resource group name), Cost Optimization
+                            (autoscaler or node auto-provisioning, vertical
+                            pod autoscaler, cost analysis) and Performance
+                            Efficiency (ephemeral OS disks, OS disk size, VM
+                            generation, kubenet, Cilium, KEDA, load balancer,
+                            subnet IPs at full scale) - Pass or Fail, a score
+                            per pillar. Several of these follow KubeBuddy's
+                            AKS checks (github.com/KubeDeckio/KubeBuddy)
           PSRule for Azure  the Azure.AKS.* rules (unless -SkipPSRule), on
                             the cluster as Export-AzRuleData reads it -
                             -Baseline and -ExcludeRule as for Invoke-AACPSRule
@@ -56,6 +66,23 @@ function Invoke-AACAksAssessment {
                             complete violation count from inside the cluster
                             (Azure Policy keeps 500 records per policy and
                             cluster), with AKS run command
+          In the cluster    with -IncludeWorkload: what is running, read with
+                            AKS run command - health (failing, pending and
+                            restarting pods, nodes, services, volumes),
+                            workload design (requests, limits, probes,
+                            replicas, spread, disruption budgets), pod security
+                            (privileged, host namespaces and paths, capabilities,
+                            seccomp, root), namespaces (network policies, quotas,
+                            limit ranges), RBAC (cluster-admin, wide access,
+                            default service accounts) and network and storage -
+                            many following KubeBuddy's checks
+                            (github.com/KubeDeckio/KubeBuddy). Their failures
+                            are findings, but not in the WAF score
+          AKS Automatic     with -IncludeWorkload: what would stop these workloads
+                            moving to a new AKS Automatic cluster, from Microsoft's
+                            Deployment Safeguards and baseline Pod Security
+                            Standards - Fix first (refused), Changed by Automatic
+                            (admitted but altered) and Review
           Versions          the control plane's version and its support
                             (supported, long-term support, out of support),
                             the upgrades available, how far behind the
@@ -99,6 +126,29 @@ function Invoke-AACAksAssessment {
         permission (Azure Kubernetes Service Cluster Admin, Contributor) and
         run command allowed on the cluster; it starts a short-lived pod in
         the aks-command namespace.
+    .PARAMETER IncludeWorkload
+        Read what is running inside each cluster with AKS run command, and assess
+        it. Needs the Microsoft.ContainerService/managedClusters/runCommand/action
+        permission and run command allowed on the cluster, and starts two
+        short-lived pods in the aks-command namespace. It changes nothing else. On
+        a cluster with Entra ID it reads what your account may see in Kubernetes:
+        what it may not read shows as Not checked. Secrets and ConfigMaps are not
+        read, and no environment variable's value leaves the cluster. Run command's
+        output stops at 512 kB: a check that didn't see everything says Not checked
+        rather than Pass. -IncludeSystemNamespace also takes in the system
+        namespaces.
+    .PARAMETER SuppressionFile
+        A JSON file of findings you have reviewed and accepted. Each entry names a
+        finding by its FindingKey, or by source and rule (and a subject, wildcards
+        allowed), with the reason and, if you like, an expiry date:
+        [{ "key": "a1b2c3d4e5f60718", "reason": "Accepted risk", "expires": "2027-01-01" }].
+        They leave the counts and the findings, and the report lists them with
+        their reasons. An expired entry is reported and ignored; a file that can't
+        be understood stops the command.
+    .PARAMETER PreviousPath
+        A findings CSV from an earlier run (-CsvPath), or the folder holding its
+        findings.csv: each finding is then marked New or Open, and the report
+        lists what has been resolved.
     .PARAMETER SkipPSRule
         Don't run PSRule for Azure.
     .PARAMETER Baseline
@@ -131,6 +181,9 @@ function Invoke-AACAksAssessment {
         Invoke-AACAksAssessment -ManagementGroupId 'mg-landingzones' -IncludeConstraint -NoDisplay | Select-Object -ExpandProperty PolicyViolations | Group-Object Namespace
         Kubernetes policy violations by namespace, with Gatekeeper's complete counts - before moving policies from Audit to Deny.
     .EXAMPLE
+        Invoke-AACAksAssessment -Name 'aks-prod-weu' -IncludeWorkload -HtmlPath .\out\AKS.html
+        Also what runs inside the cluster - health, probes, requests, pod security, RBAC - and whether it could move to AKS Automatic.
+    .EXAMPLE
         (Invoke-AACAksAssessment -SubscriptionId 00000000-0000-0000-0000-000000000000 -NoDisplay).Checks | Where-Object { $_.Status -eq 'Fail' -and $_.Pillar -eq 'Security' }
         The failed Well-Architected security checks.
     .OUTPUTS
@@ -155,6 +208,12 @@ function Invoke-AACAksAssessment {
         [switch] $IncludeSystemNamespace,
 
         [switch] $IncludeConstraint,
+
+        [switch] $IncludeWorkload,
+
+        [string] $SuppressionFile,
+
+        [string] $PreviousPath,
 
         [switch] $SkipPSRule,
 
@@ -196,6 +255,7 @@ function Invoke-AACAksAssessment {
         Name                   = @($Name | Where-Object { $_ })
         IncludeSystemNamespace = [bool]$IncludeSystemNamespace
         IncludeConstraint      = [bool]$IncludeConstraint
+        IncludeWorkload        = [bool]$IncludeWorkload
         SkipPSRule             = [bool]$SkipPSRule
         Baseline               = $Baseline
         ExcludeRule            = @($ExcludeRule | Where-Object { $_ })
@@ -204,6 +264,11 @@ function Invoke-AACAksAssessment {
         HtmlPath               = & $resolve $HtmlPath
         Title                  = $Title
     }
+
+    # Before any Azure call: a bad file should stop the run now, not after minutes of reading.
+    $request.Suppression = if ($SuppressionFile) { Read-AACSuppressionFile -Path (& $resolve $SuppressionFile) } else { $null }
+    $request.PreviousPath = & $resolve $PreviousPath
+    if ($request.PreviousPath) { $null = Invoke-AACFindingReview -PreviousPath $request.PreviousPath }
 
     if ($interactive) {
         Write-AACRule -Title 'Azure Admin Console :: AKS cluster assessment' -Color 'deepskyblue3_1'
@@ -326,13 +391,34 @@ function Invoke-AACAksAssessment {
             Update-AACProgress -Id 'gatekeeper' -Complete -Description ('Gatekeeper: {0:N0} violation(s) in {1:N0} constraint(s)' -f (@($constraints.Values | ForEach-Object { $_.Totals } | ForEach-Object TotalViolations) | Measure-Object -Sum).Sum, @($constraints.Values | ForEach-Object { $_.Totals }).Count)
         }
 
+        # --- 6b. What runs in each cluster --------------------------------------------------------------------------------
+        $inClusterReads = @{}
+        if ($request.IncludeWorkload) {
+            Update-AACProgress -Id 'inside' -Total $clusters.Count -Description 'Reading what runs in each cluster (AKS run command)'
+            foreach ($cluster in $clusters) {
+                $result = Get-AACAksWorkload -ClusterId ([string]$cluster['id']) -EntraId:([bool]$cluster['properties']['aadProfile'])
+                $inClusterReads[([string]$cluster['id']).ToLowerInvariant()] = $result
+                if ($result.Status -ne 'OK') { $notices.Add("In-cluster checks on $($cluster['name']) weren't run: $($result.Status)") }
+                elseif (@($result.Unread).Count) { $notices.Add("In-cluster checks on $($cluster['name']): couldn't fully read $($result.Unread -join '; '). Checks that need them say Not checked. Either your Kubernetes role doesn't cover them, or the answer went past run command's 512 kB limit.") }
+                Update-AACProgress -Id 'inside' -Increment 1 -Description "Read what runs in $($cluster['name'])"
+            }
+            Update-AACProgress -Id 'inside' -Complete -Description ('In-cluster: read {0:N0} cluster(s)' -f $clusters.Count)
+        }
+
         # --- 7. The assessment ----------------------------------------------------------------------------------------
         Update-AACProgress -Id 'assess' -Description 'Assessing the clusters through every lens' -Indeterminate
         $clusterNames = @{}
         foreach ($cluster in $clusters) { $clusterNames[([string]$cluster['id']).ToLowerInvariant()] = [string]$cluster['name'] }
         $policy = ConvertTo-AACAksPolicyCompliance -Component $components -ClusterState $clusterStates -Assignment @(& $rowsOf $graph 'assignments') -DefinitionName $definitionNames -ClusterName $clusterNames -SubscriptionName $subscriptionNames -IncludeSystemNamespace:$request.IncludeSystemNamespace
         $assessment = ConvertTo-AACAksAssessment -Cluster $clusters -UpgradeProfile $upgradeProfiles -PoolUpgrade $poolUpgrades -KubernetesVersion $versions -Subnet $subnets `
-            -Advisor @(& $rowsOf $graph 'advisor') -Defender @(& $rowsOf $graph 'defender') -PSRule $psrule -Policy $policy -Constraint $constraints -SubscriptionName $subscriptionNames
+            -Advisor @(& $rowsOf $graph 'advisor') -Defender @(& $rowsOf $graph 'defender') -PSRule $psrule -Policy $policy -Constraint $constraints -Workload $inClusterReads -IncludeSystemNamespace:$request.IncludeSystemNamespace -SubscriptionName $subscriptionNames
+        $review = Invoke-AACFindingReview -Finding $assessment.Findings -Suppression $request.Suppression -PreviousPath $request.PreviousPath -Stats $assessment.Stats
+        $assessment.Findings = $review.Findings
+        $assessment.SuppressedFindings = $review.Suppressed
+        $assessment.ResolvedFindings = $review.Resolved
+        foreach ($row in $assessment.Clusters) { foreach ($level in 'High', 'Medium', 'Low') { $row.$level = @($review.Findings | Where-Object { $_.ClusterId -eq $row.ResourceId -and $_.Severity -eq $level }).Count } }
+        foreach ($row in $assessment.Pillars) { $row.Findings = @($review.Findings | Where-Object Pillar -EQ $row.Pillar).Count }
+        foreach ($line in $review.Notices) { $notices.Add($line) }
         $assessment.Notices = $notices.ToArray()
         $stats = $assessment.Stats
         Update-AACProgress -Id 'assess' -Complete -Description ('Assessed {0:N0} cluster(s): WAF {1}%, {2} high, {3} medium, {4} low finding(s); {5:N0} policy violation(s)' -f $stats.Clusters, $stats.WafScore, $stats.High, $stats.Medium, $stats.Low, $policy.Stats.Violations)
@@ -375,6 +461,8 @@ function Invoke-AACAksAssessment {
                     Upgrades         = @($assessment.Upgrades | Where-Object ClusterId -EQ $id)
                     PolicyViolations = @(if ($assessment.Policy) { $assessment.Policy.Components | Where-Object { $_.ClusterId -eq $id.ToLowerInvariant() } })
                     PSRule           = @($assessment.PSRule | Where-Object { $_.ResourceName -eq $cluster.Name })
+                    InCluster        = @($assessment.WorkloadChecks | Where-Object ClusterId -EQ $id)
+                    InClusterItems   = @($assessment.WorkloadItems | Where-Object ClusterId -EQ $id)
                 }) -Force
             $cluster
         }

@@ -92,6 +92,19 @@ function Show-AACAksView {
         [Spectre.Console.AnsiConsole]::WriteLine()
     }
 
+    if (@($Assessment.WorkloadChecks).Count) {
+        $table = & $newTable "[bold]$($glyph.Bullet) In the cluster[/] [grey58]$($glyph.Dot) not in the WAF score[/]" @('Cluster', 'Passed', 'Failed', 'Not checked', 'AKS Automatic', 'Fix first', 'Changed', 'Review') @('Passed', 'Failed', 'Not checked', 'Fix first', 'Changed', 'Review')
+        foreach ($row in $Assessment.Readiness) {
+            $mine = @($Assessment.WorkloadChecks | Where-Object ClusterId -EQ $row.ClusterId)
+            $failedHere = @($mine | Where-Object Status -EQ 'Fail').Count
+            $tone = switch ($row.Verdict) { 'Fix first' { 'red1' } 'Not fully checked' { 'grey62' } default { 'green3' } }
+            & $addRow $table @("[white]$(& $escape $row.Cluster)[/]", "$(@($mine | Where-Object Status -EQ 'Pass').Count)", $(if ($failedHere) { "[orange1]$failedHere[/]" } else { '0' }), "$(@($mine | Where-Object Status -EQ 'Not checked').Count)", "[$tone]$(& $escape $row.Verdict)[/]", $(if ($row.FixFirst) { "[red1]$($row.FixFirst)[/]" } else { '0' }), "$($row.ChangedByAutomatic)", "$($row.Review)")
+        }
+        [Spectre.Console.AnsiConsole]::Write($table)
+        Write-AACMarkup '[grey42]AKS Automatic: moving these workloads to a new cluster. Fix first would be refused; Changed would be admitted but altered.[/]'
+        [Spectre.Console.AnsiConsole]::WriteLine()
+    }
+
     if (@($Assessment.Clusters).Count -le $Detail) {
         foreach ($c in $Assessment.Clusters) {
             Write-AACRule -Title "[bold]$(& $escape $c.Name)[/] [grey58]Kubernetes $(& $escape $c.Version)[/]" -Color 'grey50'

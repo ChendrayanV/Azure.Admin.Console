@@ -17,6 +17,8 @@ function Write-AACAksHtml {
           Azure Policy    by namespace, by workload, by policy, by cluster,
                           every non-compliant component, cluster states,
                           assignments, Gatekeeper's counts
+          In the cluster  with -IncludeWorkload: readiness for AKS Automatic,
+                          every check, and what each one found
     #>
     [CmdletBinding()]
     [OutputType([System.IO.FileInfo])]
@@ -52,6 +54,7 @@ function Write-AACAksHtml {
         @{ Value = '{0:N0}' -f $stats.OutOfSupport; Label = 'clusters out of support'; Tone = $(if ($stats.OutOfSupport) { 'bad' } else { 'good' }); Table = 'upgrades' }
         @{ Value = '{0:N0}' -f $stats.PSRuleFailed; Label = "PSRule rules failed ($($stats.PSRulePassed) passed)"; Tone = $(if ($stats.PSRuleFailed) { 'warn' } else { 'good' }); Table = 'psrule'; Filters = @{ Outcome = 'Fail' } }
         if ($policy) { @{ Value = '{0:N0}' -f $policy.Stats.Violations; Label = "policy violations in $($policy.Stats.Workloads) workload(s), $($policy.Stats.Namespaces) namespace(s)"; Tone = $(if ($policy.Stats.Violations) { 'warn' } else { 'good' }); Table = 'policy-namespace' } }
+        if (@($Assessment.WorkloadChecks).Count) { @{ Value = '{0:N0}' -f $stats.InClusterFailed; Label = "in-cluster checks failed, of $(@($Assessment.WorkloadChecks).Count)"; Tone = $(if ($stats.InClusterFailed) { 'warn' } else { 'good' }); Table = 'incluster-checks'; Filters = @{ Status = 'Fail' } } }
         if ($stats.GatekeeperViolations) { @{ Value = '{0:N0}' -f $stats.GatekeeperViolations; Label = 'Gatekeeper violations (complete count)'; Tone = 'warn'; Table = 'gatekeeper' } }
     )
     $charts = @(
@@ -92,7 +95,7 @@ function Write-AACAksHtml {
         & $col 'ResourceGroup' 'Resource group' $facet
         & $col 'Subscription' 'Subscription' $facet
     )
-    $nested = 'NodePools', 'Settings', 'Checks', 'Findings', 'Upgrades', 'PolicyViolations', 'PSRule'
+    $nested = 'NodePools', 'Settings', 'Checks', 'Findings', 'Upgrades', 'PolicyViolations', 'PSRule', 'InCluster', 'InClusterItems'
     $tables = [System.Collections.Generic.List[hashtable]]::new()
     $add = { param([hashtable] $Table) if (@($Table.Rows).Count) { $tables.Add($Table) } }
     & $add @{ Id = 'clusters'; Section = 'Overview'; Title = 'Clusters'; Noun = 'clusters'; File = 'aks-clusters'; Rows = @($Assessment.Clusters | Select-Object -Property * -ExcludeProperty $nested); Columns = $clusterColumns; GroupBy = @('Subscription', 'Location', 'Support', 'Tier') }
@@ -100,6 +103,8 @@ function Write-AACAksHtml {
         Id = 'findings'; Section = 'Overview'; Title = 'Findings'; Note = 'Every lens: Well-Architected checks, PSRule for Azure, Advisor, Defender for Cloud, Azure Policy, retirements. Most severe first.'; Noun = 'findings'; File = 'aks-findings'; Rows = @($Assessment.Findings); GroupBy = @('Cluster', 'Pillar', 'Source', 'Severity')
         Columns = @((& $col 'Severity' 'Severity' @{ Type = 'badge'; Tones = $severity; Facet = $true }), (& $col 'Pillar' 'Pillar' $facet), (& $col 'Source' 'Source' $facet), (& $col 'Cluster' 'Cluster' @{ Type = 'resource'; IdKey = 'ClusterId'; Facet = $true }), (& $col 'Check' 'Finding' @{ Type = 'wide' }), (& $col 'Item' 'Item'), (& $col 'Detail' 'What was found' @{ Type = 'wide' }), (& $col 'Recommendation' 'What to do' @{ Type = 'wide' }), (& $col 'Link' 'Docs' @{ Type = 'link' }), (& $col 'ResourceGroup' 'Resource group' @{ Hidden = $true }))
     }
+    & $add @{ Id = 'suppressed-findings'; Section = 'Overview'; Title = 'Suppressed findings'; Note = 'Accepted in the suppression file, and left out of every count.'; Noun = 'findings'; File = 'aks-suppressed-findings'; Rows = @($Assessment['SuppressedFindings'] | Where-Object { $_ }); Columns = @((& $col 'Severity' 'Severity' @{ Type = 'badge'; Tones = $severity; Facet = $true }), (& $col 'Source' 'Source' $facet), (& $col 'Cluster' 'Cluster' $facet), (& $col 'Check' 'Finding'), (& $col 'SuppressionReason' 'Reason' @{ Type = 'wide' }), (& $col 'SuppressedUntil' 'Until'), (& $col 'FindingKey' 'Key' @{ Type = 'mono' })) }
+    & $add @{ Id = 'resolved-findings'; Section = 'Overview'; Title = 'Resolved since the earlier run'; Noun = 'findings'; File = 'aks-resolved-findings'; Rows = @($Assessment['ResolvedFindings'] | Where-Object { $_ }); Columns = @((& $col 'Severity' 'Severity' @{ Type = 'badge'; Tones = $severity; Facet = $true }), (& $col 'Finding' 'Finding'), (& $col 'Subject' 'On'), (& $col 'FindingKey' 'Key' @{ Type = 'mono' })) }
     & $add @{ Id = 'settings'; Section = 'Current settings'; Title = 'Settings'; Note = 'Every cluster setting that matters, by area.'; Noun = 'settings'; File = 'aks-settings'; Rows = @($Assessment.Settings); GroupBy = @('Cluster', 'Area'); Group = 'Area'; Columns = @((& $col 'Cluster' 'Cluster' $facet), (& $col 'Area' 'Area' $facet), (& $col 'Setting' 'Setting'), (& $col 'Value' 'Value' @{ Type = 'wide' })) }
     & $add @{
         Id = 'nodepools'; Section = 'Current settings'; Title = 'Node pools'; Noun = 'pools'; File = 'aks-node-pools'; Rows = @($Assessment.NodePools); GroupBy = @('Cluster', 'Mode', 'VmSize', 'OsSku')
@@ -131,6 +136,22 @@ function Write-AACAksHtml {
         & $add @{ Id = 'policy-assignments'; Section = 'Azure Policy'; Title = 'Assignments'; Noun = 'assignments'; File = 'aks-policy-assignments'; Rows = @($policy.Assignments); Columns = @((& $col 'Assignment' 'Assignment'), (& $col 'Scope' 'Scope' @{ Type = 'mono' }), (& $col 'EnforcementMode' 'Enforcement' @{ Type = 'badge'; Tones = @{ Default = 'good'; DoNotEnforce = 'warn' }; Facet = $true }), (& $col 'Effect' 'Effect' $facet), (& $col 'Policies' 'Policies' $num), (& $col 'NonCompliant' 'Non-compliant' @{ Type = 'number'; Tone = 'bad' }), (& $col 'Clusters' 'Clusters' $num), (& $col 'Violations' 'Violations' $num)) }
     }
     & $add @{ Id = 'gatekeeper'; Section = 'Azure Policy'; Title = 'Gatekeeper constraints (in the clusters)'; Note = 'Complete counts from Gatekeeper, beyond Azure Policy''s 500-record cap. dryrun is Audit.'; Noun = 'constraints'; File = 'aks-gatekeeper'; Rows = @($Assessment.Constraints); Columns = @((& $col 'Cluster' 'Cluster' $facet), (& $col 'Kind' 'Constraint kind'), (& $col 'Constraint' 'Constraint'), (& $col 'Action' 'Action' @{ Type = 'badge'; Tones = $effect; Facet = $true }), (& $col 'TotalViolations' 'Violations' @{ Type = 'number'; Sum = $true }), (& $col 'Assignment' 'Assignment' $facet), (& $col 'ReferenceId' 'Reference')) }
+
+    $insideStatus = @{ Pass = 'good'; Fail = 'bad'; 'Not checked' = 'neutral' }
+    $moveTones = @{ 'Fix first' = 'bad'; 'Changed by Automatic' = 'warn'; Review = 'info' }
+    $verdictTones = @{ 'Fix first' = 'bad'; 'Not fully checked' = 'neutral'; 'No blockers found' = 'good'; 'Already AKS Automatic' = 'good' }
+    & $add @{
+        Id = 'incluster-readiness'; Section = 'In the cluster'; Title = 'Moving to AKS Automatic'; Note = 'Whether these workloads could move to a new AKS Automatic cluster, not this one converted. From Microsoft''s Deployment Safeguards and baseline Pod Security Standards: Fix first would be refused, Changed by Automatic admitted but altered.'; Noun = 'clusters'; File = 'aks-automatic-readiness'; Rows = @($Assessment.Readiness)
+        Columns = @((& $col 'Cluster' 'Cluster'), (& $col 'Verdict' 'Verdict' @{ Type = 'badge'; Tones = $verdictTones; Facet = $true }), (& $col 'FixFirst' 'Fix first' @{ Type = 'number'; Tone = 'bad'; Sum = $true }), (& $col 'ChangedByAutomatic' 'Changed by Automatic' $num), (& $col 'Review' 'Review' $num), (& $col 'NotChecked' 'Checks not run' $num), (& $col 'Workloads' 'Workloads' $num), (& $col 'Namespaces' 'Namespaces' $num))
+    }
+    & $add @{
+        Id = 'incluster-checks'; Section = 'In the cluster'; Title = 'Checks'; Note = 'What runs inside each cluster. Not checked: part of what it needs couldn''t be read. Not in the Well-Architected score.'; Noun = 'checks'; File = 'aks-in-cluster-checks'; Rows = @($Assessment.WorkloadChecks); GroupBy = @('Cluster', 'Area', 'Status', 'Severity')
+        Columns = @((& $col 'Status' 'Status' @{ Type = 'badge'; Tones = $insideStatus; Facet = $true }), (& $col 'Area' 'Area' $facet), (& $col 'Check' 'Check'), (& $col 'Severity' 'Severity' @{ Type = 'badge'; Tones = $severity; Facet = $true }), (& $col 'Affected' 'Affected' @{ Type = 'number'; Sum = $true }), (& $col 'Readiness' 'AKS Automatic' @{ Type = 'badge'; Tones = $moveTones; Facet = $true }), (& $col 'Cluster' 'Cluster' $facet), (& $col 'Detail' 'What was found' @{ Type = 'wide' }), (& $col 'Recommendation' 'What to do' @{ Type = 'wide' }), (& $col 'Link' 'Link'))
+    }
+    & $add @{
+        Id = 'incluster-items'; Section = 'In the cluster'; Title = 'What they found'; Note = 'One row per workload or object. Pods of a workload are read as one, from its first pod.'; Noun = 'items'; File = 'aks-in-cluster-items'; Rows = @($Assessment.WorkloadItems); GroupBy = @('Cluster', 'Namespace', 'Check', 'Kind')
+        Columns = @((& $col 'Severity' 'Severity' @{ Type = 'badge'; Tones = $severity; Facet = $true }), (& $col 'Check' 'Check' $facet), (& $col 'Namespace' 'Namespace' $facet), (& $col 'Kind' 'Kind' $facet), (& $col 'Name' 'Name'), (& $col 'Detail' 'Detail' @{ Type = 'wide' }), (& $col 'Readiness' 'AKS Automatic' @{ Type = 'badge'; Tones = $moveTones; Facet = $true }), (& $col 'Cluster' 'Cluster' $facet))
+    }
 
     $notices = @(foreach ($line in @($Assessment['Notices'])) { @{ Tone = 'warn'; Text = $line } })
     Write-AACHtmlReport -Path $Path -Title $Title -Subtitle 'AKS clusters through every lens: settings, Well-Architected, PSRule, Azure Policy, versions, Advisor and Defender' -Fact $Detail -Tile $tiles -Chart $charts -Table $tables.ToArray() -Notice $notices

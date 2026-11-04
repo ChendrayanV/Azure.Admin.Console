@@ -81,7 +81,8 @@ function Invoke-AACADOAssessment {
         the artifacts unread (the generators are still found in the steps).
 
         Delivery metrics over -MetricDays: each pipeline's runs, success
-        rate (cancelled runs left out), average duration and queue time,
+        rate (cancelled runs left out), average duration, total minutes (and
+        each project's share of them), whether it is getting slower, queue time,
         runs a week; each environment's deployments, deployments a week,
         and change failure rate (DORA).
 
@@ -201,6 +202,18 @@ function Invoke-AACADOAssessment {
         SbomLicense or Finding.
     .PARAMETER ThrottleLimit
         How many requests run at once (1 to 32; 8 by default).
+    .PARAMETER SuppressionFile
+        A JSON file of findings you have reviewed and accepted. Each entry names a
+        finding by its FindingKey, or by source and rule (and a subject, wildcards
+        allowed), with the reason and, if you like, an expiry date:
+        [{ "key": "a1b2c3d4e5f60718", "reason": "Accepted risk", "expires": "2027-01-01" }].
+        They leave the counts and the findings, and the report lists them with
+        their reasons. An expired entry is reported and ignored; a file that can't
+        be understood stops the command.
+    .PARAMETER PreviousPath
+        A findings CSV from an earlier run (-CsvPath), or the folder holding its
+        findings.csv: each finding is then marked New or Open, and the report
+        lists what has been resolved.
     .PARAMETER CsvPath
         Write the -View rows to this CSV file.
     .PARAMETER HtmlPath
@@ -294,11 +307,15 @@ function Invoke-AACADOAssessment {
 
         [string] $YamlPath,
 
-        [ValidateSet('Pipeline', 'Project', 'Repository', 'Task', 'Tool', 'Evidence', 'Coverage', 'Unrecognised', 'ServiceConnection', 'VariableGroup', 'Environment', 'Member', 'Branch', 'BranchPolicy', 'Variable', 'Dora', 'Feed', 'TestPlan', 'AgentPool', 'Extension', 'Migration', 'MigrationMap', 'Sbom', 'SbomComponent', 'SbomLicense', 'Finding')]
+        [ValidateSet('Pipeline', 'Project', 'Repository', 'Task', 'Tool', 'Evidence', 'Coverage', 'Unrecognised', 'ServiceConnection', 'VariableGroup', 'Environment', 'Member', 'Branch', 'BranchPolicy', 'Variable', 'Dora', 'Feed', 'TestPlan', 'AgentPool', 'Extension', 'Migration', 'MigrationMap', 'Sbom', 'SbomComponent', 'SbomLicense', 'Finding', 'SuppressedFinding', 'ResolvedFinding')]
         [string] $View = 'Pipeline',
 
         [ValidateRange(1, 32)]
         [int] $ThrottleLimit = 8,
+
+        [string] $SuppressionFile,
+
+        [string] $PreviousPath,
 
         [string] $CsvPath,
 
@@ -383,6 +400,9 @@ function Invoke-AACADOAssessment {
     $yamlFolder = & $resolve $YamlPath
 
     if ($interactive) { Write-AACRule -Title 'Azure Admin Console :: Azure DevOps assessment' -Color 'dodgerblue1' }
+    # Before any Azure DevOps call: a bad file should stop the run now, not after minutes of reading.
+    $reviewInput = @{ Suppression = $(if ($SuppressionFile) { Read-AACSuppressionFile -Path (& $resolve $SuppressionFile) }); PreviousPath = (& $resolve $PreviousPath) }
+    if ($reviewInput.PreviousPath) { $null = Invoke-AACFindingReview -PreviousPath $reviewInput.PreviousPath }
     $state = Invoke-AACProgress -ScriptBlock {
         $notices = [System.Collections.Generic.List[string]]::new()
         if ($DiscoverOrganization) {
@@ -520,6 +540,11 @@ function Invoke-AACADOAssessment {
         $rank = @{ High = 0; Medium = 1; Low = 2; Info = 3 }
         $result.Findings = @($result.Findings | Sort-Object -Property @{ Expression = { $rank[$_.Severity] } }, Organization, Project, Item, Finding)
         $result.Stats.Dora = $(if ($doraByOrg.Count -eq 1) { $doraByOrg[0].Dora } else { @{} })
+        $review = Invoke-AACFindingReview -Finding $result.Findings -Suppression $reviewInput.Suppression -PreviousPath $reviewInput.PreviousPath -Stats $result.Stats
+        $result.Findings = $review.Findings
+        $result.SuppressedFindings = $review.Suppressed
+        $result.ResolvedFindings = $review.Resolved
+        foreach ($line in $review.Notices) { $notices.Add($line) }
         @{ Result = $result; Notices = $notices.ToArray(); Organizations = @($reads | ForEach-Object { $_.Organization }) }
     }
     $authorization = $null
@@ -616,6 +641,8 @@ function Invoke-AACADOAssessment {
                     @{ Key = 'ServiceConnections'; Label = 'Connections'; Type = 'number'; Sum = $true }
                     @{ Key = 'VariableGroups'; Label = 'Variable groups'; Type = 'number'; Sum = $true }
                     @{ Key = 'Environments'; Label = 'Environments'; Type = 'number'; Sum = $true }
+                    @{ Key = 'Minutes'; Label = 'Pipeline minutes'; Type = 'number'; Format = 'N1'; Sum = $true }
+                    @{ Key = 'MinutesShare'; Label = '% of minutes'; Type = 'number'; Format = 'N1' }
                     @{ Key = 'LastRun'; Label = 'Last run'; Type = 'datetime'; Console = $true; Pdf = $true }
                     @{ Key = 'LastPush'; Label = 'Last push'; Type = 'datetime'; Console = $true; Pdf = $true }
                     $findingsColumn
@@ -652,6 +679,7 @@ function Invoke-AACADOAssessment {
                     @{ Key = 'Runs'; Label = "Runs ($MetricDays d)"; Type = 'number'; Sum = $true }
                     @{ Key = 'RunsPerWeek'; Label = 'Runs a week'; Type = 'number'; Format = 'N1' }
                     @{ Key = 'AvgDurationMin'; Label = 'Avg minutes'; Type = 'number'; Format = 'N1'; Pdf = $true }
+                    @{ Key = 'TotalMinutes'; Label = 'Total minutes'; Type = 'number'; Format = 'N1'; Sum = $true }
                     @{ Key = 'AvgQueueMin'; Label = 'Avg queue minutes'; Type = 'number'; Format = 'N1' }
                     @{ Key = 'DaysSincePush'; Label = 'Last push, days'; Type = 'number' }
                 ) + @($toolColumns) + @(
@@ -1022,6 +1050,14 @@ function Invoke-AACADOAssessment {
                     @{ Key = 'Example'; Label = 'Example'; Type = 'wide'; Console = $true; Pdf = $true }
                     @{ Key = 'Detail'; Label = 'Detail'; Type = 'wide' }
                 ) }
+            if (@($r.SuppressedFindings).Count) {
+                @{ Id = 'suppressed-findings'; Title = 'Suppressed findings'; Section = 'Findings'; Rows = @($r.SuppressedFindings); Noun = 'findings'; Note = 'Accepted in the suppression file, and left out of every count but the per-pipeline and per-project ones.'
+                    Columns = @(@{ Key = 'Severity'; Label = 'Severity'; Type = 'badge'; Tones = $rank.Tone; Facet = $true }, @{ Key = 'Project'; Label = 'Project'; Facet = $true }, @{ Key = 'Item'; Label = 'Item' }, @{ Key = 'Finding'; Label = 'Finding' }, @{ Key = 'SuppressionReason'; Label = 'Reason'; Type = 'wide' }, @{ Key = 'SuppressedUntil'; Label = 'Until' }, @{ Key = 'FindingKey'; Label = 'Key'; Type = 'mono' }) }
+            }
+            if (@($r.ResolvedFindings).Count) {
+                @{ Id = 'resolved-findings'; Title = 'Resolved since the earlier run'; Section = 'Findings'; Rows = @($r.ResolvedFindings); Noun = 'findings'
+                    Columns = @(@{ Key = 'Severity'; Label = 'Severity'; Type = 'badge'; Tones = $rank.Tone; Facet = $true }, @{ Key = 'Finding'; Label = 'Finding' }, @{ Key = 'Subject'; Label = 'On' }, @{ Key = 'FindingKey'; Label = 'Key'; Type = 'mono' }) }
+            }
             @{ Id = 'findings'; Title = 'Findings'; Section = 'Findings'; Rows = @($r.Findings); Noun = 'findings'; GroupBy = @('Finding', 'Severity', 'Area', 'Project'); ConsoleLimit = 25
                 Empty = 'Nothing to fix.'; EmptyStatus = 'Success'
                 Columns = @(
@@ -1063,6 +1099,8 @@ function Invoke-AACADOAssessment {
             'SbomComponent' { $r.SbomComponents }
             'SbomLicense' { $r.SbomLicenses }
             'Finding' { $r.Findings }
+            'SuppressedFinding' { $r.SuppressedFindings }
+            'ResolvedFinding' { $r.ResolvedFindings }
             default { $pipelines }
         })
     Invoke-AACReportOutput -Report $report -Title $Title -CsvObject $rows -Noun $View.ToLowerInvariant() -CsvPath (& $resolve $CsvPath) -HtmlPath (& $resolve $HtmlPath) -PdfPath (& $resolve $PdfPath) `

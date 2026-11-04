@@ -22,7 +22,7 @@ Shows which scopes are close to an Azure limit - role assignments, custom roles,
 Test-AACAzureLimit [[-SubscriptionId] <string[]>] [[-ManagementGroupId] <string[]>]
  [[-Status] <string[]>] [[-WarningPercent] <int>] [[-CriticalPercent] <int>]
  [[-Maximum] <hashtable>] [[-FailOnLimit] <string>] [[-CsvPath] <string>] [[-HtmlPath] <string>]
- [[-PdfPath] <string>] [[-Title] <string>] [-PassThru] [-NoDisplay] [-NoPaging]
+ [[-PdfPath] <string>] [[-Title] <string>] [-IncludeQuota] [-PassThru] [-NoDisplay] [-NoPaging]
 ```
 
 ## ALIASES
@@ -49,6 +49,9 @@ limit:
                      group or resource (50)
   Resource group     policy assignments and exemptions - listed
                      only when they reach the warning level
+  Region             with -IncludeQuota: each compute, network and
+                     storage quota in use, per subscription and region,
+                     against the maximum Azure reports for it
 ```
 
 Each (AAC.AzureLimit) has its use, the maximum, the percentage, what
@@ -92,6 +95,13 @@ Test-AACAzureLimit -Maximum @{ RoleAssignmentsPerSubscription = 6000 } -HtmlPath
 ```
 
 With a raised role assignment limit, as a report.
+
+### Example 5
+
+```powershell
+Test-AACAzureLimit -SubscriptionId 00000000-0000-0000-0000-000000000000 -IncludeQuota -FailOnLimit Warning
+A gate before a deployment: fails if a governance limit, or a vCPU, network or storage quota in a region, is at 80%.
+```
 
 ## PARAMETERS
 
@@ -171,6 +181,30 @@ Aliases: []
 ParameterSets:
 - Name: (All)
   Position: 8
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -IncludeQuota
+
+Also read the compute, network and storage quota of each region the
+subscriptions have resources in: three calls per subscription and region,
+so it takes longer. The maximums come from Azure, and -Maximum doesn't
+apply to them. Reader is enough.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false

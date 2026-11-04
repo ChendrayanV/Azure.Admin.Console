@@ -290,6 +290,9 @@ function ConvertTo-AACM365Assessment {
                     Created = & $date (& $get $p 'createdDateTime'); Modified = & $date (& $get $p 'modifiedDateTime'); Id = & $text $p 'id'
                     _AllUsers = $includeUsers -contains 'All'; _AllApps = $apps -contains 'All'; _Admins = [bool]@($includeRoles | Where-Object { $privilegedRoleIds -contains $_.ToLowerInvariant() }).Count
                     _Legacy = [bool]@($clients | Where-Object { $_ -in 'exchangeActiveSync', 'other' }).Count; _Risk = [bool]$risk; _On = $state -eq 'enabled'
+                    _ExcludesGlobalAdmin = @(& $list (& $get $c 'users.excludeRoles')) -contains $globalAdmin; _ExcludedUsers = @(& $list (& $get $c 'users.excludeUsers')).Count
+                    # A policy that blocks, or only sets session controls, isn't meant to demand anything of the sign-in.
+                    _WeakGrant = $null -ne $g -and -not $blocks -and -not $requiresMfa -and -not @($controls | Where-Object { $_ -in 'compliantDevice', 'domainJoinedDevice', 'approvedApplication', 'compliantApplication', 'passwordChange' }).Count
                 })
         })
     if (& $has 'ConditionalAccess') {
@@ -307,6 +310,14 @@ function ConvertTo-AACM365Assessment {
         if ($reportOnly.Count) { & $finding 'Low' 'Entra ID' 'Conditional Access policies left in report-only' "$($reportOnly.Count) policy(ies)" "$(@($reportOnly | Select-Object -First 4 -ExpandProperty Policy) -join '; ')$(if ($reportOnly.Count -gt 4) { '; ...' }) are evaluated but not enforced." 'Review their sign-in impact (Insights and reporting workbook), then turn them on.' $caLink }
         $noExclusion = @($on | Where-Object { $_._AllUsers -and $_.Blocks -eq 'Yes' -and -not $_.Excluded })
         if ($noExclusion.Count) { & $finding 'Medium' 'Entra ID' 'Blocking policy with no exclusion' "$($noExclusion.Count) policy(ies)" "$(@($noExclusion | Select-Object -ExpandProperty Policy) -join '; ') block all users with nobody excluded - a mistake can lock everyone out." 'Exclude your emergency-access (break-glass) accounts from every Conditional Access policy.' "$learn/entra/identity/role-based-access-control/security-emergency-access" }
+        $adminsExempt = @($on | Where-Object { $_._ExcludesGlobalAdmin -and $_.RequiresMfa -eq 'Yes' })
+        if ($adminsExempt.Count) { & $finding 'High' 'Entra ID' 'Global Administrators excluded from an MFA policy' "$($adminsExempt.Count) policy(ies)" "$(@($adminsExempt | Select-Object -ExpandProperty Policy) -join '; ') require MFA but leave out the Global Administrator role, the accounts that most need it." 'Take the role out of the exclusions, and exclude only your named emergency-access accounts.' "$learn/entra/identity/role-based-access-control/security-emergency-access" }
+        $offForAdmins = @($caRows | Where-Object { $_.State -eq 'Off' -and ($_._Admins -or $_._AllUsers) -and ($_.RequiresMfa -eq 'Yes' -or $_.Blocks -eq 'Yes') })
+        if ($offForAdmins.Count) { & $finding 'Medium' 'Entra ID' 'Protection for administrators is turned off' "$($offForAdmins.Count) policy(ies)" "$(@($offForAdmins | Select-Object -First 4 -ExpandProperty Policy) -join '; ')$(if ($offForAdmins.Count -gt 4) { '; ...' }) would cover administrators, but are off." 'Turn them on after checking their impact in report-only, or delete them if something else does the job.' $caLink }
+        $manyExcluded = @($on | Where-Object { $_._AllUsers -and $_._ExcludedUsers -gt 2 })
+        if ($manyExcluded.Count) { & $finding 'Medium' 'Entra ID' 'Too many accounts excluded from an all-users policy' "$($manyExcluded.Count) policy(ies)" "$(@($manyExcluded | ForEach-Object { "$($_.Policy) ($($_._ExcludedUsers))" }) -join '; ') exclude more accounts than the two emergency-access accounts Microsoft recommends." 'Keep exclusions to your emergency-access accounts, and review the rest.' "$learn/entra/identity/role-based-access-control/security-emergency-access" }
+        $weakGrant = @($on | Where-Object _WeakGrant)
+        if ($weakGrant.Count) { & $finding 'Low' 'Entra ID' 'Enabled policy with no strong control' "$($weakGrant.Count) policy(ies)" "$(@($weakGrant | Select-Object -First 4 -ExpandProperty Policy) -join '; ')$(if ($weakGrant.Count -gt 4) { '; ...' }) grant access without MFA, a compliant device or an approved app." 'Add a strong control to the policy, or delete it if it no longer does anything.' $caLink }
     }
     elseif ($defaults -and -not $defaultsOn -and -not $hasP1 -and (& $has 'Licenses')) {
         & $finding 'High' 'Entra ID' 'MFA is not enforced' 'Security defaults' 'Security defaults are off and Conditional Access isn''t licensed (no Entra ID P1).' 'Turn security defaults on (Entra ID > Overview > Properties).' "$learn/entra/fundamentals/security-defaults"

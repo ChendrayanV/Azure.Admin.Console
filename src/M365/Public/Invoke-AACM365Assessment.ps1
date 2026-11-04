@@ -124,6 +124,18 @@ function Invoke-AACM365Assessment {
     .PARAMETER ListPermission
         Return the Microsoft Graph permissions the report needs (as scopes
         for Connect-AAC -Scope), and read nothing.
+    .PARAMETER SuppressionFile
+        A JSON file of findings you have reviewed and accepted. Each entry names a
+        finding by its FindingKey, or by source and rule (and a subject, wildcards
+        allowed), with the reason and, if you like, an expiry date:
+        [{ "key": "a1b2c3d4e5f60718", "reason": "Accepted risk", "expires": "2027-01-01" }].
+        They leave the counts and the findings, and the report lists them with
+        their reasons. An expired entry is reported and ignored; a file that can't
+        be understood stops the command.
+    .PARAMETER PreviousPath
+        A findings CSV from an earlier run (-CsvPath), or the folder holding its
+        findings.csv: each finding is then marked New or Open, and the report
+        lists what has been resolved.
     .PARAMETER CsvPath
         A folder to write a CSV per table to.
     .PARAMETER HtmlPath
@@ -174,6 +186,10 @@ function Invoke-AACM365Assessment {
         [switch] $ListPermission,
 
         [Parameter(ParameterSetName = 'Assess')]
+        [string] $SuppressionFile,
+
+        [string] $PreviousPath,
+
         [string] $CsvPath,
 
         [Parameter(ParameterSetName = 'Assess')]
@@ -207,6 +223,11 @@ function Invoke-AACM365Assessment {
     # Read here, not inside the progress block (it runs in Invoke-AACProgress's scope).
     $request = @{ Section = @($Section); StaleDays = $StaleDays; SignInDays = $SignInDays; CsvPath = & $resolve $CsvPath; HtmlPath = & $resolve $HtmlPath; Title = $Title; Queries = $queries }
 
+    # Before any Graph call: a bad file should stop the run now, not after minutes of reading.
+    $request.Suppression = if ($SuppressionFile) { Read-AACSuppressionFile -Path (& $resolve $SuppressionFile) } else { $null }
+    $request.PreviousPath = & $resolve $PreviousPath
+    if ($request.PreviousPath) { $null = Invoke-AACFindingReview -PreviousPath $request.PreviousPath }
+
     if ($interactive) {
         Write-AACRule -Title 'Azure Admin Console :: Microsoft 365 security posture' -Color 'deepskyblue3_1'
     }
@@ -231,6 +252,11 @@ function Invoke-AACM365Assessment {
         Update-AACProgress -Id 'assess' -Indeterminate -Description 'Assessing identity, data and devices'
         $assessment = ConvertTo-AACM365Assessment -Data $read.Data -Errors $read.Errors -Query $request.Queries -StaleDays $request.StaleDays -SignInDays $request.SignInDays -Resolved $read.Resolved -Fallback $read.Fallbacks
         $stats = $assessment.Stats
+        $review = Invoke-AACFindingReview -Finding $assessment.Findings -Suppression $request.Suppression -PreviousPath $request.PreviousPath -Stats $stats
+        $assessment.Findings = $review.Findings
+        $assessment.SuppressedFindings = $review.Suppressed
+        $assessment.ResolvedFindings = $review.Resolved
+        $assessment.Notices = @($assessment.Notices) + @($review.Notices)
         Update-AACProgress -Id 'assess' -Complete -Description ('{0}: Secure Score {1}; MFA registered {2}; {3} Conditional Access polic(ies) on; {4} critical/high, {5} medium finding(s)' -f $(if ($stats.Tenant) { $stats.Tenant } else { 'Tenant' }), $(if ($null -ne $stats.SecureScore) { "$($stats.SecureScore)%" } else { 'n/a' }), $(if ($null -ne $stats.MfaRegistered) { "$($stats.MfaRegistered)%" } else { 'n/a' }), $stats.ConditionalAccessOn, ($stats.Critical + $stats.High), $stats.Medium)
 
         $detail = [ordered]@{

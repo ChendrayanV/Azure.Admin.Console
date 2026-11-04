@@ -35,10 +35,11 @@ function Get-AACContosoAks {
     }
     $prod = @{
         id = $prodId; name = 'aks-prod-weu'; type = 'Microsoft.ContainerService/managedClusters'; location = 'westeurope'; subscriptionId = $sub; resourceGroupName = 'rg-aks'
-        sku = @{ name = 'Base'; tier = 'Standard' }; identity = @{ type = 'SystemAssigned' }; tags = @{ env = 'prod' }
+        sku = @{ name = 'Base'; tier = 'Standard' }; identity = @{ type = 'UserAssigned' }; tags = @{ env = 'prod' }
         properties = @{
             kubernetesVersion = '1.30'; currentKubernetesVersion = '1.30.5'; provisioningState = 'Succeeded'; powerState = @{ code = 'Running' }; supportPlan = 'KubernetesOfficial'
-            nodeResourceGroup = 'MC_rg-aks_aks-prod-weu_westeurope'; privateFQDN = 'aks-prod-weu-abc.privatelink.westeurope.azmk8s.io'; disableLocalAccounts = $true
+            nodeResourceGroup = 'rg-aks-prod-weu-nodes'; privateFQDN = 'aks-prod-weu-abc.privatelink.westeurope.azmk8s.io'; disableLocalAccounts = $true; enableRBAC = $true
+            ingressProfile = @{ webAppRouting = @{ enabled = $true } }; workloadAutoScalerProfile = @{ keda = @{ enabled = $true }; verticalPodAutoscaler = @{ enabled = $true } }
             aadProfile = @{ managed = $true; enableAzureRBAC = $true; adminGroupObjectIDs = @('g1') }
             apiServerAccessProfile = @{ enablePrivateCluster = $true; privateDNSZone = 'system' }
             networkProfile = @{ networkPlugin = 'azure'; networkPluginMode = 'overlay'; networkDataplane = 'cilium'; networkPolicy = 'cilium'; outboundType = 'userDefinedRouting'; loadBalancerSku = 'standard'; podCidr = '10.244.0.0/16'; serviceCidr = '10.0.0.0/16'; dnsServiceIP = '10.0.0.10' }
@@ -62,10 +63,10 @@ function Get-AACContosoAks {
         sku = @{ name = 'Base'; tier = 'Free' }; identity = @{ type = 'SystemAssigned' }; tags = $null
         properties = @{
             kubernetesVersion = '1.27'; currentKubernetesVersion = '1.27.9'; provisioningState = 'Succeeded'; powerState = @{ code = 'Running' }; fqdn = 'aks-dev-xyz.hcp.westeurope.azmk8s.io'
-            disableLocalAccounts = $false; podIdentityProfile = @{ enabled = $true }
+            disableLocalAccounts = $false; podIdentityProfile = @{ enabled = $true }; enableRBAC = $false; nodeResourceGroup = 'MC_rg-aks-dev_aks-dev_westeurope'
             networkProfile = @{ networkPlugin = 'azure'; outboundType = 'loadBalancer'; loadBalancerSku = 'standard'; serviceCidr = '10.0.0.0/16'; dnsServiceIP = '10.0.0.10' }
-            addonProfiles = @{ httpApplicationRouting = @{ enabled = $true } }
-            agentPoolProfiles = @(& $pool 'nodepool1' 'System' @{ count = 1; vmSize = 'Standard_B2s'; osSKU = 'Ubuntu'; currentOrchestratorVersion = '1.27.9'; nodeImageVersion = 'AKSUbuntu-2204gen2containerd-202501.10.0'; osDiskType = 'Managed'; availabilityZones = @(); enableEncryptionAtHost = $false; enableNodePublicIP = $true; upgradeSettings = @{}; enableAutoScaling = $true; minCount = 1; maxCount = 5; maxPods = 30; vnetSubnetID = $devSubnet })
+            addonProfiles = @{ httpApplicationRouting = @{ enabled = $true }; kubeDashboard = @{ enabled = $true } }
+            agentPoolProfiles = @(& $pool 'nodepool1' 'System' @{ count = 1; vmSize = 'Standard_B2s'; osSKU = 'Ubuntu'; currentOrchestratorVersion = '1.27.9'; nodeImageVersion = 'AKSUbuntu-2204gen2containerd-202501.10.0'; osDiskType = 'Managed'; osDiskSizeGB = 64; availabilityZones = @(); enableEncryptionAtHost = $false; enableNodePublicIP = $true; upgradeSettings = @{}; enableAutoScaling = $true; minCount = 1; maxCount = 5; maxPods = 30; vnetSubnetID = $devSubnet })
         }
         resources = @(@{ type = 'Microsoft.Network/virtualNetworks/subnets'; id = $devSubnet; name = 'snet-nodes'; properties = @{ addressPrefix = '10.20.0.0/27' } })
     }
@@ -126,6 +127,6 @@ function Get-AACContosoAks {
             [pscustomobject]@{ PSTypeName = 'AAC.PSRuleResult'; Outcome = 'Fail'; Pillar = 'Security'; RuleName = 'Azure.AKS.LocalAccounts'; Title = 'Disable local accounts'; Severity = 'Critical'; ResourceName = 'aks-dev'; ResourceType = 'microsoft.containerservice/managedclusters'; ResourceGroup = 'rg-aks-dev'; Reason = 'disableLocalAccounts is false.'; Recommendation = 'Disable local accounts.'; Link = 'https://azure.github.io/PSRule.Rules.Azure/en/rules/Azure.AKS.LocalAccounts/'; ResourceId = $devId }
             [pscustomobject]@{ PSTypeName = 'AAC.PSRuleResult'; Outcome = 'Fail'; Pillar = 'Operational Excellence'; RuleName = 'Azure.AKS.AuditLogs'; Title = 'Enable audit logs'; Severity = 'Important'; ResourceName = 'aks-dev'; ResourceType = 'microsoft.containerservice/managedclusters'; ResourceGroup = 'rg-aks-dev'; Reason = 'No diagnostic setting.'; Recommendation = 'Send kube-audit logs.'; Link = ''; ResourceId = $devId }
         )
-        Constraint = @{ Totals = @([pscustomobject]@{ Kind = 'K8sAzureV1ReadOnlyRootFilesystem'; Name = 'azurepolicy-readonly-1'; Action = 'deny'; TotalViolations = 612; Assignment = 'aks-baseline'; ReferenceId = 'readOnlyRoot' }); Violations = @([pscustomobject]@{ Constraint = 'K8sAzureV1ReadOnlyRootFilesystem'; Namespace = 'payments'; Object = 'Pod/api-7d9f8b6c5d-x2kfz'; Message = 'only read-only root filesystem container is allowed' }); Status = 'OK' }
+        Constraint = @{ Totals = @([pscustomobject]@{ Kind = 'K8sAzureV1ReadOnlyRootFilesystem'; Name = 'azurepolicy-readonly-1'; Action = 'deny'; TotalViolations = 612; Assignment = 'aks-baseline'; ReferenceId = 'readOnlyRoot' }, [pscustomobject]@{ Kind = 'K8sAzureV2ContainerAllowedImages'; Name = 'azurepolicy-images-1'; Action = 'deny'; TotalViolations = 0; Assignment = 'aks-baseline'; ReferenceId = 'allowedImages' }, [pscustomobject]@{ Kind = 'K8sAzureV2NoPrivilege'; Name = 'azurepolicy-privileged-1'; Action = 'deny'; TotalViolations = 0; Assignment = 'aks-baseline'; ReferenceId = 'noPrivilege' }); Violations = @([pscustomobject]@{ Constraint = 'K8sAzureV1ReadOnlyRootFilesystem'; Namespace = 'payments'; Object = 'Pod/api-7d9f8b6c5d-x2kfz'; Message = 'only read-only root filesystem container is allowed' }); Status = 'OK' }
     }
 }

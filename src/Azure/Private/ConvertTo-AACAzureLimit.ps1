@@ -31,7 +31,10 @@ function ConvertTo-AACAzureLimit {
         Status: Critical at -CriticalPercent (95) or more of the maximum,
         Warning at -WarningPercent (80), else OK. Nothing in use is left
         out; resource groups only appear when they reach the warning level.
-        Returns @{ Limits (worst first); Notices; Stats }.
+
+        -Quota is Get-AACAzureQuota's rows: each region's quotas in use, with their
+        own maximum from Azure. -Maximum doesn't apply to them, and so a raised
+        quota needs no telling. Returns @{ Limits (worst first); Notices; Stats }.
     #>
     [CmdletBinding()]
     [OutputType([hashtable])]
@@ -48,7 +51,10 @@ function ConvertTo-AACAzureLimit {
         [int] $WarningPercent = 80,
 
         [ValidateRange(1, 100)]
-        [int] $CriticalPercent = 95
+        [int] $CriticalPercent = 95,
+
+        [AllowEmptyCollection()]
+        [object[]] $Quota = @()
     )
 
     $get = ${function:Get-AACMember}
@@ -179,8 +185,32 @@ function ConvertTo-AACAzureLimit {
         if ($inScope.Contains($id)) { & $add 'TagsPerResource' 'Subscription' (& $subName $id) "/subscriptions/$id" (& $number $row 'used') "Most: $(& $text $row 'name') ($((& $text $row 'type') -replace '^.*/', ''))" }
     }
 
+    # --- Quota, per subscription and region ---------------------------------------------------------------------------------------
+    foreach ($row in $Quota) {
+        # A maximum of 0 is a quota this subscription doesn't have, and the APIs list every quota there is.
+        if ($row.Used -le 0 -or $row.Maximum -le 0 -or -not $inScope.Contains($row.SubscriptionId)) { continue }
+        $percent = [Math]::Round(100.0 * $row.Used / $row.Maximum, 1)
+        $status = if ($percent -ge $CriticalPercent) { 'Critical' } elseif ($percent -ge $WarningPercent) { 'Warning' } else { 'OK' }
+        $item = [pscustomobject][ordered]@{
+            Status    = $status
+            Limit     = "$($row.Service) quota: $($row.Name)"
+            ScopeType = 'Region'
+            Scope     = "$($row.Location) ($(& $subName $row.SubscriptionId))"
+            Used      = $row.Used
+            Maximum   = $row.Maximum
+            Percent   = $percent
+            Remaining = [Math]::Max(0, $row.Maximum - $row.Used)
+            Detail    = ''
+            Advice    = $(if ($status -eq 'OK') { '' } else { 'Request a quota increase (Quotas in the Azure portal), free up what is unused, or deploy to another region.' })
+            LimitName = "Quota$($row.Service)"
+            ScopeId   = "/subscriptions/$($row.SubscriptionId)/locations/$($row.Location)"
+        }
+        $item.PSObject.TypeNames.Insert(0, 'AAC.AzureLimit')
+        $items.Add($item)
+    }
+
     $rank = @{ Critical = 0; Warning = 1; OK = 2 }
-    $sorted = @($items | Sort-Object -Property @{ Expression = { $rank[$_.Status] } }, @{ Expression = 'Percent'; Descending = $true }, Limit, Scope)
+    $sorted =@($items | Sort-Object -Property @{ Expression = { $rank[$_.Status] } }, @{ Expression = 'Percent'; Descending = $true }, Limit, Scope)
     @{
         Limits  = $sorted
         Notices = @($notices)

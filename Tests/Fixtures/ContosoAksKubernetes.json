@@ -1,0 +1,90 @@
+{
+  "pods": { "items": [
+    { "metadata": { "namespace": "shop", "name": "web-6f7d-aaaaa", "ownerReferences": [ { "kind": "ReplicaSet", "name": "web-6f7d" } ] },
+      "spec": { "serviceAccountName": "web", "automountServiceAccountToken": false, "topologySpreadConstraints": [ { "topologyKey": "kubernetes.io/hostname" } ], "securityContext": { "runAsNonRoot": true, "runAsUser": 1000, "seccompProfile": { "type": "RuntimeDefault" } },
+        "containers": [ { "name": "web", "image": "contoso.azurecr.io/web:1.2", "resources": { "requests": { "cpu": "100m", "memory": "128Mi" }, "limits": { "memory": "256Mi" } }, "readinessProbe": { "periodSeconds": 10 }, "livenessProbe": { "periodSeconds": 10 }, "securityContext": { "allowPrivilegeEscalation": false }, "env": [ { "name": "MODE", "value": "live" } ] } ] },
+      "status": { "phase": "Running", "containerStatuses": [ { "restartCount": 0, "state": { "running": {} } } ] } },
+    { "metadata": { "namespace": "shop", "name": "web-6f7d-bbbbb", "ownerReferences": [ { "kind": "ReplicaSet", "name": "web-6f7d" } ] },
+      "spec": { "serviceAccountName": "web", "automountServiceAccountToken": false, "topologySpreadConstraints": [ { "topologyKey": "kubernetes.io/hostname" } ], "securityContext": { "runAsNonRoot": true, "runAsUser": 1000, "seccompProfile": { "type": "RuntimeDefault" } },
+        "containers": [ { "name": "web", "image": "contoso.azurecr.io/web:1.2", "resources": { "requests": { "cpu": "100m", "memory": "128Mi" }, "limits": { "memory": "256Mi" } }, "readinessProbe": { "periodSeconds": 10 }, "livenessProbe": { "periodSeconds": 10 }, "securityContext": { "allowPrivilegeEscalation": false } } ] },
+      "status": { "phase": "Running", "containerStatuses": [ { "restartCount": 1, "state": { "running": {} } } ] } },
+    { "metadata": { "namespace": "payments", "name": "api-7d9f-ccccc", "ownerReferences": [ { "kind": "ReplicaSet", "name": "api-7d9f" } ] },
+      "spec": { "serviceAccountName": "default", "hostNetwork": true, "securityContext": { "sysctls": [ { "name": "kernel.msgmax", "value": "65536" } ] }, "volumes": [ { "name": "docker", "hostPath": { "path": "/var/run/docker.sock" } } ],
+        "containers": [ { "name": "api", "image": "contoso/api:latest", "ports": [ { "containerPort": 8080, "hostPort": 8080 } ], "securityContext": { "privileged": true, "capabilities": { "add": [ "SYS_ADMIN", "NET_BIND_SERVICE" ] }, "seccompProfile": { "type": "Unconfined" }, "procMount": "Unmasked", "appArmorProfile": { "type": "Unconfined" } }, "env": [ { "name": "PASSWORD", "valueFrom": { "secretKeyRef": { "name": "api", "key": "password" } } } ] } ],
+        "initContainers": [ { "name": "seed", "image": "contoso/seed:1.0", "securityContext": { "runAsUser": 0 } } ] },
+      "status": { "phase": "Running", "containerStatuses": [ { "restartCount": 12, "state": { "waiting": { "reason": "CrashLoopBackOff" } }, "lastState": { "terminated": { "reason": "OOMKilled" } } } ] } },
+    { "metadata": { "namespace": "payments", "name": "debug" },
+      "spec": { "serviceAccountName": "ops", "containers": [ { "name": "shell", "image": "contoso/tools:2.0", "resources": { "requests": { "cpu": "10m", "memory": "10Mi" }, "limits": { "memory": "10Mi" } }, "readinessProbe": { "periodSeconds": 10 }, "livenessProbe": { "periodSeconds": 10 }, "securityContext": { "allowPrivilegeEscalation": false, "runAsNonRoot": true } } ] },
+      "status": { "phase": "Pending" } },
+    { "metadata": { "namespace": "payments", "name": "nightly-28910-ddddd", "ownerReferences": [ { "kind": "Job", "name": "nightly-28910" } ] },
+      "spec": { "serviceAccountName": "ops", "containers": [ { "name": "job", "image": "contoso/job:3.1", "resources": { "requests": { "cpu": "10m", "memory": "10Mi" }, "limits": { "memory": "10Mi" } }, "securityContext": { "allowPrivilegeEscalation": false, "runAsNonRoot": true } } ] },
+      "status": { "phase": "Failed", "containerStatuses": [ { "restartCount": 0, "state": { "terminated": { "reason": "Error" } } } ] } },
+    { "metadata": { "namespace": "payments", "name": "ingress-nginx-controller-5b-eeeee", "ownerReferences": [ { "kind": "ReplicaSet", "name": "ingress-nginx-controller-5b" } ] },
+      "spec": { "serviceAccountName": "ingress", "containers": [ { "name": "controller", "image": "registry.k8s.io/ingress-nginx/controller:v1.9.0", "resources": { "requests": { "cpu": "100m", "memory": "90Mi" }, "limits": { "memory": "256Mi" } }, "readinessProbe": { "periodSeconds": 10 }, "livenessProbe": { "periodSeconds": 10 }, "securityContext": { "allowPrivilegeEscalation": false, "runAsNonRoot": true } } ] },
+      "status": { "phase": "Running", "containerStatuses": [ { "restartCount": 0, "state": { "running": {} } } ] } },
+    { "metadata": { "namespace": "kube-system", "name": "coredns-1a-fffff", "ownerReferences": [ { "kind": "ReplicaSet", "name": "coredns-1a" } ] },
+      "spec": { "serviceAccountName": "coredns", "containers": [ { "name": "coredns", "image": "mcr.microsoft.com/oss/kubernetes/coredns:v1.11", "securityContext": { "privileged": true } } ] },
+      "status": { "phase": "Running", "containerStatuses": [ { "restartCount": 0, "state": { "running": {} } } ] } },
+    { "metadata": { "namespace": "aks-command", "name": "command-1" }, "spec": { "containers": [ { "name": "c", "image": "x" } ] }, "status": { "phase": "Running" } }
+  ] },
+  "deployments,statefulsets,daemonsets": { "items": [
+    { "kind": "Deployment", "metadata": { "namespace": "shop", "name": "web" }, "spec": { "replicas": 2, "template": { "metadata": { "labels": { "app": "web" } } } }, "status": { "readyReplicas": 2 } },
+    { "kind": "Deployment", "metadata": { "namespace": "payments", "name": "api" }, "spec": { "replicas": 3, "template": { "metadata": { "labels": { "app": "api" } } } }, "status": { "readyReplicas": 1 } },
+    { "kind": "Deployment", "metadata": { "namespace": "payments", "name": "ingress-nginx-controller" }, "spec": { "replicas": 1, "template": { "metadata": { "labels": { "app": "ingress" } } } }, "status": { "readyReplicas": 1 } },
+    { "kind": "DaemonSet", "metadata": { "namespace": "shop", "name": "agent" }, "spec": { "template": { "metadata": { "labels": { "app": "agent" } } } }, "status": { "desiredNumberScheduled": 2, "numberReady": 2 } }
+  ] },
+  "poddisruptionbudgets": { "items": [
+    { "metadata": { "namespace": "shop", "name": "web" }, "spec": { "selector": { "matchLabels": { "app": "web" } }, "maxUnavailable": 1 } },
+    { "metadata": { "namespace": "payments", "name": "api" }, "spec": { "selector": { "matchLabels": { "app": "api" } }, "minAvailable": 3 } }
+  ] },
+  "horizontalpodautoscalers": { "items": [
+    { "metadata": { "namespace": "shop", "name": "web" }, "spec": { "scaleTargetRef": { "kind": "Deployment", "name": "web" } } },
+    { "metadata": { "namespace": "payments", "name": "old" }, "spec": { "scaleTargetRef": { "kind": "Deployment", "name": "gone" } } }
+  ] },
+  "nodes": { "items": [
+    { "metadata": { "name": "aks-apps-1" }, "status": { "conditions": [ { "type": "MemoryPressure", "status": "False" }, { "type": "Ready", "status": "True" } ] } },
+    { "metadata": { "name": "aks-apps-2" }, "status": { "conditions": [ { "type": "MemoryPressure", "status": "True" }, { "type": "Ready", "status": "False" } ] } }
+  ] },
+  "namespaces": { "items": [
+    { "metadata": { "name": "default" } },
+    { "metadata": { "name": "kube-system" } },
+    { "metadata": { "name": "payments", "labels": { "team": "pay" } } },
+    { "metadata": { "name": "shop", "labels": { "pod-security.kubernetes.io/enforce": "baseline" } } }
+  ] },
+  "networkpolicies": { "items": [ { "metadata": { "namespace": "shop", "name": "deny" } }, { "metadata": { "namespace": "shop", "name": "allow" } } ] },
+  "resourcequotas": { "items": [ { "metadata": { "namespace": "shop", "name": "q" } } ] },
+  "limitranges": { "items": [ { "metadata": { "namespace": "shop", "name": "l" } } ] },
+  "services": { "items": [
+    { "metadata": { "namespace": "shop", "name": "web" }, "spec": { "type": "ClusterIP", "selector": { "app": "web" } } },
+    { "metadata": { "namespace": "shop", "name": "legacy" }, "spec": { "type": "ClusterIP", "externalIPs": [ "20.0.0.1" ] } },
+    { "metadata": { "namespace": "payments", "name": "api" }, "spec": { "type": "LoadBalancer", "selector": { "app": "api" } } },
+    { "metadata": { "namespace": "payments", "name": "api-copy" }, "spec": { "type": "ClusterIP", "selector": { "app": "api" } } },
+    { "metadata": { "namespace": "payments", "name": "private", "annotations": { "service.beta.kubernetes.io/azure-load-balancer-internal": "true" } }, "spec": { "type": "LoadBalancer" } }
+  ] },
+  "endpoints": { "items": [
+    { "metadata": { "namespace": "shop", "name": "web" }, "subsets": [ { "addresses": [ { "ip": "10.0.0.1" } ] } ] },
+    { "metadata": { "namespace": "payments", "name": "api-copy" }, "subsets": [ { "addresses": [ { "ip": "10.0.0.2" } ] } ] }
+  ] },
+  "ingresses": { "items": [ { "metadata": { "namespace": "payments", "name": "api" }, "spec": { "ingressClassName": "nginx" } } ] },
+  "storageclasses": { "items": [ { "metadata": { "name": "managed-csi" }, "provisioner": "disk.csi.azure.com" }, { "metadata": { "name": "old-disk" }, "provisioner": "kubernetes.io/azure-disk" } ] },
+  "persistentvolumeclaims": { "items": [ { "metadata": { "namespace": "shop", "name": "data" }, "status": { "phase": "Bound" } }, { "metadata": { "namespace": "payments", "name": "ledger" }, "status": { "phase": "Pending" } } ] },
+  "clusterrolebindings": { "items": [
+    { "kind": "ClusterRoleBinding", "metadata": { "name": "system:basic-user" }, "roleRef": { "kind": "ClusterRole", "name": "system:basic-user" }, "subjects": [ { "kind": "Group", "name": "system:authenticated" } ] },
+    { "kind": "ClusterRoleBinding", "metadata": { "name": "aks-cluster-admin-binding" }, "roleRef": { "kind": "ClusterRole", "name": "cluster-admin" }, "subjects": [ { "kind": "User", "name": "clusterAdmin" } ] },
+    { "kind": "ClusterRoleBinding", "metadata": { "name": "ops-admins" }, "roleRef": { "kind": "ClusterRole", "name": "cluster-admin" }, "subjects": [ { "kind": "Group", "name": "ops" } ] },
+    { "kind": "ClusterRoleBinding", "metadata": { "name": "everyone" }, "roleRef": { "kind": "ClusterRole", "name": "edit" }, "subjects": [ { "kind": "Group", "name": "system:authenticated" } ] },
+    { "kind": "ClusterRoleBinding", "metadata": { "name": "default-admin" }, "roleRef": { "kind": "ClusterRole", "name": "cluster-admin" }, "subjects": [ { "kind": "ServiceAccount", "name": "default", "namespace": "payments" } ] },
+    { "kind": "ClusterRoleBinding", "metadata": { "name": "act-as" }, "roleRef": { "kind": "ClusterRole", "name": "impersonator" }, "subjects": [ { "kind": "User", "name": "bob" } ] }
+  ] },
+  "rolebindings": { "items": [
+    { "kind": "RoleBinding", "metadata": { "namespace": "payments", "name": "all-of-it" }, "roleRef": { "kind": "Role", "name": "payments-all" }, "subjects": [ { "kind": "User", "name": "alice" } ] }
+  ] },
+  "clusterroles": { "items": [
+    { "kind": "ClusterRole", "metadata": { "name": "system:controller" }, "rules": [ { "verbs": [ "*" ], "resources": [ "*" ] } ] },
+    { "kind": "ClusterRole", "metadata": { "name": "unused-wide" }, "rules": [ { "verbs": [ "*" ], "resources": [ "*" ] } ] },
+    { "kind": "ClusterRole", "metadata": { "name": "impersonator" }, "rules": [ { "verbs": [ "impersonate" ], "resources": [ "users" ] } ] }
+  ] },
+  "roles": { "items": [
+    { "kind": "Role", "metadata": { "namespace": "payments", "name": "payments-all" }, "rules": [ { "verbs": [ "*" ], "resources": [ "*" ] } ] }
+  ] }
+}

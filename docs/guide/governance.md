@@ -23,7 +23,7 @@ Test-AACAlzPolicy -LibraryPath C:\alz-library -ManagementGroupMap @{ alz = 'cont
 | Access | `Get-AACRoleAssignment` | Every role assignment at every scope; orphaned ones, privileged guests, applications as Owner, custom roles unused or as powerful as Owner |
 | Identities | `Get-AACServicePrincipalInsight` | Applications and managed identities with Azure roles; credentials about to expire; other tenants' apps |
 | Policy | `Get-AACPolicyRemediation` | Policies that could fix what they find, and whether remediation ran (`Invoke-AACPolicyAssessment` covers assignments, compliance, exemptions and identities' roles) |
-| Limits | `Test-AACAzureLimit` | Scopes close to an Azure limit, with what to do |
+| Limits | `Test-AACAzureLimit` | Scopes close to an Azure limit, with what to do; `-IncludeQuota` adds each region's compute, network and storage quota |
 | Settings | `Get-AACGovernanceSetting` | Hierarchy settings, management group activity logs, security contacts, classic administrators, preview features, providers |
 | Tags | `Get-AACTagUsage` | Tag coverage and consistency |
 | Locks | `Get-AACResourceLock` | Locks, and critical resources left unlocked |

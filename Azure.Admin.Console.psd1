@@ -50,6 +50,8 @@
         'New-AACArchitectureDiagram'
         'Export-AACArchitectureDecision'
         'New-AACServiceBlueprint'
+        'Invoke-AACLandingZoneAssessment'
+        'Invoke-AACResiliencyAssessment'
         'Get-AACAlertBaseline'
         'Get-AACResiliencyRecommendation'
         'Get-AACAdvisorRecommendation'

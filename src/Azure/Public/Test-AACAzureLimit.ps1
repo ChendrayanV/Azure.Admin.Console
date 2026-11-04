@@ -23,6 +23,9 @@ function Test-AACAzureLimit {
                              group or resource (50)
           Resource group     policy assignments and exemptions - listed
                              only when they reach the warning level
+          Region             with -IncludeQuota: each compute, network and
+                             storage quota in use, per subscription and region,
+                             against the maximum Azure reports for it
         Each (AAC.AzureLimit) has its use, the maximum, the percentage, what
         is left and - when it is close - what to do. Critical at
         -CriticalPercent (95%) or more, Warning at -WarningPercent (80%).
@@ -51,6 +54,11 @@ function Test-AACAzureLimit {
         PolicyExemptionsPerScope, ResourceGroupsPerSubscription,
         TagsPerSubscription, TagsPerResourceGroup, TagsPerResource,
         ManagementGroupDepth, ManagementGroupsPerTenant.
+    .PARAMETER IncludeQuota
+        Also read the compute, network and storage quota of each region the
+        subscriptions have resources in: three calls per subscription and region,
+        so it takes longer. The maximums come from Azure, and -Maximum doesn't
+        apply to them. Reader is enough.
     .PARAMETER FailOnLimit
         Stop with an error when any limit is Critical (or, with
         -FailOnLimit Warning, at Warning) - a gate for a pipeline.
@@ -80,6 +88,9 @@ function Test-AACAzureLimit {
     .EXAMPLE
         Test-AACAzureLimit -Maximum @{ RoleAssignmentsPerSubscription = 6000 } -HtmlPath .\Limits.html
         With a raised role assignment limit, as a report.
+    .EXAMPLE
+        Test-AACAzureLimit -SubscriptionId 00000000-0000-0000-0000-000000000000 -IncludeQuota -FailOnLimit Warning
+        A gate before a deployment: fails if a governance limit, or a vCPU, network or storage quota in a region, is at 80%.
     .OUTPUTS
         AAC.AzureLimit
     #>
@@ -101,6 +112,8 @@ function Test-AACAzureLimit {
         [int] $CriticalPercent = 95,
 
         [hashtable] $Maximum = @{},
+
+        [switch] $IncludeQuota,
 
         [ValidateSet('Critical', 'Warning')]
         [string] $FailOnLimit,
@@ -126,7 +139,7 @@ function Test-AACAzureLimit {
     $pipedOnward = $MyInvocation.PipelinePosition -lt $MyInvocation.PipelineLength
     $interactive = -not $NoDisplay -and -not $pipedOnward
     $resolve = { param([string] $Path) if ($Path) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path) } }
-    $request = @{ SubscriptionId = @($SubscriptionId | Where-Object { $_ }); ManagementGroupId = @($ManagementGroupId | Where-Object { $_ }); Maximum = $Maximum; WarningPercent = $WarningPercent; CriticalPercent = $CriticalPercent }
+    $request = @{ SubscriptionId = @($SubscriptionId | Where-Object { $_ }); ManagementGroupId = @($ManagementGroupId | Where-Object { $_ }); Maximum = $Maximum; WarningPercent = $WarningPercent; CriticalPercent = $CriticalPercent; IncludeQuota = [bool]$IncludeQuota }
 
     $null = Get-AACAccessToken
     if ($interactive) { Write-AACRule -Title 'Azure Admin Console :: Azure limits' -Color 'orange1' }
@@ -141,7 +154,22 @@ function Test-AACAzureLimit {
             Update-AACProgress -Id 'count' -Increment 1 -Description "Counted the $QueryName ($Done of $Total)"
         }
         Update-AACProgress -Id 'count' -Complete -Description "Counted $($query.Count - $read.Errors.Count) of $($query.Count) kinds of limit"
-        @{ Result = (ConvertTo-AACAzureLimit -Read $read -Scope $scope -Maximum $request.Maximum -WarningPercent $request.WarningPercent -CriticalPercent $request.CriticalPercent); Scope = $scope }
+        $quotaRows = @()
+        $quotaNotices = @()
+        if ($request.IncludeQuota) {
+            Update-AACProgress -Id 'quota' -Indeterminate -Description 'Finding the regions in use'
+            $regions = Invoke-AACGraphBatch -Query (Get-AACAzureLimitQuery -Quota) -SubscriptionId $scope.GraphScope -AllowFailure @('quotaLocations')
+            $quotaNotices = @(foreach ($key in $regions.Errors.Keys) { "The regions in use couldn't be read, so no quota is shown: $($regions.Errors[$key] -replace '\s+', ' ')" })
+            $wanted = @(if ($regions.Rows.Contains('quotaLocations')) { $regions.Rows['quotaLocations'] | Where-Object { $null -ne $_ } })
+            Update-AACProgress -Id 'quota' -Total ($wanted.Count * 3) -Description "Reading the quota of $($wanted.Count) subscription and region pair(s)"
+            $quota = Get-AACAzureQuota -Location $wanted -OnProgress { param($Done, $Total) Update-AACProgress -Id 'quota' -Increment 1 }
+            $quotaRows = @($quota.Rows)
+            $quotaNotices += @($quota.Notices)
+            Update-AACProgress -Id 'quota' -Complete -Description "Read the quota of $($wanted.Count) subscription and region pair(s)"
+        }
+        $result = ConvertTo-AACAzureLimit -Read $read -Scope $scope -Maximum $request.Maximum -WarningPercent $request.WarningPercent -CriticalPercent $request.CriticalPercent -Quota $quotaRows
+        $result.Notices = @($result.Notices) + $quotaNotices
+        @{ Result = $result; Scope = $scope }
     }
 
     $limits = @($outcome.Result.Limits)
@@ -183,7 +211,7 @@ function Test-AACAzureLimit {
                     @{ Key = 'ScopeId'; Label = 'Scope ID'; Type = 'mono' }
                 ) }
         )
-        Hint     = '-Status Critical, Warning narrows it; -Maximum sets a raised limit; -FailOnLimit fails a pipeline; -NoDisplay returns the limits; -HtmlPath, -PdfPath or -CsvPath for a report.'
+        Hint     = '-Status Critical, Warning narrows it; -IncludeQuota adds each region''s quota; -Maximum sets a raised limit;-FailOnLimit fails a pipeline; -NoDisplay returns the limits; -HtmlPath, -PdfPath or -CsvPath for a report.'
     }
     Invoke-AACReportOutput -Report $report -Title $Title -CsvObject $limits -Noun 'limit' -CsvPath (& $resolve $CsvPath) -HtmlPath (& $resolve $HtmlPath) -PdfPath (& $resolve $PdfPath) `
         -ShowView:$interactive -NoPaging:$NoPaging -Object $limits -ReturnObject:($PassThru -or $NoDisplay -or $pipedOnward)

@@ -20,13 +20,15 @@ Microsoft 365 tenant discovery and security posture - Entra ID, Microsoft 365 an
 
 ```
 Invoke-AACM365Assessment [-Section <string[]>] [-StaleDays <int>] [-SignInDays <int>]
- [-CsvPath <string>] [-HtmlPath <string>] [-Title <string>] [-PassThru] [-NoDisplay] [-NoPaging]
+ [-SuppressionFile <string>] [-PreviousPath <string>] [-CsvPath <string>] [-HtmlPath <string>]
+ [-Title <string>] [-PassThru] [-NoDisplay] [-NoPaging]
 ```
 
 ### Permission
 
 ```
-Invoke-AACM365Assessment -ListPermission [-Section <string[]>]
+Invoke-AACM365Assessment -ListPermission [-Section <string[]>] [-PreviousPath <string>]
+ [-CsvPath <string>]
 ```
 
 ## ALIASES
@@ -197,7 +199,7 @@ DefaultValue: None
 SupportsWildcards: false
 Aliases: []
 ParameterSets:
-- Name: Assess
+- Name: (All)
   Position: Named
   IsRequired: false
   ValueFromPipeline: false
@@ -314,6 +316,29 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -PreviousPath
+
+A findings CSV from an earlier run (-CsvPath), or the folder holding its
+findings.csv: each finding is then marked New or Open, and the report
+lists what has been resolved.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -Section
 
 What to read: Entra, Microsoft365, Intune. All by default.
@@ -372,6 +397,33 @@ more than this many days is stale. 90 by default.
 ```yaml
 Type: System.Int32
 DefaultValue: 90
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: Assess
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -SuppressionFile
+
+A JSON file of findings you have reviewed and accepted. Each entry names a
+finding by its FindingKey, or by source and rule (and a subject, wildcards
+allowed), with the reason and, if you like, an expiry date:
+[{ "key": "a1b2c3d4e5f60718", "reason": "Accepted risk", "expires": "2027-01-01" }].
+They leave the counts and the findings, and the report lists them with
+their reasons. An expired entry is reported and ignored; a file that can't
+be understood stops the command.
+
+```yaml
+Type: System.String
+DefaultValue: None
 SupportsWildcards: false
 Aliases: []
 ParameterSets:

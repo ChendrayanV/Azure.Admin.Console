@@ -23,10 +23,17 @@ function Get-AACAzureLimitQuery {
           subscriptionTags    tags on each subscription
           groupTags           the resource group with the most tags, per subscription
           resourceTags        the resource with the most tags, per subscription
+
+        With -Quota, only quotaLocations: the regions each subscription has
+        resources in, which Get-AACAzureQuota asks for their quota.
     #>
     [CmdletBinding()]
     [OutputType([System.Collections.Specialized.OrderedDictionary])]
-    param()
+    param(
+        [switch] $Quota
+    )
+
+    if ($Quota) { return [ordered]@{ quotaLocations = @{ Query = "resources | where isnotempty(location) and location !~ 'global' | distinct subscriptionId, location = tolower(location)" } } }
 
     # The scope a definition, set or exemption lives at: its ID up to /providers/Microsoft.Authorization/.
     $atScope = "extend scope = tolower(substring(id, 0, indexof(tolower(id), '/providers/microsoft.authorization/')))"

@@ -70,7 +70,7 @@ Describe 'Azure Admin Console - third-party notices' {
     It 'names the commit and copyright of each project whose data ships with the module' {
         $data = Get-Content -LiteralPath (Join-Path -Path $script:root -ChildPath 'src/Azure/Private/ServiceBaseline.json') -Raw | ConvertFrom-Json -AsHashtable
         $notice = Get-Content -LiteralPath (Join-Path -Path $script:root -ChildPath 'THIRD-PARTY-NOTICES.md') -Raw
-        foreach ($set in 'Alerts', 'Resiliency') {
+        foreach ($set in 'Alerts', 'Resiliency', 'LandingZone') {
             $notice.Contains($data.Sources[$set].Commit) | Should -BeTrue -Because "a refresh of the $set data has to update the notice"
             $notice.Contains($data.Sources[$set].Name) | Should -BeTrue
         }

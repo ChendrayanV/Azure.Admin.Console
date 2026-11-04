@@ -34,7 +34,7 @@ Describe 'Azure Admin Console - the AMBA and APRL data' {
     BeforeAll { $script:data = Get-Content -LiteralPath $script:dataPath -Raw | ConvertFrom-Json -AsHashtable }
 
     It 'names the commit and licence of each project, so a copy can be traced' {
-        foreach ($set in 'Alerts', 'Resiliency') {
+        foreach ($set in 'Alerts', 'Resiliency', 'LandingZone') {
             $script:data.Sources[$set].Commit | Should -Match '^[0-9a-f]{40}$'
             $script:data.Sources[$set].License | Should -Be 'MIT'
         }

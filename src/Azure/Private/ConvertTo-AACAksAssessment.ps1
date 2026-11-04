@@ -20,6 +20,7 @@ function ConvertTo-AACAksAssessment {
           -PSRule            PSRule for Azure's results for the clusters
           -Policy            ConvertTo-AACAksPolicyCompliance's result
           -Constraint        cluster ID -> Get-AACAksConstraint's result
+          -Workload          cluster ID -> Get-AACAksWorkload's result
 
         Returns a hashtable:
           Clusters     AAC.AksCluster: the summary of each - version and its
@@ -39,6 +40,9 @@ function ConvertTo-AACAksAssessment {
           Findings     AAC.AksFinding: what failed - from the WAF checks,
                        PSRule, Advisor, Defender, Azure Policy and Gatekeeper
                        - most severe first
+          WorkloadChecks, WorkloadItems, Readiness  with -Workload:
+                       ConvertTo-AACAksWorkload's result, for each cluster. Their
+                       failures are findings too, but not in the WAF score
           Diagnostics, Maintenance, Constraints, PSRule, Policy, Pillars, Stats
     #>
     [CmdletBinding()]
@@ -57,6 +61,8 @@ function ConvertTo-AACAksAssessment {
         [AllowEmptyCollection()] [object[]] $PSRule = @(),
         [hashtable] $Policy,
         [hashtable] $Constraint = @{},
+        [hashtable] $Workload = @{},
+        [switch] $IncludeSystemNamespace,
         [hashtable] $SubscriptionName = @{},
         [datetime] $Now = (Get-Date)
     )
@@ -91,6 +97,9 @@ function ConvertTo-AACAksAssessment {
     $diagnostics = [System.Collections.Generic.List[object]]::new()
     $maintenance = [System.Collections.Generic.List[object]]::new()
     $constraints = [System.Collections.Generic.List[object]]::new()
+    $insideChecks = [System.Collections.Generic.List[object]]::new()
+    $insideItems = [System.Collections.Generic.List[object]]::new()
+    $readiness = [System.Collections.Generic.List[object]]::new()
     # The subnets: those given, and those in the clusters' child settings (PSRule reads them).
     $subnets = @{}
     foreach ($k in $Subnet.Keys) { $subnets[(& $lower $k)] = $Subnet[$k] }
@@ -227,7 +236,9 @@ function ConvertTo-AACAksAssessment {
 
         # Cost Optimization
         $fixed = @($userPools | Where-Object { -not (& $isTrue (& $at $_ 'enableAutoScaling')) -and [int](& $at $_ 'count') -gt 0 })
-        & $check 'Cost Optimization' 'Cluster autoscaler on user pools' 'Low' (-not $fixed.Count) $(if ($fixed.Count) { "Fixed-size user pool(s): $(@($fixed | ForEach-Object { "$(& $at $_ 'name') ($(& $at $_ 'count') nodes)" }) -join ', ')." } else { 'Every user pool scales with demand.' }) 'Enable the cluster autoscaler so pools shrink when idle (or use node auto-provisioning).' "$docs/aks/cluster-autoscaler"
+        # Node auto-provisioning adds the nodes itself, so a fixed pool beside it is no waste.
+        $autoProvision = [string](& $at $p 'nodeProvisioningProfile.mode') -eq 'Auto'
+        & $check 'Cost Optimization' 'Cluster autoscaler on user pools' 'Low' ($autoProvision -or -not $fixed.Count) $(if ($autoProvision) { 'Node auto-provisioning adds and removes nodes with demand.' } elseif ($fixed.Count) { "Fixed-size user pool(s): $(@($fixed | ForEach-Object { "$(& $at $_ 'name') ($(& $at $_ 'count') nodes)" }) -join ', ')." } else { 'Every user pool scales with demand.' }) 'Enable the cluster autoscaler so pools shrink when idle (or use node auto-provisioning).' "$docs/aks/cluster-autoscaler"
         & $check 'Cost Optimization' 'Cost analysis add-on' 'Low' (& $isTrue (& $at $p 'metricsProfile.costAnalysis.enabled')) $(if (& $isTrue (& $at $p 'metricsProfile.costAnalysis.enabled')) { 'Cost analysis shows cost per namespace and workload.' } else { 'Cost analysis is off: costs can''t be read per namespace or workload.' }) 'Enable the cost analysis add-on (Standard or Premium tier).' "$docs/aks/cost-analysis"
 
         # Performance Efficiency
@@ -235,6 +246,55 @@ function ConvertTo-AACAksAssessment {
         & $check 'Performance Efficiency' 'Ephemeral OS disks' 'Low' (-not $managedDisks.Count) $(if ($managedDisks.Count) { "Managed OS disks on $(@($managedDisks | ForEach-Object { & $at $_ 'name' }) -join ', '): slower node starts and reimages, and disk cost." } else { 'Every pool uses ephemeral OS disks.' }) 'Use ephemeral OS disks where the VM size has a large enough cache or temp disk.' "$docs/aks/concepts-storage#ephemeral-os-disk"
         & $check 'Performance Efficiency' 'Supported network plugin (not kubenet)' 'Medium' ($plugin -ne 'kubenet') "Network plugin: $plugin$(if ($pluginMode) { " ($pluginMode)" })$(if ($plugin -eq 'kubenet') { ' - kubenet retires on 31 March 2028' })." 'Move to Azure CNI Overlay (and Cilium dataplane).' "$docs/aks/upgrade-azure-cni"
         & $check 'Performance Efficiency' 'Standard load balancer' 'High' ([string](& $at $network 'loadBalancerSku') -ne 'basic') "Load balancer SKU: $(& $at $network 'loadBalancerSku')." 'Basic load balancers are retired: migrate to Standard.' "$docs/aks/load-balancer-standard"
+
+        # Node pools' sizes and disks
+        $poolNames = { param($Pools) @($Pools | ForEach-Object { & $at $_ 'name' }) -join ', ' }
+        $burstable = @($agentPools | Where-Object { [string](& $at $_ 'vmSize') -match '^Standard_B' })
+        & $check 'Reliability' 'No burstable (B-series) nodes' 'Medium' (-not $burstable.Count) $(if ($burstable.Count) { "B-series nodes in $(& $poolNames $burstable): once their CPU credits run out they slow down, and pods with them." } else { 'No pool uses B-series VMs.' }) 'Use a size with steady CPU, such as the D series, for anything beyond a test cluster.' "$docs/aks/quotas-skus-regions"
+        # The families that have reached v5. GPU, confidential and other special sizes have their own numbering, and a low one isn't old.
+        $olderSizes = @($agentPools | Where-Object { [string](& $at $_ 'vmSize') -match '^Standard_(?!DC|EC|FX)[DEF]' -and $(if ([string](& $at $_ 'vmSize') -match '_v(\d+)$') { [int]$Matches[1] -lt 5 } else { $true }) })
+        & $check 'Performance Efficiency' 'Current generation VM sizes (v5 or newer)' 'Low' (-not $olderSizes.Count) $(if ($olderSizes.Count) { "Older D, E or F sizes: $(@($olderSizes | ForEach-Object { "$(& $at $_ 'name') ($(& $at $_ 'vmSize'))" }) -join ', ')." } else { 'No D, E or F pool is on a size older than v5.' }) 'Use v5 or newer sizes when pools are next replaced: they usually give more for the money.' "$docs/aks/quotas-skus-regions"
+        $smallDisks = @($agentPools | Where-Object { [string](& $at $_ 'osDiskType') -ne 'Ephemeral' -and (& $at $_ 'osDiskSizeGB') -and [int](& $at $_ 'osDiskSizeGB') -lt 128 })
+        & $check 'Performance Efficiency' 'Managed OS disks of at least 128 GB' 'Medium' (-not $smallDisks.Count) $(if ($smallDisks.Count) { "Small managed OS disks: $(@($smallDisks | ForEach-Object { "$(& $at $_ 'name') ($(& $at $_ 'osDiskSizeGB') GB)" }) -join ', '). Smaller disks have lower IOPS, which can slow the nodes down." } else { 'No pool has a managed OS disk under 128 GB.' }) 'Use ephemeral OS disks, or managed OS disks of 128 GB or more.' "$docs/aks/best-practices-performance-scale"
+        $otherOs = @($agentPools | Where-Object { [string](& $at $_ 'osType') -ne 'Windows' -and [string](& $at $_ 'osSKU') -notmatch '^(AzureLinux|CBLMariner)' })
+        & $check 'Security' 'Azure Linux on Linux pools' 'Low' (-not $otherOs.Count) $(if ($otherOs.Count) { "Not on Azure Linux: $(& $poolNames $otherOs)." } else { 'Linux pools run Azure Linux.' }) 'Consider Azure Linux for new pools: a smaller host OS, with fewer packages to patch.' "$docs/azure-linux/intro-azure-linux"
+        $untainted = @($systemPools | Where-Object { @(& $list (& $at $_ 'nodeTaints')) -notcontains 'CriticalAddonsOnly=true:NoSchedule' })
+        # Without a user pool, the taint would leave application pods nowhere to run: 'User workloads off the system pool' speaks for that case.
+        if ($userPools.Count) { & $check 'Reliability' 'System pool keeps application pods off' 'Low' (-not $untainted.Count) $(if ($untainted.Count) { "Application pods can be scheduled on $(& $poolNames $untainted)." } else { 'The system pool has the CriticalAddonsOnly taint.' }) 'Taint the system pool CriticalAddonsOnly=true:NoSchedule.' "$docs/aks/use-system-pools" }
+
+        # Identity and API access
+        $kubernetesRbac = & $at $p 'enableRBAC'
+        $rbacOff = $null -ne $kubernetesRbac -and -not (& $isTrue $kubernetesRbac)
+        & $check 'Security' 'Kubernetes RBAC' 'High' (-not $rbacOff) $(if ($rbacOff) { 'Kubernetes RBAC is off: anyone who can reach the API server has no role limiting them.' } else { 'Kubernetes RBAC is on.' }) 'Kubernetes RBAC can only be set when a cluster is created: move the workloads to a new cluster with it on.' "$docs/aks/concepts-identity"
+        if ($aad) { & $check 'Security' 'AKS-managed Entra ID (not legacy)' 'Medium' (& $isTrue (& $at $aad 'managed')) $(if (& $isTrue (& $at $aad 'managed')) { 'AKS manages the Entra ID integration.' } else { 'The legacy Entra ID integration is on: it depends on app registrations you look after.' }) 'Migrate to AKS-managed Entra ID integration.' "$docs/aks/enable-authentication-microsoft-entra-id" }
+        $identityType = [string](& $at $c 'identity.type')
+        if ($identityType) { & $check 'Security' 'User-assigned cluster identity' 'Low' ($identityType -match 'UserAssigned') "The cluster's identity is $identityType$(if ($identityType -notmatch 'UserAssigned') { ': it can''t be given its roles before the cluster exists, and goes when the cluster does' })." 'Use a user-assigned managed identity where roles have to be in place first, such as on a custom VNet.' "$docs/aks/use-managed-identity" }
+        & $check 'Security' 'Private API server' 'Medium' $private $(if ($private) { 'The API server is reachable only from the network.' } elseif ($authorized.Count) { "The API server has a public endpoint, limited to $($authorized.Count) IP range(s)." } else { 'The API server has a public endpoint.' }) 'Make the cluster private where people and pipelines can reach it over your network.' "$docs/aks/private-clusters"
+        & $check 'Security' 'OIDC issuer' 'Low' (& $isTrue (& $at $p 'oidcIssuerProfile.enabled')) $(if (& $isTrue (& $at $p 'oidcIssuerProfile.enabled')) { 'The OIDC issuer is on.' } else { 'The OIDC issuer is off: service accounts can''t be federated with Entra ID, which workload identity needs.' }) 'Enable the OIDC issuer.' "$docs/aks/use-oidc-issuer"
+        & $check 'Security' 'Key Vault secrets provider' 'Low' (& $addonOn 'azureKeyvaultSecretsProvider') $(if (& $addonOn 'azureKeyvaultSecretsProvider') { 'Pods can mount secrets from Key Vault.' } else { 'The Key Vault secrets provider is off: secrets are more likely to be kept in Kubernetes.' }) 'Enable the Key Vault secrets provider if your workloads use secrets.' "$docs/aks/csi-secrets-store-driver"
+        $dashboard = & $addonOn 'kubeDashboard'
+        & $check 'Security' 'No Kubernetes dashboard add-on' 'High' (-not $dashboard) $(if ($dashboard) { 'The Kubernetes dashboard add-on is on: it is retired, and has been a way into clusters.' } else { 'The Kubernetes dashboard add-on is off.' }) 'Turn the add-on off, and use the Kubernetes resource views in the Azure portal.' "$docs/aks/kubernetes-portal"
+
+        # What Gatekeeper enforces. Only known from inside the cluster (-IncludeConstraint), so it isn't checked otherwise: unread isn't failed.
+        if ($Constraint.Contains($key) -and $Constraint[$key].Status -eq 'OK') {
+            foreach ($rule in @(
+                    @{ Check = 'Allowed container images enforced'; Kind = '^K8sAzure(V\d+)?ContainerAllowedImages$'; Risk = 'images from any registry can be deployed'; Policy = 'Kubernetes cluster containers should only use allowed images' }
+                    @{ Check = 'Privileged containers refused'; Kind = '^K8sAzure(V\d+)?(Container)?NoPrivilege$'; Risk = 'privileged containers can be deployed'; Policy = 'Kubernetes cluster should not allow privileged containers' }
+                )) {
+                $present = @($Constraint[$key].Totals | Where-Object { [string]$_.Kind -match $rule.Kind })
+                $denying = @($present | Where-Object { [string]$_.Action -ieq 'deny' })
+                & $check 'Security' $rule.Check 'Medium' ($denying.Count -gt 0) $(if ($denying.Count) { "Gatekeeper denies this with $($denying[0].Name)." } elseif ($present.Count) { "The constraint $($present[0].Name) only audits ($($present[0].Action)): $($rule.Risk)." } else { "No constraint for this: $($rule.Risk)." }) "Assign the policy '$($rule.Policy)' with the Deny effect, once the audit results are clean." "$docs/aks/policy-reference"
+            }
+        }
+
+        # The platform's own answers to common needs
+        $appRouting = & $isTrue (& $at $p 'ingressProfile.webAppRouting.enabled')
+        $appGateway = & $addonOn 'ingressApplicationGateway'
+        & $check 'Operational Excellence' 'Managed ingress' 'Low' ($appRouting -or $appGateway) $(if ($appRouting) { 'The application routing add-on is on.' } elseif ($appGateway) { 'The Application Gateway ingress controller add-on is on.' } else { 'No managed ingress add-on: any ingress controller in the cluster is yours to patch.' }) 'Use the application routing add-on if the cluster serves HTTP traffic.' "$docs/aks/app-routing"
+        & $check 'Operational Excellence' 'Node resource group named on purpose' 'Low' ([string](& $at $p 'nodeResourceGroup') -notmatch '^MC_') "The node resource group is $(& $at $p 'nodeResourceGroup')." 'Name it to your standard when a cluster is created: it can''t be renamed later.' "$docs/aks/faq"
+        & $check 'Performance Efficiency' 'Azure CNI powered by Cilium' 'Low' ($dataplane -eq 'cilium') "Network dataplane: $(if ($dataplane) { $dataplane } else { 'not set (azure)' })." 'Consider the Cilium dataplane: it scales better than iptables and enforces network policy itself.' "$docs/aks/azure-cni-powered-by-cilium"
+        & $check 'Performance Efficiency' 'KEDA' 'Low' (& $isTrue (& $at $p 'workloadAutoScalerProfile.keda.enabled')) $(if (& $isTrue (& $at $p 'workloadAutoScalerProfile.keda.enabled')) { 'KEDA scales workloads on events.' } else { 'KEDA is off.' }) 'Enable KEDA if workloads should scale on queues or other events.' "$docs/aks/keda-about"
+        & $check 'Cost Optimization' 'Vertical pod autoscaler' 'Low' (& $isTrue (& $at $p 'workloadAutoScalerProfile.verticalPodAutoscaler.enabled')) $(if (& $isTrue (& $at $p 'workloadAutoScalerProfile.verticalPodAutoscaler.enabled')) { 'The vertical pod autoscaler is on.' } else { 'The vertical pod autoscaler is off: nothing is here to suggest better pod requests.' }) 'Enable the vertical pod autoscaler, in recommendation mode to begin with, to find oversized pods.' "$docs/aks/vertical-pod-autoscaler"
 
         # --- Node pools, their subnet capacity ---------------------------------------------------------------------------
         $poolUpgradeAvailable = 0
@@ -289,6 +349,7 @@ function ConvertTo-AACAksAssessment {
         # --- Settings (the current-settings lens) -----------------------------------------------------------------------
         $setting = { param([string] $Area, [string] $Label, $Value) $settings.Add((& $object 'AAC.AksSetting' ([ordered]@{ Cluster = $name; Area = $Area; Setting = $Label; Value = $(if ($null -eq $Value -or "$Value" -eq '') { '-' } else { [string]$Value }); ClusterId = $id }))) }
         & $setting 'General' 'Kubernetes version' "$version ($support)"
+        & $setting 'General' 'Cluster SKU' (& $at $c 'sku.name')
         & $setting 'General' 'Pricing tier' $(if ($tier) { $tier } else { 'Free' })
         & $setting 'General' 'Support plan' $supportPlan
         & $setting 'General' 'Power state' (& $at $p 'powerState.code')
@@ -303,6 +364,7 @@ function ConvertTo-AACAksAssessment {
         & $setting 'Upgrades' 'Maintenance windows' (@($maintenanceRows | ForEach-Object { & $at $_ 'name' }) -join ', ')
         & $setting 'Identity and access' 'Cluster identity' $(if (& $at $c 'identity.type') { & $at $c 'identity.type' } else { 'Service principal' })
         & $setting 'Identity and access' 'Kubelet identity' (& $leaf (& $at $p 'identityProfile.kubeletidentity.resourceId'))
+        & $setting 'Identity and access' 'Kubernetes RBAC' $(if ($null -eq $kubernetesRbac) { '' } else { & $yesNo $kubernetesRbac })
         & $setting 'Identity and access' 'Entra ID' $(if ($aad) { "Yes$(if (& $at $aad 'managed') { ' (managed)' })" } else { 'No' })
         & $setting 'Identity and access' 'Azure RBAC' (& $yesNo (& $at $aad 'enableAzureRBAC'))
         & $setting 'Identity and access' 'Admin groups' (@(& $list (& $at $aad 'adminGroupObjectIDs')).Count)
@@ -336,6 +398,7 @@ function ConvertTo-AACAksAssessment {
         & $setting 'Monitoring' 'Diagnostic settings' "$($diagnosticRows.Count)$(if ($categories) { ": $($categories -join ', ')" })"
         if ($addons -is [System.Collections.IDictionary]) { foreach ($k in $addons.Keys | Sort-Object) { & $setting 'Add-ons' $k $(if (& $isTrue (& $at $addons[$k] 'enabled')) { 'Enabled' } else { 'Disabled' }) } }
         & $setting 'Add-ons' 'Application routing (managed NGINX)' (& $yesNo (& $at $p 'ingressProfile.webAppRouting.enabled'))
+        & $setting 'Add-ons' 'Node auto-provisioning' (& $yesNo $autoProvision)
         & $setting 'Add-ons' 'KEDA' (& $yesNo (& $at $p 'workloadAutoScalerProfile.keda.enabled'))
         & $setting 'Add-ons' 'Vertical pod autoscaler' (& $yesNo (& $at $p 'workloadAutoScalerProfile.verticalPodAutoscaler.enabled'))
         & $setting 'Add-ons' 'Service mesh' (& $at $p 'serviceMeshProfile.mode')
@@ -395,6 +458,19 @@ function ConvertTo-AACAksAssessment {
             }
         }
 
+        $verdict = ''
+        $insideFailed = $null
+        if ($Workload.Contains($key) -and $Workload[$key].Status -eq 'OK') {
+            $inside = ConvertTo-AACAksWorkload -Read $Workload[$key] -ClusterName $name -ClusterId $id -ClusterSku ([string](& $at $c 'sku.name')) -IncludeSystemNamespace:$IncludeSystemNamespace
+            foreach ($row in $inside.Checks) { $insideChecks.Add($row) }
+            foreach ($row in $inside.Items) { $insideItems.Add($row) }
+            $readiness.Add($inside.Readiness)
+            $verdict = $inside.Readiness.Verdict
+            $failedInside = @($inside.Checks | Where-Object Status -EQ 'Fail')
+            $insideFailed = $failedInside.Count
+            foreach ($row in $failedInside) { & $add $row.Severity $row.Pillar 'In-cluster' $row.Check "$($row.Affected) affected" $row.Detail $row.Recommendation $row.Link }
+        }
+
         # --- The cluster's summary --------------------------------------------------------------------------------
         $mine = @($findings | Where-Object { $_.ClusterId -eq $id })
         $score = [ordered]@{}
@@ -419,7 +495,7 @@ function ConvertTo-AACAksAssessment {
                         Reliability = $score['Reliability']; Security = $score['Security']; CostOptimization = $score['Cost Optimization']; OperationalExcellence = $score['Operational Excellence']; PerformanceEfficiency = $score['Performance Efficiency']
                         WafScore = $(if ($clusterChecks.Count) { [Math]::Round(@($clusterChecks | Where-Object Status -EQ 'Pass').Count / $clusterChecks.Count * 100) } else { $null })
                         High = @($mine | Where-Object Severity -EQ 'High').Count; Medium = @($mine | Where-Object Severity -EQ 'Medium').Count; Low = @($mine | Where-Object Severity -EQ 'Low').Count
-                        PoolUpgrades = $poolUpgradeAvailable; ResourceId = $id
+                        PoolUpgrades = $poolUpgradeAvailable; InClusterFailed = $insideFailed; AutomaticReadiness = $verdict; ResourceId = $id
                     })))
     }
 
@@ -444,6 +520,9 @@ function ConvertTo-AACAksAssessment {
         Diagnostics = $diagnostics.ToArray()
         Maintenance = $maintenance.ToArray()
         Constraints = @($constraints | Sort-Object -Property @{ Expression = 'TotalViolations'; Descending = $true })
+        WorkloadChecks = $insideChecks.ToArray()
+        WorkloadItems = $insideItems.ToArray()
+        Readiness   = $readiness.ToArray()
         PSRule      = @($PSRule)
         Policy      = $Policy
         Pillars     = $pillarRows
@@ -461,6 +540,7 @@ function ConvertTo-AACAksAssessment {
             PSRulePassed    = @($PSRule | Where-Object Outcome -EQ 'Pass').Count
             PolicyViolations = $(if ($Policy) { $Policy.Stats.Violations } else { $null })
             GatekeeperViolations = & $sumOf @($constraints | ForEach-Object TotalViolations)
+            InClusterFailed = @($insideChecks | Where-Object Status -EQ 'Fail').Count
         }
     }
 }

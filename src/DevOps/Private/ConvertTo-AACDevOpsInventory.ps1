@@ -749,6 +749,15 @@ function ConvertTo-AACDevOpsInventory {
             $durations = @($runs | ForEach-Object { $s0 = & $when $_['startTime']; $f0 = & $when $_['finishTime']; if ($s0 -and $f0) { ($f0 - $s0).TotalMinutes } })
             $queues = @($runs | ForEach-Object { $q0 = & $when $_['queueTime']; $s0 = & $when $_['startTime']; if ($q0 -and $s0) { ($s0 - $q0).TotalMinutes } })
             $successRate = if ($judgedRuns.Count) { & $round (100.0 * $succeeded / $judgedRuns.Count) } else { $null }
+            $totalMinutes = [double]0; foreach ($minutes in $durations) { $totalMinutes += $minutes }
+            # Earlier runs against later ones, oldest first. Under ten runs or a two-minute change is noise.
+            $timed = @($runs | ForEach-Object { $s0 = & $when $_['startTime']; $f0 = & $when $_['finishTime']; if ($s0 -and $f0) { [pscustomobject]@{ At = $s0; Minutes = ($f0 - $s0).TotalMinutes } } } | Sort-Object -Property At)
+            $earlierMin = $null; $laterMin = $null
+            if ($timed.Count -ge 10) {
+                $half = [int][Math]::Floor($timed.Count / 2)
+                $earlierMin = & $mean @($timed[0..($half - 1)] | ForEach-Object Minutes)
+                $laterMin = & $mean @($timed[$half..($timed.Count - 1)] | ForEach-Object Minutes)
+            }
             $avgQueue = & $round (& $mean $queues)
 
             # --- Findings ------------------------------------------------------------------------------------------
@@ -773,6 +782,7 @@ function ConvertTo-AACDevOpsInventory {
                 foreach ($hit in $src.Secrets) { & $find 'High' $label 'Possible secret in the YAML' "Key '$($hit.Key)' on line $($hit.Line) of $($src.Label) has a literal value." 'Move it to a secret variable, a variable group linked to Key Vault, or a service connection - and rotate it: it is in the repository history.' }
             }
             if ($null -ne $successRate -and $judgedRuns.Count -ge 5 -and $successRate -lt 80) { & $find 'Medium' $label 'Unreliable pipeline' "$successRate% of $($judgedRuns.Count) runs in $metricDays days succeeded." 'Look at what fails most (flaky tests, agents, outside services) - a pipeline that often fails stops being trusted.' }
+            if ($null -ne $laterMin -and $earlierMin -gt 0 -and $laterMin -gt $earlierMin * 1.25 -and ($laterMin - $earlierMin) -ge 2) { & $find 'Low' $label 'Pipeline getting slower' "Later runs average $(& $round $laterMin) minutes, earlier ones $(& $round $earlierMin)." 'Look at what changed: new steps, a larger repository, lost caching. Every extra minute also holds an agent.' }
             if ($null -ne $avgQueue -and $avgQueue -ge 10) { & $find 'Low' $label 'Long queue times' "Runs waited $avgQueue minutes on average for an agent." 'Add parallel jobs or agents, or spread out scheduled runs.' }
 
             $mine.Add([pscustomobject][ordered]@{
@@ -800,6 +810,7 @@ function ConvertTo-AACDevOpsInventory {
                     Runs           = $(if ($metricsRead) { $runs.Count } else { $null })
                     SuccessRate    = $successRate
                     AvgDurationMin = $(& $round (& $mean $durations))
+                    TotalMinutes   = $(if ($metricsRead) { & $round $totalMinutes } else { $null })
                     AvgQueueMin    = $avgQueue
                     RunsPerWeek    = $(if ($metricsRead) { & $round ($runs.Count / $weeks) } else { $null })
                     Lint           = $found['Lint'] -join ', '
@@ -879,6 +890,8 @@ function ConvertTo-AACDevOpsInventory {
             if ($perm.All) { & $find $(if ($type -in 'azurerm', 'kubernetes', 'dockerregistry') { 'High' } else { 'Medium' }) $label 'Open to every pipeline' "Any pipeline in $projectName can use '$ename' ($type) without being granted it." 'Turn off "Grant access permission to all pipelines" and authorize the pipelines that need it; add an approval check on the connection.' 'Security' }
             if ($type -eq 'azurerm' -and $scheme -eq 'ServicePrincipal') { & $find 'Medium' $label 'Uses a client secret' "'$ename' signs in to Azure with a service principal's secret - it expires, and it can leak." 'Convert it to workload identity federation (the connection''s Convert button) - no secret to store or rotate.' 'Security' }
             elseif ($scheme -in 'UsernamePassword', 'PublishProfile') { & $find 'Low' $label 'Long-lived credential' "'$ename' stores a $scheme credential." 'Prefer workload identity federation or a managed identity where the service supports it.' 'Security' }
+            $sharedBy = if ($usedConnections.ContainsKey($ename.ToLowerInvariant())) { $usedConnections[$ename.ToLowerInvariant()].Count } else { 0 }
+            if ($type -in 'azurerm', 'kubernetes', 'dockerregistry' -and $sharedBy -ge 5) { & $find 'Low' $label 'Shared by many pipelines' "$sharedBy pipelines use '$ename': one compromised pipeline has the access of all of them, and its secret or federation can't be changed for one alone." 'Split it per application or environment, each with the least access it needs.' 'Security' }
             if ([string]$e['isReady'] -eq 'False') { & $find 'Low' $label 'Not ready' "'$ename' failed to set up or to verify." 'Fix or delete it.' 'Security' }
             if ($perm.Known -and -not $perm.All -and -not $perm.Count -and -not $usedBy) { & $find 'Low' $label 'Unused service connection' 'No pipeline is authorized to use it, and none refers to it.' 'Delete it - an unused credential is still a credential.' 'Security' }
             if ($link) {
@@ -1296,6 +1309,9 @@ function ConvertTo-AACDevOpsInventory {
             })
 
         $projectPushes = @($repoById.Values | Where-Object { $_.Push -and $_.Push.Date } | ForEach-Object { $_.Push.Date } | Sort-Object -Descending)
+        # Classic releases have no minutes; and run history that couldn't be read leaves this empty, not zero.
+        $projectMinutes = $null
+        foreach ($row in $mine) { if ($row.PSObject.Properties['TotalMinutes'] -and $null -ne $row.TotalMinutes) { $projectMinutes = [double]$projectMinutes + $row.TotalMinutes } }
         $projectRows.Add([pscustomobject][ordered]@{
                 PSTypeName         = 'AAC.DevOpsProject'
                 Organization       = $orgName
@@ -1305,6 +1321,8 @@ function ConvertTo-AACDevOpsInventory {
                 ClassicBuild       = @($mine | Where-Object { $_.Kind -eq 'Classic build' }).Count
                 ClassicRelease     = @($mine | Where-Object { $_.Kind -eq 'Classic release' }).Count
                 WithScanning       = @($mine | Where-Object { $_.Security }).Count
+                Minutes            = & $round $projectMinutes
+                MinutesShare       = $null
                 Repositories       = @($repoById.Values | Where-Object { $IncludeDisabledRepository -or -not $_.Disabled }).Count
                 ServiceConnections = $endpoints.Count
                 VariableGroups     = $groups.Count
@@ -1322,6 +1340,19 @@ function ConvertTo-AACDevOpsInventory {
                 Id                 = $projectId
                 Url                = $projectUrl
             })
+    }
+
+    # One project taking most of the agents' time is worth knowing, though not a fault in itself.
+    $allMinutes = [double]0; foreach ($row in $projectRows) { if ($row.Minutes) { $allMinutes += $row.Minutes } }
+    if ($allMinutes -gt 0) {
+        foreach ($row in $projectRows) {
+            $row.MinutesShare = & $round (100.0 * [double]$row.Minutes / $allMinutes)
+            if ($projectRows.Count -gt 1 -and $row.MinutesShare -ge 40) {
+                $projectName = $row.Project
+                & $find 'Info' "$($row.Project) (project)" 'Most of the organization''s pipeline minutes' "$($row.MinutesShare)% of the minutes pipelines ran for: $($row.Minutes) of $(& $round $allMinutes)." 'If queue times are long, this is where shorter or fewer runs help most.'
+                $row.Findings++
+            }
+        }
     }
 
     # --- The organization's own: feeds outside a project, agent pools, extensions --------------------------------------

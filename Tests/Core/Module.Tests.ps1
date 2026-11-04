@@ -116,6 +116,8 @@ Describe 'Azure Admin Console - Module scaffold' {
             'Invoke-AACWafAssessment'
             'New-AACApplicationPermission'
             'New-AACServiceBlueprint'
+            'Invoke-AACLandingZoneAssessment'
+            'Invoke-AACResiliencyAssessment'
             'Show-AACActivityLogEvent'
             'Show-AACApplicationGatewayMap'
             'Show-AACCost'

@@ -5,7 +5,8 @@ function Write-AACAksCsv {
         returns the files.
     .DESCRIPTION
         clusters, node-pools, settings, checks (the Well-Architected checks),
-        findings, upgrades, psrule, diagnostics, maintenance, gatekeeper, and
+        findings, suppressed-findings, resolved-findings, upgrades, psrule, diagnostics, maintenance, gatekeeper,
+        in-cluster-checks, in-cluster-items, automatic-readiness, and
         the Azure Policy views - policy-violations (every non-compliant
         component), policy-by-namespace, policy-by-workload, policy-by-policy,
         policy-by-cluster, policy-cluster-states, policy-assignments - plus
@@ -31,7 +32,7 @@ function Write-AACAksCsv {
         $folder = Split-Path -Path $target -Parent
         if (-not (Test-Path -LiteralPath $folder)) { New-Item -ItemType Directory -Path $folder -Force | Out-Null }
         # The nested lists (a cluster's node pools...) have files of their own.
-        $Rows | Select-Object -Property * -ExcludeProperty NodePools, Settings, Checks, Findings, Upgrades, PolicyViolations, PSRule | Export-Csv -LiteralPath $target -NoTypeInformation -Encoding utf8
+        $Rows | Select-Object -Property * -ExcludeProperty NodePools, Settings, Checks, Findings, Upgrades, PolicyViolations, PSRule, InCluster, InClusterItems | Export-Csv -LiteralPath $target -NoTypeInformation -Encoding utf8
         Get-Item -LiteralPath $target
     }
     & $write 'clusters' $Assessment.Clusters
@@ -39,11 +40,16 @@ function Write-AACAksCsv {
     & $write 'settings' $Assessment.Settings
     & $write 'checks' $Assessment.Checks
     & $write 'findings' $Assessment.Findings
+    & $write 'suppressed-findings' @($Assessment['SuppressedFindings'] | Where-Object { $_ })
+    & $write 'resolved-findings' @($Assessment['ResolvedFindings'] | Where-Object { $_ })
     & $write 'upgrades' $Assessment.Upgrades
     & $write 'psrule' $Assessment.PSRule
     & $write 'diagnostics' $Assessment.Diagnostics
     & $write 'maintenance' $Assessment.Maintenance
     & $write 'gatekeeper' $Assessment.Constraints
+    & $write 'in-cluster-checks' $Assessment.WorkloadChecks
+    & $write 'in-cluster-items' $Assessment.WorkloadItems
+    & $write 'automatic-readiness' $Assessment.Readiness
     $policy = $Assessment.Policy
     if ($policy) {
         & $write 'policy-violations' $policy.Components

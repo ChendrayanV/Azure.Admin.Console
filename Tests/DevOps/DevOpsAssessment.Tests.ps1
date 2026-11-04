@@ -259,6 +259,77 @@ Describe 'Azure Admin Console - Invoke-AACADOAssessment' {
         $findings | Should -Not -Contain 'Medium | Repository | payments (repository) | No required reviewers'
     }
 
+    It 'adds up the minutes pipelines ran for, per pipeline and project, and says which project takes most' {
+        $rows = @(Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $script:pat -NoDisplay)
+        ($rows | Where-Object Pipeline -EQ 'payments-ci').TotalMinutes | Should -Be 66 -Because '11 runs of 6 minutes'
+        $projects = @(Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $script:pat -View Project -NoDisplay)
+        $payments = $projects | Where-Object Project -EQ 'Payments'
+        $payments.MinutesShare | Should -BeGreaterThan 40
+        (@($projects | Where-Object { $null -ne $_.MinutesShare }) | Measure-Object -Property MinutesShare -Sum).Sum | Should -BeGreaterThan 99
+        $findings = @(Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $script:pat -View Finding -NoDisplay)
+        @($findings | Where-Object Finding -EQ 'Most of the organization''s pipeline minutes' | ForEach-Object Item) | Should -Be @('Payments (project)')
+    }
+
+    It 'says when a pipeline is getting slower, and not for a small change or a few runs' {
+        $key = @($script:ado.Answers.Keys | Where-Object { $_ -like '*/11111111-aaaa-0000-0000-000000000001/_apis/build/builds' })[0]
+        $original = $script:ado.Answers[$key]
+        $slower = { param([int] $Extra, [int] $Keep = 99)
+            $copy = @{ Status = 200; Body = @{}; Error = ''; Items = [System.Collections.Generic.List[object]]::new() }
+            foreach ($item in @($original.Items | Where-Object { $_.definition.id -eq 1 } | Select-Object -First $Keep)) {
+                $run = @{}; foreach ($k in $item.Keys) { $run[$k] = $item[$k] }
+                # The most recent runs, the ones started within the last week, take longer.
+                if (([datetime]::UtcNow - [datetime]$run.queueTime).TotalDays -lt 6) { $run.finishTime = ([datetime]$run.finishTime).AddMinutes($Extra).ToString('o') }
+                $copy.Items.Add($run)
+            }
+            $copy
+        }
+        $title = { @(Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $script:pat -View Finding -NoDisplay | Where-Object { $_.Item -like 'payments-ci*' -and $_.Finding -eq 'Pipeline getting slower' }) }
+        try {
+            $script:ado.Answers[$key] = & $slower 10
+            @(& $title).Count | Should -Be 1
+            (& $title).Detail | Should -BeLike 'Later runs average *, earlier ones *'
+            $script:ado.Answers[$key] = & $slower 1
+            @(& $title).Count | Should -Be 0 -Because 'a minute more is not worth raising'
+            $script:ado.Answers[$key] = & $slower 10 8
+            @(& $title).Count | Should -Be 0 -Because 'eight runs are too few to call a trend'
+        }
+        finally { $script:ado.Answers[$key] = $original }
+    }
+
+    It 'suppresses a finding, and compares with an earlier run''s findings CSV' {
+        $csv = Join-Path $TestDrive 'ado-findings.csv'
+        $first = @(Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $script:pat -View Finding -CsvPath $csv -PassThru -NoDisplay)
+        $target = @($first | Where-Object Finding -EQ 'Unreliable pipeline')[0]
+        $file = Join-Path $TestDrive 'ado-accepted.json'
+        [System.IO.File]::WriteAllText($file, "[{`"source`":`"DevOps`",`"rule`":`"Unreliable pipeline`",`"reason`":`"Being replaced`"}]")
+        $second = @(Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $script:pat -View Finding -SuppressionFile $file -PreviousPath $csv -NoDisplay)
+        @($second | Where-Object FindingKey -EQ $target.FindingKey).Count | Should -Be 0
+        @($second | Where-Object Change -NE 'Open').Count | Should -Be 0
+        @(Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $script:pat -View SuppressedFinding -SuppressionFile $file -NoDisplay).SuppressionReason | Should -Contain 'Being replaced'
+    }
+
+    It 'flags a powerful service connection many pipelines share' {
+        $key = @($script:ado.Answers.Keys | Where-Object { $_ -like '*/11111111-aaaa-0000-0000-000000000001/_apis/build/definitions' })[0]
+        $original = $script:ado.Answers[$key]
+        $title = { @(Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $script:pat -View Finding -NoDisplay | Where-Object { $_.Finding -eq 'Shared by many pipelines' }) }
+        @(& $title).Count | Should -Be 0
+        try {
+            $definitions = [System.Collections.Generic.List[object]]::new()
+            foreach ($item in $original.Items) { $definitions.Add($item) }
+            $yaml = @($original.Items | Where-Object { $_.name -eq 'payments-cd' })[0]
+            foreach ($n in 1..5) {
+                $clone = @{}; foreach ($k in $yaml.Keys) { $clone[$k] = $yaml[$k] }
+                $clone.id = 900 + $n; $clone.name = "copy-$n"
+                $definitions.Add($clone)
+            }
+            $script:ado.Answers[$key] = @{ Status = 200; Body = @{}; Error = ''; Items = $definitions }
+            $found = @(& $title)
+            $found.Count | Should -BeGreaterThan 0
+            $found[0].Detail | Should -BeLike '* pipelines use *'
+        }
+        finally { $script:ado.Answers[$key] = $original }
+    }
+
     It 'measures delivery from the run history: success rate, duration, queue time, deployments and change failure rate' {
         $rows = @(Invoke-AACADOAssessment -Organization contoso -PersonalAccessToken $script:pat -NoDisplay)
         $ci = $rows | Where-Object Pipeline -EQ 'payments-ci'

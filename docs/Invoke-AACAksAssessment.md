@@ -20,10 +20,10 @@ Assesses AKS clusters through every lens - current settings, the Well-Architecte
 
 ```
 Invoke-AACAksAssessment [[-SubscriptionId] <string[]>] [[-ManagementGroupId] <string[]>]
- [[-ResourceGroupName] <string[]>] [[-Name] <string[]>] [[-Baseline] <string>]
- [[-ExcludeRule] <string[]>] [[-CsvPath] <string>] [[-PdfPath] <string>] [[-HtmlPath] <string>]
- [[-Title] <string>] [-IncludeSystemNamespace] [-IncludeConstraint] [-SkipPSRule] [-PassThru]
- [-NoDisplay] [-NoPaging]
+ [[-ResourceGroupName] <string[]>] [[-Name] <string[]>] [[-SuppressionFile] <string>]
+ [[-PreviousPath] <string>] [[-Baseline] <string>] [[-ExcludeRule] <string[]>] [[-CsvPath] <string>]
+ [[-PdfPath] <string>] [[-HtmlPath] <string>] [[-Title] <string>] [-IncludeSystemNamespace]
+ [-IncludeConstraint] [-IncludeWorkload] [-SkipPSRule] [-PassThru] [-NoDisplay] [-NoPaging]
 ```
 
 ## ALIASES
@@ -51,20 +51,30 @@ REST only - no Az modules, no kubectl. For each cluster:
                     mode, OS, nodes, autoscale, zones, max pods,
                     versions, node image and its age, disks, Spot,
                     subnet, taints
-  Well-Architected  about 35 checks across the five pillars -
-                    Reliability (SLA tier, zones, system pool, Spot,
-                    version support, maintenance, surge), Security
-                    (local accounts, Entra ID, Azure RBAC, API server
-                    exposure, network policy, Azure Policy, Defender,
-                    workload identity, pod identity, image cleaner,
-                    KMS, node public IPs, encryption at host, managed
-                    identity, node images, lockdown), Operational
-                    Excellence (upgrade channels, Container insights,
-                    Prometheus, audit logs, version drift, retired
-                    add-ons), Cost Optimization (autoscaler, cost
-                    analysis) and Performance Efficiency (ephemeral
-                    OS disks, kubenet, load balancer, subnet IPs at
-                    full scale) - Pass or Fail, a score per pillar
+  Well-Architected  about 50 checks across the five pillars -
+                    Reliability (SLA tier, zones, system pool and its
+                    taint, Spot, burstable sizes, version support,
+                    maintenance, surge), Security (local accounts,
+                    Kubernetes RBAC, Entra ID, Azure RBAC, API server
+                    exposure, private API server, network policy,
+                    Azure Policy, Defender, OIDC issuer, workload
+                    identity, pod identity, user-assigned identity,
+                    image cleaner, KMS, Key Vault provider, dashboard
+                    add-on, Azure Linux, node public IPs, encryption
+                    at host, managed identity, node images, lockdown;
+                    with -IncludeConstraint, whether allowed images
+                    and privileged containers are enforced),
+                    Operational Excellence (upgrade channels,
+                    Container insights, Prometheus, audit logs,
+                    version drift, retired add-ons, managed ingress,
+                    node resource group name), Cost Optimization
+                    (autoscaler or node auto-provisioning, vertical
+                    pod autoscaler, cost analysis) and Performance
+                    Efficiency (ephemeral OS disks, OS disk size, VM
+                    generation, kubenet, Cilium, KEDA, load balancer,
+                    subnet IPs at full scale) - Pass or Fail, a score
+                    per pillar. Several of these follow KubeBuddy's
+                    AKS checks (github.com/KubeDeckio/KubeBuddy)
   PSRule for Azure  the Azure.AKS.* rules (unless -SkipPSRule), on
                     the cluster as Export-AzRuleData reads it -
                     -Baseline and -ExcludeRule as for Invoke-AACPSRule
@@ -80,6 +90,23 @@ REST only - no Az modules, no kubectl. For each cluster:
                     complete violation count from inside the cluster
                     (Azure Policy keeps 500 records per policy and
                     cluster), with AKS run command
+  In the cluster    with -IncludeWorkload: what is running, read with
+                    AKS run command - health (failing, pending and
+                    restarting pods, nodes, services, volumes),
+                    workload design (requests, limits, probes,
+                    replicas, spread, disruption budgets), pod security
+                    (privileged, host namespaces and paths, capabilities,
+                    seccomp, root), namespaces (network policies, quotas,
+                    limit ranges), RBAC (cluster-admin, wide access,
+                    default service accounts) and network and storage -
+                    many following KubeBuddy's checks
+                    (github.com/KubeDeckio/KubeBuddy). Their failures
+                    are findings, but not in the WAF score
+  AKS Automatic     with -IncludeWorkload: what would stop these workloads
+                    moving to a new AKS Automatic cluster, from Microsoft's
+                    Deployment Safeguards and baseline Pod Security
+                    Standards - Fix first (refused), Changed by Automatic
+                    (admitted but altered) and Review
   Versions          the control plane's version and its support
                     (supported, long-term support, out of support),
                     the upgrades available, how far behind the
@@ -142,6 +169,14 @@ Kubernetes policy violations by namespace, with Gatekeeper's complete counts - b
 ### Example 4
 
 ```powershell
+Invoke-AACAksAssessment -Name 'aks-prod-weu' -IncludeWorkload -HtmlPath .\out\AKS.html
+```
+
+Also what runs inside the cluster - health, probes, requests, pod security, RBAC - and whether it could move to AKS Automatic.
+
+### Example 5
+
+```powershell
 (Invoke-AACAksAssessment -SubscriptionId 00000000-0000-0000-0000-000000000000 -NoDisplay).Checks | Where-Object { $_.Status -eq 'Fail' -and $_.Pillar -eq 'Security' }
 ```
 
@@ -161,7 +196,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 4
+  Position: 6
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -182,7 +217,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 6
+  Position: 8
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -203,7 +238,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 5
+  Position: 7
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -224,7 +259,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 8
+  Position: 10
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -264,6 +299,36 @@ HelpMessage: ''
 
 Keep kube-system, gatekeeper-system and the other system namespaces
 in the policy compliance views (they are left out by default).
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -IncludeWorkload
+
+Read what is running inside each cluster with AKS run command, and assess
+it. Needs the Microsoft.ContainerService/managedClusters/runCommand/action
+permission and run command allowed on the cluster, and starts two
+short-lived pods in the aks-command namespace. It changes nothing else. On
+a cluster with Entra ID it reads what your account may see in Kubernetes:
+what it may not read shows as Not checked. Secrets and ConfigMaps are not
+read, and no environment variable's value leaves the cluster. Run command's
+output stops at 512 kB: a check that didn't see everything says Not checked
+rather than Pass. -IncludeSystemNamespace also takes in the system
+namespaces.
 
 ```yaml
 Type: System.Management.Automation.SwitchParameter
@@ -398,7 +463,30 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 7
+  Position: 9
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PreviousPath
+
+A findings CSV from an earlier run (-CsvPath), or the folder holding its
+findings.csv: each finding is then marked New or Open, and the report
+lists what has been resolved.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 5
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -471,6 +559,33 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -SuppressionFile
+
+A JSON file of findings you have reviewed and accepted. Each entry names a
+finding by its FindingKey, or by source and rule (and a subject, wildcards
+allowed), with the reason and, if you like, an expiry date:
+[{ "key": "a1b2c3d4e5f60718", "reason": "Accepted risk", "expires": "2027-01-01" }].
+They leave the counts and the findings, and the report lists them with
+their reasons. An expired entry is reported and ignored; a file that can't
+be understood stops the command.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 4
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -Title
 
 The PDF and HTML reports' title.
@@ -482,7 +597,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 9
+  Position: 11
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
