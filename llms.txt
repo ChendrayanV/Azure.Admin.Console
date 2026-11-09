@@ -2,7 +2,7 @@
 
 > A PowerShell 7.2+ module for Azure, Microsoft 365 and Azure DevOps administration over plain REST: no Az or Microsoft.Graph modules and no app registration. Read-only by default; every command gives a console view, typed objects, and CSV, HTML and PDF reports.
 
-Version 0.14.9, 98 commands. Install with `Install-PSResource -Name Azure.Admin.Console`, sign in with `Connect-AAC`. Inside PowerShell, `Get-Help <command> -Full` gives the same reference as the pages below.
+Version 0.15.0, 98 commands. Install with `Install-PSResource -Name Azure.Admin.Console`, sign in with `Connect-AAC`. Inside PowerShell, `Get-Help <command> -Full` gives the same reference as the pages below.
 
 ## Guide
 

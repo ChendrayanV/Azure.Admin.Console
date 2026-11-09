@@ -15,7 +15,7 @@ Plain REST. No Az or Microsoft.Graph modules. Read-only by default.
 [![License: MIT](https://img.shields.io/badge/license-MIT-7B61FF.svg)](LICENSE)
 [![Sponsor](https://img.shields.io/github/sponsors/ChendrayanV?label=Sponsor&logo=githubsponsors&color=EA4AAA)](https://github.com/sponsors/ChendrayanV)
 
-[How to use it](#how-to-use-it) · [What's new](#whats-new-in-0149) · [Architecture design](#architecture-design) · [Commands](#whats-inside) · [Full guide](GUIDE.md) · [Contribute](#contributing) · [Contact](#contact)
+[How to use it](#how-to-use-it) · [What's new](#whats-new-in-0150) · [Architecture design](#architecture-design) · [Commands](#whats-inside) · [Full guide](GUIDE.md) · [Contribute](#contributing) · [Contact](#contact)
 
 </div>
 
@@ -36,74 +36,76 @@ Plain REST. No Az or Microsoft.Graph modules. Read-only by default.
 | **DevOps team** | An Azure DevOps assessment: pipelines, tools, SBOM, security, DORA - and a plan to move to GitHub |
 | **Consultant** | Hand-over-ready HTML, PDF and CSV reports from a read-only sign-in |
 
-## What's new in 0.14.9
+## What's new in 0.15.0
 
 Click a tab to open it.
 
 <details open>
-<summary><b>📜 Activity Log assessment</b> &nbsp;·&nbsp; <i><code>Invoke-AACActivityLogAssessment</code>, 90, 180 or 365 days</i></summary>
+<summary><b>🧭 Plan a service before you deploy it</b> &nbsp;·&nbsp; <i><code>New-AACServiceBlueprint</code></i></summary>
 
 <br>
 
-Every resource's activity, with subscription, resource group, resource and tags on every row: who changed what and when, when each resource was last used, which are idle or were deleted, changes made by hand, guests and people changing access, keys read by people. It reads the Log Analytics workspace each subscription already sends its Activity Log to, found automatically, so a year takes seconds. Subscriptions with no export fall back to the REST API, which keeps 90 days. A Coverage tab says which source each subscription used.
+Any service in Azure's list, planned in one command: names that follow your naming rules, the Azure Policy that would apply, PSRule for Azure on the planned configuration, and the alerts and resiliency recommendations it should have. You get a console view, an HTML map, an editable draw.io file and a PDF. Function App, storage, Event Hubs and Event Grid work without signing in.
 
 ```powershell
-Invoke-AACActivityLogAssessment -ManagementGroupId 'mg-landingzones' -Days 365 -TagName CostCenter -RequiredTag CostCenter -HtmlPath .\activity.html
+New-AACServiceBlueprint -Service FunctionApp, StorageAccount, 'Virtual Network' -SubscriptionId $sub -Workload orders -Environment prod -OutputFormat DrawIo, Html -Path .\out
 ```
 
 </details>
 
 <details>
-<summary><b>🔎 Activity Log events, readable</b> &nbsp;·&nbsp; <i><code>Show-AACActivityLogEvent</code></i></summary>
+<summary><b>🏗️ Landing zone checklist and resiliency, checked</b> &nbsp;·&nbsp; <i><code>Invoke-AACLandingZoneAssessment</code> · <code>Invoke-AACResiliencyAssessment</code></i></summary>
 
 <br>
 
-An Activity Log event holds about sixty values, nested six levels deep. This command makes each one a card: what failed and why (the innermost error and what to do), who (decoded from the token: service principal, managed identity or user, how it signed in, which tenant, which roles), where, and the IDs to trace it. It reads the JSON you copy from the portal (no sign-in needed), takes a correlation ID, or accepts the failures an assessment found from the pipeline.
+The Azure Landing Zone checklist and the Azure Proactive Resiliency Library, run against your estate with Resource Graph. Each check's status says what its evidence can bear. Checks a query can't answer are listed as Manual, never counted as a pass, so neither command gives a score.
 
 ```powershell
-Show-AACActivityLogEvent -Path .\event.json -PdfPath .\incident.pdf
+Invoke-AACLandingZoneAssessment -ManagementGroupId 'mg-landingzones' -HtmlPath .\landing-zone.html
+Invoke-AACResiliencyAssessment -SubscriptionId $sub -Impact High -Status Fail
 ```
 
 </details>
 
 <details>
-<summary><b>🛡️ Effective Azure Policy</b> &nbsp;·&nbsp; <i><code>Show-AACEffectivePolicy</code> · <code>Test-AACPolicyDeployment</code></i></summary>
+<summary><b>☸️ Inside your AKS clusters</b> &nbsp;·&nbsp; <i><code>Invoke-AACAksAssessment -IncludeWorkload</code></i></summary>
 
 <br>
 
-Starts from the resource, not the assignment. You see every policy that applies, what it does to the resource (blocks, audits, changes, deploys), where it is assigned, whether the resource complies and why not, and what exempts it or leaves it out. For a resource you haven't deployed yet, Azure Policy itself says what it would refuse and which values it allows. `Test-AACPolicyDeployment` checks an ARM template or Bicep file before it deploys, and can fail a pipeline.
+49 checks on what runs in each cluster, read with AKS run command: failing and restarting pods, requests, probes, disruption budgets, privileged and host access, RBAC, public services. It also says whether the workloads could move to AKS Automatic. Secrets and ConfigMaps are never read. The assessment itself has about 20 more checks, so scores can drop from 0.14.9.
 
 ```powershell
-Show-AACEffectivePolicy -ResourceId $storageId
-Test-AACPolicyDeployment -TemplatePath .\main.bicep -SubscriptionId $sub -ResourceGroupName 'rg-orders' -FailOn Deny
+Invoke-AACAksAssessment -Name 'aks-prod-weu' -IncludeWorkload -HtmlPath .\aks.html
 ```
 
 </details>
 
 <details>
-<summary><b>📨 Service Bus entities</b> &nbsp;·&nbsp; <i><code>Show-AACServiceBusEntity</code></i></summary>
+<summary><b>✅ Accepted findings, and what changed</b> &nbsp;·&nbsp; <i><code>-SuppressionFile</code> · <code>-PreviousPath</code></i></summary>
 
 <br>
 
-Queues and topics as the signed-in user can see them, whether the role is on the namespace or only on the entities. You get live counts, dead-letters, subscriptions and configuration, plus Azure Monitor metrics with trends when the role covers the namespace. With an entity role only, `-Sample` builds a backlog trend instead.
+Mark findings you have accepted, with a reason and an expiry date, and they leave the counts but stay visible in the report. Compare with last month's run to see what is new, still open or resolved. Available in the AKS, Microsoft 365, Azure DevOps, landing zone and resiliency assessments.
 
 ```powershell
-Show-AACServiceBusEntity -NamespaceId $namespaceId -EntityName 'orders-*' -TimeRange 7d -HtmlPath .\sb.html
+Invoke-AACM365Assessment -CsvPath .\m365-november -PreviousPath .\m365-october -SuppressionFile .\accepted.json
 ```
 
 </details>
 
 <details>
-<summary><b>🔑 Key Vault assessment</b> &nbsp;·&nbsp; <i><code>Invoke-AACKeyVaultAssessment</code> (was <code>Get-AACKeyVaultInsight</code>)</i></summary>
+<summary><b>➕ And more</b> &nbsp;·&nbsp; <i>quota, Conditional Access, pipeline minutes, baseline alerts</i></summary>
 
 <br>
 
-Renamed to match the other `Invoke-AAC<Thing>Assessment` commands; it works as before. Replace the old name in your scripts, and `AAC.KeyVaultInsight` with `AAC.KeyVaultAssessment` anywhere you test the type.
+- `Test-AACAzureLimit -IncludeQuota`: each region's compute, network and storage quota.
+- `Invoke-AACM365Assessment`: four more Conditional Access findings, such as Global Administrators left out of an MFA policy.
+- `Invoke-AACADOAssessment`: pipeline minutes per project, pipelines getting slower, and widely shared service connections.
+- `Get-AACAlertBaseline` and `Get-AACResiliencyRecommendation`: the baseline alerts and resiliency recommendations for a resource type, offline.
 
 </details>
 
-The breaking change (one rename, no alias) is in the [changelog](CHANGELOG.md), with 0.14.8 (the Architecture design area) and earlier releases.
-
+Everything is in the [changelog](CHANGELOG.md), with 0.14.9 and earlier releases.
 ## Architecture design
 
 **Design it before you deploy it, and draw it the way you'll deploy it.** Architecture reviews usually start from a whiteboard sketch that nobody keeps up to date, then find out at deployment that a policy denies it. The Architecture commands turn the conversation into a design: they ask the questions an Azure architect would ask, pick the [cloud design patterns](https://learn.microsoft.com/azure/architecture/patterns/) that fit, lay out the components, check them against the Well-Architected Framework and your landing zone's Azure Policy, and draw the result. The diagram, the findings and the decision records all come from the same model, so they agree.
@@ -153,18 +155,18 @@ Everything except reading the landing zone runs offline, so a design can be revi
 
 ## What's inside
 
-89 commands. Every one gives a **console view**, **objects**, and **CSV, HTML and PDF** reports.
+98 commands. Every one gives a **console view**, **objects**, and **CSV, HTML and PDF** reports.
 
 | Area | Commands |
 |---|---|
-| **Design** | `New-AACArchitectureBrief` · `Get-AACArchitecturePattern` · `New-AACArchitectureDesign` · `Test-AACArchitectureDesign` · `New-AACArchitectureDiagram` · `Export-AACArchitectureDecision` |
-| **Assess** | `Invoke-AACTenantAssessment` · `Invoke-AACWafAssessment` · `Invoke-AACGovernanceAssessment` · `Invoke-AACPSRule` · `Test-AACGoLiveReadiness` · `Invoke-AACAksAssessment` · `Invoke-AACFunctionAppAssessment` and 11 more |
+| **Design** | `New-AACServiceBlueprint` 🆕 · `New-AACArchitectureBrief` · `Get-AACArchitecturePattern` · `New-AACArchitectureDesign` · `Test-AACArchitectureDesign` · `New-AACArchitectureDiagram` · `Export-AACArchitectureDecision` |
+| **Assess** | `Invoke-AACTenantAssessment` · `Invoke-AACWafAssessment` · `Invoke-AACGovernanceAssessment` · `Invoke-AACPSRule` · `Test-AACGoLiveReadiness` · `Invoke-AACLandingZoneAssessment` 🆕 · `Invoke-AACResiliencyAssessment` 🆕 · `Invoke-AACAksAssessment` · `Invoke-AACFunctionAppAssessment` and 12 more |
 | **See** | `Show-AACDashboard` · `Get-AACInventory` · `Show-AACResourceMap` · `Show-AACNetworkTopology` · `Get-AACDependencyGraph` |
 | **Cost** | `Show-AACCost` · `Get-AACCostAnomaly` · `Get-AACUnusedResource` · `Get-AACResourceUtilization` · `Get-AACAdvisorRecommendation` |
 | **Secure** | `Get-AACSecurityPosture` · `Get-AACAttackPath` · `Get-AACAccessReview` · `Get-AACNetworkSecurityGroup` · `Get-AACLegacyAuthentication` |
 | **Plan IPs** | `Get-AACIPAMReport` - your address plan, every IP address, overlaps and the next free ranges |
-| **Govern** | `Show-AACEffectivePolicy` 🆕 · `Test-AACPolicyDeployment` 🆕 · `Get-AACPolicyState` · `Get-AACComplianceGap` · `Get-AACConfigurationDrift` · `Get-AACResourceLock` · `Test-AACAzureLimit` |
-| **Operate** | `Get-AACResourceHealth` · `Get-AACChangeHistory` · `Get-AACResourceError` · `Invoke-AACHealthCheck` · `Get-AACFailoverReadiness` · `Invoke-AACActivityLogAssessment` 🆕 · `Show-AACActivityLogEvent` 🆕 · `Show-AACServiceBusEntity` 🆕 |
+| **Govern** | `Show-AACEffectivePolicy` · `Test-AACPolicyDeployment` · `Get-AACPolicyState` · `Get-AACComplianceGap` · `Get-AACConfigurationDrift` · `Get-AACResourceLock` · `Test-AACAzureLimit` |
+| **Operate** | `Get-AACResourceHealth` · `Get-AACChangeHistory` · `Get-AACResourceError` · `Invoke-AACHealthCheck` · `Get-AACFailoverReadiness` · `Invoke-AACActivityLogAssessment` · `Show-AACActivityLogEvent` · `Show-AACServiceBusEntity` · `Get-AACAlertBaseline` 🆕 |
 | **Microsoft 365** | `Invoke-AACM365Assessment` · `Get-AACEntraGroupMembership` · `Get-AACApplicationPermission` · `New-AACApplicationPermission` |
 | **Azure DevOps** | `Invoke-AACADOAssessment` |
 | **Build** | `Export-AACTerraform` · `Get-AACTerraformPlan` · `Deploy-AACStorageAccount` |

@@ -2,7 +2,7 @@
 
 > A PowerShell 7.2+ module for Azure, Microsoft 365 and Azure DevOps administration over plain REST: no Az or Microsoft.Graph modules and no app registration. Read-only by default; every command gives a console view, typed objects, and CSV, HTML and PDF reports.
 
-Version 0.14.9. The guide comes first, then the reference for each of the 98 commands.
+Version 0.15.0. The guide comes first, then the reference for each of the 98 commands.
 
 <!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/guide/overview.md -->
 
@@ -3534,8 +3534,8 @@ area (Core first), for a faster import.
 2. Commit, then push a tag that matches the version:
 
    ```powershell
-   git tag -a v0.14.9 -m "Azure.Admin.Console v0.14.9"
-   git push origin v0.14.9
+   git tag -a v0.15.0 -m "Azure.Admin.Console v0.15.0"
+   git push origin v0.15.0
    ```
 
 **Pre-releases.** A `Prerelease` value in the manifest's `PSData` (for

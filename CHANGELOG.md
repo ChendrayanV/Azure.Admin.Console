@@ -2,6 +2,34 @@
 
 All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never published to the PowerShell Gallery.
 
+## v0.15.0
+
+Plan a service before it is deployed; check the estate against the Azure Landing Zone checklist and the Azure Proactive Resiliency Library; look inside AKS clusters; and accept findings with a reason, then see what changed since the last run.
+
+### Changed behaviour
+
+- **`Invoke-AACAksAssessment` has about 20 more Well-Architected checks, so a cluster's WAF score can drop** while nothing about the cluster changed. Compare scores only between runs of the same version.
+- **Findings carry a `FindingKey`** in `Invoke-AACAksAssessment`, `Invoke-AACM365Assessment` and `Invoke-AACADOAssessment`: a new property and a new CSV column. Nothing was removed.
+
+### New
+
+- **A service, planned before it is deployed.** `New-AACServiceBlueprint -Service FunctionApp, StorageAccount, 'Virtual Network' -Workload orders -Environment prod` plans any service in Azure's list (read from the Support API, so new services appear without a module update, with tab completion). You get names that follow your naming rules, the Azure Policy that would apply (with `-SubscriptionId`), PSRule for Azure on the planned configuration, AMBA alerts and APRL recommendations, as a console view, an HTML map, a draw.io file and a PDF. Function App, storage, Event Hubs and Event Grid have checked configurations and work without signing in; other services are planned from their resource types and say what wasn't checked.
+- **Baseline alerts and resiliency recommendations, offline.** `Get-AACAlertBaseline -ResourceType 'Microsoft.EventHub/namespaces'` lists the alerts Azure Monitor Baseline Alerts suggests, with thresholds and severities; `Get-AACResiliencyRecommendation` lists the Azure Proactive Resiliency Library's recommendations. Both read data shipped with the module, from pinned commits.
+- **The Azure Landing Zone checklist, checked.** `Invoke-AACLandingZoneAssessment` runs the checklist's Resource Graph queries (about 130 of its 206 items; the rest are listed as Manual, with why). The queries vary, so a status says what its evidence can bear: Fail, Review (judged by a name only), Pass, Present (the query can only say a resource exists), No evidence, Manual or Not checked. There is no score.
+- **Your resources against APRL.** `Invoke-AACResiliencyAssessment` runs APRL's own queries for the resource types you use, and lists each resource that doesn't follow a recommendation. About half of APRL's recommendations have no query: those show as Manual, never as a pass.
+- **What runs inside an AKS cluster.** `Invoke-AACAksAssessment -IncludeWorkload` reads each cluster with AKS run command (`kubectl get` and `jq`, read-only) and adds 49 checks: health (failing, pending and restarting pods, nodes, services, volumes), workload design (requests, limits, probes, replicas, spread, disruption budgets), pod security (privileged, host namespaces and paths, capabilities, seccomp, root), namespaces, RBAC, network and storage. Secrets and ConfigMaps aren't read, and no environment variable's value leaves the cluster. It also says whether the workloads could move to a new AKS Automatic cluster, from Microsoft's Deployment Safeguards: Fix first, Changed by Automatic, Review. A check that couldn't see everything (refused, or past run command's 512 kB) says Not checked rather than Pass. These checks are findings, but not in the WAF score.
+- **Accepted findings, and what changed since last time.** `-SuppressionFile` takes a JSON file of reviewed findings, each with a reason and an optional expiry: they leave the counts, and the report lists them with their reasons. `-PreviousPath` takes an earlier run's findings CSV: each finding is then New or Open, and the report lists what was resolved. In `Invoke-AACAksAssessment`, `Invoke-AACM365Assessment`, `Invoke-AACADOAssessment`, `Invoke-AACLandingZoneAssessment` and `Invoke-AACResiliencyAssessment`. A malformed file stops the command before it reads anything from Azure.
+- **Quota per region.** `Test-AACAzureLimit -IncludeQuota` adds each region's compute, network and storage quota in use, against the maximum Azure reports for it.
+- **`Invoke-AACAksAssessment`, more checks** (many following KubeBuddy's AKS checks): Kubernetes RBAC, the Kubernetes dashboard add-on, legacy Entra ID integration, private API server, user-assigned identity, OIDC issuer, Key Vault secrets provider, burstable and older VM sizes, small managed OS disks, Azure Linux, the system pool's taint, managed ingress, the node resource group's name, Cilium, KEDA and the vertical pod autoscaler; and with `-IncludeConstraint`, whether allowed images and privileged containers are enforced by Gatekeeper. New settings: Cluster SKU, Kubernetes RBAC, node auto-provisioning.
+- **`Invoke-AACM365Assessment`, more Conditional Access findings:** Global Administrators excluded from an MFA policy, protection for administrators turned off, too many accounts excluded from an all-users policy, an enabled policy with no strong control.
+- **`Invoke-AACADOAssessment`, pipeline minutes:** each pipeline's total minutes, each project's share of the organization's, pipelines getting slower, and powerful service connections shared by many pipelines. `-View SuppressedFinding` and `-View ResolvedFinding`.
+- **Docs.** The guide is split into a page per topic under `docs/guide/`, with `GUIDE.md` as its index. `llms.txt` and `llms-full.txt` describe the module to AI tools, and are rebuilt with the docs. `AGENTS.md` has the rules for contributors and coding agents. `THIRD-PARTY-NOTICES.md` names the data that ships with the module and its licences.
+
+### Fixed
+
+- `Invoke-AACAksAssessment` no longer fails "Cluster autoscaler on user pools" on a cluster with node auto-provisioning.
+- The guide's command tables listed neither the four Sentinel commands nor the architecture commands under their own heading.
+
 ## v0.14.9
 
 The Activity Log, made readable and assessed over a year; the Azure Policy that applies to a resource, before and after it is deployed; Service Bus entities as an entity-scoped role sees them - and the Key Vault assessment renamed to match the others.
