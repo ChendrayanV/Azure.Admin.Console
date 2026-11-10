@@ -13,7 +13,6 @@ Azure.Admin.Console is a PowerShell 7.2+ module (Core only) for Azure, Microsoft
 - **Areas stay apart.** An area may call Core and itself only, never another area, and Core never calls into an area (`Tests\Core\Module.Tests.ps1` enforces it). A helper two areas need moves to `src\Core\Private\`.
 - **Don't touch `lib\`.** Its DLLs (Spectre.Console, PDFsharp, MigraDoc) are SHA-256 pinned in the `.psm1` and the PDF loader, so changing one means updating its hash.
 - **Don't edit generated files by hand:** `docs\<Command>.md`, `docs\Azure.Admin.Console.md`, `docs\about_*.md`, `en-US\Azure.Admin.Console-help.xml`, `llms.txt` and `llms-full.txt`. Change the source, then run `./build.ps1 -Task Docs`.
-- **`Parked\` is not loaded, packaged or tested.** Ignore it unless the task is about it.
 - **Maintainer's decisions:** don't bump `ModuleVersion`, edit `CHANGELOG.md`, tag, push or run `./build.ps1 -Task Publish` unless asked.
 - **Commits:** no AI co-author or attribution lines.
 
@@ -76,4 +75,4 @@ The build allows no PSScriptAnalyzer errors or warnings, and CI fails if the gen
 
 ## Finding your way
 
-More detail is in [the guide's Development page](docs/guide/development.md). `CHANGELOG.md`, `docs\`, `en-US\`, `lib\`, `out\`, `Parked\`, `llms-full.txt` and `Tests\Fixtures\TerraformPlans\*.json` are large, so search them rather than reading them whole.
+More detail is in [the guide's Development page](docs/guide/development.md). `CHANGELOG.md`, `docs\`, `en-US\`, `lib\`, `out\`, `llms-full.txt` and `Tests\Fixtures\TerraformPlans\*.json` are large, so search them rather than reading them whole.

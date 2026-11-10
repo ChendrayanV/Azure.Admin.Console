@@ -2,7 +2,7 @@
 
 > A PowerShell 7.2+ module for Azure, Microsoft 365 and Azure DevOps administration over plain REST: no Az or Microsoft.Graph modules and no app registration. Read-only by default; every command gives a console view, typed objects, and CSV, HTML and PDF reports.
 
-Version 0.15.0, 99 commands. Install with `Install-PSResource -Name Azure.Admin.Console`, sign in with `Connect-AAC`. Inside PowerShell, `Get-Help <command> -Full` gives the same reference as the pages below.
+Version 0.15.0, 100 commands. Install with `Install-PSResource -Name Azure.Admin.Console`, sign in with `Connect-AAC`. Inside PowerShell, `Get-Help <command> -Full` gives the same reference as the pages below.
 
 ## Guide
 
@@ -45,6 +45,7 @@ Version 0.15.0, 99 commands. Install with `Install-PSResource -Name Azure.Admin.
 - [Deploying a storage account](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/guide/deploying-a-storage-account.md)
 - [Service Bus assessment](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/guide/service-bus-assessment.md)
 - [Cosmos DB assessment](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/guide/cosmos-db-assessment.md)
+- [Application Insights assessment](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/guide/application-insights-assessment.md)
 - [Microsoft 365 security posture](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/guide/microsoft-365-security-posture.md)
 - [Entra ID group membership](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/guide/entra-id-group-membership.md)
 - [Application permission](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/guide/application-permission.md)
@@ -114,6 +115,7 @@ Version 0.15.0, 99 commands. Install with `Install-PSResource -Name Azure.Admin.
 - [Get-AACWafCheck](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACWafCheck.md): Lists the checks Invoke-AACWafAssessment runs - by pillar and design principle, with the resource type each tests, its severity, what to do and where to read more - so you can review the catalogue or pick checks for -ExcludeCheck and Test-AACGoLiveReadiness -RequiredCheck.
 - [Invoke-AACActivityLogAssessment](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Invoke-AACActivityLogAssessment.md): Assesses the Activity Log of every resource over 90, 180 or 365 days: who changed what and when, when each resource was last used, which are idle or were deleted, changes made by hand, access and secrets touched by people - with subscription, resource group, resource and tags on every row.
 - [Invoke-AACAksAssessment](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Invoke-AACAksAssessment.md): Assesses AKS clusters through every lens - current settings, the Well-Architected Framework, PSRule for Azure, Azure Policy for Kubernetes (consolidated by namespace, workload, policy and cluster), versions and upgrades, capacity, Advisor and Defender - with a Spectre.Console view, objects, and CSV, PDF and interactive HTML reports.
+- [Invoke-AACApplicationInsightAssessment](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Invoke-AACApplicationInsightAssessment.md): Assesses Application Insights components across subscriptions - ingestion and cost, workspace and architecture, security, identity and access, audit and lifecycle - as a heat map, findings, a Spectre.Console view, objects, and CSV, PDF and interactive HTML reports.
 - [Invoke-AACApplicationInsightQuery](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Invoke-AACApplicationInsightQuery.md): Queries Application Insights - the exceptions of the last few hours by default, or any KQL query - from a Log Analytics workspace or an Application Insights resource, with a Spectre.Console view, flattened objects, and CSV and interactive HTML exports.
 - [Invoke-AACCosmosDBAssessment](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Invoke-AACCosmosDBAssessment.md): Assesses Azure Cosmos DB accounts across subscriptions - availability, rate limiting (429), errors, throughput and its use, storage, every database and container, security, resilience and cost - as a heat map, findings, a Spectre.Console view, objects, and CSV, PDF and interactive HTML reports.
 - [Invoke-AACDefenderAssessment](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Invoke-AACDefenderAssessment.md): Microsoft Defender for Cloud assessed across subscriptions - recommendations, attack paths, security alerts, inventory, vulnerabilities, secure score, Defender plans, regulatory compliance and environment settings - with what to improve, as a Spectre.Console view, an object, CSV files and a tabbed, interactive HTML report.

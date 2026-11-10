@@ -22,7 +22,6 @@
     # YamlDotNet.dll; the rules themselves run in a child pwsh process
     # (PSRule\PSRuleRunner.ps1), so PSRule's YamlDotNet never meets another
     # version of it (platyPS, powershell-yaml, Az.Aks) in the session.
-    # Pester is not needed while Invoke-AACPester is parked (see Parked\).
     RequiredModules      = @(
         @{ ModuleName = 'PSRule.Rules.Azure'; ModuleVersion = '1.47.0' }
     )
@@ -97,6 +96,7 @@
         'Get-AACWafCheck'
         'Invoke-AACActivityLogAssessment'
         'Invoke-AACAksAssessment'
+        'Invoke-AACApplicationInsightAssessment'
         'Invoke-AACApplicationInsightQuery'
         'Invoke-AACTenantAssessment'
         'Invoke-AACCosmosDBAssessment'

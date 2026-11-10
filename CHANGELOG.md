@@ -2,6 +2,12 @@
 
 All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never published to the PowerShell Gallery.
 
+## Unreleased
+
+### Removed
+
+- **`Invoke-AACPester` and the rest of `Parked\`** are gone from the repository: the command, its Azure estate and `-PSRule` checks, its HTML/PDF reports, and a stale copy of `Get-AACResourceInventory`. None of it had been loaded, exported or packaged since v0.10.0, so the module behaves the same.
+
 ## v0.15.0
 
 Plan a service before it is deployed; check the estate against the Azure Landing Zone checklist and the Azure Proactive Resiliency Library; look inside AKS clusters; and accept findings with a reason, then see what changed since the last run.

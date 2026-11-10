@@ -13,7 +13,6 @@ Azure.Admin.Console/
     M365/                    Commands for the Microsoft 365 and Entra ID tenant
     DevOps/                  Commands for Azure DevOps organizations
   PSRule/                    PSRuleRunner.ps1 (runs PSRule in its own pwsh) and Rules\ (the AAC.* rules and their help)
-  Parked/                    Invoke-AACPester and its estate check, set aside (not loaded or packaged)
   lib/                       Vendored Spectre.Console and PDFsharp/MigraDoc (MIT)
   en-US/                     about_ help topic and the MAML help Get-Help shows (built by PlatyPS)
   docs/                      Markdown help, one page per command; the index groups them by area (built by PlatyPS)

@@ -32,7 +32,7 @@ Describe 'Azure Admin Console - Module scaffold' {
         { Test-ModuleManifest -Path $script:aacManifestPath -ErrorAction Stop } | Should -Not -Throw
     }
 
-    It 'exports exactly the public functions, and nothing parked or private' {
+    It 'exports exactly the public functions, and nothing removed or private' {
         $expectedFunctions = @(
             'Connect-AAC'
             'Deploy-AACSentinelHuntingQuery'
@@ -96,6 +96,7 @@ Describe 'Azure Admin Console - Module scaffold' {
             'Get-AACWafCheck'
             'Invoke-AACActivityLogAssessment'
             'Invoke-AACAksAssessment'
+            'Invoke-AACApplicationInsightAssessment'
             'Invoke-AACApplicationInsightQuery'
             'Invoke-AACTenantAssessment'
             'Invoke-AACCosmosDBAssessment'
@@ -135,7 +136,7 @@ Describe 'Azure Admin Console - Module scaffold' {
             'Test-AACPolicyDeployment'
         )
         @((Get-Command -Module 'Azure.Admin.Console').Name | Sort-Object) | Should -Be @($expectedFunctions | Sort-Object)
-        Get-Command -Name 'Invoke-AACPester' -ErrorAction Ignore | Should -BeNullOrEmpty -Because 'Invoke-AACPester is parked (Parked\README.md)'
+        Get-Command -Name 'Invoke-AACPester' -ErrorAction Ignore | Should -BeNullOrEmpty -Because 'Invoke-AACPester was removed'
     }
 
     It 'has a Public file in its area for every exported function, and exports every one' {
