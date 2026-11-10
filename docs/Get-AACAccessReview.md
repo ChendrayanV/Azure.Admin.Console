@@ -20,9 +20,10 @@ A least-privilege access review of Azure and Entra ID: every Azure RBAC assignme
 
 ```
 Get-AACAccessReview [[-SubscriptionId] <string[]>] [[-ManagementGroupId] <string[]>]
+ [[-View] <string>] [[-PrincipalType] <string[]>] [[-RoleName] <string[]>] [[-ScopeType] <string[]>]
  [[-ActivityDays] <int>] [[-Severity] <string[]>] [[-CsvPath] <string>] [[-HtmlPath] <string>]
- [[-PdfPath] <string>] [[-Title] <string>] [-SkipEntra] [-PrivilegedOnly] [-PassThru] [-NoDisplay]
- [-NoPaging]
+ [[-PdfPath] <string>] [[-Title] <string>] [-WithFinding] [-ExpandGroup] [-IncludeCustomRole]
+ [-SkipPim] [-SkipEntra] [-PrivilegedOnly] [-PassThru] [-NoDisplay] [-NoPaging]
 ```
 
 ## ALIASES
@@ -107,6 +108,14 @@ Get-AACAccessReview -NoDisplay | Where-Object Recommendation -EQ 'Make eligible 
 
 The standing access to move into PIM.
 
+### Example 4
+
+```powershell
+Get-AACAccessReview -View Assignment -PrincipalType Guest, Application -ScopeType Subscription, ManagementGroup
+```
+
+Every role guests and applications hold at subscription scope or above.
+
 ## PARAMETERS
 
 ### -ActivityDays
@@ -121,7 +130,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 2
+  Position: 6
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -143,7 +152,28 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 4
+  Position: 8
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ExpandGroup
+
+With -View Assignment: Read each group's members (transitive, up to 200 groups).
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -164,7 +194,29 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 5
+  Position: 9
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -IncludeCustomRole
+
+With -View Assignment: Also return the custom roles (AAC.CustomRole), after the
+assignments.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -269,7 +321,29 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 6
+  Position: 10
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PrincipalType
+
+With -View Assignment: Only these principals: User, Guest, Group, Application,
+ManagedIdentity, Deleted.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 3
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -283,7 +357,8 @@ HelpMessage: ''
 
 Only privileged access (Owner, Contributor, User Access
 Administrator, RBAC Administrator, equivalent custom roles,
-privileged Entra roles and Graph permissions).
+privileged Entra roles and Graph permissions). With -View Assignment:
+only privileged role assignments.
 
 ```yaml
 Type: System.Management.Automation.SwitchParameter
@@ -293,6 +368,49 @@ Aliases: []
 ParameterSets:
 - Name: (All)
   Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -RoleName
+
+With -View Assignment: Only these roles; wildcards work ('\*Owner\*').
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 4
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ScopeType
+
+With -View Assignment: Only assignments at these scopes: Root, ManagementGroup,
+Subscription, ResourceGroup, Resource.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 5
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -313,7 +431,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 3
+  Position: 7
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -327,6 +445,27 @@ HelpMessage: ''
 
 Don't read Entra ID roles and Graph application permissions (Azure
 RBAC is still reviewed; principals are still looked up).
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -SkipPim
+
+With -View Assignment: Don't read PIM (eligible and activated assignments).
 
 ```yaml
 Type: System.Management.Automation.SwitchParameter
@@ -377,7 +516,57 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 7
+  Position: 11
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -View
+
+Review (the default): what to fix - unused, standing, risky and
+external access across Azure RBAC, Entra ID roles and Graph
+permissions, with a recommendation each. Assignment: the inventory
+under it - every Azure role assignment at every scope as it is (who,
+the role, its reach, standing or PIM, the groups' members, who created
+it), with the custom roles; returns AAC.RoleAssignment rows. The
+Assignment view takes -PrincipalType, -RoleName, -ScopeType,
+-PrivilegedOnly, -WithFinding, -ExpandGroup, -IncludeCustomRole and
+-SkipPim, not -ActivityDays or -Severity.
+
+```yaml
+Type: System.String
+DefaultValue: "'Review'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 2
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -WithFinding
+
+With -View Assignment: Only assignments with a finding.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -398,7 +587,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## OUTPUTS
 
-### AAC.AccessAssignment
+### AAC.AccessAssignment AAC.RoleAssignment (and AAC.CustomRole, with -IncludeCustomRole): -View Assignment
 
 ## NOTES
 

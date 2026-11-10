@@ -19,9 +19,11 @@ Microsoft Defender for Cloud assessed across subscriptions - recommendations, at
 ### __AllParameterSets
 
 ```
-Invoke-AACDefenderAssessment [[-SubscriptionId] <string[]>] [[-Section] <string[]>]
- [[-AlertDays] <int>] [[-ScoreWarningPercent] <int>] [[-CsvPath] <string>] [[-HtmlPath] <string>]
- [[-Title] <string>] [-PassThru] [-NoDisplay] [-NoPaging]
+Invoke-AACDefenderAssessment [[-SubscriptionId] <string[]>] [[-View] <string>]
+ [[-ResourceGroupName] <string[]>] [[-Tag] <hashtable>] [[-Section] <string[]>]
+ [[-Standard] <string[]>] [[-AlertDays] <int>] [[-ScoreWarningPercent] <int>] [[-CsvPath] <string>]
+ [[-PdfPath] <string>] [[-HtmlPath] <string>] [[-Title] <string>] [-PassThru] [-NoDisplay]
+ [-NoPaging]
 ```
 
 ## ALIASES
@@ -142,6 +144,22 @@ The High recommendations and how many resources each is on.
 
 The resources no Defender plan protects.
 
+### Example 6
+
+```powershell
+Invoke-AACDefenderAssessment -View Posture -Tag @{ Environment = 'Prod' } -Section Recommendations, Alerts, Policy -PdfPath .\out\Security.pdf
+```
+
+The production resources' recommendations, alerts and Azure Policy compliance, as a PDF.
+
+### Example 7
+
+```powershell
+Invoke-AACDefenderAssessment -View Posture -Section Compliance -Standard '*ISO*' -NoDisplay | Group-Object Title
+```
+
+The failing ISO 27001 controls, as finding rows.
+
 ## PARAMETERS
 
 ### -AlertDays
@@ -156,7 +174,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 2
+  Position: 6
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -168,7 +186,8 @@ HelpMessage: ''
 
 ### -CsvPath
 
-A folder to write a CSV per table to.
+A folder to write a CSV per table to. With -View Posture: a CSV file
+of every finding.
 
 ```yaml
 Type: System.String
@@ -177,7 +196,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 4
+  Position: 8
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -198,7 +217,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 5
+  Position: 10
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -271,6 +290,49 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -PdfPath
+
+With -View Posture: write a PDF report to this file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 9
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ResourceGroupName
+
+With -View Posture: only the recommendations, alerts and compliance
+failures on resources in these resource groups.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 2
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -ScoreWarningPercent
 
 A subscription's secure score under this percentage (70 by default)
@@ -283,7 +345,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 3
+  Position: 7
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -295,8 +357,10 @@ HelpMessage: ''
 
 ### -Section
 
-What to read: Recommendations, AttackPaths, Alerts, Inventory,
-Vulnerabilities, Posture, Compliance, Settings. All by default.
+What to read. The assessment: Recommendations, AttackPaths, Alerts,
+Inventory, Vulnerabilities, Posture, Compliance, Settings. -View
+Posture: Score, Recommendations, Alerts, Plans, Compliance, Policy.
+All of the view's by default.
 
 ```yaml
 Type: System.String[]
@@ -305,7 +369,29 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 1
+  Position: 4
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Standard
+
+With -View Posture: only these regulatory compliance standards (names
+or wildcards, e.g. 'Microsoft-cloud-security-benchmark' or '\*ISO\*').
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 5
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -337,6 +423,29 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -Tag
+
+With -View Posture: only the recommendations, alerts and compliance
+failures on resources with these tags, e.g. @{ Environment = 'Prod' }
+(all must match).
+
+```yaml
+Type: System.Collections.Hashtable
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 3
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -Title
 
 The HTML report's title.
@@ -348,7 +457,35 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 6
+  Position: 11
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -View
+
+Assessment (the default): the full assessment above - every table, and
+the findings - as an AAC.DefenderAssessment object. Posture: the
+posture as flat AAC.SecurityFinding rows - secure score and controls,
+recommendations on each resource, active alerts, Defender plans,
+regulatory compliance failures and Azure Policy compliance (which
+assignments leave resources non-compliant) - that can be narrowed to
+resource groups (-ResourceGroupName) or tags (-Tag) and compliance
+standards (-Standard), and written as CSV, HTML or PDF (-PdfPath).
+
+```yaml
+Type: System.String
+DefaultValue: "'Assessment'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 1
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -369,7 +506,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## OUTPUTS
 
-### AAC.DefenderAssessment (piped onward, or with -PassThru or -NoDisplay)
+### AAC.DefenderAssessment (piped onward, or with -PassThru or -NoDisplay) AAC.SecurityFinding (-View Posture, the same way)
 
 ## NOTES
 

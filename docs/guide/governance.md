@@ -2,7 +2,7 @@
 
 [Guide index](../../GUIDE.md) · [Command reference](../Azure.Admin.Console.md)
 
-**Commands:** [`Get-AACGovernanceChange`](../Get-AACGovernanceChange.md) · [`Get-AACGovernanceSetting`](../Get-AACGovernanceSetting.md) · [`Get-AACResourceLock`](../Get-AACResourceLock.md) · [`Get-AACRoleAssignment`](../Get-AACRoleAssignment.md) · [`Get-AACServicePrincipalInsight`](../Get-AACServicePrincipalInsight.md) · [`Get-AACTagUsage`](../Get-AACTagUsage.md) · [`Invoke-AACGovernanceAssessment`](../Invoke-AACGovernanceAssessment.md) · [`Show-AACManagementGroupMap`](../Show-AACManagementGroupMap.md) · [`Test-AACAlzPolicy`](../Test-AACAlzPolicy.md) · [`Test-AACAzureLimit`](../Test-AACAzureLimit.md)
+**Commands:** [`Get-AACGovernanceChange`](../Get-AACGovernanceChange.md) · [`Get-AACGovernanceSetting`](../Get-AACGovernanceSetting.md) · [`Get-AACResourceLock`](../Get-AACResourceLock.md) · [`Get-AACAccessReview`](../Get-AACAccessReview.md) (`-View Assignment`) · [`Get-AACServicePrincipalInsight`](../Get-AACServicePrincipalInsight.md) · [`Get-AACTagUsage`](../Get-AACTagUsage.md) · [`Invoke-AACGovernanceAssessment`](../Invoke-AACGovernanceAssessment.md) · [`Show-AACManagementGroupMap`](../Show-AACManagementGroupMap.md) · [`Test-AACAlzPolicy`](../Test-AACAlzPolicy.md) · [`Test-AACAzureLimit`](../Test-AACAzureLimit.md)
 
 Governance questions across the whole tenant, in the spirit of the
 [Azure Governance Visualizer](https://github.com/Azure/Azure-Governance-Visualizer) -
@@ -12,7 +12,7 @@ each one a command of its own, and all of them together in one workbook.
 Invoke-AACGovernanceAssessment -HtmlPath .\Governance.html                     # everything, as a tabbed workbook
 Invoke-AACGovernanceAssessment -MarkdownPath .\wiki\Governance.md -MarkdownFlavor AzureDevOps -NoDisplay   # a wiki page, from a pipeline
 Show-AACManagementGroupMap                                                     # the hierarchy, in the browser
-Get-AACRoleAssignment -ExpandGroup -HtmlPath .\Rbac.html                       # every role assignment, groups expanded
+Get-AACAccessReview -View Assignment -ExpandGroup -HtmlPath .\Rbac.html                       # every role assignment, groups expanded
 Test-AACAzureLimit -FailOnLimit Warning                                        # fail a pipeline at 80% of any limit
 Test-AACAlzPolicy -LibraryPath C:\alz-library -ManagementGroupMap @{ alz = 'contoso' }
 ```
@@ -20,7 +20,7 @@ Test-AACAlzPolicy -LibraryPath C:\alz-library -ManagementGroupMap @{ alz = 'cont
 | Area | Command | What it answers |
 |---|---|---|
 | Hierarchy | `Show-AACManagementGroupMap` | Each management group, its subscriptions, policy and role assignments - a map, a tree, or `Export-AACDiagram -View Governance` for draw.io |
-| Access | `Get-AACRoleAssignment` | Every role assignment at every scope; orphaned ones, privileged guests, applications as Owner, custom roles unused or as powerful as Owner |
+| Access | `Get-AACAccessReview -View Assignment` | Every role assignment at every scope; orphaned ones, privileged guests, applications as Owner, custom roles unused or as powerful as Owner |
 | Identities | `Get-AACServicePrincipalInsight` | Applications and managed identities with Azure roles; credentials about to expire; other tenants' apps |
 | Policy | `Get-AACPolicyRemediation` | Policies that could fix what they find, and whether remediation ran (`Invoke-AACPolicyAssessment` covers assignments, compliance, exemptions and identities' roles) |
 | Limits | `Test-AACAzureLimit` | Scopes close to an Azure limit, with what to do; `-IncludeQuota` adds each region's compute, network and storage quota |

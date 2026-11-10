@@ -2,9 +2,11 @@
 
 [Guide index](../../GUIDE.md) · [Command reference](../Azure.Admin.Console.md)
 
-**Commands:** [`Show-AACCost`](../Show-AACCost.md) · [`Show-AACResource`](../Show-AACResource.md)
+**Commands:** [`Show-AACCost`](../Show-AACCost.md) · [`Get-AACInventory`](../Get-AACInventory.md) (`-View Chart`)
 
-`Show-AACResource` counts every resource you can see with two Resource Graph
+(This was `Show-AACResource`, which still works but warns, and will be removed in a later release.)
+
+`Get-AACInventory -View Chart` counts every resource you can see with two Resource Graph
 queries, and draws one bar per type, each in its own colour:
 
 ```text
@@ -16,11 +18,11 @@ network/networkinterfaces  █████████████████�
 ```
 
 ```powershell
-Show-AACResource                                  # by type, top 20
-Show-AACResource -By Location                     # or ResourceGroup, Subscription
-Show-AACResource -ResourceType 'microsoft.network/*' -Top 10
-Show-AACResource -By Subscription -PassThru | Export-Csv .\PerSubscription.csv
-Show-AACResource -HtmlPath .\Inventory.html        # an interactive inventory
+Get-AACInventory -View Chart                                  # by type, top 20
+Get-AACInventory -View Chart -By Location                     # or ResourceGroup, Subscription
+Get-AACInventory -View Chart -ResourceType 'microsoft.network/*' -Top 10
+Get-AACInventory -View Chart -By Subscription -PassThru | Export-Csv .\PerSubscription.csv
+Get-AACInventory -View Chart -HtmlPath .\Inventory.html        # an interactive inventory
 ```
 
 `-HtmlPath` writes an interactive inventory of every resource: name, type,

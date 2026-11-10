@@ -109,6 +109,24 @@ function Get-AACInventory {
     .PARAMETER ResourceGroupName
         Only these resource groups (in the subscriptions or management groups
         given, or in any you can see).
+    .PARAMETER View
+        Tree (the default): the hierarchy - management groups, subscriptions,
+        resource groups and resources - with security, cost and insight.
+        Chart: how many resources you have, as a bar chart by type, location,
+        resource group or subscription (-By, -ResourceType, -Top). Two
+        Resource Graph queries however many resources there are; with
+        -HtmlPath, an interactive inventory of the resources instead. Takes
+        -SubscriptionId, -HtmlPath, -Title, -PassThru and -NoPaging; returns
+        AAC.ResourceCount objects with -PassThru.
+    .PARAMETER By
+        With -View Chart: what to count by - Type (default), Location,
+        ResourceGroup or Subscription.
+    .PARAMETER ResourceType
+        With -View Chart: only count resources of these types.
+        Case-insensitive; wildcards work, e.g. 'microsoft.network/*'.
+    .PARAMETER Top
+        With -View Chart: how many bars to draw (default 20); the rest are
+        summed in one bar.
     .PARAMETER Depth
         How deep the console tree goes: ManagementGroup, Subscription,
         ResourceGroup (the default) or Resource. The objects and exports
@@ -158,13 +176,18 @@ function Get-AACInventory {
         Get-AACInventory -Cost -HtmlPath .\out\Inventory.html
         The tenant with what every resource, group and subscription costs.
     .EXAMPLE
+        Get-AACInventory -View Chart -By Location -ResourceType 'microsoft.network/*'
+        How many network resources there are in each region, as a bar chart.
+    .EXAMPLE
         Get-AACInventory -NoDisplay | Where-Object { $_.Level -eq 'ResourceGroup' -and $_.Resources -eq 0 }
         The empty resource groups.
     .OUTPUTS
         AAC.InventoryItem (piped onward, or with -PassThru or -NoDisplay)
+        AAC.ResourceCount (-View Chart with -PassThru)
     #>
     [CmdletBinding()]
     [OutputType('AAC.InventoryItem')]
+    [OutputType('AAC.ResourceCount')]
     param(
         [ValidateNotNullOrEmpty()]
         [string[]] $ManagementGroupId,
@@ -174,6 +197,18 @@ function Get-AACInventory {
 
         [ValidateNotNullOrEmpty()]
         [string[]] $ResourceGroupName,
+
+        [ValidateSet('Tree', 'Chart')]
+        [string] $View = 'Tree',
+
+        [ValidateSet('Type', 'Location', 'ResourceGroup', 'Subscription')]
+        [string] $By = 'Type',
+
+        [ValidatePattern('^[\w.*/-]+$')]
+        [string[]] $ResourceType,
+
+        [ValidateRange(1, 100)]
+        [int] $Top = 20,
 
         [ValidateSet('ManagementGroup', 'Subscription', 'ResourceGroup', 'Resource')]
         [string] $Depth = 'ResourceGroup',
@@ -215,6 +250,23 @@ function Get-AACInventory {
     $pdfFullPath = & $resolve $PdfPath
     $htmlFullPath = & $resolve $HtmlPath
     $quote = { param([string] $Text) ConvertTo-AACKqlLiteral -Text $Text }
+
+    # The chart (what Show-AACResource drew): resource counts, not the tree.
+    # Say plainly which tree-only parameters it can't honour rather than
+    # silently ignoring them.
+    $chartOnly = @('By', 'ResourceType', 'Top') | Where-Object { $PSBoundParameters.ContainsKey($_) }
+    if ($View -eq 'Tree' -and $chartOnly) {
+        throw "Azure Admin Console -$($chartOnly -join ', -') works with -View Chart only. Add -View Chart, or leave it out for the tree."
+    }
+    if ($View -eq 'Chart') {
+        $treeOnly = @('ManagementGroupId', 'ResourceGroupName', 'Depth', 'NoSecurity', 'Cost', 'Insight', 'CsvPath', 'PdfPath', 'NoDisplay') | Where-Object { $PSBoundParameters.ContainsKey($_) }
+        if ($treeOnly) {
+            throw "Azure Admin Console -View Chart doesn't take -$($treeOnly -join ', -'). Use -SubscriptionId, -By, -ResourceType, -Top, -HtmlPath, -Title, -PassThru or -NoPaging, or leave out -View Chart for the tree."
+        }
+        $chartTitle = if ($PSBoundParameters.ContainsKey('Title')) { $Title } else { 'Azure resources' }
+        Show-AACResourceChart -SubscriptionId $SubscriptionId -By $By -ResourceType $ResourceType -Top $Top -HtmlFullPath $htmlFullPath -Title $chartTitle -NoPaging:$NoPaging -PassThru:$PassThru
+        return
+    }
 
     $groupFilter = if ($ResourceGroupName) { "($((@($ResourceGroupName | ForEach-Object { & $quote $_ })) -join ', '))" } else { '' }
 

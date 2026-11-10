@@ -2,7 +2,7 @@
 
 [Guide index](../../GUIDE.md) · [Command reference](../Azure.Admin.Console.md)
 
-**Commands:** [`Export-AACDiagram`](../Export-AACDiagram.md) · [`Show-AACApplicationGatewayMap`](../Show-AACApplicationGatewayMap.md)
+**Commands:** [`New-AACDesignDiagram`](../New-AACDesignDiagram.md) · [`Export-AACDiagram`](../Export-AACDiagram.md) · [`Show-AACApplicationGatewayMap`](../Show-AACApplicationGatewayMap.md)
 
 `Export-AACDiagram` draws your existing resources as a diagram you can
 **edit** - not a picture. It writes a `.drawio` file. You open it in
@@ -83,3 +83,33 @@ the same shape IDs, so `Export-AACDiagram -Update` can refresh it later.
 **What it needs.** Reader on what you draw, and nothing to install: the
 diagram is written by PowerShell, with no Graphviz, Python or Visio.
 `-PdfPath` uses Microsoft Edge or Google Chrome if either is installed.
+
+## Drawing a design before it exists
+
+`New-AACDesignDiagram` draws a hub and spoke design from a few parameters, offline: nothing is read from Azure, so it works before there is a subscription for it. `Export-AACDiagram` draws what is deployed; this draws what you are about to build.
+
+```powershell
+New-AACDesignDiagram -Name contoso -Firewall -Bastion -Spoke orders, payments -Resource FunctionApp, WebApp, StorageAccount, KeyVault -Open
+```
+
+| It plans | How |
+|---|---|
+| Subnets and address ranges | Each network's subnets at the size Microsoft recommends for what is in them (AzureFirewallSubnet /26, a delegated App Service integration subnet, a private endpoint subnet...), the smallest supported when the space is tight. A spoke given as a name takes the next free /16 |
+| Routing | With `-Firewall`, a route table per spoke sending 0.0.0.0/0 to the firewall's private IP |
+| Peering | Every spoke to the hub; with `-VpnGateway`, with gateway transit and the on-premises connection |
+| Resources | Named `{type}-{spoke}-{env}-{region}`: Web and Function Apps with VNet integration and an App Service plan; storage, Key Vault, SQL, Cosmos DB, Redis, Service Bus, Event Hubs and registries behind private endpoints, their private DNS zones in the hub; VMs, AKS, Application Gateway and API Management in subnets of their own |
+
+The diagram has a box for every subscription, region, resource group, virtual network and subnet, with each name and range on it, and a Legend page. Networks that overlap, or a network too small for its subnets, stop the command, rather than drawing addresses that can't exist.
+
+For full control, give a spoke as a hashtable - its own range, subscription, resource group and subnets:
+
+```powershell
+New-AACDesignDiagram -Name contoso -Firewall -VpnGateway -HubAddressSpace 10.100.0.0/22 -Spoke @(
+    @{ Name = 'orders'; AddressSpace = '10.110.0.0/20'; Subscription = 'sub-orders-prod'
+       Subnets = @( @{ Name = 'snet-app'; AddressPrefix = '10.110.0.0/24'; Resources = 'FunctionApp' }
+                    @{ Name = 'snet-pe';  AddressPrefix = '10.110.1.0/26'; Resources = 'StorageAccount', 'ServiceBus' } ) }
+    @{ Name = 'web'; AddressSpace = '10.120.0.0/20'; Resources = 'ApplicationGateway', 'WebApp', 'SqlDatabase' }
+) -Path .\contoso.drawio -CsvPath .\contoso-ip-plan.csv
+```
+
+Change the parameters and run it again with `-Update`: the diagram is redrawn and the changes you made to it in draw.io are kept. `-CsvPath` writes the address plan, and `-HtmlPath` or `-PdfPath` a page or PDF to share.

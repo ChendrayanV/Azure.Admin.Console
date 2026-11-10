@@ -72,9 +72,30 @@ function Invoke-AACDefenderAssessment {
     .PARAMETER SubscriptionId
         Only these subscriptions. Defaults to every subscription the account
         can see.
+    .PARAMETER View
+        Assessment (the default): the full assessment above - every table, and
+        the findings - as an AAC.DefenderAssessment object. Posture: the
+        posture as flat AAC.SecurityFinding rows - secure score and controls,
+        recommendations on each resource, active alerts, Defender plans,
+        regulatory compliance failures and Azure Policy compliance (which
+        assignments leave resources non-compliant) - that can be narrowed to
+        resource groups (-ResourceGroupName) or tags (-Tag) and compliance
+        standards (-Standard), and written as CSV, HTML or PDF (-PdfPath).
+    .PARAMETER ResourceGroupName
+        With -View Posture: only the recommendations, alerts and compliance
+        failures on resources in these resource groups.
+    .PARAMETER Tag
+        With -View Posture: only the recommendations, alerts and compliance
+        failures on resources with these tags, e.g. @{ Environment = 'Prod' }
+        (all must match).
     .PARAMETER Section
-        What to read: Recommendations, AttackPaths, Alerts, Inventory,
-        Vulnerabilities, Posture, Compliance, Settings. All by default.
+        What to read. The assessment: Recommendations, AttackPaths, Alerts,
+        Inventory, Vulnerabilities, Posture, Compliance, Settings. -View
+        Posture: Score, Recommendations, Alerts, Plans, Compliance, Policy.
+        All of the view's by default.
+    .PARAMETER Standard
+        With -View Posture: only these regulatory compliance standards (names
+        or wildcards, e.g. 'Microsoft-cloud-security-benchmark' or '*ISO*').
     .PARAMETER AlertDays
         Security alerts generated in the last this many days (30 by
         default).
@@ -82,7 +103,10 @@ function Invoke-AACDefenderAssessment {
         A subscription's secure score under this percentage (70 by default)
         is a finding - High under half of it.
     .PARAMETER CsvPath
-        A folder to write a CSV per table to.
+        A folder to write a CSV per table to. With -View Posture: a CSV file
+        of every finding.
+    .PARAMETER PdfPath
+        With -View Posture: write a PDF report to this file.
     .PARAMETER HtmlPath
         Write the tabbed, interactive HTML report to this file.
     .PARAMETER Title
@@ -109,17 +133,37 @@ function Invoke-AACDefenderAssessment {
     .EXAMPLE
         (Invoke-AACDefenderAssessment -NoDisplay -Section Inventory).Inventory | Where-Object PlanState -EQ 'Off'
         The resources no Defender plan protects.
+    .EXAMPLE
+        Invoke-AACDefenderAssessment -View Posture -Tag @{ Environment = 'Prod' } -Section Recommendations, Alerts, Policy -PdfPath .\out\Security.pdf
+        The production resources' recommendations, alerts and Azure Policy compliance, as a PDF.
+    .EXAMPLE
+        Invoke-AACDefenderAssessment -View Posture -Section Compliance -Standard '*ISO*' -NoDisplay | Group-Object Title
+        The failing ISO 27001 controls, as finding rows.
     .OUTPUTS
         AAC.DefenderAssessment (piped onward, or with -PassThru or -NoDisplay)
+        AAC.SecurityFinding (-View Posture, the same way)
     #>
     [CmdletBinding()]
     [OutputType('AAC.DefenderAssessment')]
+    [OutputType('AAC.SecurityFinding')]
     param(
         [ValidatePattern('^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$')]
         [string[]] $SubscriptionId,
 
-        [ValidateSet('Recommendations', 'AttackPaths', 'Alerts', 'Inventory', 'Vulnerabilities', 'Posture', 'Compliance', 'Settings')]
+        [ValidateSet('Assessment', 'Posture')]
+        [string] $View = 'Assessment',
+
+        [ValidateNotNullOrEmpty()]
+        [string[]] $ResourceGroupName,
+
+        [hashtable] $Tag,
+
+        # The assessment's sections, then -View Posture's own (checked below).
+        [ValidateSet('Recommendations', 'AttackPaths', 'Alerts', 'Inventory', 'Vulnerabilities', 'Posture', 'Compliance', 'Settings', 'Score', 'Plans', 'Policy')]
         [string[]] $Section = @('Recommendations', 'AttackPaths', 'Alerts', 'Inventory', 'Vulnerabilities', 'Posture', 'Compliance', 'Settings'),
+
+        [SupportsWildcards()]
+        [string[]] $Standard,
 
         [ValidateRange(1, 365)]
         [int] $AlertDays = 30,
@@ -128,6 +172,8 @@ function Invoke-AACDefenderAssessment {
         [int] $ScoreWarningPercent = 70,
 
         [string] $CsvPath,
+
+        [string] $PdfPath,
 
         [string] $HtmlPath,
 
@@ -145,6 +191,25 @@ function Invoke-AACDefenderAssessment {
     trap { if ($_.Exception -is [System.Management.Automation.PipelineStoppedException]) { return }; $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
 
     $pipedOnward = $MyInvocation.PipelinePosition -lt $MyInvocation.PipelineLength
+
+    # The posture (what Get-AACSecurityPosture gave): flat findings, narrowable
+    # and with a PDF. Say plainly which parameters belong to the other view
+    # rather than ignoring them.
+    $postureSections = @('Score', 'Recommendations', 'Alerts', 'Plans', 'Compliance', 'Policy')
+    if ($View -eq 'Posture') {
+        $assessmentOnly = @('AlertDays', 'ScoreWarningPercent') | Where-Object { $PSBoundParameters.ContainsKey($_) }
+        if ($assessmentOnly) { throw "Azure Admin Console -View Posture doesn't take -$($assessmentOnly -join ', -'). Leave it out, or leave out -View Posture for the assessment." }
+        $wrong = @($Section | Where-Object { $_ -notin $postureSections })
+        if ($PSBoundParameters.ContainsKey('Section') -and $wrong.Count) { throw "Azure Admin Console -View Posture has no section $($wrong -join ', '). Its sections are $($postureSections -join ', ')." }
+        $forward = @{}
+        foreach ($key in @($PSBoundParameters.Keys)) { if ($key -ne 'View') { $forward[$key] = $PSBoundParameters[$key] } }
+        Invoke-AACSecurityPostureReport @forward -OutputPiped:$pipedOnward
+        return
+    }
+    $postureOnly = @('ResourceGroupName', 'Tag', 'Standard', 'PdfPath') | Where-Object { $PSBoundParameters.ContainsKey($_) }
+    if ($postureOnly) { throw "Azure Admin Console -$($postureOnly -join ', -') works with -View Posture only. Add -View Posture, or leave it out for the assessment." }
+    $wrong = @($Section | Where-Object { $_ -in 'Score', 'Plans', 'Policy' })
+    if ($wrong.Count) { throw "Azure Admin Console's assessment has no section $($wrong -join ', '): those are -View Posture's (secure score and plans are in the Posture section). Add -View Posture, or pick from Recommendations, AttackPaths, Alerts, Inventory, Vulnerabilities, Posture, Compliance, Settings." }
     $interactive = -not $NoDisplay -and -not $pipedOnward
     $showView = $interactive -and -not ($CsvPath -or $HtmlPath)
     $returnObjects = $PassThru -or $NoDisplay -or $pipedOnward

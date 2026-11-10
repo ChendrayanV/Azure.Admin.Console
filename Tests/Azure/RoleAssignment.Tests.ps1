@@ -1,5 +1,5 @@
 <#
-    Unit tests for Get-AACRoleAssignment: made-up assignments
+    Unit tests for Get-AACAccessReview -View Assignment (and the deprecated Get-AACRoleAssignment): made-up assignments
     (Fixtures\ContosoRbac.ps1) - every principal type, inherited and
     direct, permanent, activated and eligible, orphaned, risky - with their
     findings and the custom roles, and the command with Resource Graph,
@@ -116,7 +116,7 @@ Describe 'Azure Admin Console - role assignments' {
     }
 }
 
-Describe 'Azure Admin Console - Get-AACRoleAssignment' {
+Describe 'Azure Admin Console - Get-AACAccessReview -View Assignment' {
     BeforeEach {
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Get-AACAccessToken -MockWith { 'fake-token' }
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACGraphBatch -MockWith {
@@ -135,25 +135,25 @@ Describe 'Azure Admin Console - Get-AACRoleAssignment' {
     AfterEach { InModuleScope 'Azure.Admin.Console' { $script:AACSession = $null } }
 
     It 'filters by principal type, role, scope type, privilege and finding' {
-        @(Get-AACRoleAssignment -ManagementGroupId 'mg-platform' -NoDisplay).Count | Should -Be 12
-        @(Get-AACRoleAssignment -ManagementGroupId 'mg-platform' -PrincipalType Guest, Deleted -NoDisplay).Principal | Should -Be @('Carol', 'Identity not found (User)')
-        @(Get-AACRoleAssignment -ManagementGroupId 'mg-platform' -RoleName '*Owner*' -ScopeType Subscription -NoDisplay).Count | Should -Be 3
-        @(Get-AACRoleAssignment -ManagementGroupId 'mg-platform' -Privileged -WithFinding -NoDisplay).Count | Should -Be 5
-        $both = @(Get-AACRoleAssignment -ManagementGroupId 'mg-platform' -IncludeCustomRole -NoDisplay)
+        @(Get-AACAccessReview -View Assignment -ManagementGroupId 'mg-platform' -NoDisplay).Count | Should -Be 12
+        @(Get-AACAccessReview -View Assignment -ManagementGroupId 'mg-platform' -PrincipalType Guest, Deleted -NoDisplay).Principal | Should -Be @('Carol', 'Identity not found (User)')
+        @(Get-AACAccessReview -View Assignment -ManagementGroupId 'mg-platform' -RoleName '*Owner*' -ScopeType Subscription -NoDisplay).Count | Should -Be 3
+        @(Get-AACAccessReview -View Assignment -ManagementGroupId 'mg-platform' -PrivilegedOnly -WithFinding -NoDisplay).Count | Should -Be 5
+        $both = @(Get-AACAccessReview -View Assignment -ManagementGroupId 'mg-platform' -IncludeCustomRole -NoDisplay)
         "$(@($both | Where-Object { $_.PSObject.TypeNames -contains 'AAC.RoleAssignment' }).Count) $(@($both | Where-Object { $_.PSObject.TypeNames -contains 'AAC.CustomRole' }).Count)" | Should -Be '12 4'
         Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Read-AACGraphQuery -Times 0
     }
 
     It 'reads the groups'' members with -ExpandGroup, and skips PIM and Entra ID when told' {
-        (Get-AACRoleAssignment -ManagementGroupId 'mg-platform' -ExpandGroup -NoDisplay | Where-Object ScopeType -EQ 'Root').Members | Should -Be 3
+        (Get-AACAccessReview -View Assignment -ManagementGroupId 'mg-platform' -ExpandGroup -NoDisplay | Where-Object ScopeType -EQ 'Root').Members | Should -Be 3
         Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Read-AACGraphQuery -Times 1
-        $null = Get-AACRoleAssignment -ManagementGroupId 'mg-platform' -SkipPim -SkipEntra -NoDisplay
+        $null = Get-AACAccessReview -View Assignment -ManagementGroupId 'mg-platform' -SkipPim -SkipEntra -NoDisplay
         Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACArmParallel -Times 1 -Exactly
         Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Get-AACDirectoryObject -Times 1 -Exactly
     }
 
     It 'shows the assignments at the prompt, in characters any console can show' {
-        $text = (& $script:capture { Get-AACRoleAssignment -ManagementGroupId 'mg-platform' -NoPaging }).Text
+        $text = (& $script:capture { Get-AACAccessReview -View Assignment -ManagementGroupId 'mg-platform' -NoPaging }).Text
         foreach ($expected in 'Azure Admin Console :: Role assignments', '12 role assignment(s)', 'Role assignments (12)', 'Custom roles (4)', 'app-orders') { $text | Should -Match ([regex]::Escape($expected)) }
         foreach ($codePage in 437, 850) {
             $encoding = [System.Text.Encoding]::GetEncoding($codePage)
@@ -164,9 +164,20 @@ Describe 'Azure Admin Console - Get-AACRoleAssignment' {
     It 'writes the assignments to CSV and an HTML report with the custom roles' {
         $csv = Join-Path $TestDrive 'rbac.csv'
         $html = Join-Path $TestDrive 'rbac.html'
-        $null = & $script:capture { Get-AACRoleAssignment -ManagementGroupId 'mg-platform' -CsvPath $csv -HtmlPath $html }
+        $null = & $script:capture { Get-AACAccessReview -View Assignment -ManagementGroupId 'mg-platform' -CsvPath $csv -HtmlPath $html }
         @(Import-Csv -LiteralPath $csv)[0].Principal | Should -Be 'Carol'
         $model = [regex]::Match((Get-Content -LiteralPath $html -Raw), '<script id="aac-data" type="application/json">(.*?)</script>', 'Singleline').Groups[1].Value | ConvertFrom-Json
         @($model.tables.id) | Should -Be @('assignments', 'customRoles')
+    }
+
+    It 'keeps the review-only and assignment-only parameters apart, saying what to do' {
+        { Get-AACAccessReview -ManagementGroupId 'mg-platform' -RoleName 'Owner' -NoDisplay } | Should -Throw '*works with -View Assignment only*'
+        { Get-AACAccessReview -View Assignment -ManagementGroupId 'mg-platform' -Severity High -NoDisplay } | Should -Throw '*-View Assignment doesn''t take -Severity*'
+    }
+
+    It 'still runs Get-AACRoleAssignment, with a warning naming its replacement' {
+        $rows = @(Get-AACRoleAssignment -ManagementGroupId 'mg-platform' -Privileged -WithFinding -NoDisplay -WarningVariable seen -WarningAction SilentlyContinue)
+        $rows.Count | Should -Be 5
+        "$seen" | Should -BeLike '*deprecated*Get-AACAccessReview -View Assignment*'
     }
 }

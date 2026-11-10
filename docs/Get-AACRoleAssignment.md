@@ -12,7 +12,7 @@ title: Get-AACRoleAssignment
 
 ## SYNOPSIS
 
-Lists every Azure role assignment - root, management groups, subscriptions, resource groups and resources - with who holds it and what they are, what the role can do, how far it reaches, whether it is standing or PIM, the groups' members, who created it - and flags orphaned assignments, risky grants and custom roles that are unused or as powerful as Owner.
+Deprecated: use Get-AACAccessReview -View Assignment. Lists every Azure role assignment - root, management groups, subscriptions, resource groups and resources - with who holds it and what they are, what the role can do, how far it reaches, whether it is standing or PIM, the groups' members, who created it - and flags orphaned assignments, risky grants and custom roles that are unused or as powerful as Owner.
 
 ## SYNTAX
 
@@ -31,6 +31,10 @@ Get-AACRoleAssignment [[-SubscriptionId] <string[]>] [[-ManagementGroupId] <stri
 This command has no aliases.
 
 ## DESCRIPTION
+
+Deprecated, and to be removed in a later release: Get-AACAccessReview
+-View Assignment lists the same, with the same parameters (-Privileged
+there is -PrivilegedOnly). This command still works, and warns.
 
 The inventory under the access review: where Get-AACAccessReview
 says what to fix, this lists everything as it is. Reads, read-only:

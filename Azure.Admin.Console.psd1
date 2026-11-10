@@ -52,6 +52,7 @@
         'New-AACServiceBlueprint'
         'Invoke-AACLandingZoneAssessment'
         'Invoke-AACResiliencyAssessment'
+        'New-AACDesignDiagram'
         'Get-AACAlertBaseline'
         'Get-AACResiliencyRecommendation'
         'Get-AACAdvisorRecommendation'

@@ -2,18 +2,20 @@
 
 [Guide index](../../GUIDE.md) · [Command reference](../Azure.Admin.Console.md)
 
-**Commands:** [`Get-AACSecurityPosture`](../Get-AACSecurityPosture.md)
+**Commands:** [`Invoke-AACDefenderAssessment`](../Invoke-AACDefenderAssessment.md) (`-View Posture`)
 
-`Get-AACSecurityPosture` reads Microsoft Defender for Cloud and Azure Policy
+(This was `Get-AACSecurityPosture`, which still works but warns, and will be removed in a later release.)
+
+`Invoke-AACDefenderAssessment -View Posture` reads Microsoft Defender for Cloud and Azure Policy
 with Azure Resource Graph (`securityresources`, `policyresources`), every
 query at once. Reader or Security Reader is enough.
 
 ```powershell
-Get-AACSecurityPosture                                                 # every section, every subscription
-Get-AACSecurityPosture -Tag @{ Environment = 'Prod' } -HtmlPath .\Security.html
-Get-AACSecurityPosture -Section Alerts, Plans                          # just the alerts and the Defender plans
-Get-AACSecurityPosture -Section Compliance -Standard '*ISO*' -PdfPath .\ISO.pdf
-Get-AACSecurityPosture -NoDisplay | Where-Object { $_.Section -eq 'Recommendation' -and $_.Severity -eq 'High' } | Group-Object Title
+Invoke-AACDefenderAssessment -View Posture                                                 # every section, every subscription
+Invoke-AACDefenderAssessment -View Posture -Tag @{ Environment = 'Prod' } -HtmlPath .\Security.html
+Invoke-AACDefenderAssessment -View Posture -Section Alerts, Plans                          # just the alerts and the Defender plans
+Invoke-AACDefenderAssessment -View Posture -Section Compliance -Standard '*ISO*' -PdfPath .\ISO.pdf
+Invoke-AACDefenderAssessment -View Posture -NoDisplay | Where-Object { $_.Section -eq 'Recommendation' -and $_.Severity -eq 'High' } | Group-Object Title
 ```
 
 | Section           | What it shows                                                                                                                                                      |
@@ -36,6 +38,6 @@ empty alert list doesn't mean nothing happened.
 For every policy state in detail - compliant ones too - use
 `Get-AACPolicyState`; both commands read the same query.
 
-`Get-AACInventory` and `Get-AACSecurityPosture` share their Defender queries
+`Get-AACInventory` and `Invoke-AACDefenderAssessment -View Posture` share their Defender queries
 and objects: the inventory puts each node's score and findings in the tree,
 and this command is the posture itself.

@@ -1,5 +1,5 @@
 <#
-    Unit tests for Get-AACSecurityPosture: the posture built from made-up
+    Unit tests for Invoke-AACDefenderAssessment -View Posture (and the deprecated Get-AACSecurityPosture): the posture built from made-up
     Defender for Cloud and Azure Policy rows (Fixtures\ContosoSecurity.ps1) -
     findings across sections, scores, compliance failures traced to
     resources, plans off, policy compliance, a resource group or tag
@@ -136,7 +136,7 @@ Describe 'Azure Admin Console - security posture' {
     }
 }
 
-Describe 'Azure Admin Console - Get-AACSecurityPosture' {
+Describe 'Azure Admin Console - Invoke-AACDefenderAssessment -View Posture' {
     BeforeEach {
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Get-AACAccessToken -MockWith { 'fake-token' }
         Mock -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACGraphBatch -MockWith {
@@ -155,7 +155,7 @@ Describe 'Azure Admin Console - Get-AACSecurityPosture' {
     AfterEach { InModuleScope 'Azure.Admin.Console' { $script:AACSession = $null } }
 
     It 'returns the findings, and reads every section at once by default' {
-        $findings = @(Get-AACSecurityPosture -NoDisplay)
+        $findings = @(Invoke-AACDefenderAssessment -View Posture -NoDisplay)
         $findings.Count | Should -Be 15
         Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACGraphBatch -Times 1 -Exactly -ParameterFilter {
             $keys = @($Query.Keys)
@@ -165,7 +165,7 @@ Describe 'Azure Admin Console - Get-AACSecurityPosture' {
     }
 
     It 'reads only what the sections asked for need' {
-        $findings = @(Get-AACSecurityPosture -Section Alerts, Plans -NoDisplay)
+        $findings = @(Invoke-AACDefenderAssessment -View Posture -Section Alerts, Plans -NoDisplay)
         @($findings.Section | Select-Object -Unique | Sort-Object) | Should -Be @('Alert', 'Plan')
         Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACGraphBatch -Times 1 -Exactly -ParameterFilter {
             @($Query.Keys | Sort-Object) -join ',' -eq 'Alerts,Plans,Scores,subscriptions'
@@ -173,21 +173,21 @@ Describe 'Azure Admin Console - Get-AACSecurityPosture' {
     }
 
     It 'narrows to a tag or resource group with a scope query - exact tag values' {
-        $findings = @(Get-AACSecurityPosture -Tag @{ Environment = 'Prod' } -NoDisplay -WarningAction SilentlyContinue)
+        $findings = @(Invoke-AACDefenderAssessment -View Posture -Tag @{ Environment = 'Prod' } -NoDisplay -WarningAction SilentlyContinue)
         @($findings | Where-Object Section -EQ 'Recommendation').Resource | Select-Object -Unique | Should -Be 'vm-web-01'
         Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACGraphBatch -ParameterFilter { ([string]$Query['scope']).Contains("tostring(tags['Environment']) =~ 'Prod'") } -Times 1 -Exactly
-        $null = Get-AACSecurityPosture -ResourceGroupName 'rg-app' -NoDisplay
+        $null = Invoke-AACDefenderAssessment -View Posture -ResourceGroupName 'rg-app' -NoDisplay
         Should -Invoke -ModuleName 'Azure.Admin.Console' -CommandName Invoke-AACGraphBatch -ParameterFilter { $Query['scope'] -like "*resourceGroup in~ ('rg-app')*" -and $Query.Contains('scopeGroups') } -Times 1 -Exactly
     }
 
     It 'picks compliance standards by name' {
-        $findings = @(Get-AACSecurityPosture -Section Compliance -Standard '*ISO*' -NoDisplay)
+        $findings = @(Invoke-AACDefenderAssessment -View Posture -Section Compliance -Standard '*ISO*' -NoDisplay)
         @($findings.Category | Select-Object -Unique) | Should -Be @('ISO-27001-2013')
         @($findings | Where-Object Section -EQ 'Recommendation').Count | Should -Be 0
     }
 
     It 'draws every section at the console, in characters any console can show' {
-        $text = (& $script:capture { Get-AACSecurityPosture -NoPaging }).Text
+        $text = (& $script:capture { Invoke-AACDefenderAssessment -View Posture -NoPaging }).Text
         foreach ($expected in '56%', 'secure score (fair)', 'Subscriptions', 'Secure score controls with the most to gain', 'Recommendations', 'Management ports should be protected', 'Active security alerts', 'Suspicious login to a VM', 'Regulatory compliance', 'NS.1', 'Azure Policy assignments', 'Contoso required tags', 'not enforced', 'Defender plans that are off', 'Servers') {
             $text | Should -BeLike "*$expected*"
         }
@@ -201,7 +201,7 @@ Describe 'Azure Admin Console - Get-AACSecurityPosture' {
     It 'writes the findings to CSV, and an HTML report with a table per part and portal links' {
         $csv = Join-Path $TestDrive 'security.csv'
         $html = Join-Path $TestDrive 'security.html'
-        $null = & $script:capture { Get-AACSecurityPosture -CsvPath $csv -HtmlPath $html }
+        $null = & $script:capture { Invoke-AACDefenderAssessment -View Posture -CsvPath $csv -HtmlPath $html }
         @(Import-Csv -LiteralPath $csv).Count | Should -Be 15
         $model = [regex]::Match((Get-Content -LiteralPath $html -Raw), '<script id="aac-data" type="application/json">(.*?)</script>', 'Singleline').Groups[1].Value | ConvertFrom-Json
         @($model.tables.id) | Should -Be @('findings', 'subscriptions', 'controls', 'standards', 'complianceControls', 'policy', 'plans')
@@ -212,8 +212,22 @@ Describe 'Azure Admin Console - Get-AACSecurityPosture' {
 
     It 'writes a PDF report' -Skip:(-not $script:canWritePdf) {
         $pdf = Join-Path $TestDrive 'security.pdf'
-        $null = & $script:capture { Get-AACSecurityPosture -PdfPath $pdf }
+        $null = & $script:capture { Invoke-AACDefenderAssessment -View Posture -PdfPath $pdf }
         (Get-Item -LiteralPath $pdf).Length | Should -BeGreaterThan 1000
+    }
+
+    It 'keeps the posture-only and assessment-only parameters and sections apart, saying what to do' {
+        { Invoke-AACDefenderAssessment -Tag @{ Environment = 'Prod' } -NoDisplay } | Should -Throw '*works with -View Posture only*'
+        { Invoke-AACDefenderAssessment -Section Policy -NoDisplay } | Should -Throw '*Add -View Posture*'
+        { Invoke-AACDefenderAssessment -View Posture -AlertDays 7 -NoDisplay } | Should -Throw '*-View Posture doesn''t take -AlertDays*'
+        { Invoke-AACDefenderAssessment -View Posture -Section AttackPaths -NoDisplay } | Should -Throw '*has no section AttackPaths*'
+    }
+
+    It 'still runs Get-AACSecurityPosture, with a warning naming its replacement' {
+        $old = @(Get-AACSecurityPosture -Section Alerts, Plans -NoDisplay -WarningVariable seen -WarningAction SilentlyContinue)
+        $new = @(Invoke-AACDefenderAssessment -View Posture -Section Alerts, Plans -NoDisplay)
+        $old.Count | Should -Be $new.Count
+        "$seen" | Should -BeLike '*deprecated*Invoke-AACDefenderAssessment -View Posture*'
     }
 }
 

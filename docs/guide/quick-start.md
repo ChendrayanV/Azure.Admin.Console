@@ -19,8 +19,8 @@ Get-AACFirewallRule -HtmlPath .\FirewallRules.html
 Get-AACFirewallRule -SourceAddress 10.1.2.3 -DestinationAddress 10.0.0.4 -Port 53 -Protocol UDP
 
 # What you run, and what it costs
-Show-AACResource
-Show-AACResource -HtmlPath .\Inventory.html     # every resource, with portal links
+Get-AACInventory -View Chart
+Get-AACInventory -View Chart -HtmlPath .\Inventory.html     # every resource, with portal links
 Show-AACCost
 
 # The tenant as a tree, with secure scores and costs
@@ -30,7 +30,7 @@ Get-AACInventory -Cost -HtmlPath .\Inventory.html
 Invoke-AACTenantAssessment -SecurityCenter -IncludeCost
 
 # Defender for Cloud and Azure Policy: scores, recommendations, alerts, plans, compliance
-Get-AACSecurityPosture -HtmlPath .\Security.html
+Invoke-AACDefenderAssessment -View Posture -HtmlPath .\Security.html
 
 # Every network security group, assessed
 Get-AACNetworkSecurityGroup

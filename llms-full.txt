@@ -2,7 +2,7 @@
 
 > A PowerShell 7.2+ module for Azure, Microsoft 365 and Azure DevOps administration over plain REST: no Az or Microsoft.Graph modules and no app registration. Read-only by default; every command gives a console view, typed objects, and CSV, HTML and PDF reports.
 
-Version 0.15.0. The guide comes first, then the reference for each of the 98 commands.
+Version 0.15.0. The guide comes first, then the reference for each of the 99 commands.
 
 <!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/guide/overview.md -->
 
@@ -108,8 +108,8 @@ Get-AACFirewallRule -HtmlPath .\FirewallRules.html
 Get-AACFirewallRule -SourceAddress 10.1.2.3 -DestinationAddress 10.0.0.4 -Port 53 -Protocol UDP
 
 # What you run, and what it costs
-Show-AACResource
-Show-AACResource -HtmlPath .\Inventory.html     # every resource, with portal links
+Get-AACInventory -View Chart
+Get-AACInventory -View Chart -HtmlPath .\Inventory.html     # every resource, with portal links
 Show-AACCost
 
 # The tenant as a tree, with secure scores and costs
@@ -119,7 +119,7 @@ Get-AACInventory -Cost -HtmlPath .\Inventory.html
 Invoke-AACTenantAssessment -SecurityCenter -IncludeCost
 
 # Defender for Cloud and Azure Policy: scores, recommendations, alerts, plans, compliance
-Get-AACSecurityPosture -HtmlPath .\Security.html
+Invoke-AACDefenderAssessment -View Posture -HtmlPath .\Security.html
 
 # Every network security group, assessed
 Get-AACNetworkSecurityGroup
@@ -373,9 +373,11 @@ Invoke-RestMethod -Uri $uri -Headers $headers | Show-AACJson -Title 'Response'
 
 [Guide index](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/GUIDE.md) · [Command reference](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Azure.Admin.Console.md)
 
-**Commands:** [`Show-AACCost`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Show-AACCost.md) · [`Show-AACResource`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Show-AACResource.md)
+**Commands:** [`Show-AACCost`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Show-AACCost.md) · [`Get-AACInventory`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACInventory.md) (`-View Chart`)
 
-`Show-AACResource` counts every resource you can see with two Resource Graph
+(This was `Show-AACResource`, which still works but warns, and will be removed in a later release.)
+
+`Get-AACInventory -View Chart` counts every resource you can see with two Resource Graph
 queries, and draws one bar per type, each in its own colour:
 
 ```text
@@ -387,11 +389,11 @@ network/networkinterfaces  █████████████████�
 ```
 
 ```powershell
-Show-AACResource                                  # by type, top 20
-Show-AACResource -By Location                     # or ResourceGroup, Subscription
-Show-AACResource -ResourceType 'microsoft.network/*' -Top 10
-Show-AACResource -By Subscription -PassThru | Export-Csv .\PerSubscription.csv
-Show-AACResource -HtmlPath .\Inventory.html        # an interactive inventory
+Get-AACInventory -View Chart                                  # by type, top 20
+Get-AACInventory -View Chart -By Location                     # or ResourceGroup, Subscription
+Get-AACInventory -View Chart -ResourceType 'microsoft.network/*' -Top 10
+Get-AACInventory -View Chart -By Subscription -PassThru | Export-Csv .\PerSubscription.csv
+Get-AACInventory -View Chart -HtmlPath .\Inventory.html        # an interactive inventory
 ```
 
 `-HtmlPath` writes an interactive inventory of every resource: name, type,
@@ -910,18 +912,20 @@ them, and audit certificates aren't in Azure (see the Service Trust Portal).
 
 [Guide index](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/GUIDE.md) · [Command reference](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Azure.Admin.Console.md)
 
-**Commands:** [`Get-AACSecurityPosture`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACSecurityPosture.md)
+**Commands:** [`Invoke-AACDefenderAssessment`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Invoke-AACDefenderAssessment.md) (`-View Posture`)
 
-`Get-AACSecurityPosture` reads Microsoft Defender for Cloud and Azure Policy
+(This was `Get-AACSecurityPosture`, which still works but warns, and will be removed in a later release.)
+
+`Invoke-AACDefenderAssessment -View Posture` reads Microsoft Defender for Cloud and Azure Policy
 with Azure Resource Graph (`securityresources`, `policyresources`), every
 query at once. Reader or Security Reader is enough.
 
 ```powershell
-Get-AACSecurityPosture                                                 # every section, every subscription
-Get-AACSecurityPosture -Tag @{ Environment = 'Prod' } -HtmlPath .\Security.html
-Get-AACSecurityPosture -Section Alerts, Plans                          # just the alerts and the Defender plans
-Get-AACSecurityPosture -Section Compliance -Standard '*ISO*' -PdfPath .\ISO.pdf
-Get-AACSecurityPosture -NoDisplay | Where-Object { $_.Section -eq 'Recommendation' -and $_.Severity -eq 'High' } | Group-Object Title
+Invoke-AACDefenderAssessment -View Posture                                                 # every section, every subscription
+Invoke-AACDefenderAssessment -View Posture -Tag @{ Environment = 'Prod' } -HtmlPath .\Security.html
+Invoke-AACDefenderAssessment -View Posture -Section Alerts, Plans                          # just the alerts and the Defender plans
+Invoke-AACDefenderAssessment -View Posture -Section Compliance -Standard '*ISO*' -PdfPath .\ISO.pdf
+Invoke-AACDefenderAssessment -View Posture -NoDisplay | Where-Object { $_.Section -eq 'Recommendation' -and $_.Severity -eq 'High' } | Group-Object Title
 ```
 
 | Section           | What it shows                                                                                                                                                      |
@@ -944,7 +948,7 @@ empty alert list doesn't mean nothing happened.
 For every policy state in detail - compliant ones too - use
 `Get-AACPolicyState`; both commands read the same query.
 
-`Get-AACInventory` and `Get-AACSecurityPosture` share their Defender queries
+`Get-AACInventory` and `Invoke-AACDefenderAssessment -View Posture` share their Defender queries
 and objects: the inventory puts each node's score and findings in the tree,
 and this command is the posture itself.
 
@@ -1266,7 +1270,7 @@ after the report is written, which fails the pipeline.
 
 [Guide index](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/GUIDE.md) · [Command reference](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Azure.Admin.Console.md)
 
-**Commands:** [`Get-AACGovernanceChange`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACGovernanceChange.md) · [`Get-AACGovernanceSetting`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACGovernanceSetting.md) · [`Get-AACResourceLock`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACResourceLock.md) · [`Get-AACRoleAssignment`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACRoleAssignment.md) · [`Get-AACServicePrincipalInsight`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACServicePrincipalInsight.md) · [`Get-AACTagUsage`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACTagUsage.md) · [`Invoke-AACGovernanceAssessment`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Invoke-AACGovernanceAssessment.md) · [`Show-AACManagementGroupMap`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Show-AACManagementGroupMap.md) · [`Test-AACAlzPolicy`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Test-AACAlzPolicy.md) · [`Test-AACAzureLimit`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Test-AACAzureLimit.md)
+**Commands:** [`Get-AACGovernanceChange`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACGovernanceChange.md) · [`Get-AACGovernanceSetting`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACGovernanceSetting.md) · [`Get-AACResourceLock`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACResourceLock.md) · [`Get-AACAccessReview`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACAccessReview.md) (`-View Assignment`) · [`Get-AACServicePrincipalInsight`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACServicePrincipalInsight.md) · [`Get-AACTagUsage`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACTagUsage.md) · [`Invoke-AACGovernanceAssessment`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Invoke-AACGovernanceAssessment.md) · [`Show-AACManagementGroupMap`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Show-AACManagementGroupMap.md) · [`Test-AACAlzPolicy`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Test-AACAlzPolicy.md) · [`Test-AACAzureLimit`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Test-AACAzureLimit.md)
 
 Governance questions across the whole tenant, in the spirit of the
 [Azure Governance Visualizer](https://github.com/Azure/Azure-Governance-Visualizer) -
@@ -1276,7 +1280,7 @@ each one a command of its own, and all of them together in one workbook.
 Invoke-AACGovernanceAssessment -HtmlPath .\Governance.html                     # everything, as a tabbed workbook
 Invoke-AACGovernanceAssessment -MarkdownPath .\wiki\Governance.md -MarkdownFlavor AzureDevOps -NoDisplay   # a wiki page, from a pipeline
 Show-AACManagementGroupMap                                                     # the hierarchy, in the browser
-Get-AACRoleAssignment -ExpandGroup -HtmlPath .\Rbac.html                       # every role assignment, groups expanded
+Get-AACAccessReview -View Assignment -ExpandGroup -HtmlPath .\Rbac.html                       # every role assignment, groups expanded
 Test-AACAzureLimit -FailOnLimit Warning                                        # fail a pipeline at 80% of any limit
 Test-AACAlzPolicy -LibraryPath C:\alz-library -ManagementGroupMap @{ alz = 'contoso' }
 ```
@@ -1284,7 +1288,7 @@ Test-AACAlzPolicy -LibraryPath C:\alz-library -ManagementGroupMap @{ alz = 'cont
 | Area | Command | What it answers |
 |---|---|---|
 | Hierarchy | `Show-AACManagementGroupMap` | Each management group, its subscriptions, policy and role assignments - a map, a tree, or `Export-AACDiagram -View Governance` for draw.io |
-| Access | `Get-AACRoleAssignment` | Every role assignment at every scope; orphaned ones, privileged guests, applications as Owner, custom roles unused or as powerful as Owner |
+| Access | `Get-AACAccessReview -View Assignment` | Every role assignment at every scope; orphaned ones, privileged guests, applications as Owner, custom roles unused or as powerful as Owner |
 | Identities | `Get-AACServicePrincipalInsight` | Applications and managed identities with Azure roles; credentials about to expire; other tenants' apps |
 | Policy | `Get-AACPolicyRemediation` | Policies that could fix what they find, and whether remediation ran (`Invoke-AACPolicyAssessment` covers assignments, compliance, exemptions and identities' roles) |
 | Limits | `Test-AACAzureLimit` | Scopes close to an Azure limit, with what to do; `-IncludeQuota` adds each region's compute, network and storage quota |
@@ -1586,7 +1590,7 @@ The rest of #8 is answered by commands the module already has:
 
 | Asked for | Use |
 | --- | --- |
-| `Get-AACRoleAssignment` - RBAC assignments and effective access | `Get-AACAccessReview` (every assignment, PIM, classic admins, Entra roles and Graph app permissions, with a recommendation each) |
+| `Get-AACRoleAssignment` - RBAC assignments and effective access | `Get-AACAccessReview -View Assignment` (every assignment as it is), `Get-AACAccessReview` (every assignment, PIM, classic admins, Entra roles and Graph app permissions, with a recommendation each) |
 | `Get-AACServicePrincipalAccess` - permissions and recent use | `Get-AACAccessReview -PrivilegedOnly` for the access, `Get-AACOrphanedIdentity -Kind Application` for the unused ones |
 | `Get-AACActivityLog` - administrative changes | `Get-AACChangeHistory` (what changed, who, before and after); failed actions and permission issues: `Get-AACResourceError` |
 | `Get-AACBackupStatus` - backup health and recovery readiness | `Get-AACFailoverReadiness` (backups, restores, Site Recovery, vaults, recovery plans) |
@@ -2277,7 +2281,7 @@ Where-Object Orphan`.
 
 [Guide index](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/GUIDE.md) · [Command reference](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Azure.Admin.Console.md)
 
-**Commands:** [`Export-AACDiagram`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Export-AACDiagram.md) · [`Show-AACApplicationGatewayMap`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Show-AACApplicationGatewayMap.md)
+**Commands:** [`New-AACDesignDiagram`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/New-AACDesignDiagram.md) · [`Export-AACDiagram`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Export-AACDiagram.md) · [`Show-AACApplicationGatewayMap`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Show-AACApplicationGatewayMap.md)
 
 `Export-AACDiagram` draws your existing resources as a diagram you can
 **edit** - not a picture. It writes a `.drawio` file. You open it in
@@ -2358,6 +2362,36 @@ the same shape IDs, so `Export-AACDiagram -Update` can refresh it later.
 **What it needs.** Reader on what you draw, and nothing to install: the
 diagram is written by PowerShell, with no Graphviz, Python or Visio.
 `-PdfPath` uses Microsoft Edge or Google Chrome if either is installed.
+
+## Drawing a design before it exists
+
+`New-AACDesignDiagram` draws a hub and spoke design from a few parameters, offline: nothing is read from Azure, so it works before there is a subscription for it. `Export-AACDiagram` draws what is deployed; this draws what you are about to build.
+
+```powershell
+New-AACDesignDiagram -Name contoso -Firewall -Bastion -Spoke orders, payments -Resource FunctionApp, WebApp, StorageAccount, KeyVault -Open
+```
+
+| It plans | How |
+|---|---|
+| Subnets and address ranges | Each network's subnets at the size Microsoft recommends for what is in them (AzureFirewallSubnet /26, a delegated App Service integration subnet, a private endpoint subnet...), the smallest supported when the space is tight. A spoke given as a name takes the next free /16 |
+| Routing | With `-Firewall`, a route table per spoke sending 0.0.0.0/0 to the firewall's private IP |
+| Peering | Every spoke to the hub; with `-VpnGateway`, with gateway transit and the on-premises connection |
+| Resources | Named `{type}-{spoke}-{env}-{region}`: Web and Function Apps with VNet integration and an App Service plan; storage, Key Vault, SQL, Cosmos DB, Redis, Service Bus, Event Hubs and registries behind private endpoints, their private DNS zones in the hub; VMs, AKS, Application Gateway and API Management in subnets of their own |
+
+The diagram has a box for every subscription, region, resource group, virtual network and subnet, with each name and range on it, and a Legend page. Networks that overlap, or a network too small for its subnets, stop the command, rather than drawing addresses that can't exist.
+
+For full control, give a spoke as a hashtable - its own range, subscription, resource group and subnets:
+
+```powershell
+New-AACDesignDiagram -Name contoso -Firewall -VpnGateway -HubAddressSpace 10.100.0.0/22 -Spoke @(
+    @{ Name = 'orders'; AddressSpace = '10.110.0.0/20'; Subscription = 'sub-orders-prod'
+       Subnets = @( @{ Name = 'snet-app'; AddressPrefix = '10.110.0.0/24'; Resources = 'FunctionApp' }
+                    @{ Name = 'snet-pe';  AddressPrefix = '10.110.1.0/26'; Resources = 'StorageAccount', 'ServiceBus' } ) }
+    @{ Name = 'web'; AddressSpace = '10.120.0.0/20'; Resources = 'ApplicationGateway', 'WebApp', 'SqlDatabase' }
+) -Path .\contoso.drawio -CsvPath .\contoso-ip-plan.csv
+```
+
+Change the parameters and run it again with `-Update`: the diagram is redrawn and the changes you made to it in draw.io are kept. `-CsvPath` writes the address plan, and `-HtmlPath` or `-PdfPath` a page or PDF to share.
 
 <!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/guide/vm-size-availability-virtual-machines-and-aks.md -->
 
@@ -8806,9 +8840,10 @@ A least-privilege access review of Azure and Entra ID: every Azure RBAC assignme
 
 ```
 Get-AACAccessReview [[-SubscriptionId] <string[]>] [[-ManagementGroupId] <string[]>]
+ [[-View] <string>] [[-PrincipalType] <string[]>] [[-RoleName] <string[]>] [[-ScopeType] <string[]>]
  [[-ActivityDays] <int>] [[-Severity] <string[]>] [[-CsvPath] <string>] [[-HtmlPath] <string>]
- [[-PdfPath] <string>] [[-Title] <string>] [-SkipEntra] [-PrivilegedOnly] [-PassThru] [-NoDisplay]
- [-NoPaging]
+ [[-PdfPath] <string>] [[-Title] <string>] [-WithFinding] [-ExpandGroup] [-IncludeCustomRole]
+ [-SkipPim] [-SkipEntra] [-PrivilegedOnly] [-PassThru] [-NoDisplay] [-NoPaging]
 ```
 
 ## ALIASES
@@ -8893,6 +8928,14 @@ Get-AACAccessReview -NoDisplay | Where-Object Recommendation -EQ 'Make eligible 
 
 The standing access to move into PIM.
 
+### Example 4
+
+```powershell
+Get-AACAccessReview -View Assignment -PrincipalType Guest, Application -ScopeType Subscription, ManagementGroup
+```
+
+Every role guests and applications hold at subscription scope or above.
+
 ## PARAMETERS
 
 ### -ActivityDays
@@ -8907,7 +8950,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 2
+  Position: 6
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -8929,7 +8972,28 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 4
+  Position: 8
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ExpandGroup
+
+With -View Assignment: Read each group's members (transitive, up to 200 groups).
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -8950,7 +9014,29 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 5
+  Position: 9
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -IncludeCustomRole
+
+With -View Assignment: Also return the custom roles (AAC.CustomRole), after the
+assignments.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -9055,7 +9141,29 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 6
+  Position: 10
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PrincipalType
+
+With -View Assignment: Only these principals: User, Guest, Group, Application,
+ManagedIdentity, Deleted.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 3
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -9069,7 +9177,8 @@ HelpMessage: ''
 
 Only privileged access (Owner, Contributor, User Access
 Administrator, RBAC Administrator, equivalent custom roles,
-privileged Entra roles and Graph permissions).
+privileged Entra roles and Graph permissions). With -View Assignment:
+only privileged role assignments.
 
 ```yaml
 Type: System.Management.Automation.SwitchParameter
@@ -9079,6 +9188,49 @@ Aliases: []
 ParameterSets:
 - Name: (All)
   Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -RoleName
+
+With -View Assignment: Only these roles; wildcards work ('\*Owner\*').
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 4
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ScopeType
+
+With -View Assignment: Only assignments at these scopes: Root, ManagementGroup,
+Subscription, ResourceGroup, Resource.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 5
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -9099,7 +9251,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 3
+  Position: 7
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -9113,6 +9265,27 @@ HelpMessage: ''
 
 Don't read Entra ID roles and Graph application permissions (Azure
 RBAC is still reviewed; principals are still looked up).
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -SkipPim
+
+With -View Assignment: Don't read PIM (eligible and activated assignments).
 
 ```yaml
 Type: System.Management.Automation.SwitchParameter
@@ -9163,7 +9336,57 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 7
+  Position: 11
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -View
+
+Review (the default): what to fix - unused, standing, risky and
+external access across Azure RBAC, Entra ID roles and Graph
+permissions, with a recommendation each. Assignment: the inventory
+under it - every Azure role assignment at every scope as it is (who,
+the role, its reach, standing or PIM, the groups' members, who created
+it), with the custom roles; returns AAC.RoleAssignment rows. The
+Assignment view takes -PrincipalType, -RoleName, -ScopeType,
+-PrivilegedOnly, -WithFinding, -ExpandGroup, -IncludeCustomRole and
+-SkipPim, not -ActivityDays or -Severity.
+
+```yaml
+Type: System.String
+DefaultValue: "'Review'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 2
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -WithFinding
+
+With -View Assignment: Only assignments with a finding.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -9184,7 +9407,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## OUTPUTS
 
-### AAC.AccessAssignment
+### AAC.AccessAssignment AAC.RoleAssignment (and AAC.CustomRole, with -IncludeCustomRole): -View Assignment
 
 ## NOTES
 
@@ -15080,7 +15303,8 @@ Inventories the tenant as a tree - management groups, subscriptions, resource gr
 
 ```
 Get-AACInventory [[-ManagementGroupId] <string[]>] [[-SubscriptionId] <string[]>]
- [[-ResourceGroupName] <string[]>] [[-Depth] <string>] [[-CsvPath] <string>] [[-PdfPath] <string>]
+ [[-ResourceGroupName] <string[]>] [[-View] <string>] [[-By] <string>] [[-ResourceType] <string[]>]
+ [[-Top] <int>] [[-Depth] <string>] [[-CsvPath] <string>] [[-PdfPath] <string>]
  [[-HtmlPath] <string>] [[-Title] <string>] [-NoSecurity] [-Cost] [-Insight] [-PassThru]
  [-NoDisplay] [-NoPaging]
 ```
@@ -15250,12 +15474,42 @@ The tenant with what every resource, group and subscription costs.
 ### Example 6
 
 ```powershell
+Get-AACInventory -View Chart -By Location -ResourceType 'microsoft.network/*'
+```
+
+How many network resources there are in each region, as a bar chart.
+
+### Example 7
+
+```powershell
 Get-AACInventory -NoDisplay | Where-Object { $_.Level -eq 'ResourceGroup' -and $_.Resources -eq 0 }
 ```
 
 The empty resource groups.
 
 ## PARAMETERS
+
+### -By
+
+With -View Chart: what to count by - Type (default), Location,
+ResourceGroup or Subscription.
+
+```yaml
+Type: System.String
+DefaultValue: "'Type'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 4
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
 ### -Cost
 
@@ -15291,7 +15545,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 4
+  Position: 8
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -15314,7 +15568,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 3
+  Position: 7
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -15335,7 +15589,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 6
+  Position: 10
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -15489,7 +15743,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 5
+  Position: 9
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -15512,6 +15766,28 @@ Aliases: []
 ParameterSets:
 - Name: (All)
   Position: 2
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ResourceType
+
+With -View Chart: only count resources of these types.
+Case-insensitive; wildcards work, e.g. 'microsoft.network/\*'.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 5
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -15553,7 +15829,57 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 7
+  Position: 11
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Top
+
+With -View Chart: how many bars to draw (default 20); the rest are
+summed in one bar.
+
+```yaml
+Type: System.Int32
+DefaultValue: 20
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 6
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -View
+
+Tree (the default): the hierarchy - management groups, subscriptions,
+resource groups and resources - with security, cost and insight.
+Chart: how many resources you have, as a bar chart by type, location,
+resource group or subscription (-By, -ResourceType, -Top). Two
+Resource Graph queries however many resources there are; with
+-HtmlPath, an interactive inventory of the resources instead. Takes
+-SubscriptionId, -HtmlPath, -Title, -PassThru and -NoPaging; returns
+AAC.ResourceCount objects with -PassThru.
+
+```yaml
+Type: System.String
+DefaultValue: "'Tree'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 3
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -15574,7 +15900,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## OUTPUTS
 
-### AAC.InventoryItem (piped onward, or with -PassThru or -NoDisplay)
+### AAC.InventoryItem (piped onward, or with -PassThru or -NoDisplay) AAC.ResourceCount (-View Chart with -PassThru)
 
 ## NOTES
 
@@ -21159,7 +21485,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## SYNOPSIS
 
-Lists every Azure role assignment - root, management groups, subscriptions, resource groups and resources - with who holds it and what they are, what the role can do, how far it reaches, whether it is standing or PIM, the groups' members, who created it - and flags orphaned assignments, risky grants and custom roles that are unused or as powerful as Owner.
+Deprecated: use Get-AACAccessReview -View Assignment. Lists every Azure role assignment - root, management groups, subscriptions, resource groups and resources - with who holds it and what they are, what the role can do, how far it reaches, whether it is standing or PIM, the groups' members, who created it - and flags orphaned assignments, risky grants and custom roles that are unused or as powerful as Owner.
 
 ## SYNTAX
 
@@ -21178,6 +21504,10 @@ Get-AACRoleAssignment [[-SubscriptionId] <string[]>] [[-ManagementGroupId] <stri
 This command has no aliases.
 
 ## DESCRIPTION
+
+Deprecated, and to be removed in a later release: Get-AACAccessReview
+-View Assignment lists the same, with the same parameters (-Privileged
+there is -PrivilegedOnly). This command still works, and warns.
 
 The inventory under the access review: where Get-AACAccessReview
 says what to fix, this lists everything as it is. Reads, read-only:
@@ -22206,7 +22536,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## SYNOPSIS
 
-Your security posture in one place - Microsoft Defender for Cloud's secure scores, recommendations by control, active alerts, Defender plans and regulatory compliance, and Azure Policy compliance - flattened to one list of findings, with a Spectre.Console view, objects, and CSV, PDF and interactive HTML reports.
+Deprecated: use Invoke-AACDefenderAssessment -View Posture. Your security posture in one place - Microsoft Defender for Cloud's secure scores, recommendations by control, active alerts, Defender plans and regulatory compliance, and Azure Policy compliance - flattened to one list of findings, with a Spectre.Console view, objects, and CSV, PDF and interactive HTML reports.
 
 ## SYNTAX
 
@@ -22224,6 +22554,10 @@ Get-AACSecurityPosture [[-SubscriptionId] <string[]>] [[-ResourceGroupName] <str
 This command has no aliases.
 
 ## DESCRIPTION
+
+Deprecated, and to be removed in a later release: Invoke-AACDefenderAssessment
+-View Posture gives the same, with the same parameters. This command still
+works, and warns.
 
 Reads Defender for Cloud with Azure Resource Graph (securityresources;
 Reader or Security Reader is enough, no Az modules) - every query at
@@ -27931,9 +28265,11 @@ Microsoft Defender for Cloud assessed across subscriptions - recommendations, at
 ### __AllParameterSets
 
 ```
-Invoke-AACDefenderAssessment [[-SubscriptionId] <string[]>] [[-Section] <string[]>]
- [[-AlertDays] <int>] [[-ScoreWarningPercent] <int>] [[-CsvPath] <string>] [[-HtmlPath] <string>]
- [[-Title] <string>] [-PassThru] [-NoDisplay] [-NoPaging]
+Invoke-AACDefenderAssessment [[-SubscriptionId] <string[]>] [[-View] <string>]
+ [[-ResourceGroupName] <string[]>] [[-Tag] <hashtable>] [[-Section] <string[]>]
+ [[-Standard] <string[]>] [[-AlertDays] <int>] [[-ScoreWarningPercent] <int>] [[-CsvPath] <string>]
+ [[-PdfPath] <string>] [[-HtmlPath] <string>] [[-Title] <string>] [-PassThru] [-NoDisplay]
+ [-NoPaging]
 ```
 
 ## ALIASES
@@ -28054,6 +28390,22 @@ The High recommendations and how many resources each is on.
 
 The resources no Defender plan protects.
 
+### Example 6
+
+```powershell
+Invoke-AACDefenderAssessment -View Posture -Tag @{ Environment = 'Prod' } -Section Recommendations, Alerts, Policy -PdfPath .\out\Security.pdf
+```
+
+The production resources' recommendations, alerts and Azure Policy compliance, as a PDF.
+
+### Example 7
+
+```powershell
+Invoke-AACDefenderAssessment -View Posture -Section Compliance -Standard '*ISO*' -NoDisplay | Group-Object Title
+```
+
+The failing ISO 27001 controls, as finding rows.
+
 ## PARAMETERS
 
 ### -AlertDays
@@ -28068,7 +28420,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 2
+  Position: 6
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -28080,7 +28432,8 @@ HelpMessage: ''
 
 ### -CsvPath
 
-A folder to write a CSV per table to.
+A folder to write a CSV per table to. With -View Posture: a CSV file
+of every finding.
 
 ```yaml
 Type: System.String
@@ -28089,7 +28442,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 4
+  Position: 8
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -28110,7 +28463,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 5
+  Position: 10
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -28183,6 +28536,49 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -PdfPath
+
+With -View Posture: write a PDF report to this file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 9
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ResourceGroupName
+
+With -View Posture: only the recommendations, alerts and compliance
+failures on resources in these resource groups.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 2
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -ScoreWarningPercent
 
 A subscription's secure score under this percentage (70 by default)
@@ -28195,7 +28591,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 3
+  Position: 7
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -28207,8 +28603,10 @@ HelpMessage: ''
 
 ### -Section
 
-What to read: Recommendations, AttackPaths, Alerts, Inventory,
-Vulnerabilities, Posture, Compliance, Settings. All by default.
+What to read. The assessment: Recommendations, AttackPaths, Alerts,
+Inventory, Vulnerabilities, Posture, Compliance, Settings. -View
+Posture: Score, Recommendations, Alerts, Plans, Compliance, Policy.
+All of the view's by default.
 
 ```yaml
 Type: System.String[]
@@ -28217,7 +28615,29 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 1
+  Position: 4
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Standard
+
+With -View Posture: only these regulatory compliance standards (names
+or wildcards, e.g. 'Microsoft-cloud-security-benchmark' or '\*ISO\*').
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 5
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -28249,6 +28669,29 @@ AcceptedValues: []
 HelpMessage: ''
 ```
 
+### -Tag
+
+With -View Posture: only the recommendations, alerts and compliance
+failures on resources with these tags, e.g. @{ Environment = 'Prod' }
+(all must match).
+
+```yaml
+Type: System.Collections.Hashtable
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 3
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
 ### -Title
 
 The HTML report's title.
@@ -28260,7 +28703,35 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 6
+  Position: 11
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -View
+
+Assessment (the default): the full assessment above - every table, and
+the findings - as an AAC.DefenderAssessment object. Posture: the
+posture as flat AAC.SecurityFinding rows - secure score and controls,
+recommendations on each resource, active alerts, Defender plans,
+regulatory compliance failures and Azure Policy compliance (which
+assignments leave resources non-compliant) - that can be narrowed to
+resource groups (-ResourceGroupName) or tags (-Tag) and compliance
+standards (-Standard), and written as CSV, HTML or PDF (-PdfPath).
+
+```yaml
+Type: System.String
+DefaultValue: "'Assessment'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 1
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -28281,7 +28752,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## OUTPUTS
 
-### AAC.DefenderAssessment (piped onward, or with -PassThru or -NoDisplay)
+### AAC.DefenderAssessment (piped onward, or with -PassThru or -NoDisplay) AAC.SecurityFinding (-View Posture, the same way)
 
 ## NOTES
 
@@ -35999,6 +36470,685 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 - [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Invoke-AACWafAssessment.md)
 - [about_Azure.Admin.Console](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md)
 
+<!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/New-AACDesignDiagram.md -->
+
+# New-AACDesignDiagram
+
+## SYNOPSIS
+
+Draws a hub and spoke design from a few parameters - the firewall, the spokes and the resources in them - as an editable draw.io diagram, with every subscription, resource group, virtual network and subnet named and each address range worked out.
+
+## SYNTAX
+
+### __AllParameterSets
+
+```
+New-AACDesignDiagram [[-Name] <string>] [[-Spoke] <Object[]>] [[-Design] <Object>]
+ [[-Resource] <string[]>] [[-HubAddressSpace] <string>] [[-HubSubscription] <string>]
+ [[-HubResourceGroup] <string>] [[-Region] <string>] [[-Environment] <string>] [[-Path] <string>]
+ [[-HtmlPath] <string>] [[-PdfPath] <string>] [[-CsvPath] <string>] [[-Title] <string>] [-Firewall]
+ [-Bastion] [-VpnGateway] [-Update] [-Force] [-Open] [-PassThru] [-NoDisplay] [-NoPaging] [-WhatIf]
+ [-Confirm]
+```
+
+## ALIASES
+
+This command has no aliases.
+
+## DESCRIPTION
+
+Offline: nothing is read from Azure and nothing needs to exist, so a design
+can be drawn before there is a subscription for it. Export-AACDiagram draws
+what is already deployed; this draws what you are about to build.
+
+From the hub's address space, the spokes and the resources you name, it
+plans:
+
+```text
+  Subnets      each network's subnets at the size Microsoft recommends for
+               what is in them (AzureFirewallSubnet /26, a delegated App
+               Service integration subnet, a private endpoint subnet...),
+               from the smallest it supports when the space is tight, with
+               their ranges, usable addresses and network security group
+  Routing      with -Firewall, a route table per spoke sending 0.0.0.0/0
+               to the firewall's private IP
+  Peering      every spoke to the hub, with gateway transit when there is
+               a VPN gateway
+  Resources    named as {type}-{spoke}-{env}-{region} (storage accounts and
+               registries without hyphens): Web and Function Apps outside
+               the network with VNet integration and an App Service plan;
+               storage, Key Vault, SQL, Cosmos DB, Redis, Service Bus, Event
+               Hubs and registries behind private endpoints, with their
+               private DNS zones in the hub; VMs, AKS, Application Gateway
+               and API Management in subnets of their own
+```
+
+Networks that overlap, or a network too small for its subnets, stop the
+command: a diagram of addresses that can't exist would mislead.
+
+A spoke is a name - it gets the next free /16 (10.1.0.0/16, 10.2.0.0/16...)
+and -Resource - or a hashtable for full control:
+
+```text
+  @{ Name = 'orders'; AddressSpace = '10.10.0.0/20'; Resources = 'FunctionApp', 'StorageAccount'
+     Subscription = 'sub-orders-prod'; ResourceGroup = 'rg-orders-prod'
+     Subnets = @( @{ Name = 'snet-app'; AddressPrefix = '10.10.0.0/24'; Resources = 'FunctionApp' }
+                  @{ Name = 'snet-pe'; AddressPrefix = '10.10.1.0/26'; Resources = 'StorageAccount' } ) }
+```
+
+Subnets you give are kept as they are, and checked.
+
+The draw.io file has native containers (subscription \> region \> resource
+group \> virtual network \> subnet), Azure icons, attached connections and a
+Legend page: open it in draw.io (desktop, app.diagrams.net or the VS Code
+extension) and keep editing. Run it again with -Update after changing the
+parameters: your own changes to the diagram are kept. At the prompt you get
+the address plan; -CsvPath writes it, -PassThru returns it (AAC.DesignSubnet).
+
+-Design draws the network for a design from New-AACArchitectureDesign (the
+object, piped or given, or the JSON file its -OutPath saved): its region,
+its firewall, and the components this diagram has an icon and a subnet
+for go into one spoke (or each spoke you name). Components without one
+here - Front Door, monitoring, Azure OpenAI, AI Search... - are listed in
+a warning; New-AACArchitectureDiagram draws the whole design.
+
+## EXAMPLES
+
+### Example 1
+
+```powershell
+New-AACDesignDiagram -Name contoso -Firewall -Bastion -Spoke orders, payments -Resource FunctionApp, WebApp, StorageAccount, KeyVault -Open
+A hub with a firewall and Bastion, two spokes with the same four resources, opened in draw.io.
+```
+
+### Example 2
+
+```powershell
+New-AACDesignDiagram -Name contoso -Firewall -VpnGateway -HubAddressSpace 10.100.0.0/22 -Spoke @(
+    @{ Name = 'orders'; AddressSpace = '10.110.0.0/20'; Resources = 'FunctionApp', 'StorageAccount', 'ServiceBus'; Subscription = 'sub-orders-prod' }
+    @{ Name = 'web'; AddressSpace = '10.120.0.0/20'; Resources = 'ApplicationGateway', 'WebApp', 'SqlDatabase' }
+) -Path .\contoso.drawio -CsvPath .\contoso-ip-plan.csv
+```
+
+Spokes with their own ranges, resources and subscription, and the address plan as CSV.
+
+### Example 3
+
+```powershell
+New-AACDesignDiagram -Name contoso -Firewall -Spoke orders -Resource FunctionApp, StorageAccount -Path .\contoso.drawio -Update
+```
+
+Redraws the diagram you edited, keeping your changes.
+
+### Example 4
+
+```powershell
+New-AACArchitectureDesign -BriefPath .\brief.json -Offline | New-AACDesignDiagram -Bastion -Open
+```
+
+The network for an architecture design: its components in a spoke, its firewall in the hub.
+
+## PARAMETERS
+
+### -Bastion
+
+Put Azure Bastion in the hub.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Confirm
+
+
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases:
+- cf
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -CsvPath
+
+Write the address plan to this CSV file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 12
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Design
+
+A design from New-AACArchitectureDesign - the object, or the JSON file
+it saved with -OutPath. Its components become the spoke's resources (in
+place of -Resource), its first region the -Region, and its firewall
+-Firewall. Pipe it: New-AACArchitectureDesign ... | New-AACDesignDiagram.
+
+```yaml
+Type: System.Object
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 2
+  IsRequired: false
+  ValueFromPipeline: true
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Environment
+
+The environment in the names: prod, dev... Default prod.
+
+```yaml
+Type: System.String
+DefaultValue: "'prod'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 8
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Firewall
+
+Put Azure Firewall in the hub, and route each spoke's traffic through it.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Force
+
+Replace an existing file at -Path.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -HtmlPath
+
+Also write the design as an interactive page.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 10
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -HubAddressSpace
+
+The hub's address space. Default 10.0.0.0/22.
+
+```yaml
+Type: System.String
+DefaultValue: "'10.0.0.0/22'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 4
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -HubResourceGroup
+
+The hub's resource group. Default rg-hub-network-{env}-{region}.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 6
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -HubSubscription
+
+The hub's subscription name. Default sub-connectivity.
+
+```yaml
+Type: System.String
+DefaultValue: "'sub-connectivity'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 5
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Name
+
+The design's name, for the title and the file name. With -Design, the
+design's own name when left out.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 0
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoDisplay
+
+Return the subnets without showing the plan.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoPaging
+
+Show the whole plan at once.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Open
+
+Open the diagram when it is written, in the app your computer uses for
+draw.io files.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PassThru
+
+Show the plan and also return the subnets.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Path
+
+The draw.io file. Default .\\<Name\>-design.drawio.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 9
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PdfPath
+
+Also write the design as a one-page PDF (needs Microsoft Edge or Chrome).
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 11
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Region
+
+The region. Default westeurope.
+
+```yaml
+Type: System.String
+DefaultValue: "'westeurope'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 7
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Resource
+
+The resources in a spoke given as a name: FunctionApp, WebApp,
+StorageAccount, KeyVault, SqlDatabase, CosmosDb, Redis, ServiceBus, EventHub,
+ContainerRegistry, VirtualMachine, Aks, ApplicationGateway, ApiManagement.
+Name one twice for two of it.
+
+```yaml
+Type: System.String[]
+DefaultValue: '@()'
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 3
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Spoke
+
+The spokes: names, or hashtables with Name and any of AddressSpace,
+Resources, Subscription, ResourceGroup and Subnets (see the description).
+With -Design, one spoke named workload when left out.
+
+```yaml
+Type: System.Object[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 1
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Title
+
+The diagram's title.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 13
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Update
+
+Redraw the diagram at -Path and keep the changes you made to it: what is new
+is added and marked, what is gone is faded.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -VpnGateway
+
+Put a VPN gateway in the hub, connected to your on-premises network, and let
+the spokes use it through the peering.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -WhatIf
+
+
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases:
+- wi
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### CommonParameters
+
+This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable,
+-InformationAction, -InformationVariable, -OutBuffer, -OutVariable, -PipelineVariable,
+-ProgressAction, -Verbose, -WarningAction, and -WarningVariable. For more information, see
+[about_CommonParameters](https://go.microsoft.com/fwlink/?LinkID=113216).
+
+## INPUTS
+
+## OUTPUTS
+
+### AAC.DesignSubnet (with -PassThru or -NoDisplay, or piped onward)
+
+## NOTES
+
+## RELATED LINKS
+
+- [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/New-AACDesignDiagram.md)
+- [about_Azure.Admin.Console](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md)
+
 <!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/New-AACServiceBlueprint.md -->
 
 # New-AACServiceBlueprint
@@ -39649,7 +40799,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## SYNOPSIS
 
-Shows how many Azure resources you have - by type, location, resource group or subscription - as a colourful Spectre.Console bar chart.
+Deprecated: use Get-AACInventory -View Chart. Shows how many Azure resources you have - by type, location, resource group or subscription - as a colourful Spectre.Console bar chart.
 
 ## SYNTAX
 
@@ -39665,6 +40815,10 @@ Show-AACResource [[-SubscriptionId] <string[]>] [[-By] <string>] [[-ResourceType
 This command has no aliases.
 
 ## DESCRIPTION
+
+Deprecated, and to be removed in a later release: Get-AACInventory -View Chart
+draws the same chart, with the same parameters. This command still works, and
+warns.
 
 Counts every resource the signed-in account can see (or only those in
 -SubscriptionId, of -ResourceType) with Azure Resource Graph, over

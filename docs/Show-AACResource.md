@@ -12,7 +12,7 @@ title: Show-AACResource
 
 ## SYNOPSIS
 
-Shows how many Azure resources you have - by type, location, resource group or subscription - as a colourful Spectre.Console bar chart.
+Deprecated: use Get-AACInventory -View Chart. Shows how many Azure resources you have - by type, location, resource group or subscription - as a colourful Spectre.Console bar chart.
 
 ## SYNTAX
 
@@ -28,6 +28,10 @@ Show-AACResource [[-SubscriptionId] <string[]>] [[-By] <string>] [[-ResourceType
 This command has no aliases.
 
 ## DESCRIPTION
+
+Deprecated, and to be removed in a later release: Get-AACInventory -View Chart
+draws the same chart, with the same parameters. This command still works, and
+warns.
 
 Counts every resource the signed-in account can see (or only those in
 -SubscriptionId, of -ResourceType) with Azure Resource Graph, over

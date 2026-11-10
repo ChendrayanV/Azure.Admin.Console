@@ -39,13 +39,7 @@ function ConvertTo-AACServiceBlueprintName {
         [System.Collections.IDictionary] $Rule
     )
 
-    $regionCode = @{
-        westeurope = 'weu'; northeurope = 'neu'; uksouth = 'uks'; ukwest = 'ukw'; francecentral = 'frc'; germanywestcentral = 'gwc'; swedencentral = 'swc'; switzerlandnorth = 'chn'; norwayeast = 'noe'
-        eastus = 'eus'; eastus2 = 'eus2'; centralus = 'cus'; westus = 'wus'; westus2 = 'wus2'; westus3 = 'wus3'; canadacentral = 'cac'; brazilsouth = 'brs'
-        southeastasia = 'sea'; eastasia = 'ea'; japaneast = 'jpe'; australiaeast = 'aue'; centralindia = 'cin'; southafricanorth = 'san'; uaenorth = 'uan'
-    }
-    $key = $Region.ToLowerInvariant()
-    $tokens = @{ type = $Abbreviation; workload = $Workload; env = $Environment; region = $(if ($regionCode.ContainsKey($key)) { $regionCode[$key] } else { $key }); instance = $Instance }
+    $tokens = @{ type = $Abbreviation; workload = $Workload; env = $Environment; region = (Get-AACRegionCode -Region $Region); instance = $Instance }
     foreach ($match in [regex]::Matches($Pattern, '\{([^{}]*)\}')) {
         if (-not $tokens.ContainsKey($match.Groups[1].Value)) {
             throw "Azure Admin Console doesn't know the token {$($match.Groups[1].Value)} in the naming convention. Use {type}, {workload}, {env}, {region} and {instance}."

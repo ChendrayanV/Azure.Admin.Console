@@ -12,7 +12,7 @@ title: Get-AACSecurityPosture
 
 ## SYNOPSIS
 
-Your security posture in one place - Microsoft Defender for Cloud's secure scores, recommendations by control, active alerts, Defender plans and regulatory compliance, and Azure Policy compliance - flattened to one list of findings, with a Spectre.Console view, objects, and CSV, PDF and interactive HTML reports.
+Deprecated: use Invoke-AACDefenderAssessment -View Posture. Your security posture in one place - Microsoft Defender for Cloud's secure scores, recommendations by control, active alerts, Defender plans and regulatory compliance, and Azure Policy compliance - flattened to one list of findings, with a Spectre.Console view, objects, and CSV, PDF and interactive HTML reports.
 
 ## SYNTAX
 
@@ -30,6 +30,10 @@ Get-AACSecurityPosture [[-SubscriptionId] <string[]>] [[-ResourceGroupName] <str
 This command has no aliases.
 
 ## DESCRIPTION
+
+Deprecated, and to be removed in a later release: Invoke-AACDefenderAssessment
+-View Posture gives the same, with the same parameters. This command still
+works, and warns.
 
 Reads Defender for Cloud with Azure Resource Graph (securityresources;
 Reader or Security Reader is enough, no Az modules) - every query at

@@ -37,7 +37,7 @@ The rest of #8 is answered by commands the module already has:
 
 | Asked for | Use |
 | --- | --- |
-| `Get-AACRoleAssignment` - RBAC assignments and effective access | `Get-AACAccessReview` (every assignment, PIM, classic admins, Entra roles and Graph app permissions, with a recommendation each) |
+| `Get-AACRoleAssignment` - RBAC assignments and effective access | `Get-AACAccessReview -View Assignment` (every assignment as it is), `Get-AACAccessReview` (every assignment, PIM, classic admins, Entra roles and Graph app permissions, with a recommendation each) |
 | `Get-AACServicePrincipalAccess` - permissions and recent use | `Get-AACAccessReview -PrivilegedOnly` for the access, `Get-AACOrphanedIdentity -Kind Application` for the unused ones |
 | `Get-AACActivityLog` - administrative changes | `Get-AACChangeHistory` (what changed, who, before and after); failed actions and permission issues: `Get-AACResourceError` |
 | `Get-AACBackupStatus` - backup health and recovery readiness | `Get-AACFailoverReadiness` (backups, restores, Site Recovery, vaults, recovery plans) |

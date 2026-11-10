@@ -57,6 +57,33 @@ function Get-AACAccessReview {
         Only these subscriptions.
     .PARAMETER ManagementGroupId
         Only the subscriptions under these management groups (at any depth).
+    .PARAMETER View
+        Review (the default): what to fix - unused, standing, risky and
+        external access across Azure RBAC, Entra ID roles and Graph
+        permissions, with a recommendation each. Assignment: the inventory
+        under it - every Azure role assignment at every scope as it is (who,
+        the role, its reach, standing or PIM, the groups' members, who created
+        it), with the custom roles; returns AAC.RoleAssignment rows. The
+        Assignment view takes -PrincipalType, -RoleName, -ScopeType,
+        -PrivilegedOnly, -WithFinding, -ExpandGroup, -IncludeCustomRole and
+        -SkipPim, not -ActivityDays or -Severity.
+    .PARAMETER PrincipalType
+        With -View Assignment: Only these principals: User, Guest, Group, Application,
+        ManagedIdentity, Deleted.
+    .PARAMETER RoleName
+        With -View Assignment: Only these roles; wildcards work ('*Owner*').
+    .PARAMETER ScopeType
+        With -View Assignment: Only assignments at these scopes: Root, ManagementGroup,
+        Subscription, ResourceGroup, Resource.
+    .PARAMETER WithFinding
+        With -View Assignment: Only assignments with a finding.
+    .PARAMETER ExpandGroup
+        With -View Assignment: Read each group's members (transitive, up to 200 groups).
+    .PARAMETER IncludeCustomRole
+        With -View Assignment: Also return the custom roles (AAC.CustomRole), after the
+        assignments.
+    .PARAMETER SkipPim
+        With -View Assignment: Don't read PIM (eligible and activated assignments).
     .PARAMETER ActivityDays
         How many days of Activity Log to read for unused access (0 to 90; 30
         by default; 0 skips it).
@@ -68,7 +95,8 @@ function Get-AACAccessReview {
     .PARAMETER PrivilegedOnly
         Only privileged access (Owner, Contributor, User Access
         Administrator, RBAC Administrator, equivalent custom roles,
-        privileged Entra roles and Graph permissions).
+        privileged Entra roles and Graph permissions). With -View Assignment:
+        only privileged role assignments.
     .PARAMETER CsvPath
         Write every row to this CSV file - with Decision and Reviewer
         columns for the sign-off.
@@ -93,16 +121,40 @@ function Get-AACAccessReview {
     .EXAMPLE
         Get-AACAccessReview -NoDisplay | Where-Object Recommendation -EQ 'Make eligible (PIM)' | Select-Object Principal, Role, Scope
         The standing access to move into PIM.
+    .EXAMPLE
+        Get-AACAccessReview -View Assignment -PrincipalType Guest, Application -ScopeType Subscription, ManagementGroup
+        Every role guests and applications hold at subscription scope or above.
     .OUTPUTS
         AAC.AccessAssignment
+        AAC.RoleAssignment (and AAC.CustomRole, with -IncludeCustomRole): -View Assignment
     #>
     [CmdletBinding()]
     [OutputType('AAC.AccessAssignment')]
+    [OutputType('AAC.RoleAssignment')]
     param(
         [ValidatePattern('^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$')]
         [string[]] $SubscriptionId,
 
         [string[]] $ManagementGroupId,
+
+        [ValidateSet('Review', 'Assignment')]
+        [string] $View = 'Review',
+
+        [ValidateSet('User', 'Guest', 'Group', 'Application', 'ManagedIdentity', 'Deleted')]
+        [string[]] $PrincipalType,
+
+        [string[]] $RoleName,
+
+        [ValidateSet('Root', 'ManagementGroup', 'Subscription', 'ResourceGroup', 'Resource')]
+        [string[]] $ScopeType,
+
+        [switch] $WithFinding,
+
+        [switch] $ExpandGroup,
+
+        [switch] $IncludeCustomRole,
+
+        [switch] $SkipPim,
 
         [ValidateRange(0, 90)]
         [int] $ActivityDays = 30,
@@ -132,6 +184,22 @@ function Get-AACAccessReview {
     trap { if ($_.Exception -is [System.Management.Automation.PipelineStoppedException]) { return }; $PSCmdlet.ThrowTerminatingError((Show-AACError -ErrorRecord $_ -Cmdlet $PSCmdlet)) }
 
     $pipedOnward = $MyInvocation.PipelinePosition -lt $MyInvocation.PipelineLength
+
+    # The assignment inventory (what Get-AACRoleAssignment listed). Say plainly
+    # which parameters belong to the other view rather than ignoring them.
+    $assignmentOnly = @('PrincipalType', 'RoleName', 'ScopeType', 'WithFinding', 'ExpandGroup', 'IncludeCustomRole', 'SkipPim') | Where-Object { $PSBoundParameters.ContainsKey($_) }
+    if ($View -eq 'Review' -and $assignmentOnly) {
+        throw "Azure Admin Console -$($assignmentOnly -join ', -') works with -View Assignment only. Add -View Assignment, or leave it out for the review."
+    }
+    if ($View -eq 'Assignment') {
+        $reviewOnly = @('ActivityDays', 'Severity') | Where-Object { $PSBoundParameters.ContainsKey($_) }
+        if ($reviewOnly) { throw "Azure Admin Console -View Assignment doesn't take -$($reviewOnly -join ', -'). Leave it out, or leave out -View Assignment for the review." }
+        $forward = @{}
+        foreach ($key in @($PSBoundParameters.Keys)) { if ($key -notin 'View', 'PrivilegedOnly') { $forward[$key] = $PSBoundParameters[$key] } }
+        if ($PrivilegedOnly) { $forward['Privileged'] = $true }
+        Invoke-AACRoleAssignmentReport @forward -OutputPiped:$pipedOnward
+        return
+    }
     $interactive = -not $NoDisplay -and -not $pipedOnward
     $resolve = { param([string] $Path) if ($Path) { $PSCmdlet.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path) } }
     $request = @{ SubscriptionId = @($SubscriptionId | Where-Object { $_ }); ManagementGroupId = @($ManagementGroupId | Where-Object { $_ }); ActivityDays = $ActivityDays; SkipEntra = [bool]$SkipEntra }

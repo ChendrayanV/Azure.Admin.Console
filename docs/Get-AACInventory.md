@@ -20,7 +20,8 @@ Inventories the tenant as a tree - management groups, subscriptions, resource gr
 
 ```
 Get-AACInventory [[-ManagementGroupId] <string[]>] [[-SubscriptionId] <string[]>]
- [[-ResourceGroupName] <string[]>] [[-Depth] <string>] [[-CsvPath] <string>] [[-PdfPath] <string>]
+ [[-ResourceGroupName] <string[]>] [[-View] <string>] [[-By] <string>] [[-ResourceType] <string[]>]
+ [[-Top] <int>] [[-Depth] <string>] [[-CsvPath] <string>] [[-PdfPath] <string>]
  [[-HtmlPath] <string>] [[-Title] <string>] [-NoSecurity] [-Cost] [-Insight] [-PassThru]
  [-NoDisplay] [-NoPaging]
 ```
@@ -190,12 +191,42 @@ The tenant with what every resource, group and subscription costs.
 ### Example 6
 
 ```powershell
+Get-AACInventory -View Chart -By Location -ResourceType 'microsoft.network/*'
+```
+
+How many network resources there are in each region, as a bar chart.
+
+### Example 7
+
+```powershell
 Get-AACInventory -NoDisplay | Where-Object { $_.Level -eq 'ResourceGroup' -and $_.Resources -eq 0 }
 ```
 
 The empty resource groups.
 
 ## PARAMETERS
+
+### -By
+
+With -View Chart: what to count by - Type (default), Location,
+ResourceGroup or Subscription.
+
+```yaml
+Type: System.String
+DefaultValue: "'Type'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 4
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
 
 ### -Cost
 
@@ -231,7 +262,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 4
+  Position: 8
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -254,7 +285,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 3
+  Position: 7
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -275,7 +306,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 6
+  Position: 10
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -429,7 +460,7 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 5
+  Position: 9
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -452,6 +483,28 @@ Aliases: []
 ParameterSets:
 - Name: (All)
   Position: 2
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ResourceType
+
+With -View Chart: only count resources of these types.
+Case-insensitive; wildcards work, e.g. 'microsoft.network/\*'.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 5
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -493,7 +546,57 @@ SupportsWildcards: false
 Aliases: []
 ParameterSets:
 - Name: (All)
-  Position: 7
+  Position: 11
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Top
+
+With -View Chart: how many bars to draw (default 20); the rest are
+summed in one bar.
+
+```yaml
+Type: System.Int32
+DefaultValue: 20
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 6
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -View
+
+Tree (the default): the hierarchy - management groups, subscriptions,
+resource groups and resources - with security, cost and insight.
+Chart: how many resources you have, as a bar chart by type, location,
+resource group or subscription (-By, -ResourceType, -Top). Two
+Resource Graph queries however many resources there are; with
+-HtmlPath, an interactive inventory of the resources instead. Takes
+-SubscriptionId, -HtmlPath, -Title, -PassThru and -NoPaging; returns
+AAC.ResourceCount objects with -PassThru.
+
+```yaml
+Type: System.String
+DefaultValue: "'Tree'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 3
   IsRequired: false
   ValueFromPipeline: false
   ValueFromPipelineByPropertyName: false
@@ -514,7 +617,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## OUTPUTS
 
-### AAC.InventoryItem (piped onward, or with -PassThru or -NoDisplay)
+### AAC.InventoryItem (piped onward, or with -PassThru or -NoDisplay) AAC.ResourceCount (-View Chart with -PassThru)
 
 ## NOTES
 
