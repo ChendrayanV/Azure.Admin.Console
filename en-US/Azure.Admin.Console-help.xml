@@ -14098,6 +14098,426 @@ NotMeasured, Disabled, Healthy).</maml:para>
   </command:command>
   <command:command>
     <command:details>
+      <command:name>Get-AACManagedIdentity</command:name>
+      <maml:description>
+        <maml:para>Lists every managed identity - system-assigned (on a resource or a policy assignment) and user-assigned - with what it belongs to, what it is attached to, its Azure roles, its API permissions (Microsoft Graph and other APIs) and federated credentials, and findings for the access that matters.</maml:para>
+      </maml:description>
+      <command:verb>Get</command:verb>
+      <command:noun>AACManagedIdentity</command:noun>
+    </command:details>
+    <maml:description>
+      <maml:para>Read-only. Reads:
+  Resource Graph     the user-assigned identities, every resource's
+                     system-assigned identity, the resources (and AKS
+                     kubelets) and policy assignments using each
+                     user-assigned identity, and the role assignments
+                     and definitions (tenant-wide, so management group
+                     and root assignments count)
+  Resource Manager   each user-assigned identity's federated
+                     credentials (workload identity federation)
+  Microsoft Graph    each identity's API permissions (app role
+                     assignments) and their names - the Azure portal
+                     doesn't show these anywhere for a managed
+                     identity (-SkipEntra leaves them out)
+
+Each identity (AAC.ManagedIdentity) has its kind, resource type,
+subscription, resource group, location and tags; for a user-assigned
+one, the resources it is attached to and its federated credentials;
+its Azure roles and API permissions, the privileged ones apart; and
+findings:
+  High    an API permission that can take over the tenant
+          (RoleManagement.ReadWrite.Directory,
+          AppRoleAssignment.ReadWrite.All, Application.ReadWrite.All);
+          Owner, User Access Administrator or Role Based Access
+          Control Administrator on a subscription or above
+  Medium  another privileged API permission (Directory.ReadWrite.All,
+          Mail.Send, Sites.FullControl.All...); Contributor on a
+          subscription or above; a user-assigned identity shared by
+          more than -SharedLimit resources with privileged access, or
+          attached to nothing yet still holding access; a federated
+          credential on an identity with privileged access
+  Low     a user-assigned identity attached to nothing, without
+          access; a resource with both a system-assigned and
+          user-assigned identities
+
+The objects pipe into Get-AACApplicationPermission (by PrincipalId)
+for everything else an identity holds: directory roles, PIM,
+ownership, group membership.
+
+Reader in Azure; Application.Read.All (or Directory Readers) in Entra
+ID for the API permissions. Part of it that can't be read is a
+notice, not an error.</maml:para>
+    </maml:description>
+    <command:syntax>
+      <command:syntaxItem>
+        <maml:name>Get-AACManagedIdentity</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="none">
+          <maml:name>SubscriptionId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="1" aliases="none">
+          <maml:name>ManagementGroupId</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="2" aliases="none">
+          <maml:name>Name</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="3" aliases="none">
+          <maml:name>ResourceGroupName</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string[]</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String[]</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="4" aliases="none">
+          <maml:name>SharedLimit</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">int</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Int32</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="5" aliases="none">
+          <maml:name>MaxIdentity</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">int</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Int32</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="6" aliases="none">
+          <maml:name>CsvPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="7" aliases="none">
+          <maml:name>HtmlPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="8" aliases="none">
+          <maml:name>PdfPath</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="9" aliases="none">
+          <maml:name>Title</maml:name>
+          <maml:description />
+          <command:parameterValue required="true" variableLength="false">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>SystemAssigned</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>UserAssigned</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>SkipEntra</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>PassThru</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoDisplay</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="named" aliases="none">
+          <maml:name>NoPaging</maml:name>
+          <maml:description />
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="6" aliases="none">
+        <maml:name>CsvPath</maml:name>
+        <maml:description>
+          <maml:para>Write the identities to this CSV file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="7" aliases="none">
+        <maml:name>HtmlPath</maml:name>
+        <maml:description>
+          <maml:para>Write an interactive HTML report.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="1" aliases="none">
+        <maml:name>ManagementGroupId</maml:name>
+        <maml:description>
+          <maml:para>Only the subscriptions under these management groups (at any depth).</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="5" aliases="none">
+        <maml:name>MaxIdentity</maml:name>
+        <maml:description>
+          <maml:para>Read the API permissions of at most this many identities (one
+Microsoft Graph call each). Default 1000.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Int32</maml:name>
+        </dev:type>
+        <dev:defaultValue>1000</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="true" pipelineInput="false" position="2" aliases="none">
+        <maml:name>Name</maml:name>
+        <maml:description>
+          <maml:para>Only identities with these names (wildcards allowed). A
+system-assigned identity has its resource's name.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoDisplay</maml:name>
+        <maml:description>
+          <maml:para>Return the identities without showing the view.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>NoPaging</maml:name>
+        <maml:description>
+          <maml:para>Show the whole view at once.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>PassThru</maml:name>
+        <maml:description>
+          <maml:para>Show the view and also return the identities.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="8" aliases="none">
+        <maml:name>PdfPath</maml:name>
+        <maml:description>
+          <maml:para>Write a PDF report.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="true" pipelineInput="false" position="3" aliases="none">
+        <maml:name>ResourceGroupName</maml:name>
+        <maml:description>
+          <maml:para>Only identities in these resource groups (wildcards allowed).</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="4" aliases="none">
+        <maml:name>SharedLimit</maml:name>
+        <maml:description>
+          <maml:para>A user-assigned identity with privileged access attached to more
+resources than this is a finding. Default 10.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Int32</maml:name>
+        </dev:type>
+        <dev:defaultValue>10</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>SkipEntra</maml:name>
+        <maml:description>
+          <maml:para>Don't read the API permissions from Microsoft Graph - faster, and
+needs no Entra ID access.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="0" aliases="none">
+        <maml:name>SubscriptionId</maml:name>
+        <maml:description>
+          <maml:para>Only these subscriptions.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String[]</maml:name>
+        </dev:type>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>SystemAssigned</maml:name>
+        <maml:description>
+          <maml:para>Only system-assigned identities (of resources and policy assignments).</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="9" aliases="none">
+        <maml:name>Title</maml:name>
+        <maml:description>
+          <maml:para>The reports' title.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="true">System.String</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+        </dev:type>
+        <dev:defaultValue>'Managed identities'</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="false" position="Named" aliases="none">
+        <maml:name>UserAssigned</maml:name>
+        <maml:description>
+          <maml:para>Only user-assigned identities.</maml:para>
+        </maml:description>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes />
+    <command:returnValues>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>AAC.ManagedIdentity</maml:name>
+        </dev:type>
+        <maml:description>
+          <maml:para />
+        </maml:description>
+      </command:returnValue>
+    </command:returnValues>
+    <maml:alertSet>
+      <maml:alert>
+        <maml:para />
+      </maml:alert>
+    </maml:alertSet>
+    <command:examples>
+      <command:example>
+        <maml:title>--------- Example 1 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Get-AACManagedIdentity</dev:code>
+        <dev:remarks>
+          <maml:para>Every managed identity, the riskiest first, with an overview.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 2 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Get-AACManagedIdentity -UserAssigned -ResourceGroupName 'rg-app-*' -NoDisplay | Select-Object Name, AttachedTo, AzureRoles, ApiPermissions</dev:code>
+        <dev:remarks>
+          <maml:para>The user-assigned identities of the application resource groups.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 3 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Get-AACManagedIdentity -NoDisplay | Where-Object ApiPermissions | Select-Object Name, Kind, Permissions</dev:code>
+        <dev:remarks>
+          <maml:para>The managed identities with Microsoft Graph (or other API) permissions.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 4 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Get-AACManagedIdentity -Name 'func-orders' -NoDisplay | Get-AACApplicationPermission</dev:code>
+        <dev:remarks>
+          <maml:para>Everything one identity holds, directory roles included.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>--------- Example 5 ---------</maml:title>
+        <maml:introduction></maml:introduction>
+        <dev:code>Get-AACManagedIdentity -ManagementGroupId mg-landingzones -HtmlPath .\ManagedIdentities.html
+A report for one management group.</dev:code>
+        <dev:remarks />
+      </command:example>
+    </command:examples>
+    <command:relatedLinks>
+      <maml:navigationLink>
+        <maml:linkText>Online Version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACManagedIdentity.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>Online version</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACManagedIdentity.md</maml:uri>
+      </maml:navigationLink>
+      <maml:navigationLink>
+        <maml:linkText>about_Azure.Admin.Console</maml:linkText>
+        <maml:uri>https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md</maml:uri>
+      </maml:navigationLink>
+    </command:relatedLinks>
+  </command:command>
+  <command:command>
+    <command:details>
       <command:name>Get-AACNetworkHealth</command:name>
       <maml:description>
         <maml:para>Health of the hybrid and edge network - ExpressRoute circuits and gateways, VPN gateways, connections and tunnels, Azure Firewalls and NAT gateways - from their metrics, configuration and Resource Health: what the Azure Network Monitoring workbook charts, with % of capacity, thresholds and findings, as a heat map, a Spectre.Console view, objects, and CSV, PDF and interactive HTML reports.</maml:para>

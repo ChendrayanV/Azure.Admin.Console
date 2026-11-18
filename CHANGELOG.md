@@ -4,6 +4,19 @@ All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never pu
 
 ## Unreleased
 
+Every managed identity and what it can do, Application Insights assessed, hub and spoke designs drawn before they are built, and three commands folded into the ones that already covered them.
+
+### Deprecated
+
+- **`Get-AACSecurityPosture`, `Show-AACResource` and `Get-AACRoleAssignment` still work, but warn, and will be removed in a later release.** Use `Invoke-AACDefenderAssessment -View Posture`, `Get-AACInventory -View Chart` and `Get-AACAccessReview -View Assignment`, with the same parameters (`-PrivilegedOnly` for `-Privileged`).
+
+### New
+
+- **Every managed identity, and what it can do.** `Get-AACManagedIdentity` lists the system-assigned identities (of resources and policy assignments) and the user-assigned ones. For each identity it shows its subscription, resource group, location and tags; what a user-assigned identity is attached to (resources anywhere in the tenant, AKS kubelets, policy assignments) and its federated credentials; its Azure roles; and its Microsoft Graph and other API permissions, which the Azure portal doesn't show for a managed identity. Findings: API permissions that can take over the tenant, Owner or User Access Administrator on a subscription or above, other privileged permissions, identities shared by many resources with privileged access, identities attached to nothing that still hold access, and federated identities with privileged access. `-Name`, `-ResourceGroupName`, `-SystemAssigned` and `-UserAssigned` filter before Microsoft Graph is read; `-SkipEntra` leaves it out. The objects pipe into `Get-AACApplicationPermission` for directory roles and the rest.
+- **Application Insights assessed.** `Invoke-AACApplicationInsightAssessment` checks every component for ingestion and cost, workspace and architecture, security, identity and access, and audit and lifecycle, as a heat map with findings. `-IncludeIngestion` adds billed GB by table and day; `-IncludeActivityLog` adds who changed what.
+- **A hub and spoke design, drawn before it is built.** `New-AACDesignDiagram` works offline. From a few parameters (the firewall, the spokes and the resources in them) it plans the subnets at Microsoft's recommended sizes, the route tables, the peerings, the private endpoints and DNS zones, and the names, then writes an editable draw.io diagram. Overlapping or too-small networks stop it.
+- **Views in place of separate commands.** `Invoke-AACDefenderAssessment -View Posture` (Secure Score, recommendations, alerts, compliance, PDF), `Get-AACInventory -View Chart` (resources counted by type, location, resource group or subscription) and `Get-AACAccessReview -View Assignment` (every Azure role assignment at every scope, with `-PrincipalType`, `-RoleName`, `-ScopeType`, `-ExpandGroup`, `-IncludeCustomRole`). A parameter that belongs to the other view stops the command with what to do, rather than being ignored.
+
 ### Removed
 
 - **`Invoke-AACPester` and the rest of `Parked\`** are gone from the repository: the command, its Azure estate and `-PSRule` checks, its HTML/PDF reports, and a stale copy of `Get-AACResourceInventory`. None of it had been loaded, exported or packaged since v0.10.0, so the module behaves the same.

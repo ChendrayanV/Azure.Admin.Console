@@ -2,7 +2,7 @@
 
 [Guide index](../../GUIDE.md) · [Command reference](../Azure.Admin.Console.md)
 
-**Commands:** [`Get-AACGovernanceChange`](../Get-AACGovernanceChange.md) · [`Get-AACGovernanceSetting`](../Get-AACGovernanceSetting.md) · [`Get-AACResourceLock`](../Get-AACResourceLock.md) · [`Get-AACAccessReview`](../Get-AACAccessReview.md) (`-View Assignment`) · [`Get-AACServicePrincipalInsight`](../Get-AACServicePrincipalInsight.md) · [`Get-AACTagUsage`](../Get-AACTagUsage.md) · [`Invoke-AACGovernanceAssessment`](../Invoke-AACGovernanceAssessment.md) · [`Show-AACManagementGroupMap`](../Show-AACManagementGroupMap.md) · [`Test-AACAlzPolicy`](../Test-AACAlzPolicy.md) · [`Test-AACAzureLimit`](../Test-AACAzureLimit.md)
+**Commands:** [`Get-AACGovernanceChange`](../Get-AACGovernanceChange.md) · [`Get-AACGovernanceSetting`](../Get-AACGovernanceSetting.md) · [`Get-AACResourceLock`](../Get-AACResourceLock.md) · [`Get-AACAccessReview`](../Get-AACAccessReview.md) (`-View Assignment`) · [`Get-AACManagedIdentity`](../Get-AACManagedIdentity.md) · [`Get-AACServicePrincipalInsight`](../Get-AACServicePrincipalInsight.md) · [`Get-AACTagUsage`](../Get-AACTagUsage.md) · [`Invoke-AACGovernanceAssessment`](../Invoke-AACGovernanceAssessment.md) · [`Show-AACManagementGroupMap`](../Show-AACManagementGroupMap.md) · [`Test-AACAlzPolicy`](../Test-AACAlzPolicy.md) · [`Test-AACAzureLimit`](../Test-AACAzureLimit.md)
 
 Governance questions across the whole tenant, in the spirit of the
 [Azure Governance Visualizer](https://github.com/Azure/Azure-Governance-Visualizer) -
@@ -22,6 +22,7 @@ Test-AACAlzPolicy -LibraryPath C:\alz-library -ManagementGroupMap @{ alz = 'cont
 | Hierarchy | `Show-AACManagementGroupMap` | Each management group, its subscriptions, policy and role assignments - a map, a tree, or `Export-AACDiagram -View Governance` for draw.io |
 | Access | `Get-AACAccessReview -View Assignment` | Every role assignment at every scope; orphaned ones, privileged guests, applications as Owner, custom roles unused or as powerful as Owner |
 | Identities | `Get-AACServicePrincipalInsight` | Applications and managed identities with Azure roles; credentials about to expire; other tenants' apps |
+| Managed identities | `Get-AACManagedIdentity` | Every system- and user-assigned identity: attachments, Azure roles, API permissions (Microsoft Graph and others), federated credentials; privileged, shared and unused ones. Pipe to `Get-AACApplicationPermission` for directory roles |
 | Policy | `Get-AACPolicyRemediation` | Policies that could fix what they find, and whether remediation ran (`Invoke-AACPolicyAssessment` covers assignments, compliance, exemptions and identities' roles) |
 | Limits | `Test-AACAzureLimit` | Scopes close to an Azure limit, with what to do; `-IncludeQuota` adds each region's compute, network and storage quota |
 | Settings | `Get-AACGovernanceSetting` | Hierarchy settings, management group activity logs, security contacts, classic administrators, preview features, providers |
