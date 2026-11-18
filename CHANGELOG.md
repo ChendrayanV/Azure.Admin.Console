@@ -2,7 +2,7 @@
 
 All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never published to the PowerShell Gallery.
 
-## Unreleased
+## v0.15.1
 
 Every managed identity and what it can do, Application Insights assessed, hub and spoke designs drawn before they are built, and three commands folded into the ones that already covered them.
 
