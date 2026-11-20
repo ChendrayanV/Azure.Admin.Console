@@ -38,6 +38,7 @@
         'Export-AACDiagnosticBundle'
         'Export-AACDiagram'
         'Export-AACResource'
+        'Export-AACSentinelAnalyticsRule'
         'Export-AACTerraform'
         'Export-AACWafQuestionnaire'
         'Get-AACAccessReview'
@@ -87,7 +88,15 @@
         'Get-AACRoleAssignment'
         'Get-AACSecurityAlert'
         'Get-AACSecurityPosture'
+        'Get-AACSentinelAlert'
+        'Get-AACSentinelAnalyticsRule'
+        'Get-AACSentinelContentHub'
+        'Get-AACSentinelDataConnector'
         'Get-AACSentinelHuntingQuery'
+        'Get-AACSentinelIncident'
+        'Get-AACSentinelPlaybook'
+        'Get-AACSentinelThreatIntelligence'
+        'Get-AACSentinelWatchlist'
         'Get-AACServicePrincipalInsight'
         'Get-AACSkuAvailability'
         'Get-AACStorageAccountContainerSize'
@@ -131,6 +140,7 @@
         'Test-AACAzureLimit'
         'Test-AACGoLiveReadiness'
         'Test-AACPolicyDeployment'
+        'Test-AACSentinelRuleQuery'
     )
     CmdletsToExport      = @()
     VariablesToExport    = @()

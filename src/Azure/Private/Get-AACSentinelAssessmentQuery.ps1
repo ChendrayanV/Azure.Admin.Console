@@ -28,7 +28,8 @@ function Get-AACSentinelAssessmentQuery {
     param(
         [string[]] $Section = @('Tables', 'Health', 'Incidents', 'RuleTemplates', 'Recommendations'),
 
-        [ValidateRange(1, 90)]
+        # Invoke-AACSentinelAssessment stops at 90; Get-AACSentinelIncident looks further back.
+        [ValidateRange(1, 3650)]
         [int] $Days = 30
     )
 

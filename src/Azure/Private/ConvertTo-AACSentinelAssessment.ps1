@@ -209,7 +209,15 @@ function ConvertTo-AACSentinelAssessment {
                     HoursOpen            = $(if ($status -ne 'Closed' -and $created) { & $round ($Now - $created).TotalHours 1 })
                     Alerts               = [int](& $number $(& $get $properties 'additionalData', 'alertsCount'))
                     Provider             = [string](& $get $properties 'providerName')
+                    Products             = & $join (& $get $properties 'additionalData', 'alertProductNames')
                     Tactics              = & $join (& $get $properties 'additionalData', 'tactics')
+                    Techniques           = & $join (& $get $properties 'additionalData', 'techniques')
+                    Labels               = & $join (@(& $get $properties 'labels' | Where-Object { $_ }) | ForEach-Object { [string](& $get $_ 'labelName') })
+                    FirstActivity        = & $date (& $get $properties 'firstActivityTimeUtc')
+                    LastActivity         = & $date (& $get $properties 'lastActivityTimeUtc')
+                    Description          = [string](& $get $properties 'description')
+                    IncidentId           = [string]$item['name']
+                    RuleIds              = $ruleIds -join ', '
                     Url                  = [string](& $get $properties 'incidentUrl')
                 })
         })

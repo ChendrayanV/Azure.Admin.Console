@@ -2,7 +2,7 @@
 
 > A PowerShell 7.2+ module for Azure, Microsoft 365 and Azure DevOps administration over plain REST: no Az or Microsoft.Graph modules and no app registration. Read-only by default; every command gives a console view, typed objects, and CSV, HTML and PDF reports.
 
-Version 0.15.1. The guide comes first, then the reference for each of the 101 commands.
+Version 0.15.1. The guide comes first, then the reference for each of the 111 commands.
 
 <!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/guide/overview.md -->
 
@@ -986,6 +986,83 @@ Get-AACSecurityAlert -Name '2517*' -NoDisplay | Select-Object -ExpandProperty Ex
 | Output                              | A console view (by severity, MITRE tactic in kill-chain order, day and resource), objects, CSV, HTML and PDF             |
 
 It doesn't change an alert's state. Do that in Defender for Cloud.
+
+<!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/guide/microsoft-sentinel.md -->
+
+# Microsoft Sentinel
+
+[Guide index](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/GUIDE.md) · [Command reference](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Azure.Admin.Console.md)
+
+**Commands:** [`Invoke-AACSentinelAssessment`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Invoke-AACSentinelAssessment.md) ·
+[`Get-AACSentinelIncident`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACSentinelIncident.md) ·
+[`Get-AACSentinelAlert`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACSentinelAlert.md) ·
+[`Get-AACSentinelAnalyticsRule`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACSentinelAnalyticsRule.md) ·
+[`Get-AACSentinelWatchlist`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACSentinelWatchlist.md) ·
+[`Get-AACSentinelContentHub`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACSentinelContentHub.md) ·
+[`Export-AACSentinelAnalyticsRule`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Export-AACSentinelAnalyticsRule.md) ·
+[`Test-AACSentinelRuleQuery`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Test-AACSentinelRuleQuery.md) ·
+[`Get-AACSentinelDataConnector`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACSentinelDataConnector.md) ·
+[`Get-AACSentinelPlaybook`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACSentinelPlaybook.md) ·
+[`Get-AACSentinelThreatIntelligence`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACSentinelThreatIntelligence.md) ·
+[`Get-AACSentinelHuntingQuery`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACSentinelHuntingQuery.md) ·
+[`Find-AACSentinelHuntingQuery`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Find-AACSentinelHuntingQuery.md) ·
+[`Deploy-AACSentinelHuntingQuery`](https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Deploy-AACSentinelHuntingQuery.md)
+
+Every command takes one workspace through `-WorkspaceId`. That can be the
+workspace ID (the GUID on its Overview page), its resource ID or its name.
+They all read only. `Export-AACSentinelAnalyticsRule` writes files on your
+machine, and `Deploy-AACSentinelHuntingQuery` is the only command here that
+changes Azure. Microsoft Sentinel Reader on the workspace is enough, with Log
+Analytics Reader for the parts that run KQL.
+
+`Invoke-AACSentinelAssessment` is the whole picture, with recommendations. The
+`Get-` commands are for day-to-day questions about one thing, each with its
+own filters, and the objects they return pipe on.
+
+```powershell
+$ws = 'law-contoso-sentinel'
+Invoke-AACSentinelAssessment -WorkspaceId $ws -HtmlPath .\Sentinel.html        # everything, with recommendations
+
+Get-AACSentinelIncident -WorkspaceId $ws -Severity High -Unassigned             # open High incidents nobody owns
+Get-AACSentinelIncident -WorkspaceId $ws -Status Closed -Days 90 -Classification FalsePositive -NoDisplay | Group-Object RuleIds
+
+Get-AACSentinelAlert -WorkspaceId $ws -Days 30 -Severity High, Medium           # alerts from every connected product
+Get-AACSentinelAlert -WorkspaceId $ws -IncidentNumber 4211 -NoDisplay | Select-Object Alert, Accounts, Hosts, IpAddresses
+Get-AACSentinelAlert -WorkspaceId $ws -NoIncident                               # alerts no incident was created for
+
+Get-AACSentinelAnalyticsRule -WorkspaceId $ws -State Enabled -Failing           # rules that failed to run
+Get-AACSentinelAnalyticsRule -WorkspaceId $ws -TemplateUpdate -CsvPath .\RulesToUpdate.csv
+
+Get-AACSentinelWatchlist -WorkspaceId $ws                                       # empty, unused and stale watchlists
+Get-AACSentinelContentHub -WorkspaceId $ws -UpdateAvailable                     # solutions with an update waiting
+
+Export-AACSentinelAnalyticsRule -WorkspaceId $ws -Path .\sentinel -IncludeAutomationRule -Force   # rules as code
+
+Test-AACSentinelRuleQuery -WorkspaceId $ws -Name 'Rare admin sign-in' -Runs 24             # what a rule would have done
+Test-AACSentinelRuleQuery -WorkspaceId $ws -Query 'SigninLogs | where ResultType == "50126"' -Frequency PT5M -Period PT1H
+
+Get-AACSentinelDataConnector -WorkspaceId $ws                                   # connectors failing, silent or late
+Get-AACSentinelDataConnector -WorkspaceId $ws -View Table                       # ingestion delay per table
+Get-AACSentinelPlaybook -WorkspaceId $ws -Days 30                               # playbooks, runs and permissions
+Get-AACSentinelThreatIntelligence -WorkspaceId $ws                              # indicators by source; stale feeds
+Get-AACSentinelThreatIntelligence -WorkspaceId $ws -Indicator -IndicatorType ipv4-addr -Value '203.0.113.*'
+```
+
+| Command                             | What it answers                                                                                                                      |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `Get-AACSentinelIncident`           | What is open, who owns it, how long it has waited. Open incidents of any age by default. Closed ones go back 30 days unless `-Days` says otherwise |
+| `Get-AACSentinelAlert`              | What was detected, about which hosts, accounts and IP addresses, and which incident holds it. Reads `SecurityAlert`, so every connected product is included. The last 7 days by default |
+| `Get-AACSentinelAnalyticsRule`      | Which rules are in place, which fail (from `_SentinelHealth`), which raise the most incidents or false positives, which have a newer template, and the MITRE ATT&CK coverage |
+| `Get-AACSentinelWatchlist`          | How many items each watchlist holds, which rules and hunting queries call `_GetWatchlist` with its alias, and which are empty, unused, stale or failed |
+| `Get-AACSentinelContentHub`         | Which solutions are installed, which have an update or are deprecated, and which have no enabled rule from their analytics templates |
+| `Export-AACSentinelAnalyticsRule`   | One ARM template per rule, with stable file contents, so a commit shows what changed. Deploy them to another workspace with its name as the `workspace` parameter |
+| `Test-AACSentinelRuleQuery`         | What a rule's query returns in each of its last run windows, whether each run would alert, and whether the columns it maps exist. A query using `ago()` or `now()` can only be tested in its latest window. Each window is a query, so test a few rules at a time |
+| `Get-AACSentinelDataConnector`      | Which connectors are failing, disconnected, silent or delayed, and, with `-View Table`, how late records arrive in each table. Agent-fed sources (Windows events, Syslog, CEF) show in the table view |
+| `Get-AACSentinelPlaybook`           | The Logic Apps with a Sentinel trigger, the automation rules that run them, failed runs, and whether Sentinel holds Automation Contributor on their resource group |
+| `Get-AACSentinelThreatIntelligence` | Indicators by source and type from `ThreatIntelIndicators` and the legacy table: active, expiring, confidence, feeds that stopped, and whether any rule matches on them |
+
+Incidents and alerts hold people's names and email addresses, and so do the
+reports made from them.
 
 <!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/guide/microsoft-defender-for-cloud-assessment.md -->
 
@@ -7284,6 +7361,434 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 ## RELATED LINKS
 
 - [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Export-AACResource.md)
+- [about_Azure.Admin.Console](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md)
+
+<!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Export-AACSentinelAnalyticsRule.md -->
+
+# Export-AACSentinelAnalyticsRule
+
+## SYNOPSIS
+
+Backs up the analytics rules of a Microsoft Sentinel workspace - and, with -IncludeAutomationRule, its automation rules - as one JSON file per rule: ARM deployment templates ready for source control, Sentinel Repositories or another workspace.
+
+## SYNTAX
+
+### __AllParameterSets
+
+```
+Export-AACSentinelAnalyticsRule [-WorkspaceId] <string> [-Path] <string>
+ [-SubscriptionId <string[]>] [-ResourceGroupName <string>] [-Name <string[]>] [-Kind <string[]>]
+ [-State <string>] [-IncludeAutomationRule] [-Format <string>] [-Force] [-PassThru] [-NoDisplay]
+ [-NoPaging] [-WhatIf] [-Confirm]
+```
+
+## ALIASES
+
+This command has no aliases.
+
+## DESCRIPTION
+
+Reads the rules from Azure Resource Manager - read-only in Azure,
+nothing there is changed - and writes a file per rule into -Path
+(automation rules into -Path\AutomationRules):
+
+```text
+  -Format ArmTemplate   (the default) the template the Sentinel portal
+                        exports: deploy it to any workspace with
+                        New-AzResourceGroupDeployment, the Azure CLI or
+                        Sentinel Repositories, giving the workspace's
+                        name as the 'workspace' parameter
+  -Format Json          the rule as the API returns it
+```
+
+Properties Azure sets itself (last modified, created by) are left out,
+and keys are sorted, so exporting an unchanged rule again gives the
+same file: commit the folder and the diff shows what changed. A file
+name is the rule's display name; two rules with one name get the rule
+ID added. Files already there are left alone unless -Force; -WhatIf
+shows what would be written.
+
+Needs Microsoft Sentinel Reader on the workspace.
+
+## EXAMPLES
+
+### Example 1
+
+```powershell
+Connect-AAC
+Export-AACSentinelAnalyticsRule -WorkspaceId 'law-contoso-sentinel' -Path .\sentinel\rules
+```
+
+Every analytics rule as an ARM template, one file each.
+
+### Example 2
+
+```powershell
+Export-AACSentinelAnalyticsRule -WorkspaceId 'law-contoso-sentinel' -Path .\sentinel -IncludeAutomationRule -Force
+```
+
+Analytics and automation rules, overwriting the last backup - commit the folder to see what changed.
+
+### Example 3
+
+```powershell
+Export-AACSentinelAnalyticsRule -WorkspaceId 'law-contoso-sentinel' -Path .\out\custom -Kind Scheduled, NRT -State Enabled -WhatIf
+```
+
+Which files the enabled scheduled and NRT rules would be written to, writing nothing.
+
+### Example 4
+
+```powershell
+Export-AACSentinelAnalyticsRule -WorkspaceId 'law-contoso-sentinel' -Path .\out\rules -NoDisplay | ForEach-Object { New-AzResourceGroupDeployment -ResourceGroupName rg-contoso-sec-dr -TemplateFile $_.File -workspace law-contoso-sentinel-dr }
+```
+
+Copy every rule to a second workspace (Az.Resources does the deploying).
+
+## PARAMETERS
+
+### -Confirm
+
+
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases:
+- cf
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Force
+
+Overwrite files that are already there.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Format
+
+ArmTemplate (deployable; the default) or Json (the rule as read).
+
+```yaml
+Type: System.String
+DefaultValue: "'ArmTemplate'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -IncludeAutomationRule
+
+Also export the automation rules, into an AutomationRules folder.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Kind
+
+Only analytics rules of these kinds (Scheduled, NRT, Fusion,
+MicrosoftSecurityIncidentCreation, MLBehaviorAnalytics,
+ThreatIntelligence).
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Name
+
+Only rules whose display name or rule ID matches; wildcards work.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoDisplay
+
+Return what was written without showing the view.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoPaging
+
+Show the whole view at once instead of a page at a time.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PassThru
+
+Show the view and also return what was written.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Path
+
+The folder to write the files into. It is created if missing.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: 1
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ResourceGroupName
+
+Narrows a workspace given by name, when the name is in more than one
+resource group.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -State
+
+Only Enabled or only Disabled analytics rules.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -SubscriptionId
+
+Where to look for a workspace given by ID (GUID) or name. Every
+subscription the account can see by default.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -WhatIf
+
+
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases:
+- wi
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -WorkspaceId
+
+The workspace: its workspace ID (GUID), resource ID or name.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases:
+- Workspace
+- WorkspaceName
+- ResourceId
+ParameterSets:
+- Name: (All)
+  Position: 0
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### CommonParameters
+
+This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable,
+-InformationAction, -InformationVariable, -OutBuffer, -OutVariable, -PipelineVariable,
+-ProgressAction, -Verbose, -WarningAction, and -WarningVariable. For more information, see
+[about_CommonParameters](https://go.microsoft.com/fwlink/?LinkID=113216).
+
+## INPUTS
+
+## OUTPUTS
+
+### AAC.SentinelRuleExport (piped onward, or with -PassThru or -NoDisplay)
+
+## NOTES
+
+## RELATED LINKS
+
+- [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Export-AACSentinelAnalyticsRule.md)
 - [about_Azure.Admin.Console](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md)
 
 <!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Export-AACTerraform.md -->
@@ -23478,6 +23983,1895 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 - [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACSecurityPosture.md)
 - [about_Azure.Admin.Console](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md)
 
+<!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACSentinelAlert.md -->
+
+# Get-AACSentinelAlert
+
+## SYNOPSIS
+
+Lists the security alerts in a Microsoft Sentinel workspace - from its analytics rules and every connected product (Defender XDR, Defender for Cloud, Entra ID Protection...) - with their MITRE ATT&CK tactics, the hosts, accounts and IP addresses involved, and the incident each is in.
+
+## SYNTAX
+
+### __AllParameterSets
+
+```
+Get-AACSentinelAlert [-WorkspaceId] <string> [-SubscriptionId <string[]>]
+ [-ResourceGroupName <string>] [-Days <int>] [-Severity <string[]>] [-Status <string[]>]
+ [-Name <string[]>] [-Product <string[]>] [-Tactic <string[]>] [-Entity <string[]>]
+ [-IncidentNumber <int[]>] [-NoIncident] [-Limit <int>] [-CsvPath <string>] [-HtmlPath <string>]
+ [-PdfPath <string>] [-Title <string>] [-PassThru] [-NoDisplay] [-NoPaging]
+```
+
+## ALIASES
+
+This command has no aliases.
+
+## DESCRIPTION
+
+Queries the workspace's SecurityAlert table with KQL - read-only,
+nothing is changed - taking the latest record of each alert (an alert
+is written again when its status changes), and SecurityIncident for the
+incident each alert was grouped into.
+
+Each alert: Alert, Severity, Status, Open, Product, Provider,
+Component, Tactics, Techniques, CompromisedEntity, Hosts, Accounts,
+IpAddresses, Entities (the other kinds), TimeGenerated, AgeDays,
+StartTime, EndTime, IncidentNumber, IncidentTitle, IncidentStatus,
+Occurrences (alerts in the list with the same name and compromised
+entity), Description, Remediation, ExtendedProperties (a dictionary),
+AlertType, AlertId and AlertUrl.
+
+The last 7 days by default (-Days), newest first, at most -Limit
+alerts (10,000). -Severity is applied in the query; the other filters
+in PowerShell.
+
+At the prompt: tiles, the alerts by severity, product, tactic and day,
+the alerts, and the ones raised again and again. Alerts in no incident
+come from rules that don't create incidents, or products whose
+incidents aren't synced: -NoIncident lists them.
+
+Needs Log Analytics Reader (or Microsoft Sentinel Reader) on the
+workspace. Get-AACSecurityAlert lists Defender for Cloud's alerts
+across subscriptions instead.
+
+## EXAMPLES
+
+### Example 1
+
+```powershell
+Connect-AAC
+Get-AACSentinelAlert -WorkspaceId 'law-contoso-sentinel'
+```
+
+The last 7 days of alerts, newest first.
+
+### Example 2
+
+```powershell
+Get-AACSentinelAlert -WorkspaceId 'law-contoso-sentinel' -Days 30 -Severity High, Medium -HtmlPath .\out\SentinelAlerts.html
+A month of High and Medium alerts, as an interactive HTML report.
+```
+
+### Example 3
+
+```powershell
+Get-AACSentinelAlert -WorkspaceId 'law-contoso-sentinel' -IncidentNumber 4211 -NoDisplay | Select-Object Alert, Accounts, Hosts, IpAddresses
+```
+
+Who and what is in one incident's alerts.
+
+### Example 4
+
+```powershell
+Get-AACSentinelAlert -WorkspaceId 'law-contoso-sentinel' -Entity '*alice*' -Days 90 -NoDisplay | Sort-Object TimeGenerated
+```
+
+Every alert about one user over 90 days, oldest first.
+
+### Example 5
+
+```powershell
+Get-AACSentinelAlert -WorkspaceId 'law-contoso-sentinel' -NoIncident -NoDisplay | Group-Object Alert | Sort-Object Count -Descending
+```
+
+The alerts no incident was created for, by name.
+
+## PARAMETERS
+
+### -CsvPath
+
+Write the alerts to this CSV file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Days
+
+How far back to look: 1 to 3650 days, 7 by default.
+
+```yaml
+Type: System.Int32
+DefaultValue: 7
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Entity
+
+Only alerts whose compromised entity, hosts, accounts, IP addresses or
+other entities match; wildcards work (for example '\*alice\*').
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -HtmlPath
+
+Write an interactive HTML report to this file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -IncidentNumber
+
+Only the alerts in these incidents.
+
+```yaml
+Type: System.Int32[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Limit
+
+Read at most this many alerts, newest first: 10,000 by default.
+
+```yaml
+Type: System.Int32
+DefaultValue: 10000
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Name
+
+Only alerts whose name matches; wildcards work.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoDisplay
+
+Return the alerts without showing the view.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoIncident
+
+Only the alerts that are in no incident.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoPaging
+
+Show the whole view at once instead of a page at a time.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PassThru
+
+Show the view and also return the alerts.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PdfPath
+
+Write a PDF report to this file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Product
+
+Only alerts from products whose name matches (for example 'Azure
+Sentinel', 'Microsoft Defender\*'); wildcards work.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ResourceGroupName
+
+Narrows a workspace given by name, when the name is in more than one
+resource group.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Severity
+
+Only alerts of these severities (High, Medium, Low, Informational).
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Status
+
+Only alerts in these states (New, InProgress, Resolved, Dismissed).
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -SubscriptionId
+
+Where to look for a workspace given by ID (GUID) or name. Every
+subscription the account can see by default.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Tactic
+
+Only alerts with one of these MITRE ATT&CK tactics (for example
+InitialAccess, 'Lateral\*'); wildcards work.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Title
+
+The HTML and PDF reports' title.
+
+```yaml
+Type: System.String
+DefaultValue: "'Microsoft Sentinel alerts'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -WorkspaceId
+
+The workspace: its workspace ID (GUID), resource ID or name.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases:
+- Workspace
+- WorkspaceName
+- ResourceId
+ParameterSets:
+- Name: (All)
+  Position: 0
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### CommonParameters
+
+This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable,
+-InformationAction, -InformationVariable, -OutBuffer, -OutVariable, -PipelineVariable,
+-ProgressAction, -Verbose, -WarningAction, and -WarningVariable. For more information, see
+[about_CommonParameters](https://go.microsoft.com/fwlink/?LinkID=113216).
+
+## INPUTS
+
+## OUTPUTS
+
+### AAC.SentinelAlert (piped onward, or with -PassThru or -NoDisplay)
+
+## NOTES
+
+## RELATED LINKS
+
+- [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACSentinelAlert.md)
+- [about_Azure.Admin.Console](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md)
+
+<!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACSentinelAnalyticsRule.md -->
+
+# Get-AACSentinelAnalyticsRule
+
+## SYNOPSIS
+
+Lists the analytics rules in place on a Microsoft Sentinel workspace - kind, severity, enabled or not, MITRE ATT&CK tactics and techniques, schedule, the failures health reported, the incidents each raised and how many were false positives, and whether its template has a newer version - with the MITRE ATT&CK coverage of the enabled rules.
+
+## SYNTAX
+
+### __AllParameterSets
+
+```
+Get-AACSentinelAnalyticsRule [-WorkspaceId] <string> [-SubscriptionId <string[]>]
+ [-ResourceGroupName <string>] [-Name <string[]>] [-Kind <string[]>] [-Severity <string[]>]
+ [-State <string>] [-Tactic <string[]>] [-Failing] [-TemplateUpdate] [-Days <int>]
+ [-CsvPath <string>] [-HtmlPath <string>] [-PdfPath <string>] [-Title <string>] [-PassThru]
+ [-NoDisplay] [-NoPaging]
+```
+
+## ALIASES
+
+This command has no aliases.
+
+## DESCRIPTION
+
+Reads the workspace - read-only, nothing is changed - from:
+
+```text
+  Azure Resource Manager   the analytics rules, the rule templates
+                           (for newer versions) and the incidents
+                           created in the last -Days
+  the workspace itself     KQL: _SentinelHealth (each rule's failed
+                           runs over -Days)
+```
+
+Each rule: Name, RuleId, Kind, Enabled, Severity, Tactics, Techniques,
+Frequency, Period, CreatesIncident, TemplateId, TemplateVersion,
+LatestTemplate, TemplateUpdate, LastModified, Failures, LastFailure,
+Incidents, ClosedIncidents, FalsePositives and Query. Failing rules
+first, then enabled, by severity.
+
+Without health monitoring on (Sentinel's Settings), Failures stays 0:
+the view says so. Invoke-AACSentinelAssessment goes further, with rule
+templates worth enabling, data the rules don't read, and
+recommendations.
+
+Needs Microsoft Sentinel Reader on the workspace (and Log Analytics
+Reader for the failures).
+
+## EXAMPLES
+
+### Example 1
+
+```powershell
+Connect-AAC
+Get-AACSentinelAnalyticsRule -WorkspaceId 'law-contoso-sentinel'
+```
+
+Every analytics rule, failing ones first, with MITRE ATT&CK coverage.
+
+### Example 2
+
+```powershell
+Get-AACSentinelAnalyticsRule -WorkspaceId 'law-contoso-sentinel' -State Enabled -Failing
+```
+
+The enabled rules that failed to run in the last 30 days.
+
+### Example 3
+
+```powershell
+Get-AACSentinelAnalyticsRule -WorkspaceId 'law-contoso-sentinel' -NoDisplay | Where-Object { $_.ClosedIncidents -ge 5 -and $_.FalsePositives / $_.ClosedIncidents -ge 0.5 }
+```
+
+The noisy rules: half or more of their closed incidents were false positives.
+
+### Example 4
+
+```powershell
+Get-AACSentinelAnalyticsRule -WorkspaceId 'law-contoso-sentinel' -TemplateUpdate -CsvPath .\out\RulesToUpdate.csv
+```
+
+The rules whose template has moved on, to CSV.
+
+### Example 5
+
+```powershell
+Get-AACSentinelAnalyticsRule -WorkspaceId 'law-contoso-sentinel' -HtmlPath .\out\AnalyticsRules.html -PdfPath .\out\AnalyticsRules.pdf
+```
+
+The rules and MITRE ATT&CK coverage as an HTML report and a PDF.
+
+## PARAMETERS
+
+### -CsvPath
+
+Write the rules to this CSV file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Days
+
+How far back health failures and incidents look: 1 to 90 days, 30 by
+default.
+
+```yaml
+Type: System.Int32
+DefaultValue: 30
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Failing
+
+Only rules health reported failed runs for in the last -Days.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -HtmlPath
+
+Write an interactive HTML report to this file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Kind
+
+Only rules of these kinds (Scheduled, NRT, Fusion,
+MicrosoftSecurityIncidentCreation, MLBehaviorAnalytics,
+ThreatIntelligence).
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Name
+
+Only rules whose display name or rule ID matches; wildcards work.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoDisplay
+
+Return the rules without showing the view.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoPaging
+
+Show the whole view at once instead of a page at a time.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PassThru
+
+Show the view and also return the rules.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PdfPath
+
+Write a PDF report to this file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ResourceGroupName
+
+Narrows a workspace given by name, when the name is in more than one
+resource group.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Severity
+
+Only rules of these severities (High, Medium, Low, Informational).
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -State
+
+Only Enabled or only Disabled rules.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -SubscriptionId
+
+Where to look for a workspace given by ID (GUID) or name. Every
+subscription the account can see by default.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Tactic
+
+Only rules with one of these MITRE ATT&CK tactics (for example
+InitialAccess, 'Lateral\*'); wildcards work.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -TemplateUpdate
+
+Only rules whose template has a newer version.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Title
+
+The HTML and PDF reports' title.
+
+```yaml
+Type: System.String
+DefaultValue: "'Microsoft Sentinel analytics rules'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -WorkspaceId
+
+The workspace: its workspace ID (GUID), resource ID or name.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases:
+- Workspace
+- WorkspaceName
+- ResourceId
+ParameterSets:
+- Name: (All)
+  Position: 0
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### CommonParameters
+
+This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable,
+-InformationAction, -InformationVariable, -OutBuffer, -OutVariable, -PipelineVariable,
+-ProgressAction, -Verbose, -WarningAction, and -WarningVariable. For more information, see
+[about_CommonParameters](https://go.microsoft.com/fwlink/?LinkID=113216).
+
+## INPUTS
+
+## OUTPUTS
+
+### AAC.SentinelAnalyticsRule (piped onward, or with -PassThru or -NoDisplay)
+
+## NOTES
+
+## RELATED LINKS
+
+- [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACSentinelAnalyticsRule.md)
+- [about_Azure.Admin.Console](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md)
+
+<!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACSentinelContentHub.md -->
+
+# Get-AACSentinelContentHub
+
+## SYNOPSIS
+
+Lists the Content hub solutions and standalone content installed on a Microsoft Sentinel workspace - version, whether an update is out, support tier, the analytics rules, workbooks, hunting queries, playbooks, parsers and data connectors each brought, and how many of its analytics templates have a rule.
+
+## SYNTAX
+
+### __AllParameterSets
+
+```
+Get-AACSentinelContentHub [-WorkspaceId] <string> [-SubscriptionId <string[]>]
+ [-ResourceGroupName <string>] [-Name <string[]>] [-UpdateAvailable] [-IncludeAvailable]
+ [-CsvPath <string>] [-HtmlPath <string>] [-PdfPath <string>] [-Title <string>] [-PassThru]
+ [-NoDisplay] [-NoPaging]
+```
+
+## ALIASES
+
+This command has no aliases.
+
+## DESCRIPTION
+
+Reads the workspace from Azure Resource Manager - read-only, nothing is
+changed: the installed content packages, the Content hub catalog (for
+the latest versions), the templates the installed packages brought,
+and the analytics rules.
+
+Each package: Name, State (Installed, or Available with
+-IncludeAvailable), Kind (Solution or Standalone), Publisher, Support
+(Microsoft, Partner or Community), InstalledVersion, LatestVersion,
+UpdateAvailable, Deprecated, Preview, AnalyticsRuleTemplates,
+TemplatesUsed (templates with a rule), RulesCreated, RulesEnabled,
+Workbooks, HuntingQueries, Playbooks, Parsers, DataConnectors,
+OtherTemplates, Findings, Domains, LastPublished and ContentId.
+
+Findings:
+
+```text
+  Update available        a newer version is in Content hub; updating
+                          brings new and fixed templates, but doesn't
+                          change rules already created from them
+  Deprecated              Microsoft no longer maintains it: look for
+                          its replacement
+  No enabled rule         installed, but none of its analytics
+                          templates has an enabled rule - it detects
+                          nothing yet
+```
+
+Needs Microsoft Sentinel Reader on the workspace.
+
+## EXAMPLES
+
+### Example 1
+
+```powershell
+Connect-AAC
+Get-AACSentinelContentHub -WorkspaceId 'law-contoso-sentinel'
+```
+
+The installed solutions, the ones with findings first.
+
+### Example 2
+
+```powershell
+Get-AACSentinelContentHub -WorkspaceId 'law-contoso-sentinel' -UpdateAvailable
+```
+
+The solutions with an update waiting.
+
+### Example 3
+
+```powershell
+Get-AACSentinelContentHub -WorkspaceId 'law-contoso-sentinel' -NoDisplay | Where-Object { $_.AnalyticsRuleTemplates -and -not $_.RulesEnabled }
+```
+
+Solutions installed for detections that have none turned on.
+
+### Example 4
+
+```powershell
+Get-AACSentinelContentHub -WorkspaceId 'law-contoso-sentinel' -IncludeAvailable -Name '*Okta*', '*CrowdStrike*'
+```
+
+Whether solutions for these products are installed, and what is offered.
+
+## PARAMETERS
+
+### -CsvPath
+
+Write the packages to this CSV file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -HtmlPath
+
+Write an interactive HTML report to this file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -IncludeAvailable
+
+Also list the catalog's packages that aren't installed (several
+hundred).
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Name
+
+Only packages whose name matches; wildcards work.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoDisplay
+
+Return the packages without showing the view.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoPaging
+
+Show the whole view at once instead of a page at a time.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PassThru
+
+Show the view and also return the packages.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PdfPath
+
+Write a PDF report to this file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ResourceGroupName
+
+Narrows a workspace given by name, when the name is in more than one
+resource group.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -SubscriptionId
+
+Where to look for a workspace given by ID (GUID) or name. Every
+subscription the account can see by default.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Title
+
+The HTML and PDF reports' title.
+
+```yaml
+Type: System.String
+DefaultValue: "'Microsoft Sentinel Content hub'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -UpdateAvailable
+
+Only installed packages with a newer version in Content hub.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -WorkspaceId
+
+The workspace: its workspace ID (GUID), resource ID or name.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases:
+- Workspace
+- WorkspaceName
+- ResourceId
+ParameterSets:
+- Name: (All)
+  Position: 0
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### CommonParameters
+
+This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable,
+-InformationAction, -InformationVariable, -OutBuffer, -OutVariable, -PipelineVariable,
+-ProgressAction, -Verbose, -WarningAction, and -WarningVariable. For more information, see
+[about_CommonParameters](https://go.microsoft.com/fwlink/?LinkID=113216).
+
+## INPUTS
+
+## OUTPUTS
+
+### AAC.SentinelContentPackage (piped onward, or with -PassThru or -NoDisplay)
+
+## NOTES
+
+## RELATED LINKS
+
+- [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACSentinelContentHub.md)
+- [about_Azure.Admin.Console](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md)
+
+<!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACSentinelDataConnector.md -->
+
+# Get-AACSentinelDataConnector
+
+## SYNOPSIS
+
+Shows the health of a Microsoft Sentinel workspace's data connectors - state, the tables each writes, when data last arrived, how late it arrives, and the failures health monitoring reported - and, with -View Table, ingestion and delay per table.
+
+## SYNTAX
+
+### __AllParameterSets
+
+```
+Get-AACSentinelDataConnector [-WorkspaceId] <string> [-SubscriptionId <string[]>]
+ [-ResourceGroupName <string>] [-View <string>] [-Name <string[]>] [-Days <int>]
+ [-SilentAfterHours <int>] [-DelayThresholdMinutes <int>] [-SkipLatency] [-CsvPath <string>]
+ [-HtmlPath <string>] [-PdfPath <string>] [-Title <string>] [-PassThru] [-NoDisplay] [-NoPaging]
+```
+
+## ALIASES
+
+This command has no aliases.
+
+## DESCRIPTION
+
+Reads the workspace - read-only, nothing is changed - from:
+
+```text
+  Azure Resource Manager   the data connectors and the tables
+  the workspace itself     KQL: Usage over -Days (volume and last
+                           record per table), _SentinelHealth
+                           (connector failures), and, for the tables
+                           with data in the last day, the delay
+                           between each record's TimeGenerated and
+                           when it was ingested, over the last 6 hours
+```
+
+-View Connector (the default), one row per connector
+(AAC.SentinelConnectorHealth): Name, Status, Kind, State, Tables,
+TablesWithData, LastRecord, HoursSinceLastRecord, DelayP95Minutes,
+BillableGB, HealthFailures, LastFailure, Findings, DataTypes and
+ConnectorId. Status, worst first: Failing, Disconnected, NoData,
+Silent (nothing for -SilentAfterHours), Delayed (95th percentile over
+-DelayThresholdMinutes), Unknown (no table known for it), Healthy.
+
+-View Table, one row per table with data (AAC.SentinelTableIngestion):
+Table, Status, Connectors, LastRecord, HoursSinceLastRecord,
+DelayP50Minutes, DelayP95Minutes, DelayMaxMinutes, RecentRecords,
+BillableGB, DailyAverageGB, Plan and Type. Sources fed by the Azure
+Monitor Agent or data collection rules (Windows events, Syslog, CEF)
+aren't data connectors to the API, so they show here and not in the
+connector view.
+
+A connector's tables are the ones Microsoft's connectors are known to
+write, plus any data type that names a table. Several products write
+SecurityAlert, so its freshness proves the table, not each product.
+-SkipLatency leaves out the delay query, which reads 6 hours of every
+busy table.
+
+Needs Microsoft Sentinel Reader and Log Analytics Reader on the
+workspace.
+
+## EXAMPLES
+
+### Example 1
+
+```powershell
+Connect-AAC
+Get-AACSentinelDataConnector -WorkspaceId 'law-contoso-sentinel'
+```
+
+Every data connector's health, the unhealthy ones first.
+
+### Example 2
+
+```powershell
+Get-AACSentinelDataConnector -WorkspaceId 'law-contoso-sentinel' -View Table -NoDisplay | Where-Object DelayP95Minutes -GT 15
+```
+
+The tables whose records arrive more than 15 minutes late.
+
+### Example 3
+
+```powershell
+Get-AACSentinelDataConnector -WorkspaceId 'law-contoso-sentinel' -SilentAfterHours 6 -HtmlPath .\out\Connectors.html
+```
+
+Connector health with a tighter silence threshold, as an HTML report.
+
+## PARAMETERS
+
+### -CsvPath
+
+Write the rows to this CSV file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Days
+
+How far back to read volume and health: 1 to 90 days, 7 by default.
+
+```yaml
+Type: System.Int32
+DefaultValue: 7
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -DelayThresholdMinutes
+
+Call ingestion delayed when the 95th percentile delay is over this:
+30 minutes by default.
+
+```yaml
+Type: System.Int32
+DefaultValue: 30
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -HtmlPath
+
+Write an interactive HTML report to this file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Name
+
+Only connectors (or tables) whose name matches; wildcards work.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoDisplay
+
+Return the rows without showing the view.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoPaging
+
+Show the whole view at once instead of a page at a time.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PassThru
+
+Show the view and also return the rows.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PdfPath
+
+Write a PDF report to this file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ResourceGroupName
+
+Narrows a workspace given by name, when the name is in more than one
+resource group.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -SilentAfterHours
+
+Call a connector or table silent after this many hours without data:
+24 by default.
+
+```yaml
+Type: System.Int32
+DefaultValue: 24
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -SkipLatency
+
+Don't measure ingestion delay.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -SubscriptionId
+
+Where to look for a workspace given by ID (GUID) or name. Every
+subscription the account can see by default.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Title
+
+The HTML and PDF reports' title.
+
+```yaml
+Type: System.String
+DefaultValue: "'Microsoft Sentinel data connectors'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -View
+
+Connector (the default) or Table.
+
+```yaml
+Type: System.String
+DefaultValue: "'Connector'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -WorkspaceId
+
+The workspace: its workspace ID (GUID), resource ID or name.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases:
+- Workspace
+- WorkspaceName
+- ResourceId
+ParameterSets:
+- Name: (All)
+  Position: 0
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### CommonParameters
+
+This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable,
+-InformationAction, -InformationVariable, -OutBuffer, -OutVariable, -PipelineVariable,
+-ProgressAction, -Verbose, -WarningAction, and -WarningVariable. For more information, see
+[about_CommonParameters](https://go.microsoft.com/fwlink/?LinkID=113216).
+
+## INPUTS
+
+## OUTPUTS
+
+### AAC.SentinelConnectorHealth, or AAC.SentinelTableIngestion with -View Table (piped onward, or with -PassThru or -NoDisplay)
+
+## NOTES
+
+## RELATED LINKS
+
+- [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACSentinelDataConnector.md)
+- [about_Azure.Admin.Console](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md)
+
 <!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACSentinelHuntingQuery.md -->
 
 # Get-AACSentinelHuntingQuery
@@ -23827,6 +26221,1776 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 ## RELATED LINKS
 
 - [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACSentinelHuntingQuery.md)
+- [about_Azure.Admin.Console](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md)
+
+<!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACSentinelIncident.md -->
+
+# Get-AACSentinelIncident
+
+## SYNOPSIS
+
+Lists the incidents on a Microsoft Sentinel workspace - severity, status, owner, classification, MITRE ATT&CK tactics, the rules that raised them, how long they have been open or took to close - open and newest first, with the unassigned ones called out.
+
+## SYNTAX
+
+### __AllParameterSets
+
+```
+Get-AACSentinelIncident [-WorkspaceId] <string> [-SubscriptionId <string[]>]
+ [-ResourceGroupName <string>] [-Status <string[]>] [-Severity <string[]>] [-Days <int>]
+ [-Name <string[]>] [-Number <int[]>] [-Owner <string[]>] [-Unassigned] [-Classification <string[]>]
+ [-Tactic <string[]>] [-CsvPath <string>] [-HtmlPath <string>] [-PdfPath <string>] [-Title <string>]
+ [-PassThru] [-NoDisplay] [-NoPaging]
+```
+
+## ALIASES
+
+This command has no aliases.
+
+## DESCRIPTION
+
+Reads the workspace's incidents from Azure Resource Manager - read-only,
+nothing is changed - and, for closed ones, when each was closed from
+the workspace's SecurityIncident table (the API doesn't return it).
+
+By default the open incidents (New and Active), however old. -Status
+picks others; closed incidents are bounded to the last 30 days unless
+-Days says otherwise, because a busy workspace closes far too many to
+read them all. -Days bounds every status by when the incident was
+created. -Status and -Days are applied by the API; the other filters
+in PowerShell.
+
+Each incident: Number, Title, Severity, Status, Owner, Classification
+and its reason, Created, LastModified, Closed, HoursToClose, HoursOpen,
+Alerts, Provider, Products, Tactics, Techniques, Labels, FirstActivity,
+LastActivity, Description, IncidentId, RuleIds (the analytics rules
+that raised it) and Url (the incident in the portal). These hold
+people's names and email addresses, and so do the reports.
+
+At the prompt: tiles, the incidents by severity, owner, tactic and day,
+and the incidents. Get-AACSentinelAlert -IncidentNumber lists the
+alerts in an incident.
+
+Needs Microsoft Sentinel Reader on the workspace (and Log Analytics
+Reader for the close times).
+
+## EXAMPLES
+
+### Example 1
+
+```powershell
+Connect-AAC
+Get-AACSentinelIncident -WorkspaceId 'law-contoso-sentinel'
+```
+
+The open incidents, newest first.
+
+### Example 2
+
+```powershell
+Get-AACSentinelIncident -WorkspaceId 'law-contoso-sentinel' -Severity High -Unassigned
+```
+
+The open High incidents nobody has picked up.
+
+### Example 3
+
+```powershell
+Get-AACSentinelIncident -WorkspaceId 'law-contoso-sentinel' -Status Closed -Days 90 -Classification FalsePositive -NoDisplay | Group-Object RuleIds | Sort-Object Count -Descending
+```
+
+Which rules raised the most false positives in 90 days.
+
+### Example 4
+
+```powershell
+Get-AACSentinelIncident -WorkspaceId 'law-contoso-sentinel' -Status New, Active, Closed -Days 30 -HtmlPath .\out\Incidents.html -CsvPath .\out\Incidents.csv
+```
+
+Every incident of the last 30 days, as an interactive HTML report and a CSV file.
+
+### Example 5
+
+```powershell
+Get-AACSentinelIncident -WorkspaceId 'law-contoso-sentinel' -Number 4211 -NoDisplay | Select-Object -ExpandProperty Description
+```
+
+One incident by its number, whatever its state.
+
+## PARAMETERS
+
+### -Classification
+
+Only closed incidents classified as one of these (TruePositive,
+BenignPositive, FalsePositive, Undetermined).
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -CsvPath
+
+Write the incidents to this CSV file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Days
+
+Only incidents created in the last this many days. Without it, open
+incidents of any age, and closed ones of the last 30 days.
+
+```yaml
+Type: System.Int32
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -HtmlPath
+
+Write an interactive HTML report to this file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Name
+
+Only incidents whose title matches; wildcards work.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoDisplay
+
+Return the incidents without showing the view.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoPaging
+
+Show the whole view at once instead of a page at a time.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Number
+
+Only these incident numbers. Without -Status, every status is read.
+
+```yaml
+Type: System.Int32[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Owner
+
+Only incidents assigned to someone matching (name, UPN or email);
+wildcards work.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PassThru
+
+Show the view and also return the incidents.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PdfPath
+
+Write a PDF report to this file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ResourceGroupName
+
+Narrows a workspace given by name, when the name is in more than one
+resource group.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Severity
+
+Only incidents of these severities (High, Medium, Low, Informational).
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Status
+
+Only incidents in these states (New, Active, Closed). Default: New and
+Active.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -SubscriptionId
+
+Where to look for a workspace given by ID (GUID) or name. Every
+subscription the account can see by default.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Tactic
+
+Only incidents with one of these MITRE ATT&CK tactics (for example
+InitialAccess, 'Lateral\*'); wildcards work.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Title
+
+The HTML and PDF reports' title.
+
+```yaml
+Type: System.String
+DefaultValue: "'Microsoft Sentinel incidents'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Unassigned
+
+Only incidents with no owner.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -WorkspaceId
+
+The workspace: its workspace ID (GUID), resource ID or name.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases:
+- Workspace
+- WorkspaceName
+- ResourceId
+ParameterSets:
+- Name: (All)
+  Position: 0
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### CommonParameters
+
+This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable,
+-InformationAction, -InformationVariable, -OutBuffer, -OutVariable, -PipelineVariable,
+-ProgressAction, -Verbose, -WarningAction, and -WarningVariable. For more information, see
+[about_CommonParameters](https://go.microsoft.com/fwlink/?LinkID=113216).
+
+## INPUTS
+
+## OUTPUTS
+
+### AAC.SentinelIncident (piped onward, or with -PassThru or -NoDisplay)
+
+## NOTES
+
+## RELATED LINKS
+
+- [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACSentinelIncident.md)
+- [about_Azure.Admin.Console](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md)
+
+<!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACSentinelPlaybook.md -->
+
+# Get-AACSentinelPlaybook
+
+## SYNOPSIS
+
+Lists the Microsoft Sentinel playbooks - Logic Apps with a Sentinel trigger - with the automation rules that run them, their runs and failures over the last days, and whether Sentinel is allowed to run them: disabled playbooks still in use, missing permissions, failing runs and missing playbooks called out.
+
+## SYNTAX
+
+### __AllParameterSets
+
+```
+Get-AACSentinelPlaybook [-WorkspaceId] <string> [-SubscriptionId <string[]>]
+ [-ResourceGroupName <string>] [-Name <string[]>] [-Trigger <string[]>] [-Days <int>]
+ [-CsvPath <string>] [-HtmlPath <string>] [-PdfPath <string>] [-Title <string>] [-PassThru]
+ [-NoDisplay] [-NoPaging]
+```
+
+## ALIASES
+
+This command has no aliases.
+
+## DESCRIPTION
+
+Reads - read-only, nothing is changed - from:
+
+```text
+  Azure Resource Graph     every Logic App whose trigger is a
+                           Microsoft Sentinel one (incident, alert or
+                           entity), in the subscriptions searched
+  Azure Resource Manager   the workspace's automation rules, each
+                           playbook's runs over -Days, and the role
+                           assignments on each playbook's resource
+                           group
+```
+
+Each playbook: Name, State, Trigger (Incident, Alert, Entity),
+AutomationRules and RuleNames (the rules that run it), Runs, Failed,
+FailurePercent, LastRun, LastError, SentinelCanRun, SentinelAuth
+(ManagedIdentity or Connection), Identity, Severity, Findings,
+ResourceGroup, SubscriptionId, Location, LastModified and ResourceId.
+
+Findings:
+
+```text
+  High     disabled, but an enabled automation rule runs it; no
+           Microsoft Sentinel Automation Contributor on its resource
+           group, so Sentinel can't run it; an automation rule runs a
+           playbook that isn't there (State Missing)
+  Medium   runs that failed in the period
+  Low      its Sentinel connection signs in as an account rather
+           than a managed identity; no live automation rule runs it
+```
+
+SentinelCanRun counts any assignment of the role on the resource group
+or above: checking it is Sentinel's own principal would need
+Microsoft Graph. A playbook can also be started by hand from an
+incident, so one no rule runs isn't necessarily unused.
+
+Needs Microsoft Sentinel Reader on the workspace and Reader (or Logic
+App Operator) on the playbooks.
+
+## EXAMPLES
+
+### Example 1
+
+```powershell
+Connect-AAC
+Get-AACSentinelPlaybook -WorkspaceId 'law-contoso-sentinel'
+```
+
+Every Sentinel playbook, the ones with findings first.
+
+### Example 2
+
+```powershell
+Get-AACSentinelPlaybook -WorkspaceId 'law-contoso-sentinel' -Days 30 -NoDisplay | Where-Object Failed -GT 0 | Select-Object Name, Runs, Failed, LastError
+```
+
+The playbooks that failed in the last 30 days, and why.
+
+### Example 3
+
+```powershell
+Get-AACSentinelPlaybook -WorkspaceId 'law-contoso-sentinel' -Trigger Incident -HtmlPath .\out\Playbooks.html
+```
+
+The incident-triggered playbooks, as an interactive HTML report.
+
+## PARAMETERS
+
+### -CsvPath
+
+Write the playbooks to this CSV file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Days
+
+How far back to read the runs: 1 to 90 days, 7 by default.
+
+```yaml
+Type: System.Int32
+DefaultValue: 7
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -HtmlPath
+
+Write an interactive HTML report to this file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Name
+
+Only playbooks whose name matches; wildcards work.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoDisplay
+
+Return the playbooks without showing the view.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoPaging
+
+Show the whole view at once instead of a page at a time.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PassThru
+
+Show the view and also return the playbooks.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PdfPath
+
+Write a PDF report to this file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ResourceGroupName
+
+Narrows a workspace given by name, when the name is in more than one
+resource group.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -SubscriptionId
+
+Where to look for the workspace, if given by ID or name, and for the
+playbooks. Every subscription the account can see by default.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Title
+
+The HTML and PDF reports' title.
+
+```yaml
+Type: System.String
+DefaultValue: "'Microsoft Sentinel playbooks'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Trigger
+
+Only playbooks with these triggers (Incident, Alert, Entity).
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -WorkspaceId
+
+The workspace: its workspace ID (GUID), resource ID or name.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases:
+- Workspace
+- WorkspaceName
+- ResourceId
+ParameterSets:
+- Name: (All)
+  Position: 0
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### CommonParameters
+
+This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable,
+-InformationAction, -InformationVariable, -OutBuffer, -OutVariable, -PipelineVariable,
+-ProgressAction, -Verbose, -WarningAction, and -WarningVariable. For more information, see
+[about_CommonParameters](https://go.microsoft.com/fwlink/?LinkID=113216).
+
+## INPUTS
+
+## OUTPUTS
+
+### AAC.SentinelPlaybook (piped onward, or with -PassThru or -NoDisplay)
+
+## NOTES
+
+## RELATED LINKS
+
+- [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACSentinelPlaybook.md)
+- [about_Azure.Admin.Console](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md)
+
+<!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACSentinelThreatIntelligence.md -->
+
+# Get-AACSentinelThreatIntelligence
+
+## SYNOPSIS
+
+Summarises the threat intelligence in a Microsoft Sentinel workspace - indicators by source and type: how many, active, expired or about to expire, confidence, when each feed last updated - and whether any analytics rule matches on them. -Indicator lists the indicators themselves.
+
+## SYNTAX
+
+### __AllParameterSets
+
+```
+Get-AACSentinelThreatIntelligence [-WorkspaceId] <string> [-SubscriptionId <string[]>]
+ [-ResourceGroupName <string>] [-Days <int>] [-Indicator] [-Source <string[]>]
+ [-IndicatorType <string[]>] [-Value <string[]>] [-IncludeExpired] [-Limit <int>]
+ [-StaleAfterDays <int>] [-CsvPath <string>] [-HtmlPath <string>] [-PdfPath <string>]
+ [-Title <string>] [-PassThru] [-NoDisplay] [-NoPaging]
+```
+
+## ALIASES
+
+This command has no aliases.
+
+## DESCRIPTION
+
+Reads the workspace - read-only, nothing is changed - from:
+
+```text
+  the workspace itself     KQL: ThreatIntelIndicators (STIX, current)
+                           and ThreatIntelligenceIndicator (legacy),
+                           each indicator's latest record in -Days
+  Azure Resource Manager   the data connectors and analytics rules
+```
+
+By default, a row per source and indicator type (AAC.SentinelThreat
+IntelSource): Source, IndicatorType, Indicators, Active, Expired,
+ExpiringSoon (within 7 days), AverageConfidence, LowConfidence (below
+50), LastUpdated, DaysSinceUpdate, Findings and Table. Findings: no
+update for longer than -StaleAfterDays (a feed that stopped), none
+active, mostly low confidence.
+
+With -Indicator, the indicators (AAC.SentinelThreatIndicator), newest
+first, at most -Limit from each table: Value, IndicatorType, Source,
+Confidence, Active, ValidFrom, ValidUntil, LastUpdated, Name, Tags,
+Description, Table and Id. Expired ones are left out unless
+-IncludeExpired.
+
+The view also says when no indicators arrive, when no enabled rule
+reads the threat intelligence tables, when rules still read the
+legacy table that has no data, and when a threat intelligence
+connector is disconnected.
+
+Needs Log Analytics Reader and Microsoft Sentinel Reader on the
+workspace.
+
+## EXAMPLES
+
+### Example 1
+
+```powershell
+Connect-AAC
+Get-AACSentinelThreatIntelligence -WorkspaceId 'law-contoso-sentinel'
+```
+
+Indicators by source and type, stale feeds first.
+
+### Example 2
+
+```powershell
+Get-AACSentinelThreatIntelligence -WorkspaceId 'law-contoso-sentinel' -Indicator -IndicatorType ipv4-addr -Value '203.0.113.*'
+```
+
+The active IP indicators in a range.
+
+### Example 3
+
+```powershell
+Get-AACSentinelThreatIntelligence -WorkspaceId 'law-contoso-sentinel' -Indicator -Source 'Microsoft Defender*' -CsvPath .\out\Indicators.csv
+```
+
+One feed's active indicators, to CSV.
+
+## PARAMETERS
+
+### -CsvPath
+
+Write the rows to this CSV file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Days
+
+How far back to look for indicator records: 1 to 365 days, 30 by
+default. Feeds refresh their indicators, so 30 days holds the current
+ones.
+
+```yaml
+Type: System.Int32
+DefaultValue: 30
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -HtmlPath
+
+Write an interactive HTML report to this file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -IncludeExpired
+
+With -Indicator: also list expired and inactive indicators.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Indicator
+
+List the indicators rather than the summary.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -IndicatorType
+
+Only these indicator types (ipv4-addr, ipv6-addr, domain-name, url,
+file, email-addr...); wildcards work.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Limit
+
+With -Indicator: read at most this many from each table, newest first:
+5,000 by default.
+
+```yaml
+Type: System.Int32
+DefaultValue: 5000
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoDisplay
+
+Return the rows without showing the view.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoPaging
+
+Show the whole view at once instead of a page at a time.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PassThru
+
+Show the view and also return the rows.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PdfPath
+
+Write a PDF report to this file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ResourceGroupName
+
+Narrows a workspace given by name, when the name is in more than one
+resource group.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Source
+
+Only these sources; wildcards work.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -StaleAfterDays
+
+Call a source stale when it hasn't updated an indicator for longer
+than this: 7 days by default.
+
+```yaml
+Type: System.Int32
+DefaultValue: 7
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -SubscriptionId
+
+Where to look for a workspace given by ID (GUID) or name. Every
+subscription the account can see by default.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Title
+
+The HTML and PDF reports' title.
+
+```yaml
+Type: System.String
+DefaultValue: "'Microsoft Sentinel threat intelligence'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Value
+
+With -Indicator: only indicators whose value matches; wildcards work.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -WorkspaceId
+
+The workspace: its workspace ID (GUID), resource ID or name.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases:
+- Workspace
+- WorkspaceName
+- ResourceId
+ParameterSets:
+- Name: (All)
+  Position: 0
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### CommonParameters
+
+This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable,
+-InformationAction, -InformationVariable, -OutBuffer, -OutVariable, -PipelineVariable,
+-ProgressAction, -Verbose, -WarningAction, and -WarningVariable. For more information, see
+[about_CommonParameters](https://go.microsoft.com/fwlink/?LinkID=113216).
+
+## INPUTS
+
+## OUTPUTS
+
+### AAC.SentinelThreatIntelSource, or AAC.SentinelThreatIndicator with -Indicator (piped onward, or with -PassThru or -NoDisplay)
+
+## NOTES
+
+## RELATED LINKS
+
+- [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACSentinelThreatIntelligence.md)
+- [about_Azure.Admin.Console](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md)
+
+<!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACSentinelWatchlist.md -->
+
+# Get-AACSentinelWatchlist
+
+## SYNOPSIS
+
+Lists the watchlists on a Microsoft Sentinel workspace - how many items each holds, which analytics rules and hunting queries use it, when it was last updated and by whom - with the empty, unused, stale and failed ones called out.
+
+## SYNTAX
+
+### __AllParameterSets
+
+```
+Get-AACSentinelWatchlist [-WorkspaceId] <string> [-SubscriptionId <string[]>]
+ [-ResourceGroupName <string>] [-Name <string[]>] [-StaleAfterDays <int>] [-CsvPath <string>]
+ [-HtmlPath <string>] [-PdfPath <string>] [-Title <string>] [-PassThru] [-NoDisplay] [-NoPaging]
+```
+
+## ALIASES
+
+This command has no aliases.
+
+## DESCRIPTION
+
+Reads the workspace - read-only, nothing is changed - from:
+
+```text
+  Azure Resource Manager   the watchlists, the analytics rules and the
+                           saved searches (hunting queries)
+  the workspace itself     KQL: the Watchlist table, for the items in
+                           each watchlist now (deleted items left out)
+```
+
+Each watchlist: Name, Alias, Items, SearchKey, Rules and
+HuntingQueries (how many enabled rules and hunting queries call
+_GetWatchlist with its alias), UsedBy (their names), Findings,
+Provider, Source, SourceType, Labels, ItemExpiry, Created, CreatedBy,
+Updated, UpdatedBy, DaysSinceUpdate, Description and WatchlistId.
+
+Findings:
+
+```text
+  Upload failed            the watchlist didn't finish provisioning
+  No items                 nothing to match against
+  Unused                   no enabled rule or hunting query calls
+                           _GetWatchlist with its alias (one reading
+                           the Watchlist table directly isn't counted)
+  Not updated for N days   over -StaleAfterDays (180): a list of VIPs,
+                           service accounts or IP ranges goes out of
+                           date
+```
+
+Needs Microsoft Sentinel Reader on the workspace (and Log Analytics
+Reader for the item counts).
+
+## EXAMPLES
+
+### Example 1
+
+```powershell
+Connect-AAC
+Get-AACSentinelWatchlist -WorkspaceId 'law-contoso-sentinel'
+```
+
+Every watchlist, the ones with findings first.
+
+### Example 2
+
+```powershell
+Get-AACSentinelWatchlist -WorkspaceId 'law-contoso-sentinel' -NoDisplay | Where-Object Findings -Match 'Unused'
+```
+
+The watchlists nothing uses.
+
+### Example 3
+
+```powershell
+Get-AACSentinelWatchlist -WorkspaceId 'law-contoso-sentinel' -StaleAfterDays 90 -HtmlPath .\out\Watchlists.html
+```
+
+The watchlists, calling stale any not updated for 90 days, as an HTML report.
+
+## PARAMETERS
+
+### -CsvPath
+
+Write the watchlists to this CSV file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -HtmlPath
+
+Write an interactive HTML report to this file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Name
+
+Only watchlists whose name or alias matches; wildcards work.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoDisplay
+
+Return the watchlists without showing the view.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoPaging
+
+Show the whole view at once instead of a page at a time.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PassThru
+
+Show the view and also return the watchlists.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PdfPath
+
+Write a PDF report to this file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ResourceGroupName
+
+Narrows a workspace given by name, when the name is in more than one
+resource group.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -StaleAfterDays
+
+Call a watchlist stale when nothing in it changed for longer than
+this: 180 days by default.
+
+```yaml
+Type: System.Int32
+DefaultValue: 180
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -SubscriptionId
+
+Where to look for a workspace given by ID (GUID) or name. Every
+subscription the account can see by default.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Title
+
+The HTML and PDF reports' title.
+
+```yaml
+Type: System.String
+DefaultValue: "'Microsoft Sentinel watchlists'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -WorkspaceId
+
+The workspace: its workspace ID (GUID), resource ID or name.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases:
+- Workspace
+- WorkspaceName
+- ResourceId
+ParameterSets:
+- Name: (All)
+  Position: 0
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### CommonParameters
+
+This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable,
+-InformationAction, -InformationVariable, -OutBuffer, -OutVariable, -PipelineVariable,
+-ProgressAction, -Verbose, -WarningAction, and -WarningVariable. For more information, see
+[about_CommonParameters](https://go.microsoft.com/fwlink/?LinkID=113216).
+
+## INPUTS
+
+## OUTPUTS
+
+### AAC.SentinelWatchlist (piped onward, or with -PassThru or -NoDisplay)
+
+## NOTES
+
+## RELATED LINKS
+
+- [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Get-AACSentinelWatchlist.md)
 - [about_Azure.Admin.Console](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md)
 
 <!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACServicePrincipalInsight.md -->
@@ -44699,6 +48863,512 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 ## RELATED LINKS
 
 - [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Test-AACPolicyDeployment.md)
+- [about_Azure.Admin.Console](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md)
+
+<!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Test-AACSentinelRuleQuery.md -->
+
+# Test-AACSentinelRuleQuery
+
+## SYNOPSIS
+
+Replays Microsoft Sentinel analytics rule queries - or a query you are writing - over their last run windows, to see how many results each run returns, whether it would alert and how often, and whether the columns the rule maps exist, before enabling or changing a rule.
+
+## SYNTAX
+
+### Rule (Default)
+
+```
+Test-AACSentinelRuleQuery [-WorkspaceId] <string> [-SubscriptionId <string[]>]
+ [-ResourceGroupName <string>] [-Name <string[]>] [-RuleId <string[]>] [-Runs <int>]
+ [-CsvPath <string>] [-HtmlPath <string>] [-PdfPath <string>] [-Title <string>] [-PassThru]
+ [-NoDisplay] [-NoPaging]
+```
+
+### Query
+
+```
+Test-AACSentinelRuleQuery [-WorkspaceId] <string> -Query <string> [-SubscriptionId <string[]>]
+ [-ResourceGroupName <string>] [-Frequency <string>] [-Period <string>] [-TriggerOperator <string>]
+ [-TriggerThreshold <int>] [-Runs <int>] [-CsvPath <string>] [-HtmlPath <string>]
+ [-PdfPath <string>] [-Title <string>] [-PassThru] [-NoDisplay] [-NoPaging]
+```
+
+## ALIASES
+
+This command has no aliases.
+
+## DESCRIPTION
+
+For each scheduled or NRT rule, runs its KQL in the workspace over the
+last -Runs windows as Sentinel would schedule them: each window ends
+one query frequency before the next and looks back the query period.
+Read-only: the rule isn't changed and no alert is raised.
+
+Each rule (AAC.SentinelRuleQueryTest): Name, Status (Error, Warning,
+Alerting or Quiet), Kind, Enabled, Frequency, Period, Trigger,
+Grouping, Runs, RunsAlerting, LatestResults, AverageResults,
+MaxResults, EstimatedAlerts (over the runs tested), Findings,
+MissingColumns, Columns, Error, Note, RuleId, Sample (up to 5 rows of
+the latest window), RunDetail (each window: start, end, results,
+whether it would alert) and Query.
+
+Findings: the query fails; columns the rule maps for entities, custom
+details or alert overrides aren't in its results; a look-back over 14
+days; a frequency longer than the look-back; alerting in every run
+tested; reaching 150 alerts in a run; over 10,000 characters;
+searching every table.
+
+A query that calls ago() or now() counts from when it runs, so only
+its latest window is tested. NRT rules are tested in 1-hour windows.
+Each window is a query against the workspace and its cost: test a few
+rules at a time.
+
+Rules come from -Name, from the pipeline (Get-AACSentinelAnalyticsRule
+output), or, with neither, every enabled scheduled and NRT rule.
+-Query tests a query that isn't a rule yet.
+
+Needs Microsoft Sentinel Reader and Log Analytics Reader on the
+workspace.
+
+## EXAMPLES
+
+### Example 1
+
+```powershell
+Connect-AAC
+Test-AACSentinelRuleQuery -WorkspaceId 'law-contoso-sentinel' -Name 'Rare admin sign-in'
+```
+
+One rule's last 6 runs replayed: results, alerts and findings.
+
+### Example 2
+
+```powershell
+Get-AACSentinelAnalyticsRule -WorkspaceId 'law-contoso-sentinel' -State Disabled -Kind Scheduled -NoDisplay | Test-AACSentinelRuleQuery -WorkspaceId 'law-contoso-sentinel' -Runs 24
+```
+
+What the disabled scheduled rules would have done over their last 24 runs.
+
+### Example 3
+
+```powershell
+Test-AACSentinelRuleQuery -WorkspaceId 'law-contoso-sentinel' -Query 'SigninLogs | where ResultType == "50126"' -Frequency PT5M -Period PT1H -TriggerThreshold 10 -Runs 12
+A query you are writing, as a rule that runs every 5 minutes.
+```
+
+### Example 4
+
+```powershell
+(Test-AACSentinelRuleQuery -WorkspaceId 'law-contoso-sentinel' -Name 'Brute force*' -NoDisplay).RunDetail
+```
+
+Each replayed window of a rule: when, how many results, alert or not.
+
+## PARAMETERS
+
+### -CsvPath
+
+Write the results to this CSV file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Frequency
+
+With -Query: how often it would run, as an ISO 8601 duration (PT1H by
+default).
+
+```yaml
+Type: System.String
+DefaultValue: "'PT1H'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: Query
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -HtmlPath
+
+Write an interactive HTML report to this file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Name
+
+The rules to test, by display name or rule ID; wildcards work.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: true
+Aliases: []
+ParameterSets:
+- Name: Rule
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoDisplay
+
+Return the results without showing the view.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -NoPaging
+
+Show the whole view at once instead of a page at a time.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PassThru
+
+Show the view and also return the results.
+
+```yaml
+Type: System.Management.Automation.SwitchParameter
+DefaultValue: False
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -PdfPath
+
+Write a PDF report to this file.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Period
+
+With -Query: how far back each run would look (PT1H by default).
+
+```yaml
+Type: System.String
+DefaultValue: "'PT1H'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: Query
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Query
+
+A KQL query to test instead of a rule.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: Query
+  Position: Named
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -ResourceGroupName
+
+Narrows a workspace given by name, when the name is in more than one
+resource group.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -RuleId
+
+The rules to test, by rule ID. Takes RuleId from the pipeline, so
+Get-AACSentinelAnalyticsRule's output can be piped in.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: Rule
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: true
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Runs
+
+How many of the latest run windows to replay: 1 to 48, 6 by default.
+
+```yaml
+Type: System.Int32
+DefaultValue: 6
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -SubscriptionId
+
+Where to look for a workspace given by ID (GUID) or name. Every
+subscription the account can see by default.
+
+```yaml
+Type: System.String[]
+DefaultValue: None
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -Title
+
+The HTML and PDF reports' title.
+
+```yaml
+Type: System.String
+DefaultValue: "'Microsoft Sentinel rule query test'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: (All)
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -TriggerOperator
+
+With -Query: GreaterThan (the default), LessThan, Equal or NotEqual.
+
+```yaml
+Type: System.String
+DefaultValue: "'GreaterThan'"
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: Query
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -TriggerThreshold
+
+With -Query: the result count the operator compares with (0 by
+default).
+
+```yaml
+Type: System.Int32
+DefaultValue: 0
+SupportsWildcards: false
+Aliases: []
+ParameterSets:
+- Name: Query
+  Position: Named
+  IsRequired: false
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### -WorkspaceId
+
+The workspace: its workspace ID (GUID), resource ID or name.
+
+```yaml
+Type: System.String
+DefaultValue: None
+SupportsWildcards: false
+Aliases:
+- Workspace
+- WorkspaceName
+ParameterSets:
+- Name: (All)
+  Position: 0
+  IsRequired: true
+  ValueFromPipeline: false
+  ValueFromPipelineByPropertyName: false
+  ValueFromRemainingArguments: false
+DontShow: false
+AcceptedValues: []
+HelpMessage: ''
+```
+
+### CommonParameters
+
+This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable,
+-InformationAction, -InformationVariable, -OutBuffer, -OutVariable, -PipelineVariable,
+-ProgressAction, -Verbose, -WarningAction, and -WarningVariable. For more information, see
+[about_CommonParameters](https://go.microsoft.com/fwlink/?LinkID=113216).
+
+## INPUTS
+
+## OUTPUTS
+
+### AAC.SentinelRuleQueryTest (piped onward, or with -PassThru or -NoDisplay)
+
+## NOTES
+
+## RELATED LINKS
+
+- [Online version](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/Test-AACSentinelRuleQuery.md)
 - [about_Azure.Admin.Console](https://github.com/ChendrayanV/Azure.Admin.Console/blob/main/docs/about_Azure.Admin.Console.md)
 
 <!-- Source: https://raw.githubusercontent.com/ChendrayanV/Azure.Admin.Console/main/docs/Get-AACApplicationPermission.md -->
