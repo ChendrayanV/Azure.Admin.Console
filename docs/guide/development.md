@@ -141,8 +141,8 @@ area (Core first), for a faster import.
 2. Commit, then push a tag that matches the version:
 
    ```powershell
-   git tag -a v0.15.1 -m "Azure.Admin.Console v0.15.1"
-   git push origin v0.15.1
+   git tag -a v0.15.2 -m "Azure.Admin.Console v0.15.2"
+   git push origin v0.15.2
    ```
 
 **Pre-releases.** A `Prerelease` value in the manifest's `PSData` (for

@@ -15,7 +15,7 @@ Plain REST. No Az or Microsoft.Graph modules. Read-only by default.
 [![License: MIT](https://img.shields.io/badge/license-MIT-7B61FF.svg)](LICENSE)
 [![Sponsor](https://img.shields.io/github/sponsors/ChendrayanV?label=Sponsor&logo=githubsponsors&color=EA4AAA)](https://github.com/sponsors/ChendrayanV)
 
-[How to use it](#how-to-use-it) · [What's new](#whats-new-in-0150) · [Architecture design](#architecture-design) · [Commands](#whats-inside) · [Full guide](GUIDE.md) · [Contribute](#contributing) · [Contact](#contact)
+[How to use it](#how-to-use-it) · [What's new](#whats-new-in-0152) · [Architecture design](#architecture-design) · [Commands](#whats-inside) · [Full guide](GUIDE.md) · [Contribute](#contributing) · [Contact](#contact)
 
 </div>
 
@@ -30,82 +30,87 @@ Plain REST. No Az or Microsoft.Graph modules. Read-only by default.
 | **Azure administrator** | Health, inventory, locks, diagnostics and errors - one command each |
 | **Platform / cloud engineer** | Assessments for AKS, networks, storage, Cosmos DB, Service Bus, Log Analytics, WAF and ALZ |
 | **Security and compliance** | Defender, Azure Policy, attack paths, access reviews, legacy authentication, NSGs |
+| **SOC / Sentinel engineer** | Incidents, alerts, analytics rules tested and kept as code, connector and threat intelligence health, playbooks, watchlists, Content hub |
 | **FinOps** | Costs, anomalies, unused and under-used resources, Advisor savings |
 | **Solution architect** | A guided design - patterns, components, policy checks, draw.io and Mermaid diagrams, decision records - before anything is deployed |
 | **Microsoft 365 / Entra admin** | Tenant assessment, nested group membership, application permissions |
 | **DevOps team** | An Azure DevOps assessment: pipelines, tools, SBOM, security, DORA - and a plan to move to GitHub |
 | **Consultant** | Hand-over-ready HTML, PDF and CSV reports from a read-only sign-in |
 
-## What's new in 0.15.0
+## What's new in 0.15.2
 
-Click a tab to open it.
+Microsoft Sentinel, day to day. `Invoke-AACSentinelAssessment` already gave the whole picture; ten new commands answer the questions a SOC asks every day, each with its own filters, objects that pipe on, and CSV, HTML and PDF reports. Click a tab to open it.
 
 <details open>
-<summary><b>🧭 Plan a service before you deploy it</b> &nbsp;·&nbsp; <i><code>New-AACServiceBlueprint</code></i></summary>
+<summary><b>🚨 Incidents and alerts</b> &nbsp;·&nbsp; <i><code>Get-AACSentinelIncident</code> · <code>Get-AACSentinelAlert</code></i></summary>
 
 <br>
 
-Any service in Azure's list, planned in one command: names that follow your naming rules, the Azure Policy that would apply, PSRule for Azure on the planned configuration, and the alerts and resiliency recommendations it should have. You get a console view, an HTML map, an editable draw.io file and a PDF. Function App, storage, Event Hubs and Event Grid work without signing in.
+What is open, who owns it and how long it has waited; which incidents were false positives, and which rules raised them. Alerts come from the workspace's `SecurityAlert` table, so every connected product is there (Defender XDR, Defender for Cloud, Entra ID Protection and Sentinel's own rules), with the hosts, accounts and IP addresses split out, the incident each alert is in, and the ones that keep coming back.
 
 ```powershell
-New-AACServiceBlueprint -Service FunctionApp, StorageAccount, 'Virtual Network' -SubscriptionId $sub -Workload orders -Environment prod -OutputFormat DrawIo, Html -Path .\out
+Get-AACSentinelIncident -WorkspaceId 'law-sentinel' -Severity High -Unassigned
+Get-AACSentinelAlert -WorkspaceId 'law-sentinel' -IncidentNumber 4211 -NoDisplay | Select-Object Alert, Accounts, Hosts, IpAddresses
 ```
 
 </details>
 
 <details>
-<summary><b>🏗️ Landing zone checklist and resiliency, checked</b> &nbsp;·&nbsp; <i><code>Invoke-AACLandingZoneAssessment</code> · <code>Invoke-AACResiliencyAssessment</code></i></summary>
+<summary><b>🎯 Analytics rules: in place, tested, exported</b> &nbsp;·&nbsp; <i><code>Get-AACSentinelAnalyticsRule</code> · <code>Test-AACSentinelRuleQuery</code> · <code>Export-AACSentinelAnalyticsRule</code></i></summary>
 
 <br>
 
-The Azure Landing Zone checklist and the Azure Proactive Resiliency Library, run against your estate with Resource Graph. Each check's status says what its evidence can bear. Checks a query can't answer are listed as Manual, never counted as a pass, so neither command gives a score.
+Every rule with its failed runs, the incidents it raised and how many were false positives, whether its template has moved on, and the MITRE ATT&CK coverage of the enabled ones. Before enabling or changing a rule, replay its query over its last run windows: results per run, whether it would alert, and whether the columns it maps exist. Then keep the rules as code: one ARM template per rule, written the same way every time, so a commit shows only what changed.
 
 ```powershell
-Invoke-AACLandingZoneAssessment -ManagementGroupId 'mg-landingzones' -HtmlPath .\landing-zone.html
-Invoke-AACResiliencyAssessment -SubscriptionId $sub -Impact High -Status Fail
+Get-AACSentinelAnalyticsRule -WorkspaceId 'law-sentinel' -State Enabled -Failing
+Test-AACSentinelRuleQuery -WorkspaceId 'law-sentinel' -Name 'Rare admin sign-in' -Runs 24
+Export-AACSentinelAnalyticsRule -WorkspaceId 'law-sentinel' -Path .\sentinel -IncludeAutomationRule -Force
 ```
 
 </details>
 
 <details>
-<summary><b>☸️ Inside your AKS clusters</b> &nbsp;·&nbsp; <i><code>Invoke-AACAksAssessment -IncludeWorkload</code></i></summary>
+<summary><b>📡 Is the data arriving?</b> &nbsp;·&nbsp; <i><code>Get-AACSentinelDataConnector</code> · <code>Get-AACSentinelThreatIntelligence</code></i></summary>
 
 <br>
 
-49 checks on what runs in each cluster, read with AKS run command: failing and restarting pods, requests, probes, disruption budgets, privileged and host access, RBAC, public services. It also says whether the workloads could move to AKS Automatic. Secrets and ConfigMaps are never read. The assessment itself has about 20 more checks, so scores can drop from 0.14.9.
+Each connector Failing, Disconnected, without data, Silent, Delayed or Healthy, and, with `-View Table`, how late records arrive in each table (including agent-fed sources like Windows events, Syslog and CEF). Threat indicators by source and type: active, expiring, confidence, feeds that stopped, and whether any rule matches on them at all.
 
 ```powershell
-Invoke-AACAksAssessment -Name 'aks-prod-weu' -IncludeWorkload -HtmlPath .\aks.html
+Get-AACSentinelDataConnector -WorkspaceId 'law-sentinel' -View Table
+Get-AACSentinelThreatIntelligence -WorkspaceId 'law-sentinel'
 ```
 
 </details>
 
 <details>
-<summary><b>✅ Accepted findings, and what changed</b> &nbsp;·&nbsp; <i><code>-SuppressionFile</code> · <code>-PreviousPath</code></i></summary>
+<summary><b>🤖 Playbooks, watchlists and Content hub</b> &nbsp;·&nbsp; <i><code>Get-AACSentinelPlaybook</code> · <code>Get-AACSentinelWatchlist</code> · <code>Get-AACSentinelContentHub</code></i></summary>
 
 <br>
 
-Mark findings you have accepted, with a reason and an expiry date, and they leave the counts but stay visible in the report. Compare with last month's run to see what is new, still open or resolved. Available in the AKS, Microsoft 365, Azure DevOps, landing zone and resiliency assessments.
+Playbooks with the automation rules that run them, their failed runs, and whether Sentinel may run them at all; disabled or missing playbooks a live rule still calls. Watchlists that are empty, unused, stale or failed. Solutions with an update waiting, deprecated ones, and ones installed for detections that have none turned on.
 
 ```powershell
-Invoke-AACM365Assessment -CsvPath .\m365-november -PreviousPath .\m365-october -SuppressionFile .\accepted.json
+Get-AACSentinelPlaybook -WorkspaceId 'law-sentinel' -Days 30
+Get-AACSentinelContentHub -WorkspaceId 'law-sentinel' -UpdateAvailable
 ```
 
 </details>
 
 <details>
-<summary><b>➕ And more</b> &nbsp;·&nbsp; <i>quota, Conditional Access, pipeline minutes, baseline alerts</i></summary>
+<summary><b>➕ Also since 0.15.0</b> &nbsp;·&nbsp; <i>0.15.1: managed identities, Application Insights, hub and spoke designs</i></summary>
 
 <br>
 
-- `Test-AACAzureLimit -IncludeQuota`: each region's compute, network and storage quota.
-- `Invoke-AACM365Assessment`: four more Conditional Access findings, such as Global Administrators left out of an MFA policy.
-- `Invoke-AACADOAssessment`: pipeline minutes per project, pipelines getting slower, and widely shared service connections.
-- `Get-AACAlertBaseline` and `Get-AACResiliencyRecommendation`: the baseline alerts and resiliency recommendations for a resource type, offline.
+- `Get-AACManagedIdentity`: every managed identity, what it is attached to, its Azure roles and the Microsoft Graph permissions the portal doesn't show.
+- `Invoke-AACApplicationInsightAssessment`: every Application Insights component, as a heat map with findings.
+- `New-AACDesignDiagram`: a hub and spoke design, planned and drawn in draw.io before it is built, offline.
+- `Get-AACSecurityPosture`, `Show-AACResource` and `Get-AACRoleAssignment` are deprecated in favour of `-View` on the commands that already covered them.
 
 </details>
 
-Everything is in the [changelog](CHANGELOG.md), with 0.14.9 and earlier releases.
+The walkthrough is in [the Microsoft Sentinel guide](docs/guide/microsoft-sentinel.md); everything is in the [changelog](CHANGELOG.md).
 ## Architecture design
 
 **Design it before you deploy it, and draw it the way you'll deploy it.** Architecture reviews usually start from a whiteboard sketch that nobody keeps up to date, then find out at deployment that a policy denies it. The Architecture commands turn the conversation into a design: they ask the questions an Azure architect would ask, pick the [cloud design patterns](https://learn.microsoft.com/azure/architecture/patterns/) that fit, lay out the components, check them against the Well-Architected Framework and your landing zone's Azure Policy, and draw the result. The diagram, the findings and the decision records all come from the same model, so they agree.
@@ -155,18 +160,19 @@ Everything except reading the landing zone runs offline, so a design can be revi
 
 ## What's inside
 
-98 commands. Every one gives a **console view**, **objects**, and **CSV, HTML and PDF** reports.
+111 commands. Every one gives a **console view**, **objects**, and **CSV, HTML and PDF** reports.
 
 | Area | Commands |
 |---|---|
-| **Design** | `New-AACServiceBlueprint` 🆕 · `New-AACArchitectureBrief` · `Get-AACArchitecturePattern` · `New-AACArchitectureDesign` · `Test-AACArchitectureDesign` · `New-AACArchitectureDiagram` · `Export-AACArchitectureDecision` |
-| **Assess** | `Invoke-AACTenantAssessment` · `Invoke-AACWafAssessment` · `Invoke-AACGovernanceAssessment` · `Invoke-AACPSRule` · `Test-AACGoLiveReadiness` · `Invoke-AACLandingZoneAssessment` 🆕 · `Invoke-AACResiliencyAssessment` 🆕 · `Invoke-AACAksAssessment` · `Invoke-AACFunctionAppAssessment` and 12 more |
+| **Design** | `New-AACServiceBlueprint` · `New-AACArchitectureBrief` · `Get-AACArchitecturePattern` · `New-AACArchitectureDesign` · `Test-AACArchitectureDesign` · `New-AACArchitectureDiagram` · `Export-AACArchitectureDecision` |
+| **Assess** | `Invoke-AACTenantAssessment` · `Invoke-AACWafAssessment` · `Invoke-AACGovernanceAssessment` · `Invoke-AACPSRule` · `Test-AACGoLiveReadiness` · `Invoke-AACLandingZoneAssessment` · `Invoke-AACResiliencyAssessment` · `Invoke-AACAksAssessment` · `Invoke-AACFunctionAppAssessment` and 12 more |
 | **See** | `Show-AACDashboard` · `Get-AACInventory` · `Show-AACResourceMap` · `Show-AACNetworkTopology` · `Get-AACDependencyGraph` |
 | **Cost** | `Show-AACCost` · `Get-AACCostAnomaly` · `Get-AACUnusedResource` · `Get-AACResourceUtilization` · `Get-AACAdvisorRecommendation` |
-| **Secure** | `Get-AACSecurityPosture` · `Get-AACAttackPath` · `Get-AACAccessReview` · `Get-AACNetworkSecurityGroup` · `Get-AACLegacyAuthentication` |
+| **Secure** | `Invoke-AACDefenderAssessment` · `Get-AACAttackPath` · `Get-AACManagedIdentity` · `Get-AACAccessReview` · `Get-AACNetworkSecurityGroup` · `Get-AACLegacyAuthentication` |
+| **Sentinel** | `Invoke-AACSentinelAssessment` · `Get-AACSentinelIncident` 🆕 · `Get-AACSentinelAlert` 🆕 · `Get-AACSentinelAnalyticsRule` 🆕 · `Test-AACSentinelRuleQuery` 🆕 · `Export-AACSentinelAnalyticsRule` 🆕 · `Get-AACSentinelDataConnector` 🆕 · `Get-AACSentinelThreatIntelligence` 🆕 · `Get-AACSentinelPlaybook` 🆕 · `Get-AACSentinelWatchlist` 🆕 · `Get-AACSentinelContentHub` 🆕 · hunting queries |
 | **Plan IPs** | `Get-AACIPAMReport` - your address plan, every IP address, overlaps and the next free ranges |
 | **Govern** | `Show-AACEffectivePolicy` · `Test-AACPolicyDeployment` · `Get-AACPolicyState` · `Get-AACComplianceGap` · `Get-AACConfigurationDrift` · `Get-AACResourceLock` · `Test-AACAzureLimit` |
-| **Operate** | `Get-AACResourceHealth` · `Get-AACChangeHistory` · `Get-AACResourceError` · `Invoke-AACHealthCheck` · `Get-AACFailoverReadiness` · `Invoke-AACActivityLogAssessment` · `Show-AACActivityLogEvent` · `Show-AACServiceBusEntity` · `Get-AACAlertBaseline` 🆕 |
+| **Operate** | `Get-AACResourceHealth` · `Get-AACChangeHistory` · `Get-AACResourceError` · `Invoke-AACHealthCheck` · `Get-AACFailoverReadiness` · `Invoke-AACActivityLogAssessment` · `Show-AACActivityLogEvent` · `Show-AACServiceBusEntity` · `Get-AACAlertBaseline` |
 | **Microsoft 365** | `Invoke-AACM365Assessment` · `Get-AACEntraGroupMembership` · `Get-AACApplicationPermission` · `New-AACApplicationPermission` |
 | **Azure DevOps** | `Invoke-AACADOAssessment` |
 | **Build** | `Export-AACTerraform` · `Get-AACTerraformPlan` · `Deploy-AACStorageAccount` |
@@ -194,7 +200,7 @@ The same switches work everywhere:
 | `Get-Help <command> -Full` | The permissions it needs, and examples |
 
 PowerShell 7.2+ on Windows, Linux and macOS. PDF reports need Windows and PowerShell 7.4+.
-Only `Deploy-AACStorageAccount` and `New-AACApplicationPermission` change anything in Azure or Entra ID, and both support `-WhatIf`.
+Only `Deploy-AACStorageAccount`, `Deploy-AACSentinelHuntingQuery` and `New-AACApplicationPermission` change anything in Azure or Entra ID, and all three support `-WhatIf`.
 
 <a href="https://www.youtube.com/watch?v=xBkStQ1H2OU">Watch the walkthrough on YouTube</a>
 

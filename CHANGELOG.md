@@ -2,6 +2,28 @@
 
 All notable changes to Azure.Admin.Console. Versions before 0.10.0 were never published to the PowerShell Gallery.
 
+## v0.15.2
+
+Microsoft Sentinel, day to day: incidents, alerts and analytics rules; rules tested before they are enabled and kept as code; connector, threat intelligence and playbook health; watchlists and Content hub.
+
+### New
+
+- **Incidents.** `Get-AACSentinelIncident` lists a workspace's incidents: severity, status, owner, classification, MITRE ATT&CK tactics, the rules that raised them, and how long each has been open or took to close. Open incidents of any age by default; closed ones go back 30 days unless `-Days` says otherwise. `-Severity`, `-Owner`, `-Unassigned`, `-Classification`, `-Tactic` and `-Number` filter.
+- **Alerts from every connected product.** `Get-AACSentinelAlert` reads the workspace's `SecurityAlert` table (the latest record of each alert), so Defender XDR, Defender for Cloud, Entra ID Protection and Sentinel's own rules are all there. Hosts, accounts and IP addresses are split out of the entities, and each alert shows the incident it is in. Alerts raised three times or more for one entity are listed as recurring. `-Entity`, `-IncidentNumber` and `-NoIncident` filter; the last 7 days by default.
+- **The analytics rules in place.** `Get-AACSentinelAnalyticsRule` lists every rule with its failed runs (from `_SentinelHealth`), the incidents it raised and how many were false positives, whether its template has a newer version, and the MITRE ATT&CK coverage of the enabled rules. `-State`, `-Kind`, `-Failing` and `-TemplateUpdate` filter.
+- **Rule queries, tested before they go live.** `Test-AACSentinelRuleQuery` replays a rule's KQL over its last run windows (6 by default, up to 48), as Sentinel would schedule them: results per window, whether each run would alert, estimated alerts, and whether the columns the rule maps for entities, custom details and alert overrides are in the results. It also flags a look-back over 14 days, a frequency longer than the look-back, alerting in every run, and reaching 150 alerts in a run. Rules come from `-Name`, from `Get-AACSentinelAnalyticsRule` on the pipeline, or every enabled rule; `-Query` tests KQL that isn't a rule yet. A query using `ago()` or `now()` is tested in its latest window only.
+- **Rules as code.** `Export-AACSentinelAnalyticsRule` writes one ARM deployment template per analytics rule (and per automation rule with `-IncludeAutomationRule`), ready for source control, Sentinel Repositories or another workspace. Properties Azure sets are left out and keys are sorted, so exporting an unchanged rule gives the same file. Existing files are left alone unless `-Force`; `-WhatIf` writes nothing.
+- **Connector health.** `Get-AACSentinelDataConnector` gives each connector a status (Failing, Disconnected, NoData, Silent, Delayed, Unknown or Healthy) from its state, its tables' last data, health failures and how late records arrive. `-View Table` shows ingestion and delay per table, including agent-fed sources that aren't connectors to the API.
+- **Threat intelligence.** `Get-AACSentinelThreatIntelligence` counts indicators by source and type, from `ThreatIntelIndicators` and the legacy `ThreatIntelligenceIndicator`: active, expired, expiring, confidence, and feeds that stopped updating. It says when no enabled rule matches on the indicators, when rules still read the empty legacy table, and when a threat intelligence connector is disconnected. `-Indicator` lists the indicators.
+- **Playbooks.** `Get-AACSentinelPlaybook` finds the Logic Apps with a Sentinel trigger, the automation rules that run them, their runs and failures, and whether Sentinel holds Microsoft Sentinel Automation Contributor on their resource group. It flags disabled or missing playbooks a live rule still runs, and Sentinel connections that sign in as an account rather than a managed identity.
+- **Watchlists.** `Get-AACSentinelWatchlist` lists each watchlist's items, the rules and hunting queries that call `_GetWatchlist` with its alias, and those that are empty, unused, stale or failed to upload.
+- **Content hub.** `Get-AACSentinelContentHub` lists the installed solutions with their version and the latest one, support tier, the templates each brought, and how many of its analytics templates have a rule. It flags updates, deprecated packages, and solutions with no enabled rule. `-IncludeAvailable` adds the rest of the catalog.
+- **A Microsoft Sentinel guide page**, with every Sentinel command and what it answers.
+
+### Changed behaviour
+
+- **`AAC.SentinelIncident` has more properties** in `Invoke-AACSentinelAssessment` too: `Products`, `Techniques`, `Labels`, `FirstActivity`, `LastActivity`, `Description`, `IncidentId` and `RuleIds`. Nothing was removed.
+
 ## v0.15.1
 
 Every managed identity and what it can do, Application Insights assessed, hub and spoke designs drawn before they are built, and three commands folded into the ones that already covered them.
